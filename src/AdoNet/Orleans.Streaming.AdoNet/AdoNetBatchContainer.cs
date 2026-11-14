@@ -6,6 +6,7 @@ namespace Orleans.Streaming.AdoNet;
 /// <remarks>
 /// 1. This class only supports binary serialization as performance and data size is the priority for database storage.
 /// 2. Though the <see cref="SequenceToken"/> is supported here, it is not yet used, as the ADO.NET provider is not rewindable.
+/// 3. The <see cref="SequenceToken"/> holds the queue cache position assigned by the receiver, not the <see cref="MessageId"/>.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
@@ -42,6 +43,14 @@ internal class AdoNetBatchContainer : IBatchContainer
 
     #endregion Serialized State
 
+    [NonSerialized]
+    private long _messageId;
+
+    /// <summary>
+    /// Identifies the stored message for confirmation by the receiving silo.
+    /// </summary>
+    public long MessageId => _messageId;
+
     #region Interface
 
     StreamSequenceToken IBatchContainer.SequenceToken => SequenceToken;
@@ -71,16 +80,17 @@ internal class AdoNetBatchContainer : IBatchContainer
     #region Conversion
 
     /// <summary>
-    /// Creates a new <see cref="AdoNetBatchContainer"/> from the specified <see cref="AdoNetStreamMessage"/>.
+    /// Creates a new <see cref="AdoNetBatchContainer"/> from the specified <see cref="AdoNetStreamMessage"/> at the specified queue cache position.
     /// </summary>
-    public static AdoNetBatchContainer FromMessage(Serializer<AdoNetBatchContainer> serializer, AdoNetStreamMessage message)
+    public static AdoNetBatchContainer FromMessage(Serializer<AdoNetBatchContainer> serializer, AdoNetStreamMessage message, long position)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(message);
 
         // A stored stream message always contains a serialized batch container.
         var container = serializer.Deserialize(message.Payload)!;
-        container.SequenceToken = new(message.MessageId);
+        container.SequenceToken = new(position);
+        container._messageId = message.MessageId;
         container.Dequeued = message.Dequeued;
 
         return container;

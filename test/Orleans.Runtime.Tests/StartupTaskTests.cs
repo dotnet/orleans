@@ -78,7 +78,7 @@ namespace DefaultCluster.Tests
             {
                 private readonly IClusterMembershipService inner;
                 private readonly TaskCompletionSource releaseActiveUpdate = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                private int activeUpdateDelayed;
+                private int activeUpdateClaimed;
                 private int refreshCount;
                 private long staleDirectoryVersion;
                 private long activeDirectoryVersion;
@@ -93,7 +93,7 @@ namespace DefaultCluster.Tests
 
                 public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => this.GetMembershipUpdates();
 
-                public bool ActiveUpdateDelayed => Volatile.Read(ref this.activeUpdateDelayed) != 0;
+                public bool ActiveUpdateDelayed => Volatile.Read(ref this.activeDirectoryVersion) != 0;
 
                 public int RefreshCount => Volatile.Read(ref this.refreshCount);
 
@@ -105,8 +105,8 @@ namespace DefaultCluster.Tests
 
                 public async ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default)
                 {
-                    var staleVersion = Volatile.Read(ref this.staleDirectoryVersion);
-                    if (Volatile.Read(ref this.activeUpdateDelayed) != 0 && minimumVersion.Value > staleVersion)
+                    if (Volatile.Read(ref this.activeDirectoryVersion) != 0
+                        && minimumVersion.Value > Volatile.Read(ref this.staleDirectoryVersion))
                     {
                         Interlocked.Increment(ref this.refreshCount);
                         Interlocked.CompareExchange(ref this.firstRefreshMinimumVersion, minimumVersion.Value, 0);
@@ -124,7 +124,7 @@ namespace DefaultCluster.Tests
                     await foreach (var update in this.inner.MembershipUpdates.WithCancellation(cancellationToken))
                     {
                         if (update.Members.Values.Any(static member => member.Status == SiloStatus.Active)
-                            && Interlocked.CompareExchange(ref this.activeUpdateDelayed, 1, 0) == 0)
+                            && Interlocked.CompareExchange(ref this.activeUpdateClaimed, 1, 0) == 0)
                         {
                             var staleVersion = update.Version.Value - 1;
                             if (staleVersion <= 0)
@@ -136,6 +136,7 @@ namespace DefaultCluster.Tests
                             var joiningMembers = update.Members.ToImmutableDictionary(
                                 static member => member.Key,
                                 static member => new ClusterMember(member.Key, SiloStatus.Joining, member.Value.Name));
+                            // Publish the delayed-view metadata before Refresh can release it.
                             Volatile.Write(ref this.staleDirectoryVersion, staleVersion);
                             Volatile.Write(ref this.activeDirectoryVersion, update.Version.Value);
                             yield return new ClusterMembershipSnapshot(joiningMembers, new(staleVersion));

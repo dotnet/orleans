@@ -20,6 +20,7 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
     private InProcessTestCluster? _cluster;
     private ReminderTestClock? _clock;
     private readonly short _initialSilos = 1;
+    private readonly bool _useVirtualBuckets;
 
     public ReminderServiceLifecycleFixture()
     {
@@ -35,6 +36,11 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
         _initialSilos = initialSilos;
     }
 
+    internal ReminderServiceLifecycleFixture(bool useVirtualBuckets)
+    {
+        _useVirtualBuckets = useVirtualBuckets;
+    }
+
     public ReminderServiceLifecycleHarness Harness { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
@@ -42,8 +48,12 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
         try
         {
             var builder = new InProcessTestClusterBuilder(_initialSilos);
-            builder.ConfigureSilo((_, siloBuilder) =>
-                siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
+            if (!_useVirtualBuckets)
+            {
+                builder.ConfigureSilo((_, siloBuilder) =>
+                    siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
+            }
+
             builder.UseIdealizedReminderTable(
                 configureReminderOptions: options => options.ReminderLoadingWindow = LoadingWindow);
             _clock = ReminderTestClock.Attach(
@@ -133,22 +143,27 @@ public sealed class ReminderServiceLifecycleConformanceTests
     public Task ReminderService_ExactDueRecovery()
         => RunAsync((runner, token) => runner.RunReminderService_ExactDueRecovery(token));
 
-    [Fact]
-    public Task ReminderService_StaleOwnerRegistrationReconciles()
-        => RunAsync((runner, token) => runner.RunReminderService_StaleOwnerRegistrationReconciles(token));
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task ReminderService_StaleOwnerRegistrationReconciles(bool useVirtualBuckets)
+        => RunAsync((runner, token) => runner.RunReminderService_StaleOwnerRegistrationReconciles(token), useVirtualBuckets);
 
-    [Fact]
-    public Task ReminderService_OneSiloJoinLeaveTransfersOwnership()
-        => RunAsync((runner, token) => runner.RunReminderService_OneSiloJoinLeaveTransfersOwnership(token));
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task ReminderService_OneSiloJoinLeaveTransfersOwnership(bool useVirtualBuckets)
+        => RunAsync((runner, token) => runner.RunReminderService_OneSiloJoinLeaveTransfersOwnership(token), useVirtualBuckets);
 
     [Fact]
     public Task ReminderService_CleanupIsIsolated()
         => RunAsync((runner, token) => runner.RunReminderService_CleanupIsIsolated(token));
 
     private static async Task RunAsync(
-        Func<ReminderServiceLifecycleTestRunner, CancellationToken, Task> scenario)
+        Func<ReminderServiceLifecycleTestRunner, CancellationToken, Task> scenario,
+        bool useVirtualBuckets = false)
     {
-        var fixture = new ReminderServiceLifecycleFixture();
+        var fixture = new ReminderServiceLifecycleFixture(useVirtualBuckets);
         await fixture.InitializeAsync();
         try
         {
@@ -310,6 +325,55 @@ public sealed class FaultyReminderServiceLifecycleTests
             });
     }
 
+    [Fact]
+    public Task MissingOwnedIdentityFailsAndCleansUpJoinedSilo()
+    {
+        IReminderServiceLifecycleHarness? original = null;
+        return RunFaultAsync(
+            harness => new LifecycleRunner(
+                new UnownedIdentityHarness(original = harness),
+                "UnownedIdentity"),
+            async (runner, token) =>
+            {
+                var failure = await Assert.ThrowsAsync<ReminderConformanceException>(
+                    () => runner.RunReminderService_OneSiloJoinLeaveTransfersOwnership(token));
+                Assert.Contains("identity selection", failure.Message);
+                Assert.Contains("4096 deterministic candidates", failure.Message);
+                Assert.NotNull(original);
+                Assert.Single(original.ActiveSilos);
+            });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task JoinPreservesExistingSiloHashStorage(bool useVirtualBuckets)
+    {
+        var fixture = new ReminderServiceLifecycleFixture(useVirtualBuckets);
+        await fixture.InitializeAsync();
+        try
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TimeSpan.FromMinutes(2));
+            await fixture.Harness.WaitForStartupReadinessAsync(cancellation.Token);
+            var existing = Assert.Single(fixture.Harness.ActiveSilos);
+            var consistentHash = existing.GetConsistentHashCode();
+            var uniformHashes = existing.GetUniformHashCodes(30);
+
+            var joined = await fixture.Harness.JoinOneSiloAsync(cancellation.Token);
+
+            Assert.NotEqual(existing, joined);
+            Assert.Equal(2, fixture.Harness.ActiveSilos.Count);
+            Assert.Equal(consistentHash, existing.GetConsistentHashCode());
+            Assert.True(uniformHashes.Equals(existing.GetUniformHashCodes(30)));
+        }
+        finally
+        {
+            await fixture.DisposeAsync();
+        }
+    }
+
     private static async Task RunFaultAsync(
         Func<IReminderServiceLifecycleHarness, LifecycleRunner> createRunner,
         Func<LifecycleRunner, CancellationToken, Task> scenario,
@@ -357,7 +421,7 @@ public sealed class FaultyReminderServiceLifecycleTests
         public virtual Task RefreshAsync(CancellationToken cancellationToken) => Inner.RefreshAsync(cancellationToken);
         public virtual Task WaitForOwnerCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => Inner.WaitForOwnerCountAsync(grainId, reminderName, count, cancellationToken);
         public virtual IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName) => Inner.GetOwners(grainId, reminderName);
-        public bool IsOwner(SiloAddress siloAddress, GrainId grainId) => Inner.IsOwner(siloAddress, grainId);
+        public virtual bool IsOwner(SiloAddress siloAddress, GrainId grainId) => Inner.IsOwner(siloAddress, grainId);
         public virtual Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken) => Inner.WaitForScheduleAsync(grainId, reminderName, cancellationToken);
         public virtual int GetLocalStartCount(GrainId grainId, string reminderName) => Inner.GetLocalStartCount(grainId, reminderName);
         public int GetLocalStopCount(GrainId grainId, string reminderName) => Inner.GetLocalStopCount(grainId, reminderName);
@@ -368,6 +432,11 @@ public sealed class FaultyReminderServiceLifecycleTests
         public Task<SiloAddress> JoinOneSiloAsync(CancellationToken cancellationToken) => Inner.JoinOneSiloAsync(cancellationToken);
         public Task LeaveSiloAsync(SiloAddress siloAddress, CancellationToken cancellationToken) => Inner.LeaveSiloAsync(siloAddress, cancellationToken);
         public Task WaitForTopologyReconciliationAsync(CancellationToken cancellationToken) => Inner.WaitForTopologyReconciliationAsync(cancellationToken);
+    }
+
+    private sealed class UnownedIdentityHarness(IReminderServiceLifecycleHarness inner) : DelegatingHarness(inner)
+    {
+        public override bool IsOwner(SiloAddress siloAddress, GrainId grainId) => false;
     }
 
     private sealed class DirectedRegistrationHarness(IReminderServiceLifecycleHarness inner) : DelegatingHarness(inner)

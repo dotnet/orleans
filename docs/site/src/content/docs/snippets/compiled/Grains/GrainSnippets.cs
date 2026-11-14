@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
@@ -286,7 +287,7 @@ public sealed class CacheParticipant : ILifecycleParticipant<IGrainLifecycle>
     public void Participate(IGrainLifecycle lifecycle)
     {
         lifecycle.Subscribe<CacheParticipant>(
-            GrainLifecycleStage.Activate,
+            GrainLifecycleStage.SetupState,
             OnStart,
             OnStop);
     }
@@ -298,6 +299,45 @@ public sealed class CacheParticipant : ILifecycleParticipant<IGrainLifecycle>
         Task.CompletedTask;
 }
     // </lifecycle_participant>
+
+    // <activation_setup>
+public interface ICachedGrain : IGrain;
+
+public sealed class CacheSetupConfigurator(GrainClassMap grainClasses)
+    : IConfigureGrainTypeComponents
+{
+    public void Configure(
+        GrainType grainType,
+        GrainProperties properties,
+        GrainTypeSharedContext shared)
+    {
+        if (grainClasses.TryGetGrainClass(grainType, out Type? grainClass)
+            && typeof(ICachedGrain).IsAssignableFrom(grainClass))
+        {
+            shared.AddActivationSetup(static context =>
+            {
+                CacheParticipant cache = context.ActivationServices
+                    .GetRequiredService<CacheParticipant>();
+                cache.Participate(context.ObservableLifecycle);
+            });
+        }
+    }
+}
+    // </activation_setup>
+
+    internal static class CacheConfiguration
+    {
+        internal static void Configure(ISiloBuilder siloBuilder)
+        {
+            // <activation_setup_registration>
+siloBuilder.ConfigureServices(services =>
+{
+    services.AddScoped<CacheParticipant>();
+    services.AddSingleton<IConfigureGrainTypeComponents, CacheSetupConfigurator>();
+});
+            // </activation_setup_registration>
+        }
+    }
 
     internal sealed class MigratingGrain : Grain
     {

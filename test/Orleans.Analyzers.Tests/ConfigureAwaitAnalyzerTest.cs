@@ -173,6 +173,80 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     /// <summary>
+    /// Verifies that ConfigureAwait(false) in a grain class implementing an IAddressable interface triggers a diagnostic.
+    /// </summary>
+    [Fact]
+    public Task ConfigureAwaitFalse_InGrainClassWithIAddressableInterface_ShouldTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething()
+                        {
+                            await Task.Delay(100).ConfigureAwait(false);
+                        }
+                    }
+
+                    public interface IMyGrain : Orleans.Runtime.IAddressable
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        return VerifyHasDiagnostic(code);
+    }
+
+    /// <summary>
+    /// Verifies that ConfigureAwait(false) in a POCO grain class implementing IGrainBase triggers a diagnostic.
+    /// </summary>
+    [Fact]
+    public Task ConfigureAwaitFalse_InPocoGrainClassImplementingIGrainBase_ShouldTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : IGrainBase, IMyGrain
+                    {
+                        public Orleans.Runtime.IGrainContext GrainContext { get; }
+                        public MyGrain(Orleans.Runtime.IGrainContext context) => GrainContext = context;
+
+                        public async Task DoSomething()
+                        {
+                            await Task.Delay(100).ConfigureAwait(false);
+                        }
+                    }
+
+                    public interface IMyGrain : Orleans.Runtime.IAddressable
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        return VerifyHasDiagnostic(code);
+    }
+
+    /// <summary>
+    /// Verifies that ConfigureAwait(false) in a grain class with GrainType attribute triggers a diagnostic.
+    /// </summary>
+    [Fact]
+    public Task ConfigureAwaitFalse_InGrainClassWithGrainTypeAttribute_ShouldTriggerDiagnostic()
+    {
+        var code = """
+                    [GrainType("my-custom-grain")]
+                    public class MyGrain : IGrainBase
+                    {
+                        public Orleans.Runtime.IGrainContext GrainContext { get; }
+                        public MyGrain(Orleans.Runtime.IGrainContext context) => GrainContext = context;
+
+                        public async Task DoSomething()
+                        {
+                            await Task.Delay(100).ConfigureAwait(false);
+                        }
+                    }
+                    """;
+
+        return VerifyHasDiagnostic(code);
+    }
+
+    /// <summary>
     /// Verifies that ConfigureAwait(false) in a generic grain class triggers a diagnostic.
     /// </summary>
     [Fact]

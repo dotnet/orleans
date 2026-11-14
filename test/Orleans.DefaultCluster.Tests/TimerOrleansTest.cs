@@ -106,8 +106,10 @@ namespace DefaultCluster.Tests.TimerTests
         {
             using var callbackObserver = TimerCallbackDiagnosticObserver.Create();
             var grainId = grain.GetGrainId();
+            var waitForDelay = callbackObserver.WaitForDelayScheduledCountAsync(
+                grainId, callbackObserver.GetDelayScheduledCount(grainId) + 1, TimerDiagnosticTimeout);
             var externalTick = grain.ExternalTick("external");
-            await callbackObserver.WaitForDelayScheduledCountAsync(grainId, callbackObserver.GetDelayScheduledCount(grainId) + 1, TimerDiagnosticTimeout);
+            await waitForDelay;
             await fixture.AdvanceTimeAsync(TimerCallbackDelay);
             await externalTick;
             await AdvanceTimerToTickCountAsync(grain, timerObserver, dueTime, TimerCallbackDelay, expectedTimerTicks);

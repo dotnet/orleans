@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -11,19 +14,23 @@ using NATS.Client.Serializers.Json;
 namespace Orleans.Streaming.NATS;
 
 /// <summary>
-/// Wrapper around NATS and JetStream APIs
+/// Owns the root and producer connections for one adapter. The provider factory owns this manager's lifetime.
 /// </summary>
-internal sealed partial class NatsConnectionManager
+internal sealed partial class NatsConnectionManager : IAsyncDisposable
 {
     private static readonly byte[] AckPayload = "+ACK"u8.ToArray();
     private readonly string _providerName;
     private readonly NatsOpts _natsClientOptions;
-    private readonly NatsConnection _natsConnection;
+    private NatsConnection _natsConnection = null!;
+    private readonly string _natsServer;
     private readonly ILogger _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly NatsOptions _options;
     private readonly NatsJSContext[] _producerNatsContexts;
-    private readonly NatsJSContext _natsContext;
+    private NatsJSContext _natsContext = null!;
+    private readonly object _lifecycleLock = new();
+    private Task? _initializationTask;
+    private Task? _disposalTask;
 
     [GeneratedActivatorConstructor]
     public NatsConnectionManager(string providerName, ILoggerFactory loggerFactory, NatsOptions options)
@@ -56,37 +63,56 @@ internal sealed partial class NatsConnectionManager
         }
 
         this._natsClientOptions = this._options.NatsClientOptions;
-        this._natsConnection = new NatsConnection(this._natsClientOptions);
-        this._natsContext = new NatsJSContext(this._natsConnection);
-
+        this._natsServer = GetLogSafeServerDescription(this._natsClientOptions.Url);
         this._producerNatsContexts = new NatsJSContext[this._options.ProducerCount];
-
-        for (var i = 0; i < this._options.ProducerCount; i++)
-        {
-            var producerOptions = this._natsClientOptions with { Name = $"Orleans-{this._providerName}-Producer-{i}" };
-            var producerConnection = new NatsConnection(producerOptions);
-            this._producerNatsContexts[i] = new NatsJSContext(producerConnection);
-        }
     }
 
     /// <summary>
     /// Initialize the connection to the NATS server and check if JetStream is available
     /// </summary>
-    public async Task Initialize(CancellationToken cancellationToken = default)
+    public Task Initialize(CancellationToken cancellationToken = default)
+    {
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposalTask is not null, this);
+            return _initializationTask ??= InitializeCore(cancellationToken);
+        }
+    }
+
+    private async Task InitializeCore(CancellationToken cancellationToken)
     {
         try
         {
+            this._natsConnection = new NatsConnection(this._natsClientOptions);
+            this._natsContext = new NatsJSContext(this._natsConnection);
+            for (var i = 0; i < this._producerNatsContexts.Length; i++)
+            {
+                var producerOptions = this._natsClientOptions with { Name = $"Orleans-{this._providerName}-Producer-{i}" };
+#pragma warning disable CA2000 // The context retains the connection for DisposeCore; construction failure disposes it below.
+                var producerConnection = new NatsConnection(producerOptions);
+#pragma warning restore CA2000
+                try
+                {
+                    this._producerNatsContexts[i] = new NatsJSContext(producerConnection);
+                }
+                catch
+                {
+                    await producerConnection.DisposeAsync();
+                    throw;
+                }
+            }
+
             await this._natsConnection.ConnectAsync();
 
             if (this._natsConnection.ConnectionState != NatsConnectionState.Open)
             {
-                this.LogUnableToConnectToNatsServer(this._natsClientOptions.Url);
+                this.LogUnableToConnectToNatsServer(this._natsServer);
                 return;
             }
 
             if (!this._natsConnection.ServerInfo!.JetStreamAvailable)
             {
-                this.LogJetStreamUnavailable(this._natsClientOptions.Url, this._providerName);
+                this.LogJetStreamUnavailable(this._natsServer, this._providerName);
                 return;
             }
 
@@ -96,12 +122,13 @@ internal sealed partial class NatsConnectionManager
 
                 if (producerContext.Connection.ConnectionState != NatsConnectionState.Open)
                 {
-                    this.LogUnableToConnectToNatsServer(producerContext.Connection.Opts.Url);
+                    this.LogUnableToConnectToNatsServer(
+                        GetLogSafeServerDescription(producerContext.Connection.Opts.Url));
                     return;
                 }
             }
 
-            this.LogConnectedToNatsServer(this._natsClientOptions.Url);
+            this.LogConnectedToNatsServer(this._natsServer);
 
             try
             {
@@ -120,7 +147,7 @@ internal sealed partial class NatsConnectionManager
                 await this._natsContext.UpdateStreamAsync(BuildStreamConfig(), cancellationToken);
             }
 
-            this.LogInitializedJetStreamStream(this._options.StreamName, this._natsClientOptions.Url);
+            this.LogInitializedJetStreamStream(this._options.StreamName, this._natsServer);
         }
         catch (Exception ex)
         {
@@ -128,6 +155,57 @@ internal sealed partial class NatsConnectionManager
             throw;
         }
     }
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_lifecycleLock)
+        {
+            return new(_disposalTask ??= DisposeCore());
+        }
+    }
+
+    private async Task DisposeCore()
+    {
+        var disposals = new List<Task>(_producerNatsContexts.Length + 1);
+        if (_natsConnection is not null)
+        {
+            disposals.Add(_natsConnection.DisposeAsync().AsTask());
+        }
+
+        foreach (var context in _producerNatsContexts)
+        {
+            if (context is not null)
+            {
+                disposals.Add(context.Connection.DisposeAsync().AsTask());
+            }
+        }
+
+        await Task.WhenAll(disposals).ConfigureAwait(false);
+        if (_initializationTask is { } initialization)
+        {
+            // Closing the connections interrupts initial-connect retries. The creating caller observes initialization failures.
+            await initialization.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+    }
+
+    internal static string GetLogSafeServerDescription(string connectionUrls)
+        => string.Join(
+            ',',
+            connectionUrls.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(static value =>
+                {
+                    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                    {
+                        return "configured NATS endpoint";
+                    }
+
+                    var builder = new UriBuilder(uri)
+                    {
+                        UserName = string.Empty,
+                        Password = string.Empty,
+                    };
+                    return builder.Uri.ToString();
+                }));
 
     private StreamConfig BuildStreamConfig() => new(this._options.StreamName, [$"{this._providerName}.>"])
     {
@@ -155,12 +233,12 @@ internal sealed partial class NatsConnectionManager
             throw new InvalidOperationException("Unable to enqueue message because the NATS context is not initialized.");
         }
 
-        var ns = message.StreamId.Namespace.IsEmpty ? "null" : Encoding.UTF8.GetString(message.StreamId.Namespace.Span);
-        var id = Encoding.UTF8.GetString(message.StreamId.Key.Span);
+        var ns = GetSubjectToken(message.StreamId.Namespace.Span, isNamespace: true);
+        var id = GetSubjectToken(message.StreamId.Key.Span);
 
         var subject = $"{this._providerName}.{ns}.{id}";
 
-        var context = this._producerNatsContexts[Math.Abs(id.GetHashCode()) % this._producerNatsContexts.Length];
+        var context = this._producerNatsContexts[GetProducerIndex(id.GetHashCode(StringComparison.Ordinal), this._producerNatsContexts.Length)];
 
         var ack = await context.TryPublishAsync(
             subject,
@@ -191,6 +269,39 @@ internal sealed partial class NatsConnectionManager
             partition,
             this._options.BatchSize,
             this._natsClientOptions.SerializerRegistry.GetDeserializer<NatsStreamMessage>());
+
+    internal static int GetProducerIndex(int hashCode, int producerCount)
+        => (int)((uint)hashCode % (uint)producerCount);
+
+    internal static string GetSubjectToken(ReadOnlySpan<byte> value, bool isNamespace = false)
+    {
+        if (isNamespace && value.IsEmpty)
+        {
+            return "null";
+        }
+
+        if (!value.IsEmpty && value[0] != (byte)'~' && Utf8.IsValid(value))
+        {
+            var token = Encoding.UTF8.GetString(value);
+            var valid = !isNamespace || token != "null";
+            foreach (var character in token)
+            {
+                if (character is '.' or '*' or '>' || char.IsWhiteSpace(character) || char.IsControl(character))
+                {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (valid)
+            {
+                return token;
+            }
+        }
+
+        // Reserve '~' so encoded bytes and literal tokens have distinct identities.
+        return $"~{Convert.ToHexString(value)}";
+    }
 
     /// <summary>
     /// Acknowledge messages on a subject in a NATS JetStream stream

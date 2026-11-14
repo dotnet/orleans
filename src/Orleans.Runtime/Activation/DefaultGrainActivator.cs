@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,8 +18,10 @@ namespace Orleans.Runtime
         /// Initializes a new <see cref="DefaultGrainActivator"/> instance.
         /// </summary>
         /// <param name="serviceProvider">The service provider.</param>
-        /// <param name="grainClass">The grain class.</param>
-        public DefaultGrainActivator(IServiceProvider serviceProvider, Type grainClass)
+        /// <param name="grainClass">The grain class with its public constructors preserved for dependency injection.</param>
+        public DefaultGrainActivator(
+            IServiceProvider serviceProvider,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type grainClass)
         {
             _argumentFactory = new GrainConstructorArgumentFactory(serviceProvider, grainClass);
             _grainInstanceFactory = ActivatorUtilities.CreateFactory(grainClass, _argumentFactory.ArgumentTypes);

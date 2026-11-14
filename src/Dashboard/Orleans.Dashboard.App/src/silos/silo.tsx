@@ -5,6 +5,20 @@ import GrainBreakdown from '../components/grain-table';
 import ChartWidget from '../components/multi-series-chart-widget';
 import Panel from '../components/panel';
 import Chart from '../components/time-series-chart';
+import type { Counter } from './silo-counters';
+
+const byteUnits = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+function formatBytes(bytes: number): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < byteUnits.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+
+  return unit === 0 ? `${value} B` : `${value.toFixed(1)} ${byteUnits[unit]}`;
+}
 
 interface SiloDataPoint {
   count: number;
@@ -17,11 +31,6 @@ interface SiloDataPoint {
   activationCount?: number;
   recentlyUsedActivationCount?: number;
   clientCount?: number;
-  receivedMessages?: number;
-  sentMessages?: number;
-  receiveQueueLength?: number;
-  requestQueueLength?: number;
-  sendQueueLength?: number;
 }
 
 interface SiloStatsData {
@@ -64,6 +73,7 @@ interface SiloProps {
   siloMetadata: (SiloMetadata | null)[];
   dashboardCounters: DashboardCounters;
   siloStats: SiloStatsData;
+  counters: Counter[];
 }
 
 interface SiloGraphProps {
@@ -146,11 +156,8 @@ export default class Silo extends React.Component<SiloProps> {
     const last = this.props.data[this.props.data.length - 1]!;
     const properties: { [key: string]: string | number } = {
       Clients: last.clientCount || '0',
-      'Messages received': last.receivedMessages || '0',
-      'Messages sent': last.sentMessages || '0',
-      'Receive queue': last.receiveQueueLength || '0',
-      'Request queue': last.requestQueueLength || '0',
-      'Send queue': last.sendQueueLength || '0'
+      'Bytes received': formatBytes(Number(this.props.counters.find(counter => counter.name === 'orleans-messaging-received-messages-size')?.value ?? 0)),
+      'Bytes sent': formatBytes(Number(this.props.counters.find(counter => counter.name === 'orleans-messaging-sent-messages-size')?.value ?? 0))
     };
 
     const grainStats = (

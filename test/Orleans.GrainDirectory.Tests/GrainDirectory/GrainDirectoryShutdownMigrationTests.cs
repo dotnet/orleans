@@ -22,13 +22,11 @@ public sealed class GrainDirectoryShutdownMigrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(2);
+        builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Services.AddSingleton<MembershipTableManager>();
             siloBuilder.Services.AddSingleton<IMembershipManager, DelayedMembershipManager>();
-#pragma warning disable ORLEANSEXP003
-            siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
 
         await using var cluster = builder.Build();
@@ -263,8 +261,11 @@ internal sealed class DelayedMembershipManager(MembershipTableManager inner) : I
     public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).ProcessGossipSnapshot(snapshot, cancellationToken);
 
-    public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) =>
-        ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken);
+    public Task Refresh(
+        MembershipVersion? targetVersion,
+        CancellationToken cancellationToken,
+        bool requireFresh = false) =>
+        ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken, requireFresh);
 
     public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).TryKillSilo(silo, cancellationToken);

@@ -26,9 +26,7 @@ Some instruments retain historical types or unit strings. The descriptions below
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
 | `orleans-app-requests-canceled` | C | Requests, implicit | `grain_type` | Outbound grain requests canceled by their caller. |
-| `orleans-app-requests-latency-bucket` | OC | Milliseconds, implicit | `duration` | Completed outbound request callbacks in one latency band. Bands are mutually exclusive, range from `1ms` through `15000ms`, and include an overflow band. |
-| `orleans-app-requests-latency-count` | OC | Requests, implicit | - | Total completed outbound request callbacks represented by the latency bands. |
-| `orleans-app-requests-latency-sum` | OC | Milliseconds, implicit | - | Sum of caller-observed elapsed time for completed outbound request callbacks. |
+| `orleans-app-requests-latency` | H | `ms` | - | Distribution of caller-observed elapsed time for completed outbound request callbacks. Configure application-specific bucket boundaries using an exporter View. |
 | `orleans-app-requests-timedout` | C | Requests, implicit | `grain_type` | Outbound grain requests which exceeded the configured response timeout. |
 | `orleans-client-connected-gateways` | OG | Gateways, implicit | - | Gateway connections currently held by an Orleans client. |
 
@@ -72,19 +70,47 @@ Request latency covers the interval until the caller's callback completes, inclu
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
 | `orleans-catalog-activation-collections` | C | Scans, implicit | - | Activation-collection scans performed by the silo. |
-| `orleans-catalog-activation-concurrent-registration-attempts` | C | Attempts, implicit | - | Activation registrations which encountered an activation already registered elsewhere. |
-| `orleans-catalog-activation-created` | C | Activations, implicit | - | Activation objects created on the silo. |
-| `orleans-catalog-activation-destroyed` | C | Activations, implicit | - | Activations removed from the silo catalog. |
-| `orleans-catalog-activation-failed-to-activate` | C | Activations, implicit | - | Activations whose lifecycle initialization failed or was canceled. |
-| `orleans-catalog-activation-latency` | H | `ms` | `status`, `directory` | Activation duration, split by outcome and whether the grain uses the directory. Status values include `success`, `canceled`, `directory_error`, `duplicate`, and `error`. |
-| `orleans-catalog-activation-non-existent` | C | Messages, implicit | - | Messages which targeted an activation that wasn't present in the local catalog. |
-| `orleans-catalog-activation-shutdown` | C | Activations, implicit | `via` | Activation shutdowns split by `collection`, `deactivateOnIdle`, `deactivateStuckActivation`, or `migration`. |
-| `orleans-catalog-activation-working-set` | OG | Activations, implicit | - | Activations currently in the silo's active working set. |
-| `orleans-catalog-activations` | OG | Activations, implicit | - | Activations currently registered in the silo catalog. |
-| `orleans-catalog-deactivation-latency` | H | `ms` | `via` | Deactivation duration, split by the shutdown path. |
-| `orleans-grains` | UDC | Grains, implicit | `type` | Current grain instances by grain type. |
+| `orleans-catalog-activation-concurrent-registration-attempts` | C | Attempts, implicit | `grain_type` | Activation registrations which encountered an activation already registered elsewhere. |
+| `orleans-catalog-activation-created` | C | Activations, implicit | `grain_type` | Grain contexts created by the silo catalog, including attempts which subsequently fail activation. |
+| `orleans-catalog-activation-destroyed` | C | Activations, implicit | `grain_type` | Grain contexts successfully unregistered from the silo catalog. |
+| `orleans-catalog-activation-failed-to-activate` | C | Activations, implicit | `grain_type` | Activations whose lifecycle initialization failed or was canceled. |
+| `orleans-catalog-activation-latency` | H | `ms` | `grain_type`, `status`, `directory` | Activation duration, split by outcome and whether the grain uses the directory (`enabled` or `disabled`). Status values are `success`, `canceled`, `directory_error`, `duplicate`, and `error`. |
+| `orleans-catalog-activation-non-existent` | C | Messages, implicit | `grain_type` | Requests for a new activation which the catalog could not create while the silo was inactive, tagged with the target's canonical grain type. |
+| `orleans-catalog-activation-shutdown` | C | Shutdown events, implicit | `via`, `grain_type` for individual activations | Activation shutdowns split by `collection`, `deactivateOnIdle`, `deactivateStuckActivation`, or `migration`. Includes the historical additional event for each nonempty collection batch, tagged only with `via=collection`. |
+| `orleans-catalog-activation-working-set` | OG | Activations, implicit | `grain_type` | Activations recently active on this silo, counted until working-set eviction or deactivation. |
+| `orleans-catalog-activations` | OG | Catalog entries, implicit | `grain_type` | Targets currently registered in the local activation directory, including system targets and stateless-worker group contexts. |
+| `orleans-catalog-deactivation-latency` | H | `ms` | `grain_type`, `via` | Deactivation duration, split by the shutdown path. `via=unknown` identifies completion before a shutdown path was selected. |
+| `orleans-grains` | UDC | Grains, implicit | `grain_type` | Constructed grain instances, incremented on instance assignment and decremented on disposal. Each stateless-worker instance contributes individually. |
 | `orleans-scheduler-long-running-turns` | C | Turns, implicit | - | Grain micro-turns whose synchronous execution exceeded <xref:Orleans.Configuration.SchedulingOptions.TurnWarningLengthThreshold>. |
 | `orleans-system-targets` | UDC | System targets, implicit | `type` | Current Orleans system-target instances by type. |
+
+### Grain-type identity and aggregation
+
+`grain_type` is the canonical string representation of the target's <xref:Orleans.Runtime.GrainType>, equivalent to `GrainId.Type.ToString()`. Each activation and targeted message carries this identity in its grain ID. Explicit grain-type names and constructed generic arguments are part of that identity, including a grain explicitly named `unknown`. The value can differ from the CLR implementation name.
+
+Activation metrics cache the canonical string and population counters per registered type for the silo lifetime. All activations of a type share this metadata. Rejected activation requests reuse cached names when available and otherwise format the target's grain type for that event, keeping cache growth tied to type registration. Working-set insertion/removal and activation-directory registration/removal update the corresponding populations. A scrape enumerates type counters, including zero counts after the last member leaves. Working-set members which expose no grain identity contribute an untagged population. The first idle working-set scan retains a member; eviction removes it. Completed transitions reconcile per-type and untagged sums with the corresponding local population; concurrent scrapes can observe transitions in progress.
+
+Lifecycle counters record additive events. Sum their increases across types and any untagged contributions for the same emitter and interval to recover total event volume. Collection scans and the additional collection-batch shutdown event retain their batch-level scope; individual activation events carry their grain type. A completed activation attempt contributes one latency observation with its outcome and directory tags; a completed deactivation contributes one observation with its shutdown path. Histograms begin timing when enabled at the start of the operation.
+
+Constructed-instance counts are stored in the same per-type metadata and updated atomically during instance assignment and disposal. Management statistics read those counters and combine types sharing a CLR implementation name when collecting a snapshot; metric events retain each canonical grain-type identity.
+
+Population gauges record snapshots. For a cluster total, select the latest fresh observation for each emitting silo and type, then sum across those silos. Preserve distinct emitter identities, expire stale observations, and materialize gauges as current values in the backend. Repeated scrapes contribute successive snapshots. `orleans-grains` instead supplies signed instance deltas which the exporter aggregates from the start of collection.
+
+Catalog populations, working-set populations, and constructed instance counts each retain their own scope. A stateless-worker group contributes one catalog entry and can contain several constructed workers. Activation failures can leave a catalog entry temporarily present while cleanup proceeds. During migration, the source and destination account for their own registrations and removals.
+
+For the `orleans-grains` key/value migration and dashboard updates, see [Activation metric schema update](../../migration-guide.md#activation-metric-schema-update).
+
+## Cluster manifests
+
+| Instrument | Type | Unit | Attributes | Description |
+|---|---|---|---|---|
+| `orleans-manifest-cache-lookups` | C | Lookups, implicit | `result`, `source` | Content-cache lookups with `hit` or `miss` results, sourced from a `silo` hash response or a `peer` summary. |
+| `orleans-manifest-fallbacks` | C | Retrievals, implicit | `reason` | Hash retrievals falling back to the direct manifest RPC: `error`, `missing`, or `mismatch`. |
+| `orleans-manifest-peer-probes` | C | Attempts, implicit | `status` | Local peer attempts completed with `success`, `timeout`, `canceled`, or `error`; `skipped` counts attempts denied by local admission. |
+| `orleans-manifest-peer-repairs` | C | Silo entries, implicit | - | Missing silo manifest entries supplied by successfully published peer repairs. |
+| `orleans-manifest-retrieval-duration` | H | `ms` | `mode`, `status` | Local silo-manifest retrieval duration in `direct` or `hash` mode, ending in `success`, `error`, or `canceled`. |
+
+The categories are fixed and carry no silo addresses, manifest hashes, or grain type names. Probe cancellation includes optional work superseded by complete direct results. See [cluster manifest retrieval](../../implementation/cluster-manifest-retrieval.md) for publication, fallback, and rollout semantics.
 
 ## Grain directory and consistent rings
 
@@ -94,33 +120,33 @@ Request latency covers the interval until the caller's callback completes, inclu
 | `orleans-consistent-ring-range-percentage-local` | OG | Percent, implicit | - | Percentage of the consistent-hash ring currently owned by this silo. |
 | `orleans-consistent-ring-size` | OG | Silos, implicit | - | Members in the consistent-hash ring. |
 | `orleans-directory-cache-size` | OG | Entries, implicit | - | Total entries across registered local grain-directory caches. |
-| `orleans-directory-lookups-cache-issued` | C | Lookups, implicit | - | Grain-location lookups attempted against the local directory cache. |
+| `orleans-directory-lookups-cache-issued` | C | Lookups, implicit | - | Grain-location lookups attempted against this silo's directory cache. |
 | `orleans-directory-lookups-cache-successes` | C | Lookups, implicit | - | Local directory-cache lookups which returned a usable entry. |
 | `orleans-directory-lookups-full-issued` | C | Lookups, implicit | - | Full grain-directory lookups initiated by this silo. |
-| `orleans-directory-lookups-local-directory-issued` | C | Lookups, implicit | - | Lookups issued directly against the local directory partition. |
-| `orleans-directory-lookups-local-directory-successes` | C | Lookups, implicit | - | Direct local-partition lookups which returned a grain address. |
-| `orleans-directory-lookups-local-issued` | C | Lookups, implicit | - | Grain-location lookups issued through the local grain locator. |
-| `orleans-directory-lookups-local-successes` | C | Lookups, implicit | - | Local grain-locator lookups which returned a grain address. |
+| `orleans-directory-lookups-local-directory-issued` | C | Lookups, implicit | - | Lookups issued directly against the legacy directory partition. |
+| `orleans-directory-lookups-local-directory-successes` | C | Lookups, implicit | - | Direct legacy-partition lookups which returned a grain address. |
+| `orleans-directory-lookups-local-issued` | C | Lookups, implicit | - | Grain-location lookups issued through the legacy grain locator. |
+| `orleans-directory-lookups-local-successes` | C | Lookups, implicit | - | Legacy grain-locator lookups which returned a grain address. |
 | `orleans-directory-lookups-remote-received` | C | Lookups, implicit | - | Forwarded directory lookup requests received from another silo. |
 | `orleans-directory-lookups-remote-sent` | C | Lookups, implicit | - | Directory lookup requests forwarded to another silo. |
-| `orleans-directory-partition-size` | OG | Entries, implicit | - | Grain registrations in this silo's local directory partition. |
+| `orleans-directory-partition-size` | OG | Entries, implicit | - | Grain registrations in this silo's legacy directory partition. |
 | `orleans-directory-range-lock-held-duration` | H | Milliseconds, implicit | - | Distribution of time directory range locks were held. |
 | `orleans-directory-recovery-count` | C | Recoveries, implicit | - | Directory range recoveries completed after membership changes. |
 | `orleans-directory-recovery-duration` | H | Milliseconds, implicit | - | Distribution of completed directory range-recovery durations. |
 | `orleans-directory-registration-duration` | H | `ms` | `locator`, `status` | Grain registration duration by locator implementation and `success`, `canceled`, or `error` outcome. |
 | `orleans-directory-registrations` | C | Registrations, implicit | `locator`, `status` | Completed grain registration attempts by locator implementation and outcome. |
 | `orleans-directory-registrations-single-act-issued` | C | Registrations, implicit | - | Single-activation registration requests initiated on this silo. |
-| `orleans-directory-registrations-single-act-local` | C | Registrations, implicit | - | Single-activation registrations handled by the local directory owner. |
+| `orleans-directory-registrations-single-act-local` | C | Registrations, implicit | - | Single-activation registrations handled by this silo's legacy directory partition. |
 | `orleans-directory-registrations-single-act-remote-received` | C | Registrations, implicit | - | Forwarded single-activation registration requests received from another silo. |
 | `orleans-directory-registrations-single-act-remote-sent` | C | Registrations, implicit | - | Single-activation registration requests forwarded to another silo. |
-| `orleans-directory-ring-local-portion-average-percentage` | OG | Percent, implicit | - | Equal-share percentage of the local grain-directory ring (`100 / ring size`). |
+| `orleans-directory-ring-local-portion-average-percentage` | OG | Percent, implicit | - | Equal-share percentage of the legacy grain-directory ring (`100 / ring size`). |
 | `orleans-directory-ring-local-portion-distance` | OG | Hash-ring distance, implicit | - | Raw hash-ring distance from this silo to its successor. |
-| `orleans-directory-ring-local-portion-percentage` | OG | Percent, implicit | - | Percentage of the local grain-directory ring assigned to this silo. |
-| `orleans-directory-ring-size` | OG | Silos, implicit | - | Members in the local grain-directory ring. |
+| `orleans-directory-ring-local-portion-percentage` | OG | Percent, implicit | - | Percentage of the legacy grain-directory ring assigned to this silo. |
+| `orleans-directory-ring-size` | OG | Silos, implicit | - | Members in the legacy grain-directory ring. |
 | `orleans-directory-snapshot-transfer-count` | C | Transfers, implicit | - | Directory range snapshots successfully received from the previous partition owner. |
 | `orleans-directory-snapshot-transfer-duration` | H | Milliseconds, implicit | - | Distribution of successful directory snapshot-transfer durations. |
 | `orleans-directory-unregistrations-issued` | C | Unregistrations, implicit | - | Single grain-unregistration requests initiated on this silo. |
-| `orleans-directory-unregistrations-local` | C | Unregistrations, implicit | - | Single grain-unregistration requests handled by the local directory owner. |
+| `orleans-directory-unregistrations-local` | C | Unregistrations, implicit | - | Single grain-unregistration requests handled by this silo's legacy directory partition. |
 | `orleans-directory-unregistrations-many-issued` | C | Requests, implicit | - | Batch grain-unregistration requests initiated on this silo. |
 | `orleans-directory-unregistrations-many-remote-received` | C | Requests, implicit | - | Forwarded batch unregistration requests received from another silo. |
 | `orleans-directory-unregistrations-many-remote-sent` | C | Requests, implicit | - | Batch unregistration requests forwarded to another silo. |
@@ -254,7 +280,37 @@ Core journaling instruments use `operation` and `status` where applicable. Opera
 | `orleans-journaling-storage-operations` | C | Operations, implicit | `operation`, `status` | Journal storage operations by operation and outcome. |
 | `orleans-journaling-write-coalesced-callers` | H | Callers, implicit | `operation` | Number of callers combined into each coalesced journal write. |
 
-Azure journaling storage instruments use operations `create`, `get_metadata`, `update_metadata`, `append`, `delete`, `read`, and `replace`.
+### Provider workload counters
+
+Provider counters record catalog traversal and explicit provider retries at existing execution
+points. Each provider library defines its own short name for the `provider` tag: `s3`,
+`azure_blob`, `azure_table`, `redis`, or `volatile`. Existing state-manager and provider-specific
+instruments supply storage operation latency, outcomes, and bytes.
+
+| Instrument | Type | Unit | Attributes | Description |
+|---|---|---|---|---|
+| `orleans-journaling-provider-catalog-entries` | C | Entries, implicit | `provider` | Catalog entries delivered to the consumer. |
+| `orleans-journaling-provider-catalog-pages` | C | Pages, implicit | `provider` | Pages received during S3 and Azure catalog traversal, including empty pages. |
+| `orleans-journaling-provider-catalog-items` | C | Items, implicit | `provider` | Native catalog page candidates before filtering, or Redis scan keys consumed by catalog traversal. |
+| `orleans-journaling-provider-retries` | C | Retries, implicit | `provider`, `reason` | Explicit provider-loop retries, using bounded reason labels. |
+
+S3 and Azure count each page received by the catalog traversal and all candidates on that page,
+before local filtering. Redis counts keys consumed by traversal before filtering and duplicate
+suppression. Volatile storage records delivered entries. Comparing candidates with delivered
+entries shows how much data the provider filters.
+
+Empty logical ranges produce zero pages, items, and entries. Early disposal and cancellation
+retain counts already recorded. A terminal enumeration advance or a failed page retrieval adds
+zero pages. Provider retry counts describe explicit storage recovery loops.
+
+Use the existing duration histograms for storage latency and
+[host-provided dependency telemetry](../../grains/journaling/operations.md#use-host-provided-dependency-telemetry)
+for SDK request timing, outcomes, and transport attempts. Catalog page and item counts describe
+provider traversal; service-side transaction metrics provide the basis for billing reconciliation.
+
+The existing state-manager and provider-specific instruments below retain their original meanings.
+
+Azure and S3 storage-method instruments use operations `create`, `get_metadata`, `update_metadata`, `append`, `delete`, `read`, and `replace`.
 
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
@@ -264,6 +320,9 @@ Azure journaling storage instruments use operations `create`, `get_metadata`, `u
 | `orleans-journaling-azure-table-operation-bytes` | C | `bytes` | `operation` | Cumulative bytes successfully processed by Azure Table journal storage operations. |
 | `orleans-journaling-azure-table-operation-duration` | H | `ms` | `operation`, `status` | Azure Table journal storage operation duration by operation and outcome. |
 | `orleans-journaling-azure-table-operations` | C | Operations, implicit | `operation`, `status` | Azure Table journal storage operations by operation and `ok` or `error` status. |
+| `orleans-journaling-s3-operation-bytes` | C | `bytes` | `operation` | Cumulative bytes successfully processed by S3 journal storage methods. |
+| `orleans-journaling-s3-operation-duration` | H | `ms` | `operation`, `status` | S3 journal storage method duration by operation and outcome. |
+| `orleans-journaling-s3-operations` | C | Operations, implicit | `operation`, `status` | S3 journal storage methods by operation and `ok` or `error` status. |
 
 ## Use the catalog
 

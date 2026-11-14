@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Google.Cloud.Firestore;
@@ -38,14 +39,18 @@ internal partial class FirestoreGatewayListProvider : IGatewayListProvider
         this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
     }
 
-    public async Task<IList<Uri>> GetGateways()
+    public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+    public async Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         LogSearchingForGateways(this._clusterId);
 
         try
         {
             var results = await this._storage.QueryEntities<SiloInstanceEntity>(
-                collection => collection.WhereEqualTo(nameof(SiloInstanceEntity.Status), (int)SiloStatus.Active));
+                collection => collection.WhereEqualTo(nameof(SiloInstanceEntity.Status), (int)SiloStatus.Active),
+                cancellationToken);
             var gateways = results
                 .Where(silo => silo.ProxyPort > 0)
                 .Select(ConvertToGatewayUri)
@@ -54,6 +59,10 @@ internal partial class FirestoreGatewayListProvider : IGatewayListProvider
             LogFoundGateways(gateways.Count, this._clusterId);
             return gateways;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             LogErrorSearchingForGateways(exception, this._clusterId);
@@ -61,14 +70,17 @@ internal partial class FirestoreGatewayListProvider : IGatewayListProvider
         }
     }
 
-    public async Task InitializeGatewayListProvider()
+    public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+    public async Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         this._storage = new FirestoreDataManager(
             ClusterGroup,
             Utils.SanitizeId(this._clusterId),
             this._options,
             this._loggerFactory.CreateLogger<FirestoreDataManager>());
-        await this._storage.Initialize();
+        await this._storage.Initialize(cancellationToken);
     }
 
     private static Uri ConvertToGatewayUri(SiloInstanceEntity gateway) =>

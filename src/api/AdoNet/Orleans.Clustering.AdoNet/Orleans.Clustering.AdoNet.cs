@@ -71,7 +71,11 @@ namespace Orleans.Runtime.Membership
 
         public System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGateways() { throw null; }
 
+        public System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGatewaysAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.Task InitializeGatewayListProvider() { throw null; }
+
+        public System.Threading.Tasks.Task InitializeGatewayListProviderAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 
@@ -106,9 +110,10 @@ namespace Orleans.Runtime.MembershipService
 
         public System.Threading.Tasks.Task<MembershipTableData> ReadAllAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        [System.Obsolete("Use ReadRowAsync instead.")]
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadRow(SiloAddress key) { throw null; }
 
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadRowAsync(SiloAddress key, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         [System.Obsolete("Use UpdateIAmAliveAsync instead.")]

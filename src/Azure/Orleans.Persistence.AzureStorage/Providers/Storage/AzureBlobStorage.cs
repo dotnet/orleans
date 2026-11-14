@@ -52,10 +52,15 @@ namespace Orleans.Storage
         /// <exception cref="ArgumentNullException">
         /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
         /// </exception>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(grainType);
             ArgumentNullException.ThrowIfNull(grainState);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
@@ -68,8 +73,8 @@ namespace Orleans.Storage
 
                 T? loadedState = this.grainStorageSerializer switch
                 {
-                    IGrainStorageStreamingSerializer serializer => await ReadStateWithStreamAsync(serializer, blob, grainType, grainId, grainState, blobName, container.Name),
-                    _ => await ReadStateWithPooledBufferAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
+                    IGrainStorageStreamingSerializer serializer => await ReadStateWithStreamAsync(serializer, blob, grainType, grainId, grainState, blobName, container.Name, cancellationToken),
+                    _ => await ReadStateWithPooledBufferAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name, cancellationToken),
                 };
 
                 grainState.State = loadedState ?? CreateInstance<T>();
@@ -87,7 +92,7 @@ namespace Orleans.Storage
                     LogTraceContainerNotFoundReading(grainType, grainId, grainState.ETag, blobName, container.Name);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorReading(ex, grainType, grainId, grainState.ETag, blobName, container.Name);
                 throw;
@@ -108,10 +113,15 @@ namespace Orleans.Storage
         /// <exception cref="ArgumentNullException">
         /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
         /// </exception>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(grainType);
             ArgumentNullException.ThrowIfNull(grainState);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
@@ -124,17 +134,17 @@ namespace Orleans.Storage
 
                 if (this.grainStorageSerializer is IGrainStorageStreamingSerializer serializer)
                 {
-                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, "application/octet-stream", blob);
+                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, "application/octet-stream", blob, cancellationToken);
                 }
                 else
                 {
                     var contents = ConvertToStorageFormat(grainState.State);
-                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
+                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob, cancellationToken);
                 }
 
                 LogTraceDataWritten(grainType, grainId, grainState.ETag, blobName, container.Name);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorWriting(ex, grainType, grainId, grainState.ETag, blobName, container.Name);
 
@@ -147,10 +157,15 @@ namespace Orleans.Storage
         /// <exception cref="ArgumentNullException">
         /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
         /// </exception>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(grainType);
             ArgumentNullException.ThrowIfNull(grainState);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
@@ -168,20 +183,22 @@ namespace Orleans.Storage
                 if (options.DeleteStateOnClear)
                 {
                     await DoOptimisticUpdate(
-                        static state => state.blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: state.conditions),
+                        static (state, cancellationToken) => state.blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: state.conditions, cancellationToken: cancellationToken),
                         (blob, conditions),
                         blob,
-                        grainState.ETag).ConfigureAwait(false);
+                        grainState.ETag,
+                        cancellationToken).ConfigureAwait(false);
                     grainState.ETag = null;
                 }
                 else
                 {
                     var options = new BlobUploadOptions { Conditions = conditions };
                     var response = await DoOptimisticUpdate(
-                        static state => state.blob.UploadAsync(BinaryData.Empty, state.options),
+                        static (state, cancellationToken) => state.blob.UploadAsync(BinaryData.Empty, state.options, cancellationToken),
                         (blob, options, conditions),
                         blob,
-                        grainState.ETag).ConfigureAwait(false);
+                        grainState.ETag,
+                        cancellationToken).ConfigureAwait(false);
                     grainState.ETag = response.Value.ETag.ToString();
                 }
 
@@ -189,7 +206,7 @@ namespace Orleans.Storage
                 grainState.State = CreateInstance<T>();
                 LogTraceCleared(grainType, grainId, grainState.ETag, blobName, container.Name);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorClearing(ex, grainType, grainId, grainState.ETag, blobName, container.Name);
 
@@ -197,7 +214,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob)
+        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob, CancellationToken cancellationToken)
         {
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
@@ -214,10 +231,11 @@ namespace Orleans.Storage
                 };
 
                 var result = await DoOptimisticUpdate(
-                    static state => state.blob.UploadAsync(state.contents, state.options),
+                    static (state, cancellationToken) => state.blob.UploadAsync(state.contents, state.options, cancellationToken),
                     (blob, contents, options),
                     blob,
-                    grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag,
+                    cancellationToken).ConfigureAwait(false);
 
                 grainState.ETag = result.Value.ETag.ToString();
                 grainState.RecordExists = true;
@@ -226,12 +244,12 @@ namespace Orleans.Storage
             {
                 // if the container does not exist, create it, and make another attempt
                 LogTraceContainerNotFound(grainType, grainId, grainState.ETag, blob.Name, container.Name);
-                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
-                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, mimeType, blob).ConfigureAwait(false);
+                await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, mimeType, blob, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async Task WriteStateBufferedStreamAndCreateContainerIfNotExists<T>(IGrainStorageStreamingSerializer serializer, string grainType, GrainId grainId, IGrainState<T> grainState, string mimeType, BlobClient blob)
+        private async Task WriteStateBufferedStreamAndCreateContainerIfNotExists<T>(IGrainStorageStreamingSerializer serializer, string grainType, GrainId grainId, IGrainState<T> grainState, string mimeType, BlobClient blob, CancellationToken cancellationToken)
         {
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
@@ -248,10 +266,11 @@ namespace Orleans.Storage
                 };
 
                 var result = await DoOptimisticUpdate(
-                    static state => state.self.UploadSerializedStateBufferedAsync(state.serializer, state.blob, state.options, state.value),
+                    static (state, cancellationToken) => state.self.UploadSerializedStateBufferedAsync(state.serializer, state.blob, state.options, state.value, cancellationToken),
                     (self: this, serializer, blob, options, value: grainState.State),
                     blob,
-                    grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag,
+                    cancellationToken).ConfigureAwait(false);
 
                 grainState.ETag = result.Value.ETag.ToString();
                 grainState.RecordExists = true;
@@ -260,19 +279,19 @@ namespace Orleans.Storage
             {
                 // if the container does not exist, create it, and make another attempt
                 LogTraceContainerNotFound(grainType, grainId, grainState.ETag, blob.Name, container.Name);
-                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
-                await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, mimeType, blob).ConfigureAwait(false);
+                await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, mimeType, blob, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async Task<Response<BlobContentInfo>> UploadSerializedStateBufferedAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, BlobUploadOptions options, T value)
+        private async Task<Response<BlobContentInfo>> UploadSerializedStateBufferedAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, BlobUploadOptions options, T value, CancellationToken cancellationToken)
         {
             var bufferStream = PooledBufferStream.Rent();
             try
             {
-                await serializer.SerializeAsync(value, bufferStream).ConfigureAwait(false);
+                await serializer.SerializeAsync(value, bufferStream, cancellationToken).ConfigureAwait(false);
                 bufferStream.Position = 0;
-                return await blob.UploadAsync(bufferStream, options).ConfigureAwait(false);
+                return await blob.UploadAsync(bufferStream, options, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -280,9 +299,10 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task<T?> ReadStateWithStreamAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
+        private async Task<T?> ReadStateWithStreamAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName, CancellationToken cancellationToken)
         {
-            var response = await blob.DownloadStreamingAsync();
+            var response = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
+            await using var content = response.Value.Content;
             var eTag = response.Value.Details.ETag.ToString();
             var contentLength = response.Value.Details.ContentLength;
 
@@ -293,16 +313,16 @@ namespace Orleans.Storage
                 return default;
             }
 
-            await using var content = response.Value.Content;
-            var loadedState = await serializer.DeserializeAsync<T>(content).ConfigureAwait(false);
+            var loadedState = await serializer.DeserializeAsync<T>(content, cancellationToken).ConfigureAwait(false);
             LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
             grainState.ETag = eTag;
             return loadedState;
         }
 
-        private async Task<T?> ReadStateWithPooledBufferAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
+        private async Task<T?> ReadStateWithPooledBufferAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName, CancellationToken cancellationToken)
         {
-            var response = await blob.DownloadStreamingAsync();
+            var response = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
+            await using var content = response.Value.Content;
             var eTag = response.Value.Details.ETag.ToString();
             var contentLength = response.Value.Details.ContentLength;
 
@@ -313,7 +333,6 @@ namespace Orleans.Storage
                 return default;
             }
 
-            await using var content = response.Value.Content;
             T? loadedState;
             if (contentLength <= int.MaxValue)
             {
@@ -321,7 +340,7 @@ namespace Orleans.Storage
                 try
                 {
                     var memory = buffer.AsMemory(0, (int)contentLength);
-                    await content.ReadExactlyAsync(memory);
+                    await content.ReadExactlyAsync(memory, cancellationToken);
                     loadedState = this.ConvertFromStorageFormat<T>(new BinaryData(memory));
                 }
                 finally
@@ -331,7 +350,7 @@ namespace Orleans.Storage
             }
             else
             {
-                loadedState = this.ConvertFromStorageFormat<T>(new BinaryData(content));
+                loadedState = this.ConvertFromStorageFormat<T>(await BinaryData.FromStreamAsync(content, cancellationToken).ConfigureAwait(false));
                 LogWarningLargePayloadFallback(contentLength, grainType, grainId, eTag, blobName, containerName);
             }
 
@@ -340,11 +359,12 @@ namespace Orleans.Storage
             return loadedState;
         }
 
-        private static async Task<TResult> DoOptimisticUpdate<TState, TResult>(Func<TState, Task<TResult>> updateOperation, TState state, BlobClient blob, string? currentETag)
+        private static async Task<TResult> DoOptimisticUpdate<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> updateOperation, TState state, BlobClient blob, string? currentETag, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                return await updateOperation(state).ConfigureAwait(false);
+                return await updateOperation(state, cancellationToken).ConfigureAwait(false);
             }
             catch (RequestFailedException ex) when (ex.IsPreconditionFailed() || ex.IsConflict() || ex.IsNotFound() && !ex.IsContainerNotFound())
             {

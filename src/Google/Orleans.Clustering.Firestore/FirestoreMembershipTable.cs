@@ -15,6 +15,8 @@ namespace Orleans.Clustering.Firestore;
 internal partial class FirestoreMembershipTable : IMembershipTable
 {
     private const string ClusterGroup = "Cluster";
+    private const int MaxContentionAttempts = 5;
+    private static readonly TransactionOptions ReadTransactionOptions = TransactionOptions.ForMaxAttempts(1);
     private readonly FirestoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
@@ -73,54 +75,61 @@ internal partial class FirestoreMembershipTable : IMembershipTable
     public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>(cancellationToken);
-        var defunctEntries = entities
-            .Where(entity => entity.Id != this._partitionId)
-            .Where(entity => entity.Status != (int)SiloStatus.Active)
-            .Where(entity => GetEffectiveUpdateTime(entity) < beforeDate)
-            .ToArray();
+        var query = this._storage.GetCollection()
+            .WhereEqualTo(nameof(SiloInstanceEntity.Status), (int)SiloStatus.Dead);
+        var snapshot = await FirestoreDataManager.ExecuteWithCancellation(
+            query.GetSnapshotAsync(cancellationToken), cancellationToken);
+        var defunct = snapshot.Documents
+            .Where(document => GetEffectiveUpdateTime(document.ConvertTo<SiloInstanceEntity>()) < beforeDate);
+        await Task.WhenAll(defunct.Chunk(FirestoreDataManager.MaxBatchSize).Select(DeleteBatch));
 
-        await Task.WhenAll(defunctEntries.Chunk(FirestoreDataManager.MaxBatchSize)
-            .Select(chunk => this._storage.DeleteEntities(chunk, cancellationToken)));
+        async Task DeleteBatch(DocumentSnapshot[] candidates)
+        {
+            var batch = query.Database.StartBatch();
+            foreach (var document in candidates)
+            {
+                batch.Delete(document.Reference, Precondition.LastUpdated(document.UpdateTime!.Value));
+            }
+
+            try
+            {
+                await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
+            }
+            catch (RpcException exception) when (exception.StatusCode is StatusCode.Aborted or StatusCode.FailedPrecondition or StatusCode.NotFound)
+            {
+                // Refresh only a conflicted batch. Native transaction retries protect its new eligibility checks.
+                await this._storage.ExecuteTransaction(async transaction =>
+                {
+                    var current = await transaction.GetAllSnapshotsAsync(
+                        candidates.Select(document => document.Reference), transaction.CancellationToken);
+                    foreach (var document in current)
+                    {
+                        if (!document.Exists)
+                        {
+                            continue;
+                        }
+
+                        var entity = document.ConvertTo<SiloInstanceEntity>();
+                        if (entity.Status == (int)SiloStatus.Dead && GetEffectiveUpdateTime(entity) < beforeDate)
+                        {
+                            transaction.Delete(document.Reference, Precondition.LastUpdated(document.UpdateTime!.Value));
+                        }
+                    }
+
+                    return true;
+                }, cancellationToken);
+            }
+        }
     }
 
-    [Obsolete("Use ReadRowAsync instead.")]
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-    public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+    public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        try
-        {
-            var collection = this._storage.GetCollection();
-            var data = await this._storage.ExecuteTransaction(async transaction =>
-            {
-                var versionSnapshot = await transaction.GetSnapshotAsync(
-                    collection.Document(this._partitionId),
-                    transaction.CancellationToken);
-                var siloSnapshot = await transaction.GetSnapshotAsync(
-                    collection.Document(key.ToParsableString()),
-                    transaction.CancellationToken);
-                if (!versionSnapshot.Exists)
-                    throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
-
-                var silos = siloSnapshot.Exists
-                    ? new[] { siloSnapshot.ConvertTo<SiloInstanceEntity>() }
-                    : Array.Empty<SiloInstanceEntity>();
-                return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
-            }, cancellationToken);
-
-            var table = Convert(data);
-
-            LogReadEntry(key, table);
-
-            return table;
-        }
-        catch (Exception exc) when (exc is not OperationCanceledException)
-        {
-            LogReadEntryError(exc, key);
-            throw;
-        }
+        return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
     }
 
     [Obsolete("Use ReadAllAsync instead.")]
@@ -132,10 +141,9 @@ internal partial class FirestoreMembershipTable : IMembershipTable
         try
         {
             var collection = this._storage.GetCollection();
-            var entries = await this._storage.ExecuteTransaction(async transaction =>
+            var entries = await ExecuteWithContentionRetries(() => collection.Database.RunTransactionAsync(async transaction =>
             {
-                // RunQuery streams its response, but the transaction binds every document to one
-                // serializable snapshot so membership rows cannot be torn from the version row.
+                // The transaction binds every streamed document to one serializable snapshot.
                 var snapshot = await transaction.GetSnapshotAsync(collection, transaction.CancellationToken);
                 var versionSnapshot = snapshot.Documents.SingleOrDefault(document => document.Id == this._partitionId)
                     ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
@@ -144,7 +152,7 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     .Select(document => document.ConvertTo<SiloInstanceEntity>())
                     .ToArray();
                 return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
-            }, cancellationToken);
+            }, ReadTransactionOptions, cancellationToken), cancellationToken);
             var data = Convert(entries);
             LogReadAll(data);
 
@@ -174,24 +182,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            bool result;
             try
             {
-                result = await this._storage.ExecuteTransaction(transaction =>
-                {
-                    transaction.Create(siloReference, silo);
-                    transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                    return Task.FromResult(true);
-                }, cancellationToken);
+                var batch = collection.Database.StartBatch();
+                batch.Create(siloReference, silo);
+                batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
+                await ExecuteWithContentionRetries(() => batch.CommitAsync(cancellationToken), cancellationToken);
+                return true;
             }
             catch (RpcException exception) when (IsContention(exception))
             {
-                result = false;
+                LogInsertContention(exception, entry, tableVersion);
+                return false;
             }
-
-            if (result == false)
-                LogInsertContention(entry, tableVersion);
-            return result;
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -211,31 +214,26 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             LogUpdateRow(entry, etag, tableVersion);
 
             var silo = SiloInstanceEntity.FromMembershipEntry(entry, tableVersion.Version);
-            silo.ETag = Utils.ParseTimestamp(etag);
             var version = CreateClusterVersionEntity(tableVersion.Version);
             version.ETag = Utils.ParseTimestamp(tableVersion.VersionEtag);
 
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            bool result;
             try
             {
-                result = await this._storage.ExecuteTransaction(transaction =>
-                {
-                    transaction.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag.Value));
-                    transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                    return Task.FromResult(true);
-                }, cancellationToken);
+                var batch = collection.Database.StartBatch();
+                // The version guards canonical changes; heartbeat writes can change the row ETag.
+                batch.Update(siloReference, silo.GetFields(), Precondition.MustExist);
+                batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
+                await ExecuteWithContentionRetries(() => batch.CommitAsync(cancellationToken), cancellationToken);
+                return true;
             }
             catch (RpcException exception) when (IsContention(exception))
             {
-                result = false;
+                LogUpdateContention(exception, entry, etag, tableVersion);
+                return false;
             }
-
-            if (result == false)
-                LogUpdateContention(entry, etag, tableVersion);
-            return result;
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -257,23 +255,13 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var id = entry.SiloAddress.ToParsableString();
             var iAmAliveTime = new DateTimeOffset(DateTime.SpecifyKind(entry.IAmAliveTime, DateTimeKind.Utc));
             var document = this._storage.GetCollection().Document(id);
-            await this._storage.ExecuteTransaction(async transaction =>
-            {
-                var snapshot = await transaction.GetSnapshotAsync(document, transaction.CancellationToken);
-                if (!snapshot.Exists)
-                    throw new KeyNotFoundException($"Could not find silo entry for {id}");
-
-                if (snapshot.ConvertTo<SiloInstanceEntity>().IAmAliveTime >= iAmAliveTime)
-                {
-                    return false;
-                }
-
-                transaction.Update(document, new Dictionary<string, object?>
-                {
-                    [nameof(SiloInstanceEntity.IAmAliveTime)] = iAmAliveTime,
-                });
-                return true;
-            }, cancellationToken);
+            await document.UpdateAsync(
+                nameof(SiloInstanceEntity.IAmAliveTime), iAmAliveTime, cancellationToken: cancellationToken);
+        }
+        catch (RpcException exception) when (
+            cancellationToken.IsCancellationRequested && exception.StatusCode == StatusCode.Cancelled)
+        {
+            throw new OperationCanceledException("The Firestore operation was canceled.", exception, cancellationToken);
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -309,6 +297,22 @@ internal partial class FirestoreMembershipTable : IMembershipTable
 
     private static bool IsContention(RpcException exception) =>
         exception.StatusCode is StatusCode.Aborted or StatusCode.AlreadyExists or StatusCode.FailedPrecondition or StatusCode.NotFound;
+
+    private static async Task<TResult> ExecuteWithContentionRetries<TResult>(Func<Task<TResult>> operation, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await FirestoreDataManager.ExecuteWithCancellation(operation(), cancellationToken);
+            }
+            catch (RpcException exception) when (exception.StatusCode == StatusCode.Aborted && attempt < MaxContentionAttempts - 1)
+            {
+                // Retry a whole aborted snapshot or the same conditional batch, preserving the caller's CAS preconditions.
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * (1 << attempt)), cancellationToken);
+            }
+        }
+    }
 
     private static DateTimeOffset GetEffectiveUpdateTime(SiloInstanceEntity entity)
     {
@@ -367,8 +371,8 @@ internal partial class FirestoreMembershipTable : IMembershipTable
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Insert failed due to contention on the table. Will retry. Entry {Data}, table version = {TableVersion}")]
-    private partial void LogInsertContention(MembershipEntry data, TableVersion tableVersion);
+        Message = "Insert encountered membership contention. Entry {Data}, table version = {TableVersion}")]
+    private partial void LogInsertContention(Exception exception, MembershipEntry data, TableVersion tableVersion);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
@@ -382,8 +386,8 @@ internal partial class FirestoreMembershipTable : IMembershipTable
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}")]
-    private partial void LogUpdateContention(MembershipEntry data, string etag, TableVersion tableVersion);
+        Message = "Update encountered membership contention. Entry {Data}, eTag {ETag}, table version = {TableVersion}")]
+    private partial void LogUpdateContention(Exception exception, MembershipEntry data, string etag, TableVersion tableVersion);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

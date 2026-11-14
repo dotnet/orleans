@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,8 +20,10 @@ namespace Orleans.Runtime
         /// Initializes a new <see cref="GrainConstructorArgumentFactory"/> instance.
         /// </summary>
         /// <param name="serviceProvider">The service provider.</param>
-        /// <param name="grainType">The grain type.</param>
-        public GrainConstructorArgumentFactory(IServiceProvider serviceProvider, Type grainType)
+        /// <param name="grainType">The grain type with its public constructors preserved for argument discovery.</param>
+        public GrainConstructorArgumentFactory(
+            IServiceProvider serviceProvider,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type grainType)
         {
             _argumentFactories = new List<Factory<IGrainContext, object>>();
 

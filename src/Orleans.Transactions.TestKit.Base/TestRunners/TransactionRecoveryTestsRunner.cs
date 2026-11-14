@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -435,6 +436,8 @@ namespace Orleans.Transactions.TestKit
         /// <param name="gracefulShutdown">Whether to stop the silo gracefully.</param>
         /// <param name="cancellationToken">A token which cancels the recovery test.</param>
         /// <returns>A task which represents the recovery test.</returns>
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness selects a silo to stop during recovery conformance tests.")]
         protected virtual async Task TransactionWillRecoverAfterRandomSiloFailure(
             string transactionTestGrainClassName,
             int concurrent,

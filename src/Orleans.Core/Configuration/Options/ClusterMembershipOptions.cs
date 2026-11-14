@@ -61,6 +61,9 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the period between fetching updates from the membership table.
         /// </summary>
+        /// <remarks>
+        /// Use a positive interval for periodic membership refreshes and peer-monitoring reevaluation.
+        /// </remarks>
         /// <value>The membership table is refreshed every 60 seconds by default.</value>
         public TimeSpan TableRefreshTimeout { get; set; } = TimeSpan.FromSeconds(60);
 
@@ -86,6 +89,18 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>Attempt to join for 5 minutes before giving up by default.</value>
         public TimeSpan MaxJoinAttemptTime { get; set; } = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// Gets or sets the age at which absent positive silo generations are classified as dead.
+        /// </summary>
+        /// <remarks>
+        /// The cutoff is established when publishing membership views using the peer's local UTC clock.
+        /// Present members retain their recorded status. Set to <see langword="null"/> to disable generation retirement.
+        /// Observed death evidence is retained until covered by the cutoff, or for the observer's lifetime when retirement is disabled.
+        /// The value must be greater than or equal to <see cref="TimeSpan.Zero"/>.
+        /// </remarks>
+        /// <value>One hour by default.</value>
+        public TimeSpan? SiloGenerationRetirementAge { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
         /// Gets or sets a value indicating whether membership updates are disseminated between hosts using gossip.
@@ -118,29 +133,41 @@ namespace Orleans.Configuration
         public int NumVotesForDeathDeclaration { get; set; } = 2;
 
         /// <summary>
-        /// Gets or sets the period of time after which membership entries for defunct silos are eligible for removal.
+        /// Gets or sets the retention period after which dead silo entries are eligible for removal.
+        /// The cleanup agent identifies expired entries using the latest startup, liveness, or suspect-vote timestamp.
         /// Valid only if <see cref="DefunctSiloCleanupPeriod"/> is not <see langword="null" />.
         /// </summary>
         /// <value>Defunct silos are eligible for removal from membership after one week by default.</value>
         public TimeSpan DefunctSiloExpiration { get; set; } = TimeSpan.FromDays(7);
 
         /// <summary>
-        /// Gets or sets a value indicating whether defunct silo entries older than <see cref="DefunctSiloExpiration" /> are removed.
+        /// Gets or sets the cleanup period for dead silo entries older than <see cref="DefunctSiloExpiration" />.
         /// Cleanup is attempted when membership changes are observed and the current membership snapshot contains expired
-        /// non-active entries, or when this period has elapsed since the last cleanup call.
+        /// dead entries, or when this period has elapsed since the last cleanup call.
         /// Set this value to <see langword="null"/> to disable expiration-based cleanup.
         /// </summary>
         /// <value>Expiration-based cleanup is enabled by default.</value>
         public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
-        /// Gets or sets the maximum number of defunct silo entries to retain in the membership table.
+        /// Gets or sets the maximum number of dead silo entries to retain in the membership table.
         /// When this limit is exceeded, the first active silo, selected by natural <see cref="Orleans.Runtime.SiloAddress"/>
-        /// sort order, asynchronously removes the oldest excess defunct entries from the membership table.
+        /// sort order, asynchronously removes the oldest excess dead entries from the membership table.
         /// Set this value to <see langword="null"/> to retain all defunct entries and disable threshold-based cleanup.
         /// </summary>
         /// <value>Membership retains up to 25 defunct silo entries by default.</value>
         public int? MaxDefunctSiloEntries { get; set; } = 25;
+
+        /// <summary>
+        /// Gets or sets the minimum period for which dead silo entries are retained in the membership table.
+        /// Cleanup removes only dead entries whose latest startup, liveness, or suspect-vote timestamp is older than this period,
+        /// regardless of <see cref="DefunctSiloExpiration"/> and <see cref="MaxDefunctSiloEntries"/>.
+        /// Retaining recent dead entries lets a silo whose membership operations are delayed or retried, such as a joining
+        /// silo within <see cref="MaxJoinAttemptTime"/>, observe that it was declared dead.
+        /// This period should comfortably exceed <see cref="MaxJoinAttemptTime"/> and expected clock skew between silos.
+        /// </summary>
+        /// <value>Dead silo entries are retained for at least one hour by default.</value>
+        public TimeSpan DefunctSiloMinimumRetention { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
         /// Gets the period after which a silo's membership entry is considered stale if it has not updated its heartbeat in the membership table.

@@ -107,6 +107,11 @@ namespace Orleans.Configuration
         public System.TimeSpan RecoveryPeriod { get { throw null; } set { } }
     }
 
+    public sealed partial class ClusterManifestOptions
+    {
+        public bool EnableContentAddressedRetrieval { get { throw null; } set { } }
+    }
+
     public partial class ConsistentRingOptions
     {
         public const int DEFAULT_NUM_VIRTUAL_RING_BUCKETS = 30;
@@ -185,6 +190,8 @@ namespace Orleans.Configuration
 
         public CachingStrategyType CachingStrategy { get { throw null; } set { } }
 
+        public System.Func<Runtime.SiloAddress, int, System.Collections.Immutable.ImmutableArray<uint>> GetPartitionBoundaries { get { throw null; } set { } }
+
         [System.Obsolete("InitialCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan InitialCacheTTL { get { throw null; } set { } }
 
@@ -241,28 +248,6 @@ namespace Orleans.Configuration
         public System.TimeSpan StoppedActivationWarningInterval { get { throw null; } set { } }
 
         public System.TimeSpan TurnWarningLengthThreshold { get { throw null; } set { } }
-    }
-
-    public partial class SiloConnectionOptions : SiloConnectionOptions.ISiloConnectionBuilderOptions
-    {
-        public void ConfigureGatewayInboundConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-
-        public void ConfigureSiloInboundConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-
-        public void ConfigureSiloOutboundConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-
-        void ISiloConnectionBuilderOptions.ConfigureGatewayInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder) { }
-
-        void ISiloConnectionBuilderOptions.ConfigureSiloInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder) { }
-
-        void ISiloConnectionBuilderOptions.ConfigureSiloOutboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder) { }
-
-        public partial interface ISiloConnectionBuilderOptions
-        {
-            void ConfigureGatewayInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder);
-            void ConfigureSiloInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder);
-            void ConfigureSiloOutboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder);
-        }
     }
 
     public partial class SiloMessagingOptions : MessagingOptions
@@ -401,7 +386,6 @@ namespace Orleans.Hosting
     {
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP003")]
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null) { throw null; }
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DevelopmentClusterMembershipOptions>> configureOptions) { throw null; }
@@ -409,6 +393,8 @@ namespace Orleans.Hosting
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Configuration.DevelopmentClusterMembershipOptions> configureOptions) { throw null; }
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint? primarySiloEndpoint) { throw null; }
+
+        public static ISiloBuilder UseLegacyGrainDirectory(this ISiloBuilder siloBuilder) { throw null; }
 
         public static ISiloBuilder UseLocalhostClustering(this ISiloBuilder builder, int siloPort = 11111, int gatewayPort = 30000, System.Net.IPEndPoint? primarySiloEndpoint = null, string serviceId = "dev", string clusterId = "dev") { throw null; }
     }
@@ -509,9 +495,24 @@ namespace Orleans.Hosting
             where TStartup : class, Runtime.IStartupTask { throw null; }
     }
 
+    public static partial class SiloTlsHostingExtensions
+    {
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { throw null; }
+    }
+
     public static partial class SystemTextJsonSerializerExtensions
     {
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
+
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Serialization.SystemTextJsonGrainStorageSerializerOptions>> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Serialization.SystemTextJsonGrainStorageSerializerOptions> configureOptions) { throw null; }
     }
 }
 
@@ -519,6 +520,7 @@ namespace Orleans.Metadata
 {
     public partial class GrainClassMap
     {
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("The dictionary's grain types must have public constructors preserved separately, for example by GrainTypeOptions.AddClass or TypeManifestOptions.AddInterfaceImplementation.")]
         public GrainClassMap(Serialization.TypeSystem.TypeConverter typeConverter, System.Collections.Immutable.ImmutableDictionary<Runtime.GrainType, System.Type> classes) { }
 
         public bool TryGetGrainClass(Runtime.GrainType grainType, out System.Type? grainClass) { throw null; }
@@ -723,6 +725,8 @@ namespace Orleans.Runtime
         public Orleans.Configuration.SchedulingOptions SchedulingOptions { get { throw null; } }
 
         public Orleans.Serialization.Session.SerializerSessionPool SerializerSessionPool { get { throw null; } }
+
+        public void AddActivationSetup(System.Action<IGrainContext> setup) { }
 
         public object? GetComponent(System.Type componentType) { throw null; }
 
@@ -991,6 +995,8 @@ namespace Orleans.Runtime
         public object? GetTarget() { throw null; }
 
         public void Migrate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken) { }
+
+        void IGrainContext.ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options) { }
 
         object? Orleans.Serialization.Invocation.ITargetHolder.GetComponent(System.Type componentType) { throw null; }
 
@@ -1576,6 +1582,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.LeaseRequest[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1609,6 +1617,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.AcquiredLease[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1642,6 +1652,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.AcquiredLease[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }

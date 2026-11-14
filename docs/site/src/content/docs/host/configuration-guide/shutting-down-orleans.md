@@ -34,6 +34,7 @@ Set the orchestrator's termination grace period longer than the host shutdown ti
 - Load balancers and readiness probes to stop sending new traffic.
 - Gateway and membership changes to propagate.
 - Grain deactivation callbacks and state writes.
+- Admitted client-observer invocations and their response handling.
 - Stream, reminder, storage, and telemetry providers to flush and stop.
 
 If the external grace period expires first, the process is killed and graceful shutdown can't complete.
@@ -47,6 +48,18 @@ If the external grace period expires first, the process is killed and graceful s
 - Avoid synchronous blocking and unbounded retries in shutdown callbacks.
 
 Grains can move or reactivate elsewhere after a silo leaves. Don't use graceful shutdown as an application-wide drain barrier unless the application separately coordinates that behavior.
+
+### Queued requests during shutdown
+
+When a silo shuts down gracefully, an activation which still has queued requests after its running requests finish migrates to another silo, carrying those requests in its migration package. The destination admits them through the activation's ordinary FIFO queue and overload checks. A new activation receives them before it registers in the grain directory in place of the old one; requests already queued at the destination retain their place. The calling silos then record the request's new location, so their calls keep waiting for a response after the original silo leaves the cluster. Calls retain their original identities and response timeouts. Recording the new location is best-effort: a call whose caller doesn't record it fails if the original silo leaves the cluster first. Every migration carries the activation's queued requests in the same way, including migrations requested with <xref:Orleans.Grain.MigrateOnIdle>. The destination drops requests whose message time-to-live has expired. Expiry tracking is best-effort across transport and retries, so a delayed request can execute after its caller has timed out.
+
+When the migration fails or its outcome is unknown, the original silo rejects those requests, so their callers fail with a rejection which they can retry. A rejected request may still run on the destination silo if the destination took it but its response was lost.
+
+Requests which can't migrate with their activation are forwarded instead. This includes requests for stateless workers and <xref:Orleans.Placement.ImmovableAttribute> grains, requests whose size bound together with the activation's migration state exceeds <xref:Orleans.Configuration.MessagingOptions.MaxMessageBodySize>, requests which arrive after the activation's migration has begun, requests for an activation which was already deactivating for another reason when shutdown began, and requests migrating to a silo which runs an earlier version. Arbitrary request-context values use <xref:Orleans.Configuration.MessagingOptions.MaxMessageHeaderSize> as their conservative header bound. Callers of forwarded requests fail with <xref:Orleans.Runtime.SiloUnavailableException> if the original silo leaves the cluster before the response arrives, as they do when a silo crashes.
+
+A migration counts as a forward. Requests which have already been forwarded <xref:Orleans.Configuration.SiloMessagingOptions.MaxForwardCount> times stay with the original activation and are rejected when it deactivates, so their callers fail with a rejection without the request executing.
+
+Migration adds activation time on the destination silo to shutdown, in two phases. First, a migrating activation waits up to <xref:Orleans.Configuration.SiloMessagingOptions.SystemResponseTimeout> for the acceptance invocation, including asynchronous outgoing call filters and the destination's response. If that invocation times out, the source rejects its requests. Second, after the destination takes the requests, the source retargets their callers' pending calls. When <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> elapses, a queued migration is canceled and its requests are forwarded, and an accepted migration completes without waiting for the retargeting to finish. Allow the host shutdown budget enough time for both phases.
 
 ## Containers and orchestrators
 

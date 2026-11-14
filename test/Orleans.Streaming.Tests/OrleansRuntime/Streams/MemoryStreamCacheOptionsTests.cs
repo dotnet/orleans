@@ -36,12 +36,12 @@ public sealed class MemoryStreamCacheOptionsTests
     [InlineData(1)]
     [InlineData(25)]
     [InlineData(int.MaxValue)]
-    public void ConfiguredMaxAddCountFlowsToCache(int maxAddCount)
+    public async Task ConfiguredMaxAddCountFlowsToCache(int maxAddCount)
     {
         using var host = CreateHost(builder => builder.AddMemoryStreams("configured", stream =>
             stream.ConfigureCache(options => options.Configure(value => value.MaxAddCount = maxAddCount))));
 
-        host.Services.GetRequiredService<IStartupValidator>().Validate();
+        await ValidateStartupAsync(host.Services);
         IQueueFlowController controller = CreateCache(host.Services, "configured");
 
         Assert.Equal(maxAddCount, controller.GetMaxAddCount());
@@ -66,7 +66,7 @@ public sealed class MemoryStreamCacheOptionsTests
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(int.MinValue)]
-    public void InvalidMaxAddCountIsRejectedDuringStartupValidation(int maxAddCount)
+    public async Task InvalidMaxAddCountIsRejectedDuringStartupValidation(int maxAddCount)
     {
         var services = new ServiceCollection();
         var configurator = new SiloMemoryStreamConfigurator<DefaultMemoryMessageBodySerializer>(
@@ -74,8 +74,8 @@ public sealed class MemoryStreamCacheOptionsTests
         configurator.ConfigureCache(options => options.Configure(value => value.MaxAddCount = maxAddCount));
         using var serviceProvider = services.BuildServiceProvider();
 
-        var exception = Assert.Throws<OptionsValidationException>(
-            serviceProvider.GetRequiredService<IStartupValidator>().Validate);
+        var exception = await Assert.ThrowsAsync<OptionsValidationException>(
+            () => ValidateStartupAsync(serviceProvider));
 
         Assert.Equal("invalid", exception.OptionsName);
         Assert.Equal(typeof(MemoryStreamCacheOptions), exception.OptionsType);
@@ -157,6 +157,16 @@ public sealed class MemoryStreamCacheOptionsTests
                 maxAddCount));
 
         Assert.Equal("maxAddCount", exception.ParamName);
+    }
+
+    private static Task ValidateStartupAsync(IServiceProvider services)
+    {
+#if NET11_0_OR_GREATER
+        return services.GetRequiredService<IAsyncStartupValidator>().ValidateAsync(TestContext.Current.CancellationToken);
+#else
+        services.GetRequiredService<IStartupValidator>().Validate();
+        return Task.CompletedTask;
+#endif
     }
 
     private static IHost CreateHost(Action<ISiloBuilder> configure)

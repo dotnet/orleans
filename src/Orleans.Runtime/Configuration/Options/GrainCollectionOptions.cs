@@ -29,8 +29,13 @@ namespace Orleans.Configuration
         public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = new Dictionary<string, TimeSpan>();
 
         /// <summary>
-        /// Timeout value before giving up when trying to activate a grain.
+        /// Gets or sets the period after which the runtime cancels the <see cref="System.Threading.CancellationToken"/> passed to activation code,
+        /// including <c>Grain.OnActivateAsync</c> and grain lifecycle participants.
         /// </summary>
+        /// <remarks>
+        /// The runtime awaits activation code to completion and then fails the activation if the token was canceled.
+        /// Activation code observes the token and completes promptly once it is canceled.
+        /// </remarks>
         public TimeSpan ActivationTimeout { get; set; } = DEFAULT_ACTIVATION_TIMEOUT;
 
         /// <summary>
@@ -39,9 +44,14 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_ACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
 
         /// <summary>
-        /// Timeout value before giving up when trying to deactivate a grain activation
-        /// (waiting for all timers to stop and calling Grain.OnDeactivate())
+        /// Gets or sets the period after which the runtime cancels the <see cref="System.Threading.CancellationToken"/> passed to deactivation code,
+        /// including <c>Grain.OnDeactivateAsync</c> and grain lifecycle participants.
         /// </summary>
+        /// <remarks>
+        /// The runtime awaits deactivation code to completion before it unregisters the activation and disposes the activation's services.
+        /// Deactivation code observes the token and completes promptly once it is canceled.
+        /// The activation collector waits up to this period for each collection batch, then continues with subsequent passes while deactivation completes.
+        /// </remarks>
         public TimeSpan DeactivationTimeout { get; set; } = DEFAULT_DEACTIVATION_TIMEOUT;
 
         /// <summary>

@@ -148,8 +148,14 @@ namespace UnitTests.Grains
         {
             _log.LogInformation(reason.Exception, "Deactivating ReasonCode: {ReasonCode} Description: {ReasonText}", reason.ReasonCode, reason.Description);
 
+            if (isDeactivatingBlocking)
+            {
+                var completion = RunForever();
+                SetDeactivationStarted(this.GetGrainId());
+                return completion;
+            }
+
             SetDeactivationStarted(this.GetGrainId());
-            if (isDeactivatingBlocking) return RunForever();
 
             var key = this.GetPrimaryKey();
             lock (grains)

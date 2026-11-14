@@ -1,0 +1,17 @@
+using Orleans.Serialization.ContextSmoke;
+
+StaticFactoryContracts.FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry();
+StaticFactoryContracts.CyclicConstructionPublishesCompletedGraphs();
+StaticFactoryContracts.FailedCyclicConstructionRollsBack();
+StaticFactoryContracts.CaughtNestedFailureFaultsTheWholeGraph();
+StaticFactoryContracts.DirectProviderServicesRemainGraphOwned();
+StaticFactoryContracts.ClosedDependenciesRemainIndependentOfKeyedDiRegistrations();
+StaticFactoryContracts.KeyedOnlyDescriptorsDoNotSelectDependencyConstructors();
+StaticFactoryContracts.KeyedFacadePreservesProviderCapabilitiesOutsideConstruction();
+StaticFactoryContracts.CapturedKeyedFacadeGuardsPendingConstruction();
+StaticFactoryContracts.GeneratedMetadataCollectionsComposeWithClosedFactories();
+StaticFactoryContracts.MixedCyclesPublishCompletedGraphs();
+StaticFactoryContracts.FailedMixedCyclesRollBackFromBothRoots();
+StaticFactoryContracts.GeneratedMixedCyclesPreserveObjectGraphsFromBothRoots();
+StaticFactoryContracts.MixedNullableTupleCyclesDeferOptionalQueries();
+Console.WriteLine("Static serializer factory contracts passed: atomic graph publication and constructor-failure rollback.");

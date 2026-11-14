@@ -1,7 +1,7 @@
 ---
 title: Grain directory architecture
-description: Compare the default LocalGrainDirectory DHT with the experimental distributed directory.
-ms.date: 08/02/2026
+description: Understand the default view-synchronous distributed directory and the legacy-directory DHT.
+ms.date: 08/21/2026
 ms.topic: concept-article
 ---
 
@@ -9,19 +9,19 @@ ms.topic: concept-article
 
 The grain directory maps a grain identity to an activation address. It is on the critical path when a caller has no usable cached address and when the runtime creates, moves, or removes an activation. Placement chooses a silo; the directory coordinates which activation address is authoritative.
 
-Orleans uses `LocalGrainDirectory` by default. `DistributedGrainDirectory` is experimental and must be enabled explicitly.
+Orleans uses `DistributedGrainDirectory` by default, with versioned range ownership and coordinated membership-view transitions. Select `LegacyGrainDirectory` with <xref:Orleans.Hosting.CoreHostingExtensions.UseLegacyGrainDirectory*>.
 
-## Default: `LocalGrainDirectory` <a name="overview-and-architecture"></a>
+## `LegacyGrainDirectory` <a name="overview-and-architecture"></a>
 
-`LocalGrainDirectory` partitions registrations over the membership ring. Hashing a grain identity selects the silo whose local `LocalGrainDirectoryPartition` is authoritative for that key. This follows the broad consistent-hashing distributed-hash-table model described by [Chord](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf), adapted to Orleans membership and activation semantics. Each silo also keeps non-authoritative cache entries to avoid repeated remote lookups.
+`LegacyGrainDirectory` partitions registrations over the membership ring. Hashing a grain identity selects the silo whose legacy directory partition is authoritative for that key. This follows the broad consistent-hashing distributed-hash-table model described by [Chord](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf), adapted to Orleans membership and activation semantics. Each silo also keeps non-authoritative cache entries to avoid repeated remote lookups.
 
 ```mermaid
 flowchart LR
     Caller[Calling silo]
     Cache[Local address cache]
     Ring[Membership hash ring]
-    Owner[Owning LocalGrainDirectory]
-    Partition[LocalGrainDirectoryPartition]
+    Owner[Owning LegacyGrainDirectory]
+    Partition[Legacy directory partition]
     Activation[Target activation]
 
     Caller --> Cache
@@ -32,7 +32,7 @@ flowchart LR
     Caller --> Activation
 ```
 
-The default directory preserves these invariants:
+The legacy directory preserves these invariants:
 
 - a directory key is derived from the grain identity, not its current location;
 - the membership view determines the authoritative owner;
@@ -43,22 +43,20 @@ The default directory preserves these invariants:
 
 Message forwarding and invalidation repair stale caches. Forwarding is bounded and is not an application-level retry policy.
 
-Source: [`LocalGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/LocalGrainDirectory.cs) and [`LocalGrainDirectoryPartition`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/LocalGrainDirectoryPartition.cs).
+Source: [Legacy directory implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/LocalGrainDirectory.cs) and [legacy partition implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/LocalGrainDirectoryPartition.cs).
 
 ## Directory selection
 
-The runtime resolves a directory per grain type. The unnamed default resolves to `LocalGrainDirectory` unless the silo has explicitly replaced it. A named implementation of <xref:Orleans.GrainDirectory.IGrainDirectory> can be registered and selected using grain-type metadata.
+The runtime resolves a directory per grain type. The unnamed default resolves to `DistributedGrainDirectory` unless the silo has explicitly replaced it. A named implementation of <xref:Orleans.GrainDirectory.IGrainDirectory> can be registered and selected using grain-type metadata.
 
 Custom directories own their consistency, availability, and cleanup behavior. They should define what concurrent registration means, how failed silos are removed, and whether stale reads are possible. The surrounding message router cannot turn an eventually consistent custom directory into a strongly consistent one.
 
-## Experimental: `DistributedGrainDirectory` <a name="distributed-grain-directory"></a>
+## Default: `DistributedGrainDirectory` <a name="distributed-grain-directory"></a>
 
-<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> opts into a view-synchronous directory marked with compiler warning **`ORLEANSEXP003`**:
-
-It is not the default. The experimental status allows its API and protocol to evolve.
+The default directory is view-synchronous, with versioned range ownership and coordinated membership-view transitions. <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> selects it explicitly or registers a named alias. Aliases share one directory instance and one lifecycle participant per silo.
 
 <a name="partitioning-strategy"></a>
-The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
+The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
 
 <a name="view-change-procedure"></a>
 ```mermaid
@@ -84,13 +82,15 @@ API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?d
 
 ## Tradeoffs
 
-| Property | Default `LocalGrainDirectory` | Experimental `DistributedGrainDirectory` |
+| Property | `LegacyGrainDirectory` | Default `DistributedGrainDirectory` |
 | --- | --- | --- |
-| Status | Default | Opt-in, `ORLEANSEXP003` |
+| Selection | <xref:Orleans.Hosting.CoreHostingExtensions.UseLegacyGrainDirectory*?displayProperty=nameWithType> | Runtime default |
 | Ownership | Membership consistent-hash ring | Versioned ranges over membership views |
 | Normal lookup | Owner partition plus per-silo cache | Owner partition plus view coordination |
 | View change | Partition split/merge and cache repair | Sealed ranges and snapshot transfer |
 | Recovery emphasis | Duplicate detection and invalidation | Explicit range recovery |
-| Configuration | Existing default behavior | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType>, default 1 |
+| Configuration | Explicit directory selection | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType>, default 1 |
 
-More partitions can improve ownership granularity but increase transfer and coordination work. This page documents the mechanism; any production rollout of an experimental component should include compatibility, failure, and load testing.
+More partitions can improve ownership granularity but increase transfer and coordination work. Production rollouts should include compatibility, failure, and load testing.
+
+For directory changes during a version upgrade, follow [Grain directory migration](../migration/grain-directory.md#legacy-to-distributed-directory-upgrade).

@@ -7,6 +7,10 @@ namespace Orleans.Journaling;
 
 internal sealed class JournalingInstruments(OrleansInstruments instruments)
 {
+    // Direct construction shares process-lifetime telemetry, as JournalStorageTelemetry does.
+    private static readonly Lazy<JournalingInstruments> Direct = new(
+        static () => new(new OrleansInstruments(new DirectMeterFactory())));
+
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
     private const string OperationTagName = "operation";
@@ -26,7 +30,7 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
     internal const string CompactionReasonStorageRequested = "storage_requested";
     internal const string CompactionReasonMigration = "migration";
 
-    internal static JournalingInstruments CreateForDirectConstruction() => new(new OrleansInstruments(new DirectMeterFactory()));
+    internal static JournalingInstruments CreateForDirectConstruction() => Direct.Value;
 
     private readonly Counter<long> StateWriteRequests = instruments.Meter.CreateCounter<long>("orleans-journaling-state-write-requests");
     private readonly Counter<long> StateDeleteRequests = instruments.Meter.CreateCounter<long>("orleans-journaling-state-delete-requests");

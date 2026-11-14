@@ -21,7 +21,7 @@ The instrument type determines which query is meaningful. Don't alert on every d
 
 | Instrument type | Orleans use | Interpret it as |
 |---|---|---|
-| Counter or observable counter | Completed events, failures, bytes, and preaggregated request-latency data | A monotonically increasing total for one process lifetime. Query the increase or rate over a window. Account for resets when a process restarts. |
+| Counter or observable counter | Completed events, failures, and bytes | A monotonically increasing total for one process lifetime. Query the increase or rate over a window. Account for resets when a process restarts. |
 | Up/down counter | Connected clients and grain instances | A running total which can increase or decrease. Query the latest aggregated value, not its rate, when the question is "how many exist now?" |
 | Observable gauge | Connected gateways, activations, working-set members, and available memory | A point-in-time observation. Aggregate intentionally: a minimum often finds an unhealthy instance, while a sum gives a cluster total for counts. |
 | Histogram | Storage, activation, deactivation, message-size, and reminder-tardiness distributions | A distribution of observations. Use count for volume and buckets or percentiles for tail behavior. Configure backend bucket boundaries which cover expected values. |
@@ -39,13 +39,15 @@ Caller-side request instruments are emitted by standalone clients and by silos w
 | Instrument | Type and unit | Meaning and interpretation |
 |---|---|---|
 | `orleans-client-connected-gateways` | Observable gauge, count | Number of gateway connections held by this client. Alert when it remains zero beyond the expected reconnect window. A reduction which remains above zero indicates less path redundancy and should be correlated with gateway and network signals. |
-| `orleans-app-requests-latency-count` | Observable counter, count | Completed outbound request callbacks observed by the caller. Use its increase as the request volume denominator. |
-| `orleans-app-requests-latency-sum` | Observable counter, milliseconds, without unit metadata | Cumulative caller-observed elapsed time. Divide the increase in `sum` by the increase in `count` for a windowed mean, but use the bucket series for tail behavior. |
-| `orleans-app-requests-latency-bucket` | Observable counter, milliseconds encoded by the `duration` attribute | Preaggregated latency bands with boundaries from `1ms` through `15000ms`, plus an overflow band. Each series counts observations in its own band, rather than cumulative observations less than or equal to the boundary. Compute a distribution from increases in all bands over the same window. |
+| `orleans-app-requests-latency` | Histogram, `ms` | Distribution of completed outbound request callbacks observed by the caller. Use the histogram count for request volume, its sum and count for mean latency, and its buckets or percentiles for tail behavior. Orleans doesn't prescribe bucket boundaries because appropriate latency thresholds depend on the application. Configure them using an exact-name exporter View. |
 | `orleans-app-requests-timedout` | Counter, count; `grain_type` | Requests which exceeded the configured response timeout. Alert on a volume-gated ratio against completed requests, not one timeout or the lifetime total. |
 | `orleans-app-requests-canceled` | Counter, count; `grain_type` | Requests canceled by their caller. Separate expected cancellation from service failure using application context and traces. |
 
 Caller-observed request latency includes time until the callback completes, so it can include transport, queueing, grain execution, storage, and response delivery. It also records terminal paths such as timeout, cancellation, target-silo failure, and host shutdown. Use traces and the [incident runbooks](troubleshooting.md) to locate the delay.
+
+Versions which predate the histogram instrument emitted three observable counters named `orleans-app-requests-latency-bucket`, `orleans-app-requests-latency-count`, and `orleans-app-requests-latency-sum`. The bucket streams used a `duration` attribute and mutually exclusive bands. The histogram replaces those streams with a standard histogram distribution and a floating-point sum. Exporters choose the transport representation; for example, Prometheus classic histograms use cumulative `le` bucket series. Update exporter Views, dashboards, alerts, recording rules, and queries when upgrading.
+
+Configure boundaries according to the application's latency objectives and expected long tail. Use the same boundaries on every instance whose distributions are aggregated together. For example, a general-purpose millisecond profile could use `1`, `5`, `10`, `25`, `50`, `100`, `250`, `500`, `1000`, `2500`, `5000`, `10000`, `30000`, and `60000`, augmented with application-specific SLO thresholds. This is an example rather than an Orleans default.
 
 ## Silo signals
 
@@ -62,19 +64,24 @@ Caller-observed request latency includes time until the callback completes, so i
 | `orleans-messaging-pings-reply-missed` | Counter, count; `Destination` | Failed direct or indirect membership probes. Alert on a sustained increase or missed-reply ratio and correlate with membership transitions. Isolated misses can occur during pauses, restarts, or transient packet loss. |
 | `orleans-networking-sockets-opened` / `orleans-networking-sockets-closed` | Counters, count; `Direction` | Connection churn. Compare their rates and correlate with send failures. Their difference is only meaningful within one process lifetime. |
 
-Message-size instruments `orleans-messaging-sent-messages-size` and `orleans-messaging-received-messages-size` are histograms in `bytes`. Use them for payload growth and bandwidth diagnosis, not primary availability alerts. They include `ConnectionDirection`, `MessageDirection`, and sometimes a remote `silo` attribute.
+Message-size instruments `orleans-messaging-sent-messages-size` and `orleans-messaging-received-messages-size` are histograms in `bytes`. Use their distributions for payload growth and their sums for bandwidth diagnosis. They include `ConnectionDirection`, `MessageDirection`, and sometimes a remote `silo` attribute.
 
 ### Scheduling and activations
 
 | Instrument | Type and unit | Meaning and interpretation |
 |---|---|---|
 | `orleans-scheduler-long-running-turns` | Counter, count | Grain micro-turns whose synchronous execution exceeded <xref:Orleans.Configuration.SchedulingOptions.TurnWarningLengthThreshold>. The default is one second. The lifetime total naturally only increases; alert on its rate and correlate with latency, CPU, thread-pool, traces, and warning logs. |
-| `orleans-catalog-activations` | Observable gauge, count | Activations currently registered on this silo. Trend it against memory and traffic. A high value isn't intrinsically unhealthy; unexpected growth, imbalance, or churn is the useful signal. |
-| `orleans-catalog-activation-working-set` | Observable gauge, count | Activations in the local active working set. Compare it with total activations to understand the active portion of the catalog. |
-| `orleans-grains` | Up/down counter, count; `type` | Current grain instances by grain type after aggregation. Use it to identify placement imbalance or a grain type driving activation growth. |
-| `orleans-catalog-activation-created` / `orleans-catalog-activation-destroyed` | Counters, count | Activation lifecycle throughput. High rates in both directions indicate churn even when the current activation gauge is flat. |
-| `orleans-catalog-activation-latency` | Histogram, `ms`; `status`, `directory` | Activation duration and outcome. Break down non-success statuses (`canceled`, `directory_error`, `duplicate`, or `error`) and correlate tail latency with directory and storage health. |
-| `orleans-catalog-activation-failed-to-activate` | Counter, count | Activation attempts which failed to construct or initialize an activation. A sustained increase is an application availability signal. |
+| `orleans-catalog-activations` | Observable gauge, count; `grain_type` | Targets registered in this silo's activation directory, including system targets and stateless-worker group contexts. Trend each type against memory and traffic to identify growth, imbalance, or churn. |
+| `orleans-catalog-activation-working-set` | Observable gauge, count; `grain_type` | Recently active activations, retained until working-set eviction or deactivation. Compare per-type trends with catalog populations. |
+| `orleans-grains` | Up/down counter, count; `grain_type` | Constructed grain instances after aggregation of instance-assignment and disposal deltas. Each stateless-worker instance contributes individually. |
+| `orleans-catalog-activation-created` / `orleans-catalog-activation-destroyed` | Counters, count; `grain_type` | Catalog creation and unregistration throughput. High rates in both directions indicate churn even when the current activation gauge is flat. |
+| `orleans-catalog-activation-latency` | Histogram, `ms`; `grain_type`, `status`, `directory` | Activation duration and outcome. Break down non-success statuses (`canceled`, `directory_error`, `duplicate`, or `error`) and correlate tail latency with directory and storage health. |
+| `orleans-catalog-deactivation-latency` | Histogram, `ms`; `grain_type`, `via` | Deactivation duration by grain type and shutdown path. Use it to diagnose collection, migration, and shutdown delays. |
+| `orleans-catalog-activation-failed-to-activate` | Counter, count; `grain_type` | Activation attempts whose lifecycle initialization failed or was canceled. A sustained increase is an application availability signal. |
+
+The `grain_type` value is the canonical `GrainId.Type.ToString()` identity, including explicit names and constructed generic arguments. Orleans caches this value once per registered type and shares it across activations. Targeted events use the type in their grain ID; batch-level events retain their batch scope. See [Grain-type identity and aggregation](metrics-catalog.md#grain-type-identity-and-aggregation) for population boundaries and aggregation.
+
+For lifecycle throughput, sum event-counter increases across types and any untagged contributions over the same interval. For current cluster populations, sum the latest fresh per-silo gauge values, including untagged working-set members. Configure exporter resource identity and backend freshness rules so each silo contributes one current population. Compare per-host populations using the same observation window and freshness policy.
 
 A long-running turn means Orleans observed one scheduled work item executing synchronously beyond the configured warning threshold. It doesn't by itself prove a deadlock. Common causes include synchronous blocking, lock contention, CPU-heavy work, or blocking I/O. See [Grain turns appear stuck](troubleshooting.md#grain-turns-appear-stuck).
 
@@ -108,7 +115,7 @@ Metric identity includes resource attributes and instrument attributes. Set stab
 
 Useful Orleans dimensions are bounded operational categories:
 
-- `grain_type` or `type` for deployed grain types.
+- `grain_type` for canonical grain types and `type` for system-target types.
 - `Direction`, `ConnectionDirection`, `MessageDirection`, and `Phase`.
 - `status`, `directory`, and `via` for lifecycle outcomes.
 - `provider_type_name`, `state_name`, and `state_type` for configured storage.

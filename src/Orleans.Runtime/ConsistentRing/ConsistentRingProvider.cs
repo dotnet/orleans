@@ -19,11 +19,11 @@ namespace Orleans.Runtime.ConsistentRing
         internal SiloAddress MyAddress { get; }
         private IRingRange myRange;
 
-        /// list of silo members sorted by the hash value of their address
+        /// List of silo members sorted by unsigned address hash, matching the ring range boundaries and lookup keys.
         private readonly List<SiloAddress> membershipRingList = new();
         private readonly ILogger log;
         private bool isRunning;
-        private readonly int myKey;
+        private readonly uint myKey;
         private readonly RingRangeListenerManager rangeChangeListeners;
         private readonly ISiloStatusOracle _siloStatusOracle;
 
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.ConsistentRing
             log = loggerFactory.CreateLogger<ConsistentRingProvider>();
             MyAddress = siloAddr;
             _siloStatusOracle = siloStatusOracle;
-            myKey = MyAddress.GetConsistentHashCode();
+            myKey = unchecked((uint)MyAddress.GetConsistentHashCode());
 
             myRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
             rangeChangeListeners = new(myRange);
@@ -81,12 +81,12 @@ namespace Orleans.Runtime.ConsistentRing
                     throw new OrleansException(string.Format("{0}: Couldn't find my position in the ring {1}.", MyAddress, Utils.EnumerableToString(membershipRingList)));
 
                 // insert new silo in the sorted order
-                int hash = silo.GetConsistentHashCode();
+                uint hash = unchecked((uint)silo.GetConsistentHashCode());
 
                 // Find the last silo with hash smaller than the new silo, and insert the latter after (this is why we have +1 here) the former.
                 // Notice that FindLastIndex might return -1 if this should be the first silo in the list, but then
                 // 'index' will get 0, as needed.
-                int index = membershipRingList.FindLastIndex(siloAddr => siloAddr.GetConsistentHashCode() < hash) + 1;
+                int index = membershipRingList.FindLastIndex(siloAddr => unchecked((uint)siloAddr.GetConsistentHashCode()) < hash) + 1;
                 membershipRingList.Insert(index, silo);
 
                 // relating to triggering handler ... new node took over some of my responsibility
@@ -94,7 +94,7 @@ namespace Orleans.Runtime.ConsistentRing
                     (myOldIndex == 0 && index == membershipRingList.Count - 1)) // I am the first node, and the new server is the last node
                 {
                     IRingRange oldRange = myRange;
-                    myRange = RangeFactory.CreateRange(unchecked((uint)hash), unchecked((uint)myKey));
+                    myRange = RangeFactory.CreateRange(hash, myKey);
                     notification = PublishRangeChange(oldRange, myRange, false);
                 }
 
@@ -156,9 +156,9 @@ namespace Orleans.Runtime.ConsistentRing
                     else
                     {
                         int myNewPredIndex = myNewIndex == 0 ? membershipRingList.Count - 1 : myNewIndex - 1;
-                        int myPredecessorsHash = membershipRingList[myNewPredIndex].GetConsistentHashCode();
+                        uint myPredecessorsHash = unchecked((uint)membershipRingList[myNewPredIndex].GetConsistentHashCode());
 
-                        myRange = RangeFactory.CreateRange(unchecked((uint)myPredecessorsHash), unchecked((uint)myKey));
+                        myRange = RangeFactory.CreateRange(myPredecessorsHash, myKey);
                     }
 
                     notification = PublishRangeChange(oldRange, myRange, true);
@@ -273,7 +273,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private bool IsSiloNextInTheRing(SiloAddress siloAddr, uint hash, bool excludeMySelf)
         {
-            return siloAddr.GetConsistentHashCode() >= hash && (!siloAddr.Equals(MyAddress) || !excludeMySelf);
+            return unchecked((uint)siloAddr.GetConsistentHashCode()) >= hash && (!siloAddr.Equals(MyAddress) || !excludeMySelf);
         }
 
         public void Dispose()

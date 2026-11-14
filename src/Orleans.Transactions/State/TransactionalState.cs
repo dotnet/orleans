@@ -27,7 +27,6 @@ namespace Orleans.Transactions
         private readonly Dictionary<Type, object> copiers;
         private readonly IGrainRuntime grainRuntime;
         private readonly ILogger logger;
-        private readonly ActivationLifetime activationLifetime;
         private ParticipantId participantId;
         private TransactionQueue<TState> queue = null!;
 
@@ -60,12 +59,13 @@ namespace Orleans.Transactions
             this.logger = logger;
             this.copiers = new Dictionary<Type, object>();
             this.copiers.Add(typeof(TState), copier);
-            this.activationLifetime = new ActivationLifetime(this.context);
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="operation"/> is null.</exception>
         public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation)
         {
+            ArgumentNullException.ThrowIfNull(operation);
             if (detectReentrancy)
             {
                 throw new LockRecursionException("Cannot perform a read operation from within another operation");
@@ -115,6 +115,48 @@ namespace Orleans.Transactions
 
                     return result;
                 });
+        }
+
+        /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="operation"/> is null.</exception>
+        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation, ReadIsolation isolation)
+        {
+            return isolation switch
+            {
+                ReadIsolation.Serializable => PerformRead(operation),
+                ReadIsolation.ReadCommitted => PerformReadCommitted(operation),
+                _ => throw new ArgumentOutOfRangeException(nameof(isolation), isolation, "Unknown read isolation."),
+            };
+        }
+
+        private async Task<TResult> PerformReadCommitted<TResult>(Func<TState, TResult> operation)
+        {
+            ArgumentNullException.ThrowIfNull(operation);
+            if (detectReentrancy)
+            {
+                throw new LockRecursionException("Cannot perform a read operation from within another operation");
+            }
+
+            // A committed snapshot is outside the ambient transaction's locks, so it would break serializability.
+            if (TransactionContext.GetTransactionInfo() is { } info)
+            {
+                throw new OrleansTransactionException($"A read-committed read cannot be performed inside transaction {info.Id}.");
+            }
+
+            await this.queue.Ready();
+
+            this.queue.GetCommittedState(out var state, out var sequenceNumber);
+            LogDebugReadCommitted(sequenceNumber);
+
+            try
+            {
+                detectReentrancy = true;
+                return CopyResult(operation(state));
+            }
+            finally
+            {
+                detectReentrancy = false;
+            }
         }
 
         /// <inheritdoc/>
@@ -185,10 +227,16 @@ namespace Orleans.Transactions
         }
 
         /// <inheritdoc />
-        public void Participate(IGrainLifecycle lifecycle)
+        public void Participate(IGrainLifecycle lifecycle) => Participate(lifecycle, SetupResourceFactory);
+
+        internal void Participate(IGrainLifecycle lifecycle, Action<IGrainContext, string, TransactionQueue<TState>> setupResourceFactory)
         {
-            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(SetupResourceFactory, ct));
+            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(setupResourceFactory, ct), OnStop);
+            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.Last, static _ => Task.CompletedTask, OnStop);
         }
+
+        // Setup can fail before the queue is created.
+        private Task OnStop(CancellationToken ct) => this.queue?.StopAsync(ct) ?? Task.CompletedTask;
 
         private static void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
         {
@@ -199,7 +247,7 @@ namespace Orleans.Transactions
             context.RegisterResourceFactory<ITransactionManager>(stateName, () => new TransactionManager<TState>(queue));
         }
 
-        internal async Task OnSetupState(Action<IGrainContext, string, TransactionQueue<TState>> setupResourceFactory, CancellationToken ct)
+        private async Task OnSetupState(Action<IGrainContext, string, TransactionQueue<TState>> setupResourceFactory, CancellationToken ct)
         {
             if (ct.IsCancellationRequested) return;
 
@@ -224,7 +272,6 @@ namespace Orleans.Transactions
                 clock,
                 logger,
                 timerManager,
-                this.activationLifetime,
                 diagnosticIdentity);
 
             setupResourceFactory(this.context, this.config.StateName, queue);
@@ -264,6 +311,12 @@ namespace Orleans.Transactions
             Message = "Update-lock read v{SequenceNumber} {TransactionId} {Timestamp}"
         )]
         private partial void LogDebugUpdateLockRead(long sequenceNumber, Guid transactionId, DateTimeLogRecord timestamp);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Read-committed read v{SequenceNumber}"
+        )]
+        private partial void LogDebugReadCommitted(long sequenceNumber);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

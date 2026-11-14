@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -38,14 +39,9 @@ internal static class Program
 
         var blobServiceClient = new BlobServiceClient(settings.ConnectionString);
         var container = blobServiceClient.GetBlobContainerClient(settings.ContainerName);
-        await container.CreateIfNotExistsAsync();
 
         var walBlobName = $"{settings.BlobName}/wal";
         var blob = container.GetAppendBlobClient(walBlobName);
-        if (settings.ResetBlob)
-        {
-            await blob.DeleteIfExistsAsync();
-        }
 
         builder.UseOrleans(siloBuilder =>
         {
@@ -68,35 +64,48 @@ internal static class Program
         });
 
         using var host = builder.Build();
+        var cancellationToken = host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
 
-        await host.StartAsync();
+        try
+        {
+            await host.StartAsync(cancellationToken);
+            await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            if (settings.ResetBlob)
+            {
+                await blob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            }
 
-        var client = host.Services.GetRequiredService<IClusterClient>();
-        var grain = client.GetGrain<IJournaledSampleGrain>("azure-json-codec");
+            var client = host.Services.GetRequiredService<IClusterClient>();
+            var grain = client.GetGrain<IJournaledSampleGrain>("azure-json-codec");
 
-        Console.WriteLine("Writing durable grain state...");
-        var written = await grain.RunScenario();
-        Console.WriteLine(JsonSerializer.Serialize(written, JournalingSampleJsonContext.Default.JournaledSampleSummary));
+            Console.WriteLine("Writing durable grain state...");
+            var written = await grain.RunScenario(cancellationToken);
+            Console.WriteLine(JsonSerializer.Serialize(written, JournalingSampleJsonContext.Default.JournaledSampleSummary));
 
-        Console.WriteLine("Deactivating and reactivating the grain to force recovery...");
-        await grain.Deactivate();
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+            Console.WriteLine("Deactivating and reactivating the grain to force recovery...");
+            await grain.Deactivate(cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
-        var recovered = await grain.GetSummary();
-        ValidateRecovery(written, recovered);
-        Console.WriteLine(JsonSerializer.Serialize(recovered, JournalingSampleJsonContext.Default.JournaledSampleSummary));
+            var recovered = await grain.GetSummary(cancellationToken);
+            ValidateRecovery(written, recovered);
+            Console.WriteLine(JsonSerializer.Serialize(recovered, JournalingSampleJsonContext.Default.JournaledSampleSummary));
 
-        Console.WriteLine();
-        Console.WriteLine($"Raw JSONL blob contents from {settings.ContainerName}/{walBlobName}:");
-        Console.WriteLine(await DownloadBlobAsText(blob));
-
-        await host.StopAsync();
-        return 0;
+            Console.WriteLine();
+            Console.WriteLine($"Raw JSONL blob contents from {settings.ContainerName}/{walBlobName}:");
+            Console.WriteLine(await DownloadBlobAsText(blob, cancellationToken));
+            return 0;
+        }
+        finally
+        {
+            using var shutdown = new CancellationTokenSource(
+                host.Services.GetRequiredService<IOptions<HostOptions>>().Value.ShutdownTimeout);
+            await host.StopAsync(shutdown.Token);
+        }
     }
 
-    private static async Task<string> DownloadBlobAsText(AppendBlobClient blob)
+    private static async Task<string> DownloadBlobAsText(AppendBlobClient blob, CancellationToken cancellationToken)
     {
-        var result = await blob.DownloadContentAsync();
+        var result = await blob.DownloadContentAsync(cancellationToken);
         return Encoding.UTF8.GetString(result.Value.Content.ToArray());
     }
 
@@ -230,52 +239,62 @@ internal static class Program
 
 public interface IJournaledSampleGrain : IGrainWithStringKey
 {
-    Task<JournaledSampleSummary> RunScenario();
-    Task<JournaledSampleSummary> GetSummary();
-    Task Deactivate();
+    Task<JournaledSampleSummary> RunScenario(CancellationToken cancellationToken);
+    Task<JournaledSampleSummary> GetSummary(CancellationToken cancellationToken);
+    Task Deactivate(CancellationToken cancellationToken);
 }
 
-public sealed class JournaledSampleGrain(
-    [FromKeyedServices("inventory")] IDurableDictionary<string, InventoryItem> inventory,
-    [FromKeyedServices("events")] IDurableList<JournalEvent> events,
-    [FromKeyedServices("work")] IDurableQueue<WorkItem> workQueue,
-    [FromKeyedServices("tags")] IDurableSet<string> tags,
-    [FromKeyedServices("balance")] IDurableValue<AccountBalance> balance,
-    [FromKeyedServices("profile")] IPersistentState<ProfileState> profile,
-    [FromKeyedServices("receipt")] IDurableTaskCompletionSource<Receipt> receipt) : DurableGrain, IJournaledSampleGrain
+public sealed class JournaledSampleGrain(IDurableStateManager stateManager) : Grain, IJournaledSampleGrain
 {
     private readonly Guid _activationId = Guid.NewGuid();
 
-    public async Task<JournaledSampleSummary> RunScenario()
+    // Declare state components during construction; Orleans recovers state before grain methods run.
+    private readonly IDurableDictionary<string, InventoryItem> _inventory =
+        stateManager.GetOrAddDictionary<string, InventoryItem>("inventory");
+    private readonly IDurableList<JournalEvent> _events =
+        stateManager.GetOrAddList<JournalEvent>("events");
+    private readonly IDurableQueue<WorkItem> _workQueue =
+        stateManager.GetOrAddQueue<WorkItem>("work");
+    private readonly IDurableSet<string> _tags =
+        stateManager.GetOrAddSet<string>("tags");
+    private readonly IDurableValue<AccountBalance> _balance =
+        stateManager.GetOrAddValue<AccountBalance>("balance");
+    private readonly IPersistentState<ProfileState> _profile =
+        stateManager.GetOrAddPersistentState<ProfileState>("profile");
+    private readonly IDurableTaskCompletionSource<Receipt> _receipt =
+        stateManager.GetOrAddTaskCompletionSource<Receipt>("receipt");
+
+    public async Task<JournaledSampleSummary> RunScenario(CancellationToken cancellationToken)
     {
-        inventory.Clear();
-        inventory["sku-apple"] = new InventoryItem("sku-apple", 12, 1.25m, ["fresh", "fruit"]);
-        inventory["sku-orange"] = new InventoryItem("sku-orange", 9, 1.10m, ["citrus", "fruit"]);
-        inventory.Remove("sku-orange");
-        inventory["sku-coffee"] = new InventoryItem("sku-coffee", 3, 12.99m, ["beans", "dark-roast"]);
+        cancellationToken.ThrowIfCancellationRequested();
+        _inventory.Clear();
+        _inventory["sku-apple"] = new InventoryItem("sku-apple", 12, 1.25m, ["fresh", "fruit"]);
+        _inventory["sku-orange"] = new InventoryItem("sku-orange", 9, 1.10m, ["citrus", "fruit"]);
+        _inventory.Remove("sku-orange");
+        _inventory["sku-coffee"] = new InventoryItem("sku-coffee", 3, 12.99m, ["beans", "dark-roast"]);
 
-        events.Clear();
-        events.Add(new JournalEvent("started", DateTimeOffset.UtcNow, "scenario", ["initial write"]));
-        events.Add(new JournalEvent("inventory-loaded", DateTimeOffset.UtcNow, "inventory", ["dictionary set", "dictionary remove"]));
-        events.Insert(1, new JournalEvent("audit-inserted", DateTimeOffset.UtcNow, "audit", ["list insert"]));
-        events[0] = new JournalEvent("started-updated", DateTimeOffset.UtcNow, "scenario", ["list set"]);
-        events.RemoveAt(2);
-        events.Add(new JournalEvent("ready", DateTimeOffset.UtcNow, "scenario", ["list add"]));
+        _events.Clear();
+        _events.Add(new JournalEvent("started", DateTimeOffset.UtcNow, "scenario", ["initial write"]));
+        _events.Add(new JournalEvent("inventory-loaded", DateTimeOffset.UtcNow, "inventory", ["dictionary set", "dictionary remove"]));
+        _events.Insert(1, new JournalEvent("audit-inserted", DateTimeOffset.UtcNow, "audit", ["list insert"]));
+        _events[0] = new JournalEvent("started-updated", DateTimeOffset.UtcNow, "scenario", ["list set"]);
+        _events.RemoveAt(2);
+        _events.Add(new JournalEvent("ready", DateTimeOffset.UtcNow, "scenario", ["list add"]));
 
-        workQueue.Clear();
-        workQueue.Enqueue(new WorkItem(Guid.NewGuid(), "ship", 10, true));
-        workQueue.Enqueue(new WorkItem(Guid.NewGuid(), "email", 2, false));
-        _ = workQueue.Dequeue();
-        workQueue.Enqueue(new WorkItem(Guid.NewGuid(), "reconcile", 7, true));
+        _workQueue.Clear();
+        _workQueue.Enqueue(new WorkItem(Guid.NewGuid(), "ship", 10, true));
+        _workQueue.Enqueue(new WorkItem(Guid.NewGuid(), "email", 2, false));
+        _ = _workQueue.Dequeue();
+        _workQueue.Enqueue(new WorkItem(Guid.NewGuid(), "reconcile", 7, true));
 
-        tags.Clear();
-        tags.Add("json");
-        tags.Add("azure-append-blob");
-        tags.Add("temporary");
-        tags.Remove("temporary");
-        tags.UnionWith(["journaling", "recovery"]);
+        _tags.Clear();
+        _tags.Add("json");
+        _tags.Add("azure-append-blob");
+        _tags.Add("temporary");
+        _tags.Remove("temporary");
+        _tags.UnionWith(["journaling", "recovery"]);
 
-        balance.Value = new AccountBalance(
+        _balance.Value = new AccountBalance(
             "USD",
             42.75m,
             [
@@ -283,39 +302,45 @@ public sealed class JournaledSampleGrain(
                 new LedgerEntry("coffee", -7.25m, "inventory adjustment")
             ]);
 
-        profile.State = new ProfileState(
+        _profile.State = new ProfileState(
             "json-codec-sample",
             2,
             DateTimeOffset.UtcNow,
-            balance.Value);
+            _balance.Value);
 
-        receipt.TrySetResult(new Receipt("receipt-001", OperationCount: 24, CompletedAt: DateTimeOffset.UtcNow));
+        _receipt.TrySetResult(new Receipt("receipt-001", OperationCount: 24, CompletedAt: DateTimeOffset.UtcNow));
 
-        await WriteStateAsync();
+        // One acknowledgement covers pending changes across all seven state components.
+        await stateManager.WriteStateAsync(cancellationToken);
         return CreateSummary();
     }
 
-    public Task<JournaledSampleSummary> GetSummary() => Task.FromResult(CreateSummary());
-
-    public Task Deactivate()
+    public Task<JournaledSampleSummary> GetSummary(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(CreateSummary());
+    }
+
+    public Task Deactivate(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         DeactivateOnIdle();
         return Task.CompletedTask;
     }
 
     private JournaledSampleSummary CreateSummary()
     {
-        var completion = receipt.State;
+        var completion = _receipt.State;
         return new JournaledSampleSummary(
             _activationId,
-            inventory.OrderBy(static item => item.Key, StringComparer.Ordinal)
+            _inventory.OrderBy(static item => item.Key, StringComparer.Ordinal)
                 .Select(static item => new InventoryEntry(item.Key, item.Value))
                 .ToArray(),
-            events.ToArray(),
-            workQueue.ToArray(),
-            tags.Order(StringComparer.Ordinal).ToArray(),
-            balance.Value ?? throw new InvalidOperationException("Balance has not been written."),
-            profile.State,
+            _events.ToArray(),
+            _workQueue.ToArray(),
+            _tags.Order(StringComparer.Ordinal).ToArray(),
+            _balance.Value ?? throw new InvalidOperationException("Balance has not been written."),
+            _profile.State,
             completion.Status,
             completion.Value);
     }

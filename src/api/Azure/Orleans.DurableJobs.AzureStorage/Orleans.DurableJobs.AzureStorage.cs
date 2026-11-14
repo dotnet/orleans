@@ -13,5 +13,9 @@ namespace Orleans.Hosting
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureBlobDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
 
         public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, System.Action<Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Journaling.AzureTableJournalStorageOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseAzureTableDurableJobs(this ISiloBuilder builder, System.Action<Journaling.AzureTableJournalStorageOptions> configure) { throw null; }
     }
 }

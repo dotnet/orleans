@@ -19,7 +19,7 @@ internal static class Program
         ValidateRuntimeRegistration();
         await ValidateStartupTaskActivation();
 
-        Console.WriteLine("Selected generic DI constructor flows survived the self-contained trimmed smoke.");
+        Console.WriteLine("Selected generic DI constructor flows activated successfully.");
     }
 
     private static void ValidateCoreRegistration()

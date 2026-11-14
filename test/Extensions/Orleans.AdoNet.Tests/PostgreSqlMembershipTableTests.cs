@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
+using Orleans.Clustering.TestKit;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
@@ -16,6 +18,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     [TestCategory("Membership"), TestCategory("PostgreSql"), TestCategory("Functional")]
     [TestSuite("Functional")]
+    [TestCategory("ClusteringCurrentSchema")]
     [TestProvider("PostgreSql")]
     [TestArea("Membership")]
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
@@ -32,14 +35,24 @@ namespace UnitTests.MembershipTests
         }
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             var options = new AdoNetClusteringSiloOptions()
             {
                 Invariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new AdoNetClusteringTable(this.Services, this._clusterOptions, Options.Create(options), this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
+            return new AdoNetClusteringTable(this.Services, clusterOptions, Options.Create(options), this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
+
+        private ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
+            => AdoNetMembershipTableConformanceProbe.IsDeletedAsync(
+                new NpgsqlConnection(connectionString), clusterId, cancellationToken);
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
@@ -61,14 +74,14 @@ namespace UnitTests.MembershipTests
             var instance = await RelationalStorageForTesting.SetupInstance(
                 GetAdoInvariant(),
                 testDatabaseName,
-                cancellationToken: TestContext.Current.CancellationToken);
+                cancellationToken: TestContext.Current.CancellationToken,
+                setupSqlScriptFileNames: ["PostgreSQL-Main.sql", "PostgreSQL-Clustering.sql"]);
             return instance.CurrentConnectionString;
         }
 
         [Fact]
-        public void MembershipTable_PostgreSql_Init()
-        {
-        }
+        public Task MembershipTable_PostgreSql_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact]
         public async Task MembershipTable_PostgreSql_GetGateways()

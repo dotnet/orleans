@@ -25,7 +25,6 @@ namespace Orleans.Transactions
         private readonly IGrainContext context;
         private readonly ITransactionDataCopier<OperationState> copier;
         private readonly IGrainRuntime grainRuntime;
-        private readonly ActivationLifetime activationLifetime;
         private readonly ILogger logger;
         private ParticipantId participantId;
         private TransactionQueue<OperationState> queue = null!;
@@ -52,7 +51,6 @@ namespace Orleans.Transactions
             this.copier = copier;
             this.grainRuntime = grainRuntime;
             this.logger = logger;
-            this.activationLifetime = new ActivationLifetime(this.context);
         }
 
         /// <inheritdoc/>
@@ -125,8 +123,12 @@ namespace Orleans.Transactions
         /// <inheritdoc/>
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.SetupState, OnSetupState, OnStop);
+            lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.Last, static _ => Task.CompletedTask, OnStop);
         }
+
+        // Setup can fail before the queue is created.
+        private Task OnStop(CancellationToken ct) => this.queue?.StopAsync(ct) ?? Task.CompletedTask;
 
         private async Task OnSetupState(CancellationToken ct)
         {
@@ -155,7 +157,6 @@ namespace Orleans.Transactions
                 clock,
                 logger,
                 timerManager,
-                this.activationLifetime,
                 diagnosticIdentity);
 
             // Add transaction manager factory to the grain context

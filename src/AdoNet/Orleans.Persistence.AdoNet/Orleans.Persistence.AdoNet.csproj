@@ -32,4 +32,3 @@
     <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
   </ItemGroup>
 </Project>
-

@@ -1,0 +1,340 @@
+using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.TestingHost;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
+using Xunit;
+
+namespace DefaultCluster.Tests.General;
+
+/// <summary>
+/// Tests for <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>,
+/// which runs a delegate as a request on the grain's activation.
+/// </summary>
+[TestCategory("BVT"), TestCategory("Scheduler")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
+public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
+{
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+
+    public RunRequestTests(DefaultClusterFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task NonReentrantGrain_RunsRequestAfterCurrentCall()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartRequestDuringCall();
+        await grain.AwaitPendingRequest();
+
+        Assert.Equal(["call-start", "call-end", "request"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task ReentrantGrain_InterleavesRequestWithCurrentCall()
+    {
+        var grain = GrainFactory.GetGrain<IReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartRequestDuringCall();
+        await grain.AwaitPendingRequest();
+
+        Assert.Equal(["call-start", "request", "call-end"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task NonReentrantGrain_RequestExcludesGrainCalls()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.StartBlockingRequest();
+        await WaitForLogEntryAsync(grain, "request-start");
+
+        var ping = grain.Ping();
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+        Assert.False(ping.IsCompleted);
+
+        await grain.ReleaseBlockingRequest();
+        await ping;
+        await grain.AwaitPendingRequest();
+
+        Assert.Equal(["request-start", "request-end", "ping"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task ReentrantGrain_GrainCallsInterleaveWithRequest()
+    {
+        var grain = GrainFactory.GetGrain<IReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.StartBlockingRequest();
+        await WaitForLogEntryAsync(grain, "request-start");
+
+        await grain.Ping();
+        await grain.ReleaseBlockingRequest();
+        await grain.AwaitPendingRequest();
+
+        Assert.Equal(["request-start", "ping", "request-end"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task RunRequest_ReturnsCallbackResult()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartValueRequest(21);
+
+        Assert.Equal("42", await grain.AwaitPendingRequest());
+    }
+
+    [Fact]
+    public async Task RunRequest_StartsNewCallChain()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartRequestContextRequest("caller");
+
+        Assert.Null(await grain.AwaitPendingRequest());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunRequest_PropagatesCallbackException(bool synchronous)
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartFaultingRequest(synchronous);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(grain.AwaitPendingRequest);
+        Assert.Equal("Request failed.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunRequest_CanceledBeforeStart_DoesNotRunCallback(bool cancelBeforeQueue)
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartCanceledRequest(cancelBeforeQueue);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(grain.AwaitPendingRequest);
+        Assert.Empty(await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task RunRequest_PassesThroughGrainCallFilter()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartValueRequest(1);
+        await grain.AwaitPendingRequest();
+
+        Assert.Contains("IGrainRequestInvoker.RunRequestAsync", await grain.GetFilteredCalls());
+    }
+
+
+    [Fact]
+    public async Task ReceiveLocalRequest_CustomRequest_ReceivesResponse()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartCustomInvokableRequest("custom");
+
+        Assert.Equal("custom:True", await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+        Assert.Contains("ICustomRequests.Apply", await grain.GetFilteredCalls());
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_ThroughCallFilter_CompletesWithResultInstance()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        Assert.True(await grain.ReceiveLocalRequestReturnsResultInstance().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_WithoutCallFilters_CompletesWithResultInstance()
+    {
+        var grain = GrainFactory.GetGrain<IUnfilteredRunRequestGrain>(Guid.NewGuid());
+
+        Assert.True(await grain.ReceiveLocalRequestReturnsResultInstance().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_CustomRequest_IsDisposedAfterCompletion()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        Assert.Equal("lifecycle:True:disposed-before-completion=False", await grain.RunCustomRequestLifecycle().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_RejectedBatchWithThrowingCompletion_CompletesEveryRequestOnce()
+    {
+        var grain = GrainFactory.GetGrain<IMayInterleaveRunRequestGrain>(Guid.NewGuid());
+        await grain.StartBlockingRequest();
+        await WaitForLogEntryAsync(grain, "request-start");
+
+        Assert.Equal("Predicate failed.:1|Predicate failed.:1", await grain.RejectRequestsWithThrowingCompletion().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+
+        await grain.ReleaseBlockingRequest();
+        await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_MayInterleavePredicate_ObservesCustomRequest()
+    {
+        var grain = GrainFactory.GetGrain<IMayInterleaveRunRequestGrain>(Guid.NewGuid());
+        await grain.StartBlockingRequest();
+        await WaitForLogEntryAsync(grain, "request-start");
+
+        Assert.Equal("custom:True", await grain.RunCustomRequestDuringBlockingRequest());
+
+        await grain.ReleaseBlockingRequest();
+        await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task NonReentrantGrain_InterleavingRequestRunsDuringCurrentCall()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartInterleavingRequestDuringCall();
+        await grain.AwaitPendingRequest();
+
+        Assert.Equal(["call-start", "request", "call-end"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task RunRequest_FilterThrows_FaultsRequest()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.SetRequestFilterMode(RequestFilterMode.Throw);
+
+        await grain.StartValueRequest(1);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+        Assert.Equal("Filter failed.", exception.Message);
+    }
+
+    [Fact]
+    public async Task RunRequest_FilterShortCircuits_CompletesWithFilterResult()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.SetRequestFilterMode(RequestFilterMode.ShortCircuit);
+
+        await grain.StartValueRequest(1);
+
+        Assert.Equal("filtered", await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task RunRequest_FilterThrowsAfterInvoke_CompletesWithCallbackResult()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.SetRequestFilterMode(RequestFilterMode.ThrowAfterInvoke);
+
+        await grain.StartValueRequest(21);
+
+        Assert.Equal("42", await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task RunRequest_FromOutsideActivation_RunsOnActivation()
+    {
+        var key = Guid.NewGuid();
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(key);
+        await grain.RetainInstance();
+
+        Assert.Equal("ran", await RunRequestGrainBase.RunRequestOnRetainedInstance(key).WaitAsync(Timeout, TestContext.Current.CancellationToken));
+        Assert.Equal(["outside"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task RunRequest_OnDeactivatedActivation_IsRejected()
+    {
+        var key = Guid.NewGuid();
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(key);
+        await grain.DeactivateAndRetainInstance();
+
+        // Requests queued while the activation is still deactivating run; once it is invalid, they are rejected.
+        await WaitForRejectionAsync(key);
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_RejectionCompletionQueuesRequest_RejectsEachRequestOnce()
+    {
+        var key = Guid.NewGuid();
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(key);
+        await grain.DeactivateAndRetainInstance();
+        await WaitForRejectionAsync(key);
+
+        // The first request's rejection queues the second request while the activation drains its queue.
+        var (firstCompletions, secondResponse) = await RunRequestGrainBase.QueueChainedRequestsOnRetainedInstance(key).WaitAsync(Timeout, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, firstCompletions);
+        Assert.IsType<OrleansMessageRejectionException>(secondResponse.Exception);
+    }
+
+    private static async Task WaitForRejectionAsync(Guid key)
+    {
+        using var timeout = new CancellationTokenSource(Timeout);
+        while (true)
+        {
+            try
+            {
+                await RunRequestGrainBase.RunRequestOnRetainedInstance(key).WaitAsync(timeout.Token);
+            }
+            catch (OrleansMessageRejectionException)
+            {
+                return;
+            }
+
+            await Task.Delay(50, timeout.Token);
+        }
+    }
+
+    private static async Task WaitForLogEntryAsync(IRunRequestGrain grain, string entry)
+    {
+        using var timeout = new CancellationTokenSource(Timeout);
+        while (!(await grain.GetLog()).Contains(entry))
+        {
+            await Task.Delay(20, timeout.Token);
+        }
+    }
+}
+
+/// <summary>
+/// Tests how requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>
+/// interact with <see cref="SiloMessagingOptions.MaxEnqueuedRequestsHardLimit"/>.
+/// </summary>
+[TestCategory("BVT"), TestCategory("Scheduler")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
+public class RunRequestQueueLimitTests : TestClusterPerTest
+{
+    private const int HardLimit = 3;
+
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        builder.Options.InitialSilosCount = 1;
+        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+    }
+
+    [Fact]
+    public async Task RunRequest_IgnoresHardLimit()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        Assert.Equal(HardLimit * 4, await grain.QueueRequests(HardLimit * 4).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+    }
+
+
+    private sealed class SiloConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder) =>
+            hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxEnqueuedRequestsHardLimit = HardLimit);
+    }
+}

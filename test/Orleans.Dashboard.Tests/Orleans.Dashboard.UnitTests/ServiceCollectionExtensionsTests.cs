@@ -31,6 +31,26 @@ namespace UnitTests;
 public class ServiceCollectionExtensionsTests
 {
     [Fact]
+    public void AddDashboard_NullSiloBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => builder.AddDashboard());
+
+        Assert.Equal("siloBuilder", exception.ParamName);
+    }
+
+    [Fact]
+    public void AddDashboard_NullClientBuilder_ThrowsArgumentNullException()
+    {
+        IClientBuilder builder = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => builder.AddDashboard());
+
+        Assert.Equal("clientBuilder", exception.ParamName);
+    }
+
+    [Fact]
     public void AddDashboard_SiloBuilder_RegistersExpectedImplementationsLifetimesAndSharedIdentities()
     {
         var builder = new TestSiloBuilder();
@@ -44,15 +64,16 @@ public class ServiceCollectionExtensionsTests
         AssertTypeDescriptor<IIncomingGrainCallFilter, GrainProfilerFilter>(builder.Services);
         AssertTypeDescriptor<EmbeddedAssetProvider, EmbeddedAssetProvider>(builder.Services);
         AssertTypeDescriptor<DashboardTelemetryExporter, DashboardTelemetryExporter>(builder.Services);
+        AssertTypeDescriptor<DashboardHost, DashboardHost>(builder.Services);
         AssertTypeDescriptor<DashboardLogger, DashboardLogger>(builder.Services);
         AssertTypeDescriptor<SiloStatusOracleSiloDetailsProvider, SiloStatusOracleSiloDetailsProvider>(builder.Services);
         AssertTypeDescriptor<MembershipTableSiloDetailsProvider, MembershipTableSiloDetailsProvider>(builder.Services);
 
         var hostedService = Assert.Single(
             builder.Services,
-            descriptor => descriptor.ServiceType == typeof(IHostedService)
-                && descriptor.ImplementationType == typeof(DashboardHost));
+            descriptor => descriptor.ServiceType == typeof(IHostedService));
         Assert.Equal(ServiceLifetime.Singleton, hostedService.Lifetime);
+        Assert.NotNull(hostedService.ImplementationFactory);
 
         var grainService = Assert.Single(
             builder.Services,
@@ -108,11 +129,23 @@ public class ServiceCollectionExtensionsTests
         Assert.True(options.HideTrace);
         Assert.Single(
             builder.Services,
-            descriptor => descriptor.ServiceType == typeof(IHostedService)
-                && descriptor.ImplementationType == typeof(DashboardHost));
+            descriptor => descriptor.ServiceType == typeof(IHostedService));
         Assert.Single(
             builder.Services,
             descriptor => descriptor.ServiceType == typeof(GrainProfilerFilter.GrainMethodFormatterDelegate));
+    }
+
+    [Fact]
+    public void AddDashboard_SharesHostBetweenHostedServiceAndSiloLifecycle()
+    {
+        using var host = new HostBuilder()
+            .ConfigureLogging(logging => logging.ClearProviders())
+            .UseOrleans(silo => silo.UseLocalhostClustering().AddDashboard())
+            .Build();
+        var dashboardHost = host.Services.GetRequiredService<DashboardHost>();
+
+        Assert.Same(dashboardHost, Assert.Single(host.Services.GetServices<IHostedService>().OfType<DashboardHost>()));
+        Assert.Same(dashboardHost, Assert.Single(host.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>().OfType<DashboardHost>()));
     }
 
     [Fact]
@@ -216,21 +249,13 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public void AddOrleansDashboardForSiloCore_ProfilerLifecycleRegistrationAliasesProfilerInstance()
     {
-        var services = new ServiceCollection();
-        services.AddOrleansDashboardForSiloCore();
-        var lifecycleDescriptor = Assert.Single(
-            services,
-            descriptor => descriptor.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>));
-        Assert.Equal(ServiceLifetime.Singleton, lifecycleDescriptor.Lifetime);
-        Assert.NotNull(lifecycleDescriptor.ImplementationFactory);
+        using var host = new HostBuilder()
+            .ConfigureLogging(logging => logging.ClearProviders())
+            .UseOrleans(silo => silo.UseLocalhostClustering().AddDashboard())
+            .Build();
+        var profiler = host.Services.GetRequiredService<IGrainProfiler>();
 
-        var profiler = new TestProfiler();
-        IServiceCollection aliasServices = new ServiceCollection();
-        aliasServices.AddSingleton<IGrainProfiler>(profiler);
-        aliasServices.Add(lifecycleDescriptor);
-
-        using var provider = aliasServices.BuildServiceProvider();
-        Assert.Same(profiler, provider.GetRequiredService<ILifecycleParticipant<ISiloLifecycle>>());
+        Assert.Same(profiler, Assert.Single(host.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>().OfType<IGrainProfiler>()));
     }
 
     [Fact]

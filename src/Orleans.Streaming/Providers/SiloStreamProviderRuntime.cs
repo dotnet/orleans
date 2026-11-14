@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
@@ -41,7 +42,9 @@ namespace Orleans.Runtime.Providers
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
             this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
-            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
+            this.grainBasedPubSub = new GrainBasedPubSubRuntime(
+                this.GrainFactory,
+                this.ServiceProvider.GetRequiredService<IClusterMembershipService>());
             var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
@@ -62,6 +65,8 @@ namespace Orleans.Runtime.Providers
             }
         }
 
+        [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+            Justification = "The manager constructor registers with ActivationDirectory, which owns disposal even when initialization fails.")]
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,

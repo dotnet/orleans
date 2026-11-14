@@ -94,5 +94,24 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.WRWRTest(grainStates, grainCount);
         }
 
+        /// <inheritdoc cref="GoldenPathTransactionTestRunner.SingleGrainReadCommitted(string)"/>
+        [Theory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public override Task SingleGrainReadCommitted(string grainStates)
+        {
+            return base.SingleGrainReadCommitted(grainStates);
+        }
+
+        /// <inheritdoc cref="GoldenPathTransactionTestRunner.ReadCommittedRejectedInsideTransaction(string)"/>
+        [Theory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public override Task ReadCommittedRejectedInsideTransaction(string grainStates)
+        {
+            return base.ReadCommittedRejectedInsideTransaction(grainStates);
+        }
     }
 }

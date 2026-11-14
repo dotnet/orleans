@@ -35,7 +35,7 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
     public async Task OrleansBinary_RecoversUpstreamMainWrittenJournal()
     {
         var journalBytes = LoadUpstreamMainJournal();
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>(journalBytes), TestContext.Current.CancellationToken);
 
         var states = CreateStates(storage);
@@ -92,8 +92,8 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
                 new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableValue<int>("value", manager,
                 new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
-            new DurableState<string>("state", manager,
-                new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+            new JournaledPersistentState<string>("state", manager,
+                new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool), CodecProvider.GetActivator<string>()),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,
@@ -124,6 +124,6 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
         DurableQueue<int> Queue,
         DurableSet<string> Set,
         DurableValue<int> Value,
-        DurableState<string> State,
+        JournaledPersistentState<string> State,
         DurableTaskCompletionSource<int> Tcs);
 }

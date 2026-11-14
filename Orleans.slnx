@@ -38,6 +38,7 @@
     <Project Path="src/Orleans.Analyzers.Contracts/Orleans.Analyzers.Contracts.csproj" />
     <Project Path="src/Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
     <Project Path="src/Orleans.Client/Orleans.Client.csproj" />
+    <Project Path="src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" />
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
@@ -69,7 +70,6 @@
   <Folder Name="/src/Extensions/">
     <Project Path="src/Orleans.Clustering.Consul/Orleans.Clustering.Consul.csproj" />
     <Project Path="src/Orleans.Clustering.ZooKeeper/Orleans.Clustering.ZooKeeper.csproj" />
-    <Project Path="src/Orleans.Connections.Security/Orleans.Connections.Security.csproj" />
     <Project Path="src/Orleans.Hosting.Kubernetes/Orleans.Hosting.Kubernetes.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/AdoNet/">
@@ -135,6 +135,7 @@
     <Project Path="test/Orleans.DependencyInjection.Tests/Orleans.DependencyInjection.Tests.csproj" />
     <Project Path="test/Orleans.Core.Tests/Orleans.Core.Tests.csproj" />
     <Project Path="test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" />
+    <Project Path="test\Orleans.Clustering.TestKit.Tests\Orleans.Clustering.TestKit.Tests.csproj" />
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />
@@ -208,8 +209,10 @@
     <Project Path="test/Misc/TestSerializerExternalModels/TestSerializerExternalModels.csproj" />
   </Folder>
   <Folder Name="/test/TestInfrastructure/">
+    <Project Path="test/TestInfrastructure/FSharpCodeGenModels/FSharpCodeGenModels.fsproj" />
     <Project Path="test/TestInfrastructure/Orleans.TestingHost.Tests/Orleans.TestingHost.Tests.csproj" />
     <Project Path="test/TestInfrastructure/TestExtensions/TestExtensions.csproj" />
+    <Project Path="test/TestInfrastructure/TestUtilities/TestUtilities.csproj" />
   </Folder>
   <Folder Name="/test/Transactions/">
     <Project Path="test/Transactions/Orleans.Transactions.AdoNet.Tests/Orleans.Transactions.AdoNet.Tests.csproj" />

@@ -9,7 +9,7 @@ export default defineConfig({
   base: "./",
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   optimizeDeps: {
@@ -18,6 +18,9 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     sourcemap: true,
+    license: {
+      fileName: "THIRD-PARTY-NOTICES.md",
+    },
     commonjsOptions: {
       include: [/node_modules/, /src/],
       transformMixedEsModules: true,
@@ -25,7 +28,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: undefined,
-        inlineDynamicImports: true,
+        codeSplitting: false,
         entryFileNames: "index.min.js",
         assetFileNames: (assetInfo) =>
         {

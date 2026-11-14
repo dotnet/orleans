@@ -1,16 +1,24 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Net;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 using Orleans.Storage;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
+using Orleans.Transactions.TestKit;
 using TestExtensions;
 using Xunit;
 
@@ -22,6 +30,569 @@ namespace Orleans.Transactions.Tests;
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class TransactionQueueStorageWorkTests
 {
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task PerformUpdateExtensionRejectsMissingInputsBeforeDelegation(bool missingState, bool missingAction)
+    {
+        var storage = new RecordingTransactionalState();
+        ITransactionalState<TestState> state = missingState ? null! : storage;
+        Action<TestState> update = missingAction ? null! : value => value.Value++;
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() => state.PerformUpdate(update));
+
+        Assert.Equal(missingState ? "transactionalState" : "updateAction", exception.ParamName);
+        Assert.Equal(0, storage.UpdateCalls);
+        Assert.Equal(0, storage.State.Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PerformUpdateExtensionPreservesCallbackResultAndFailure(bool callbackThrows)
+    {
+        var storage = new RecordingTransactionalState();
+        var expectedFailure = new InvalidOperationException("update failed");
+        var callbackCalls = 0;
+        var error = await Record.ExceptionAsync(() => storage.PerformUpdate(value =>
+        {
+            callbackCalls++;
+            value.Value = 42;
+            if (callbackThrows)
+            {
+                throw expectedFailure;
+            }
+        }));
+
+        Assert.Equal(1, storage.UpdateCalls);
+        Assert.Equal(1, callbackCalls);
+        Assert.Equal(42, storage.State.Value);
+        if (callbackThrows)
+        {
+            Assert.Same(expectedFailure, error);
+        }
+        else
+        {
+            Assert.Null(error);
+        }
+    }
+
+    private sealed class RecordingTransactionalState : ITransactionalState<TestState>
+    {
+        public TestState State { get; } = new();
+        public int UpdateCalls { get; private set; }
+
+        public Task<TResult> PerformUpdate<TResult>(Func<TestState, TResult> updateFunction)
+        {
+            UpdateCalls++;
+            return Task.FromResult(updateFunction(State));
+        }
+
+        public Task<TResult> PerformRead<TResult>(Func<TestState, TResult> readFunction) => throw new NotSupportedException();
+        public Task<TResult> PerformRead<TResult>(Func<TestState, TResult> readFunction, ReadIsolation isolation) => throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(ReadIsolation.Serializable)]
+    [InlineData(ReadIsolation.ReadCommitted)]
+    public async Task PerformReadRejectsMissingOperationBeforeTransactionOrQueueAccess(ReadIsolation? isolation)
+    {
+        var state = new TransactionalState<TestState>(
+            null!, new TestGrainContextAccessor(), new TestStateCopier(), null!,
+            NullLogger<TransactionalState<TestState>>.Instance);
+        Assert.Null(TransactionContext.GetTransactionInfo());
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() => isolation is { } value
+            ? state.PerformRead<TestState>(null!, value)
+            : state.PerformRead<TestState>(null!));
+
+        Assert.Equal("operation", exception.ParamName);
+        Assert.Null(TransactionContext.GetTransactionInfo());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadCommitted_PendingWriterReturnsCommittedCopyBeforeAbort(bool prepareCommit)
+    {
+        var storage = new CoordinatedTransactionalStateStorage();
+        var abortStoreStarted = new TaskCompletionSource<CoordinatedTransactionalStateStorage.StoreCall>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishAbortStore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var committed = new TestState { Value = 7 };
+        storage.EnqueueLoad(() => Task.FromResult(new TransactionalStorageLoadResponse<TestState>(
+            "loaded-etag", committed, 1, new TransactionalStateMetaData(), Array.Empty<PendingTransactionState<TestState>>())));
+        var participant = new ParticipantId("state", null!, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
+        var queue = CreateQueue(storage, static () => { }, participant, new NoOpTimerManager());
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var context = new TestGrainContext(services, new TestLifecycle());
+        var state = new TransactionalState<TestState>(
+            null!, new TestGrainContextAccessor(context), new TestStateCopier(), null!,
+            NullLogger<TransactionalState<TestState>>.Instance);
+        typeof(TransactionalState<TestState>).GetField("queue", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(state, queue);
+        var scheduler = new ControlledTaskScheduler();
+        var test = Task.Factory.StartNew(async () =>
+        {
+            await queue.NotifyOfRestore();
+            await queue.WaitForBackgroundWorkAsync();
+            var timestamp = DateTime.UtcNow;
+            var writer = new TransactionInfo(Guid.NewGuid(), timestamp, timestamp);
+            TransactionContext.SetTransactionInfo(writer);
+            try
+            {
+                await state.PerformUpdate(value =>
+                {
+                    value.Value = 99;
+                    return value;
+                });
+            }
+            finally
+            {
+                TransactionContext.Clear();
+            }
+
+            Assert.True(queue.RWLock.TryGetRecord(writer.TransactionId, out var record));
+            Assert.True(record.IsExclusiveLock);
+            Assert.Equal(99, record.State.Value);
+            Task<TransactionalStatus>? commit = null;
+            if (prepareCommit)
+            {
+                commit = new TransactionManager<TestState>(queue).PrepareAndCommit(
+                    writer.TransactionId, new AccessCounter { Writes = 1 }, record.Timestamp,
+                    new List<ParticipantId> { participant }, totalResources: 2);
+                await queue.WaitForLockWorkAsync();
+                queue.GetMostRecentState(out var tentative, out _);
+                Assert.Same(record.State, tentative);
+                Assert.False(commit.IsCompleted);
+            }
+
+            var read = state.PerformRead(value => value, ReadIsolation.ReadCommitted);
+            Assert.True(read.IsCompletedSuccessfully);
+            var result = await read;
+            Assert.Equal(7, result.Value);
+            Assert.NotSame(committed, result);
+            result.Value = 123;
+            Assert.Equal(7, committed.Value);
+            Assert.Equal(99, record.State.Value);
+            if (!prepareCommit)
+            {
+                Assert.True(queue.RWLock.TryGetRecord(writer.TransactionId, out var held));
+                Assert.Same(record, held);
+            }
+
+            if (prepareCommit)
+            {
+                storage.EnqueueStore(async call =>
+                {
+                    abortStoreStarted.SetResult(call);
+                    await finishAbortStore.Task.WaitAsync(TestContext.Current.CancellationToken);
+                    return "aborted-etag";
+                });
+            }
+
+            await queue.NotifyOfCancel(writer.TransactionId, record.Timestamp, TransactionalStatus.BrokenLock);
+            if (commit is not null)
+            {
+                Assert.Equal(TransactionalStatus.BrokenLock, await commit);
+                var abortStore = await abortStoreStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+                Assert.Equal("loaded-etag", abortStore.ExpectedETag);
+                Assert.Null(abortStore.AbortAfter);
+                Assert.Null(abortStore.CommitUpTo);
+                Assert.NotNull(abortStore.StatesToPrepare);
+                Assert.Empty(abortStore.StatesToPrepare);
+            }
+
+            var afterAbort = await state.PerformRead(value => value, ReadIsolation.ReadCommitted);
+            Assert.Equal(7, afterAbort.Value);
+            Assert.NotSame(result, afterAbort);
+            queue.GetMostRecentState(out var latest, out _);
+            Assert.Same(committed, latest);
+            var (lockStatus, _) = await queue.RWLock.ValidateLock(writer.TransactionId, new AccessCounter { Writes = 1 });
+            Assert.Equal(TransactionalStatus.BrokenLock, lockStatus);
+            finishAbortStore.SetResult();
+            await queue.WaitForBackgroundWorkAsync();
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }, TestContext.Current.CancellationToken, TaskCreationOptions.None, scheduler).Unwrap();
+
+        await scheduler.RunUntilCompletedAsync(test, TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(GrainLifecycleStage.SetupState)]
+    [InlineData(GrainLifecycleStage.Last)]
+    public async Task FaultInjectionDelegatedSetup_RegistersStorageDrain(int stopStage)
+    {
+        var storage = new CoordinatedTransactionalStateStorage();
+        var resource = new ParticipantId("state", null!, ParticipantId.Role.Resource);
+        storage.EnqueueLoad(() => Task.FromResult(CreateLoadResponse(
+            Guid.NewGuid(), DateTime.UtcNow, resource, "loaded-etag", includeCommitRecord: false)));
+        var storeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishStore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.EnqueueStore(async _ =>
+        {
+            storeStarted.SetResult();
+            await finishStore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            return "stored-etag";
+        });
+        using var services = new ServiceCollection()
+            .AddSingleton<INamedTransactionalStateStorageFactory>(new TestStorageFactory(storage))
+            .AddSingleton<IOptions<TransactionalStateOptions>>(Options.Create(new TransactionalStateOptions()))
+            .AddSingleton<IClock>(new Clock())
+            .AddSingleton<ITimerManager>(new NoOpTimerManager())
+            .BuildServiceProvider();
+        var lifecycle = new TestLifecycle();
+        var context = new TestGrainContext(services, lifecycle);
+        var state = new TransactionalState<TestState>(
+            new TransactionalStateConfiguration(new TransactionalStateAttribute("state", "storage")),
+            new TestGrainContextAccessor(context), null!, null!, NullLogger<TransactionalState<TestState>>.Instance);
+        var wrapper = new FaultInjectionTransactionalState<TestState>(
+            state, null!, null!, NullLogger<FaultInjectionTransactionalState<TestState>>.Instance);
+
+        wrapper.Participate(lifecycle);
+        await lifecycle.Observers[GrainLifecycleStage.SetupState].OnStart(TestContext.Current.CancellationToken);
+
+        Assert.IsType<FaultInjectionTransactionalResource<TestState>>(context.GetResourceFactoryRegistry<ITransactionalResource>()!["state"]());
+        Assert.IsType<FaultInjectionTransactionManager<TestState>>(context.GetResourceFactoryRegistry<ITransactionManager>()!["state"]());
+        var queue = Assert.IsType<TransactionQueue<TestState>>(typeof(TransactionalState<TestState>)
+            .GetField("queue", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(state));
+        var worker = Assert.IsType<BatchWorkerFromDelegate>(typeof(TransactionQueue<TestState>)
+            .GetField("storageWorker", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(queue));
+        await worker.WaitForCurrentWorkToBeServiced().WaitAsync(TestContext.Current.CancellationToken);
+        var batch = Assert.IsType<StorageBatch<TestState>>(typeof(TransactionQueue<TestState>)
+            .GetField("storageBatch", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(queue));
+        batch.Read(DateTime.UtcNow);
+        bool? outcome = null;
+        Task? stop = null;
+        batch.FollowUpAction(success =>
+        {
+            Assert.NotNull(stop);
+            Assert.False(stop.IsCompleted);
+            outcome = success;
+        });
+        var work = worker.NotifyAndWaitForWorkToBeServiced();
+        await storeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        stop = lifecycle.Observers[stopStage].OnStop(TestContext.Current.CancellationToken);
+
+        Assert.True(queue.OnDeactivating.IsCancellationRequested);
+        Assert.False(stop.IsCompleted);
+        finishStore.SetResult();
+        await work.WaitAsync(TestContext.Current.CancellationToken);
+        await stop.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.True(outcome);
+        await lifecycle.Observers[GrainLifecycleStage.SetupState].OnStop(TestContext.Current.CancellationToken);
+        await lifecycle.Observers[GrainLifecycleStage.Last].OnStop(TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LifecycleStop_HandlesCanceledSetupForBothFacets(bool committer)
+    {
+        var contextAccessor = new TestGrainContextAccessor();
+        ILifecycleParticipant<IGrainLifecycle> participant = committer
+            ? new TransactionCommitter<object>(null!, contextAccessor, null!, null!, NullLogger<TransactionCommitter<object>>.Instance)
+            : new TransactionalState<TestState>(null!, contextAccessor, null!, null!, NullLogger<TransactionalState<TestState>>.Instance);
+        var lifecycle = new TestLifecycle();
+        participant.Participate(lifecycle);
+        Assert.Equal(new[] { GrainLifecycleStage.SetupState, GrainLifecycleStage.Last }, lifecycle.Observers.Keys.Order());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await lifecycle.Observers[GrainLifecycleStage.SetupState].OnStart(cancellation.Token);
+        await lifecycle.Observers[GrainLifecycleStage.Last].OnStop(TestContext.Current.CancellationToken);
+        await lifecycle.Observers[GrainLifecycleStage.SetupState].OnStop(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task StoppedQueue_LeavesStorageBatchUntouched()
+    {
+        var storage = new ScriptedTransactionalStateStorage();
+        var queue = CreateQueue(storage, static () => { });
+        await queue.StopAsync(TestContext.Current.CancellationToken);
+        var batch = CreateDirtyBatch();
+        var completed = false;
+        batch.FollowUpAction(_ => completed = true);
+        queue.SetStorageBatch(batch);
+
+        await queue.StartStorageWorkAsync();
+
+        Assert.True(queue.OnDeactivating.IsCancellationRequested);
+        Assert.Equal(0, storage.StoreCallCount);
+        Assert.Equal(0, storage.LoadCallCount);
+        Assert.Same(batch, queue.CurrentStorageBatch);
+        Assert.False(completed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Shutdown_DrainsQueuedCyclesWithoutStartingStorage(bool queueAnotherCycle)
+    {
+        var storage = new ScriptedTransactionalStateStorage();
+        var queue = CreateQueue(storage, static () => { });
+        var batch = CreateDirtyBatch();
+        queue.SetStorageBatch(batch);
+        var scheduler = new ControlledTaskScheduler();
+        Task? work = null;
+        Task? stop = null;
+        var scheduled = Task.Factory.StartNew(() =>
+        {
+            TaskScheduler? observerScheduler = null;
+            var observerThread = 0;
+            using var registration = queue.OnDeactivating.Register(() =>
+            {
+                observerScheduler = TaskScheduler.Current;
+                observerThread = Environment.CurrentManagedThreadId;
+            });
+            work = queue.StartStorageWorkAsync();
+            if (queueAnotherCycle)
+            {
+                queue.NotifyStorageWorker();
+            }
+
+            stop = queue.StopAsync(TestContext.Current.CancellationToken);
+            Assert.Same(scheduler, observerScheduler);
+            Assert.Equal(Environment.CurrentManagedThreadId, observerThread);
+            Assert.False(work.IsCompleted);
+            Assert.False(stop.IsCompleted);
+        }, TestContext.Current.CancellationToken, TaskCreationOptions.None, scheduler);
+
+        scheduler.RunAll();
+        await scheduled;
+        Assert.NotNull(work);
+        Assert.NotNull(stop);
+        await work.WaitAsync(TestContext.Current.CancellationToken);
+        await stop.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, storage.StoreCallCount);
+        Assert.Equal(0, storage.LoadCallCount);
+        Assert.Same(batch, queue.CurrentStorageBatch);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Shutdown_UsesLifecycleCancellationAndPreservesStorageOutcome(bool alreadyCanceled)
+    {
+        var storage = new CoordinatedTransactionalStateStorage();
+        var storeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishStore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.EnqueueStore(async _ =>
+        {
+            storeStarted.SetResult();
+            await finishStore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            return "committed-etag";
+        });
+        var queue = CreateQueue(storage, static () => { });
+        var batch = CreateDirtyBatch();
+        var outcomes = new List<bool>();
+        batch.FollowUpAction(outcomes.Add);
+        queue.SetStorageBatch(batch);
+        var work = queue.StartStorageWorkAsync();
+        await storeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        if (alreadyCanceled)
+        {
+            cancellation.Cancel();
+        }
+
+        var stop = queue.StopAsync(cancellation.Token);
+        Assert.True(queue.OnDeactivating.IsCancellationRequested);
+        Assert.False(work.IsCompleted);
+        Assert.Empty(outcomes);
+        if (alreadyCanceled)
+        {
+            Assert.True(stop.IsCompletedSuccessfully);
+        }
+        else
+        {
+            Assert.False(stop.IsCompleted);
+            cancellation.Cancel();
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stop);
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+        }
+
+        var repeatedStop = queue.StopAsync(TestContext.Current.CancellationToken);
+        Assert.False(repeatedStop.IsCompleted);
+        finishStore.SetResult();
+        await work.WaitAsync(TestContext.Current.CancellationToken);
+        await repeatedStop.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(Assert.Single(outcomes));
+        Assert.Equal("committed-etag", queue.CurrentStorageBatch.ETag);
+        await queue.StopAsync(TestContext.Current.CancellationToken);
+        var lateObserverCalled = false;
+        using var registration = queue.OnDeactivating.Register(() => lateObserverCalled = true);
+        Assert.True(lateObserverCalled);
+    }
+
+    [Fact]
+    public async Task Shutdown_ReportsCancellationObserverFailuresAndRemainsStopped()
+    {
+        var storage = new ScriptedTransactionalStateStorage();
+        var queue = CreateQueue(storage, static () => { });
+        var failure = new InvalidOperationException("observer failed");
+        var otherObserverCalled = false;
+        using var successfulRegistration = queue.OnDeactivating.Register(() => otherObserverCalled = true);
+        using var failingRegistration = queue.OnDeactivating.Register(() => throw failure);
+
+        var exception = await Assert.ThrowsAsync<AggregateException>(() => queue.StopAsync(TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, Assert.Single(exception.InnerExceptions));
+        Assert.True(otherObserverCalled);
+        Assert.True(queue.OnDeactivating.IsCancellationRequested);
+        queue.SetStorageBatch(CreateDirtyBatch());
+        await queue.StartStorageWorkAsync();
+        await queue.StopAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, storage.StoreCallCount);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    public async Task Deactivation_DrainsStorageOutcomeRecoveryAndFollowUp(bool failStore, bool failRestore, bool queueAnotherCycle)
+    {
+        var storage = new CoordinatedTransactionalStateStorage();
+        var storeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishStore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishRestore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.EnqueueStore(async _ =>
+        {
+            storeStarted.SetResult();
+            await finishStore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            if (failStore) throw new InvalidOperationException("store failed");
+            return "committed-etag";
+        });
+        storage.EnqueueLoad(async () =>
+        {
+            restoreStarted.SetResult();
+            await finishRestore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            if (failRestore) throw new InvalidOperationException("restore failed");
+            return CreateLoadResponse(Guid.NewGuid(), DateTime.UtcNow,
+                new ParticipantId("resource", null!, ParticipantId.Role.Resource), "restored-etag", includeCommitRecord: false);
+        });
+
+        var queue = CreateQueue(storage, static () => { });
+        var batch = CreateDirtyBatch();
+        Task? stop = null;
+        var outcomes = new List<bool>();
+        batch.FollowUpAction(success =>
+        {
+            Assert.NotNull(stop);
+            Assert.False(stop.IsCompleted);
+            outcomes.Add(success);
+        });
+        queue.SetStorageBatch(batch);
+
+        var work = queue.StartStorageWorkAsync();
+        await storeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        if (queueAnotherCycle)
+        {
+            queue.NotifyStorageWorker();
+        }
+
+        stop = queue.StopAsync(TestContext.Current.CancellationToken);
+        Assert.False(stop.IsCompleted);
+        finishStore.SetResult();
+
+        if (failStore)
+        {
+            await restoreStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.False(stop.IsCompleted);
+            Assert.Empty(outcomes);
+            finishRestore.SetResult();
+        }
+
+        if (failRestore)
+        {
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => work);
+            Assert.Equal("restore failed", exception.Message);
+            Assert.Same(exception, await Assert.ThrowsAsync<InvalidOperationException>(() => stop));
+        }
+        else
+        {
+            await work.WaitAsync(TestContext.Current.CancellationToken);
+            await stop.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(failStore ? "restored-etag" : "committed-etag", queue.CurrentStorageBatch.ETag);
+        }
+
+        Assert.Equal(!failStore, Assert.Single(outcomes));
+        Assert.Equal(failStore, restoreStarted.Task.IsCompleted);
+        Assert.True(queue.OnDeactivating.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task Shutdown_CompletesWhileRemoteConfirmationIsPending()
+    {
+        var storage = new ScriptedTransactionalStateStorage();
+        var queue = CreateQueue(storage, static () => { });
+        var remote = new PendingConfirmation();
+        var participant = new ParticipantId("remote",
+            new TestGrainReference(GrainId.Create("test", "remote"), remote), ParticipantId.Role.Resource);
+        var transactionId = Guid.NewGuid();
+        var timestamp = DateTime.UtcNow;
+        var batch = CreateDirtyBatchWithCommitRecord(transactionId, timestamp, participant);
+        queue.SetStorageBatch(batch);
+
+        queue.AddConfirmation(transactionId, timestamp, new List<ParticipantId> { participant });
+        Assert.Equal(1, remote.CallCount);
+        Assert.False(remote.Completion.Task.IsCompleted);
+
+        await queue.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(remote.Completion.Task.IsCompleted);
+        Assert.True(queue.IsConfirmationPending(transactionId));
+        Assert.Contains(transactionId, batch.MetaData.CommitRecords.Keys);
+        Assert.Equal(0, storage.StoreCallCount);
+        remote.Completion.SetResult();
+    }
+
+    [Fact]
+    public async Task FollowUpException_DrainsStorageAfterRecovery()
+    {
+        var storage = new CoordinatedTransactionalStateStorage();
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishRestore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.EnqueueStore(_ => Task.FromResult("committed-etag"));
+        storage.EnqueueLoad(async () =>
+        {
+            restoreStarted.SetResult();
+            await finishRestore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            return CreateLoadResponse(Guid.NewGuid(), DateTime.UtcNow,
+                new ParticipantId("resource", null!, ParticipantId.Role.Resource), "restored-etag", includeCommitRecord: false);
+        });
+        var queue = CreateQueue(storage, static () => { });
+        var batch = CreateDirtyBatch();
+        Task? stop = null;
+        var callbackCount = 0;
+        batch.FollowUpAction(success =>
+        {
+            Assert.True(success);
+            callbackCount++;
+            stop = queue.StopAsync(TestContext.Current.CancellationToken);
+            Assert.False(stop.IsCompleted);
+            throw new InvalidOperationException("follow-up failed");
+        });
+        queue.SetStorageBatch(batch);
+
+        var work = queue.StartStorageWorkAsync();
+        await restoreStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(stop);
+        Assert.False(stop.IsCompleted);
+        finishRestore.SetResult();
+
+        await work.WaitAsync(TestContext.Current.CancellationToken);
+        await stop.WaitAsync(TestContext.Current.CancellationToken);
+        await queue.WaitForBackgroundWorkAsync().WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, callbackCount);
+        Assert.Equal("restored-etag", queue.CurrentStorageBatch.ETag);
+    }
+
     [Fact]
     public async Task StoreFailureAndFailedRestore_CountsOneFailurePerCycle_AndLoadsOncePerCycle()
     {
@@ -341,22 +912,13 @@ public class TransactionQueueStorageWorkTests
             storage,
             deactivate,
             new ParticipantId("resource", null!, ParticipantId.Role.Resource),
-            new NoOpTimerManager(),
-            new TestActivationLifetime());
+            new NoOpTimerManager());
 
     private static TestTransactionQueue CreateQueue(
         ITransactionalStateStorage<TestState> storage,
         Action deactivate,
         ParticipantId resource,
         ITimerManager timerManager)
-        => CreateQueue(storage, deactivate, resource, timerManager, new TestActivationLifetime());
-
-    private static TestTransactionQueue CreateQueue(
-        ITransactionalStateStorage<TestState> storage,
-        Action deactivate,
-        ParticipantId resource,
-        ITimerManager timerManager,
-        IActivationLifetime activationLifetime)
     {
         return new TestTransactionQueue(
             Options.Create(new TransactionalStateOptions()),
@@ -365,8 +927,7 @@ public class TransactionQueueStorageWorkTests
             storage,
             new Clock(),
             NullLogger.Instance,
-            timerManager,
-            activationLifetime);
+            timerManager);
     }
 
     private static StorageBatch<TestState> CreateDirtyBatch()
@@ -431,13 +992,14 @@ public class TransactionQueueStorageWorkTests
             ITransactionalStateStorage<TestState> storage,
             IClock clock,
             Microsoft.Extensions.Logging.ILogger logger,
-            ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
-            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime, diagnosticIdentity: default)
+            ITimerManager timerManager)
+            : base(options, resource, deactivate, storage, clock, logger, timerManager, diagnosticIdentity: default)
         {
         }
 
         public Task InvokeStorageWorkAsync() => (Task)StorageWorkMethod.Invoke(this, null)!;
+
+        public Task StartStorageWorkAsync() => ((BatchWorker)StorageWorkerField.GetValue(this)!).NotifyAndWaitForWorkToBeServiced();
 
         public void SetStorageBatch(StorageBatch<TestState> batch) => this.storageBatch = batch;
 
@@ -457,6 +1019,152 @@ public class TransactionQueueStorageWorkTests
             => (Task)AbortAndRestoreMethod.Invoke(this, new object?[] { status, exception, storageOutcomeInDoubt })!;
 
         public Task WaitForBackgroundWorkAsync() => ((BatchWorker)StorageWorkerField.GetValue(this)!).WaitForCurrentWorkToBeServiced();
+
+        public Task WaitForLockWorkAsync() => ((BatchWorker)typeof(ReadWriteLock<TestState>)
+            .GetField("lockWorker", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(RWLock)!).WaitForCurrentWorkToBeServiced();
+    }
+
+    private sealed class TestStorageFactory(ITransactionalStateStorage<TestState> storage) : INamedTransactionalStateStorageFactory
+    {
+        public ITransactionalStateStorage<T> Create<T>(string? storageName, string stateName) where T : class, new()
+        {
+            Assert.Equal("storage", storageName);
+            Assert.Equal("state", stateName);
+            return Assert.IsAssignableFrom<ITransactionalStateStorage<T>>(storage);
+        }
+    }
+
+    private sealed class TestGrainContextAccessor(IGrainContext? context = null) : IGrainContextAccessor
+    {
+        public IGrainContext GrainContext => context!;
+    }
+
+    private sealed class TestGrainContext(IServiceProvider activationServices, IGrainLifecycle lifecycle) : IGrainContext
+    {
+        private readonly Dictionary<Type, object> components = new();
+        public GrainId GrainId { get; } = GrainId.Create("test", "fault-injection");
+        public ActivationId ActivationId { get; } = ActivationId.NewId();
+        public GrainReference GrainReference => new TestGrainReference(GrainId, null!);
+        public GrainAddress Address => new()
+        {
+            SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1),
+            GrainId = GrainId,
+            ActivationId = ActivationId,
+        };
+        public IServiceProvider ActivationServices => activationServices;
+        public IGrainLifecycle ObservableLifecycle => lifecycle;
+        public object? GrainInstance => null;
+        public IWorkItemScheduler Scheduler => throw new NotSupportedException();
+        public Task Deactivated => Task.CompletedTask;
+        public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
+        public object? GetComponent(Type type) => components.GetValueOrDefault(type);
+        public TComponent? GetComponent<TComponent>() where TComponent : class => GetComponent(typeof(TComponent)) as TComponent;
+
+        public void SetComponent<TComponent>(TComponent? value) where TComponent : class
+        {
+            if (value is null)
+            {
+                components.Remove(typeof(TComponent));
+            }
+            else
+            {
+                components[typeof(TComponent)] = value;
+            }
+        }
+
+        public object? GetTarget() => null;
+        public TTarget? GetTarget<TTarget>() where TTarget : class => null;
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void ReceiveMessage(object message) => throw new NotSupportedException();
+        public void Rehydrate(IRehydrationContext context) => throw new NotSupportedException();
+    }
+
+    private sealed class TestLifecycle : IGrainLifecycle
+    {
+        public Dictionary<int, ILifecycleObserver> Observers { get; } = new();
+
+        public IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
+        {
+            Observers.Add(stage, observer);
+            return new Subscription();
+        }
+
+        public void AddMigrationParticipant(IGrainMigrationParticipant participant) => throw new NotSupportedException();
+        public void RemoveMigrationParticipant(IGrainMigrationParticipant participant) => throw new NotSupportedException();
+
+        private sealed class Subscription : IDisposable
+        {
+            public void Dispose() { }
+        }
+    }
+
+    private sealed class ControlledTaskScheduler : TaskScheduler
+    {
+        private readonly ConcurrentQueue<Task> tasks = new();
+        private readonly Channel<bool> taskQueued = Channel.CreateUnbounded<bool>();
+
+        protected override void QueueTask(Task task)
+        {
+            tasks.Enqueue(task);
+            taskQueued.Writer.TryWrite(true);
+        }
+
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
+
+        protected override IEnumerable<Task> GetScheduledTasks() => tasks.ToArray();
+
+        public void RunAll()
+        {
+            while (tasks.TryDequeue(out var task))
+            {
+                TryExecuteTask(task);
+            }
+        }
+
+        public async Task RunUntilCompletedAsync(Task completion, CancellationToken cancellationToken)
+        {
+            while (!completion.IsCompleted)
+            {
+                await taskQueued.Reader.ReadAsync(cancellationToken);
+                RunAll();
+            }
+
+            await completion;
+        }
+    }
+
+    private sealed class TestGrainReference(GrainId grainId, IGrainReferenceRuntime runtime)
+        : GrainReference(
+            new GrainReferenceShared(grainId.Type, default, interfaceVersion: 0, runtime,
+                invokeMethodOptions: default, codecProvider: null!, copyContextPool: null!, serviceProvider: null!),
+            grainId.Key);
+
+    private sealed class PendingConfirmation : IGrainReferenceRuntime, ITransactionalResourceExtension
+    {
+        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int CallCount { get; private set; }
+
+        public object Cast(IAddressable grain, Type interfaceType)
+        {
+            Assert.Equal(typeof(ITransactionalResourceExtension), interfaceType);
+            return this;
+        }
+
+        public Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp)
+        {
+            CallCount++;
+            return Completion.Task;
+        }
+
+        public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp) => throw new NotSupportedException();
+        public Task Abort(string resourceId, Guid transactionId) => throw new NotSupportedException();
+        public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status) => throw new NotSupportedException();
+        public Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager) => throw new NotSupportedException();
+        public ValueTask<T?> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options) => throw new NotSupportedException();
+        public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options) => throw new NotSupportedException();
+        public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options) => throw new NotSupportedException();
     }
 
     private sealed class ScriptedTransactionalStateStorage : ITransactionalStateStorage<TestState>
@@ -587,23 +1295,13 @@ public class TransactionQueueStorageWorkTests
         }
     }
 
-    private sealed class TestActivationLifetime : IActivationLifetime
-    {
-        public CancellationToken OnDeactivating => CancellationToken.None;
-
-        public IDisposable BlockDeactivation() => NoOpDisposable.Instance;
-
-        private sealed class NoOpDisposable : IDisposable
-        {
-            public static NoOpDisposable Instance { get; } = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
     private sealed class TestState
     {
+        public int Value { get; set; }
+    }
+
+    private sealed class TestStateCopier : ITransactionDataCopier<TestState>
+    {
+        public TestState DeepCopy(TestState original) => new() { Value = original.Value };
     }
 }

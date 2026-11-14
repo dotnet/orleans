@@ -50,7 +50,7 @@ namespace Orleans.Runtime.MembershipService
             if (!tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
 
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
-                entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                entry.Copy(), lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
             return true;
         }
@@ -62,7 +62,7 @@ namespace Orleans.Runtime.MembershipService
             if (!data.Item2.Equals(etag, StringComparison.Ordinal) || !tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
 
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
-                entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                entry.Copy(), lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
             return true;
         }
@@ -73,7 +73,6 @@ namespace Orleans.Runtime.MembershipService
             if (data == null) return;
 
             data.Item1.IAmAliveTime = entry.IAmAliveTime;
-            siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(data.Item1, NewETag());
         }
 
         public override string ToString() => $"Table = {ReadAll()}, ETagCounter={lastETagCounter}";
@@ -88,7 +87,7 @@ namespace Orleans.Runtime.MembershipService
             var removedEntries = new List<SiloAddress>();
             foreach (var (key, (value, _)) in siloTable)
             {
-                if (value.Status != SiloStatus.Active
+                if (value.Status == SiloStatus.Dead
                     && value.EffectiveUpdateTime < beforeDate)
                 {
                     removedEntries.Add(key);

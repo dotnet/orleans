@@ -1,9 +1,11 @@
 using System.Data.Common;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.Runtime;
+using Orleans.Runtime.Membership;
 using Orleans.Storage;
 using Orleans.Tests.SqlUtils;
 using UnitTests.StorageTests.Relational;
@@ -16,6 +18,24 @@ namespace UnitTests.AdoNet;
 [TestArea("Persistence")]
 public sealed class AdoNetOptionsValidatorTests
 {
+    [Theory]
+    [InlineData("options")]
+    [InlineData("gatewayOptions")]
+    [InlineData("clusterOptions")]
+    public void GatewayConstructorRejectsNullRequiredOptions(string parameter)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+
+        var exception = Assert.Throws<ArgumentNullException>(() => new AdoNetGatewayListProvider(
+            NullLogger<AdoNetGatewayListProvider>.Instance,
+            services,
+            parameter == "options" ? null! : Options.Create(new AdoNetClusteringClientOptions()),
+            parameter == "gatewayOptions" ? null! : Options.Create(new GatewayOptions()),
+            parameter == "clusterOptions" ? null! : Options.Create(new ClusterOptions())));
+
+        Assert.Equal(parameter, exception.ParamName);
+    }
+
     [Fact]
     public void NamedOptions_ResolveKeyedDataSources()
     {
@@ -177,6 +197,44 @@ public sealed class AdoNetOptionsValidatorTests
         };
 
         AssertInvariantRequired(new AdoNetGrainStorageOptionsValidator(options, "storage").ValidateConfiguration);
+    }
+
+    [Theory]
+    [InlineData(AdoNetGrainStorageKeyFormat.Legacy, false, true)]
+    [InlineData(AdoNetGrainStorageKeyFormat.Legacy, true, true)]
+    [InlineData(AdoNetGrainStorageKeyFormat.GrainTypeQualified, false, true)]
+    [InlineData(AdoNetGrainStorageKeyFormat.GrainTypeQualified, true, false)]
+    [InlineData((AdoNetGrainStorageKeyFormat)2, false, false)]
+    public void GrainStorage_ValidatesKeyFormat(AdoNetGrainStorageKeyFormat keyFormat, bool orleans3CompatibleHasher, bool valid)
+    {
+        var options = new AdoNetGrainStorageOptions
+        {
+            ConnectionString = "configured",
+            Invariant = AdoNetInvariants.InvariantNameSqlLite,
+            HashPicker = new StorageHasherPicker([new ConstantHasher()]),
+            KeyFormat = keyFormat
+        };
+        if (orleans3CompatibleHasher)
+        {
+            options.UseOrleans3CompatibleHasher();
+        }
+
+        var validator = new AdoNetGrainStorageOptionsValidator(options, "storage");
+        if (valid)
+        {
+            validator.ValidateConfiguration();
+        }
+        else
+        {
+            var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+            Assert.Contains(nameof(AdoNetGrainStorageOptions.KeyFormat), exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void GrainStorage_DefaultsToLegacyKeyFormat()
+    {
+        Assert.Equal(AdoNetGrainStorageKeyFormat.Legacy, new AdoNetGrainStorageOptions().KeyFormat);
     }
 
     [Theory]

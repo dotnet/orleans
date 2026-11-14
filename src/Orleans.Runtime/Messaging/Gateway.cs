@@ -6,12 +6,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime.Internal;
 
@@ -121,6 +121,8 @@ namespace Orleans.Runtime.Messaging
         }
 
         long IConnectedClientCollection.Version => Interlocked.Read(ref clientsCollectionVersion);
+
+        int IConnectedClientCollection.Count => clients.Count;
 
         List<GrainId> IConnectedClientCollection.GetConnectedClientIds()
         {
@@ -451,7 +453,6 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     connection.Send(message);
-                    _gateway.GatewayInstruments.OnGatewaySent();
                     return true;
                 }
                 catch (Exception exception)

@@ -158,8 +158,10 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="info"/> is <see langword="null"/>.</exception>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            ArgumentNullException.ThrowIfNull(info);
             info.AddValue("tv", GrainType.UnsafeGetArray(_type));
             info.AddValue("th", _type.GetHashCode());
             info.AddValue("kv", IdSpan.UnsafeGetArray(_key));
@@ -227,12 +229,20 @@ namespace Orleans.Runtime
             => Read(ref reader, typeToConvert, options);
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> is <see langword="null"/>.</exception>
         public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options)
-            => WriteGrainId(writer, value, isPropertyName: false);
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            WriteGrainId(writer, value, isPropertyName: false);
+        }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> is <see langword="null"/>.</exception>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] GrainId value, JsonSerializerOptions options)
-            => WriteGrainId(writer, value, isPropertyName: true);
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            WriteGrainId(writer, value, isPropertyName: true);
+        }
 
         private static void WriteGrainId(Utf8JsonWriter writer, GrainId value, bool isPropertyName)
         {

@@ -12,6 +12,7 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using static Orleans.Internal.StandardExtensions;
@@ -28,12 +29,11 @@ namespace Orleans
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager? localObjects;
         private int _isStopping;
-        private bool disposing;
+        private int _disposeRequested;
         private bool disposed;
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager? _cancellationManager;
         private IClusterConnectionStatusObserver[]? _statusObservers;
 
@@ -82,7 +82,6 @@ namespace Orleans
         {
             TimeProvider = timeProvider;
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
-            _applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -103,7 +102,8 @@ namespace Orleans
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
                 this.clientMessagingOptions.WaitForCancellationAcknowledgement,
-                null);
+                null,
+                new ApplicationRequestInstruments(orleansInstruments));
         }
 
         internal void ConsumeServices()
@@ -153,19 +153,42 @@ namespace Orleans
         {
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
-            await Task.Run(() => this.StartInternal(cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            try
+            {
+                await Task.Run(() => this.StartInternal(cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The client lifecycle starts after this method, so cancellation here owns network cleanup.
+                await StopObserverInvocationsAsync().ConfigureAwait(false);
+                await ServiceProvider.GetRequiredService<ConnectionManager>().Close(CancellationToken.None).ConfigureAwait(false);
+                if (MessageCenter is null)
+                {
+                    await ServiceProvider.GetRequiredService<GatewayManager>().StopAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+
+                await StopAsync(CancellationToken.None).ConfigureAwait(false);
+                throw;
+            }
 
             LogStartedClient(logger, CurrentActivationAddress, _localClientDetails.ClientId);
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
+        internal Task StopObserverInvocationsAsync()
         {
             Volatile.Write(ref _isStopping, 1);
+            var drain = this.localObjects?.StopAsync() ?? Task.CompletedTask;
             this.callbackTimer.Dispose();
 
             // Fault callbacks before any cancellation-sensitive waits. Completing them can resume code
             // which issues follow-up calls, so request admission must already be closed.
             BreakOutstandingMessages();
+            return drain;
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            await StopObserverInvocationsAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
 
             if (this.callbackTimerTask is { } task)
             {
@@ -208,14 +231,15 @@ namespace Orleans
             this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver!);
 
             await ExecuteWithRetries(
-                _manifestProvider!.StartAsync,
+                () => _manifestProvider!.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
 
             static async Task ExecuteWithRetries(Func<Task> task, IClientConnectionRetryFilter? retryFilter, CancellationToken cancellationToken)
             {
-                do
+                while (true)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
                         await task();
@@ -223,14 +247,16 @@ namespace Orleans
                     }
                     catch (Exception exception) when (retryFilter is not null && !cancellationToken.IsCancellationRequested)
                     {
-                        var shouldRetry = await retryFilter.ShouldRetryConnectionAttempt(exception, cancellationToken);
-                        if (cancellationToken.IsCancellationRequested || !shouldRetry)
+                        var retry = retryFilter.ShouldRetryConnectionAttempt(exception, cancellationToken);
+                        retry.Ignore();
+                        var shouldRetry = await retry.WaitAsync(cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!shouldRetry)
                         {
                             throw;
                         }
                     }
                 }
-                while (!cancellationToken.IsCancellationRequested);
             }
         }
 
@@ -251,10 +277,15 @@ namespace Orleans
                     }
                 default:
                     LogMessageNotSupported(logger, message);
+                    message.Dispose();
                     break;
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the response message is transferred to the message center.")]
         public void SendResponse(Message request, Response response)
         {
             ThrowIfDisposed();
@@ -265,6 +296,10 @@ namespace Orleans
             MessageCenter!.SendMessage(message);
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the request message is transferred to callback tracking or the message center.")]
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options)
         {
             ThrowIfDisposed();
@@ -295,7 +330,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, context!, message);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -332,6 +367,7 @@ namespace Orleans
 
             if (response.Result is Message.ResponseTypes.Status)
             {
+                using var statusMessage = response;
                 var status = (StatusResponse)response.BodyObject!;
                 callbacks.TryGetValue(response.Id, out var callback);
                 var request = callback?.Message;
@@ -377,6 +413,7 @@ namespace Orleans
             else
             {
                 LogDebugNoCallbackForResponseMessage(logger, response);
+                response.Dispose();
             }
         }
 
@@ -437,17 +474,27 @@ namespace Orleans
 
         public void Dispose()
         {
-            if (this.disposing) return;
-            this.disposing = true;
-            Volatile.Write(ref _isStopping, 1);
-
-            this.callbackTimer.Dispose();
-            BreakOutstandingMessages();
-
-            Utils.SafeExecute(() => MessageCenter?.Dispose());
+            if (Interlocked.Exchange(ref _disposeRequested, 1) != 0) return;
+            _ = DisposeAfterDrainAsync(StopObserverInvocationsAsync());
 
             GC.SuppressFinalize(this);
-            disposed = true;
+        }
+
+        private async Task DisposeAfterDrainAsync(Task drain)
+        {
+            try
+            {
+                await drain.ConfigureAwait(false);
+                MessageCenter?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                LogErrorDisposing(logger, exception);
+            }
+            finally
+            {
+                disposed = true;
+            }
         }
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
@@ -456,7 +503,7 @@ namespace Orleans
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail(deadSilo);
                 }
             }
         }
@@ -607,6 +654,12 @@ namespace Orleans
             Message = "Error while processing callback expiry."
         )]
         private static partial void LogErrorWhileProcessingCallbackExpiry(ILogger logger, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error disposing the client message center after draining observer invocations."
+        )]
+        private static partial void LogErrorDisposing(ILogger logger, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

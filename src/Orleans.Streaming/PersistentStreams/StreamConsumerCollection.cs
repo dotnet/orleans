@@ -41,6 +41,8 @@ namespace Orleans.Streams
         {
             if (!queueData.Remove(subscriptionId, out var consumer)) return false;
 
+            consumer.HandshakeRequestId++;
+            consumer.HandshakeGeneration++;
             consumer.SafeDisposeCursor(logger);
             return true;
         }
@@ -85,8 +87,10 @@ namespace Orleans.Streams
             // 1) There were no new events received for that stream in the last inactivityPeriod
             // 2) All consumer for that stream are currently inactive (that is, all cursors are inactive) - 
             //    meaning there is nothing for those consumers in the adapter cache.
+            // 3) Consumer handshakes have completed and their positions are reconciled.
             if (now - lastActivityTime < inactivityPeriod) return false;
-            return !queueData.Values.Any(data => data.State.Equals(StreamConsumerDataState.Active));
+            return !queueData.Values.Any(data => data.PendingHandshakes != 0 || data.HasUnresolvedHandshake
+                || data.State.Equals(StreamConsumerDataState.Active));
         }
     }
 }

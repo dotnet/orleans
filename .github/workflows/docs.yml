@@ -31,7 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      ORLEANS_DOCS_BUILD_CONCURRENCY: 4
       ORLEANS_DOCS_SOURCE_COMMIT: ${{ github.sha }}
     steps:
       - name: Checkout
@@ -105,18 +104,24 @@ jobs:
           ./samples/Validate-Samples.ps1 -NoBuild
 
       - name: Build and test documentation projects
-        run: dotnet test --solution docs/Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false -bl:docs-projects.binlog --minimum-expected-tests 1 --max-parallel-test-modules 1
+        run: dotnet test --solution docs/Docs.slnx --configuration Release --framework net10.0 -bl:docs-projects.binlog --minimum-expected-tests 1 --max-parallel-test-modules 1
 
       - name: Build samples against local Orleans packages
         shell: pwsh
-        run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -SkipExternalAssets
+        # Keep sample compiler processes isolated until the SDK's runtime includes the JIT fix
+        # from dotnet/runtime#132395 (shipped in .NET 10.0.13, absent from 11.0.0). Then validate
+        # shared compilation in repeated runs before removal.
+        # See #11235, dotnet/roslyn#85656, and dotnet/runtime#132631.
+        run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -DisableSharedCompilation
 
       - name: Upload build diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: documentation-project-binlog
-          path: docs-projects.binlog
+          name: documentation-build-binlogs
+          path: |
+            docs-projects.binlog
+            Artifacts/Samples/Release/samples.binlog
           if-no-files-found: ignore
           retention-days: 3
 

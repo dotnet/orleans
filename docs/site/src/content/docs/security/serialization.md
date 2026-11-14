@@ -26,7 +26,7 @@ Use the narrowest applicable mechanism:
 1. Allow assemblies whose relevant types belong inside the same trust boundary.
 1. Implement <xref:Orleans.Serialization.ITypeNameFilter> or <xref:Orleans.Serialization.ITypeFilter> when trust requires an explicit policy.
 
-A denial from a registered type-name filter takes precedence over assembly trust. Constructed generic arguments and array element types are checked independently, so all components must be trusted. See [configure serialization](../host/configuration-guide/serialization-configuration.md#authorize-type-name-resolution) for the supported APIs and examples.
+A denial from a registered type-name filter takes precedence over assembly trust. Constructed generic types require an authorized definition and approved arguments; array element types are checked independently. An explicit resolved-type filter grant for a closed generic type authorizes that construction, while argument denials still take precedence within the resolved-type checks. See [configure serialization](../host/configuration-guide/serialization-configuration.md#authorize-type-name-resolution) for the supported APIs and examples.
 
 ## Treat serializer extensions as security-sensitive
 

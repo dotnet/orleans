@@ -54,6 +54,7 @@ namespace AWSUtils.Tests.Streaming
                         .AddDynamoDBGrainStorage("DynamoDBStore", options =>
                         {
                             options.Service = AWSTestConstants.DynamoDbService;
+                            options.ServiceId = string.Empty;
                             options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                             options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                             options.DeleteStateOnClear = true;
@@ -61,6 +62,7 @@ namespace AWSUtils.Tests.Streaming
                         .AddDynamoDBGrainStorage("PubSubStore", options =>
                         {
                             options.Service = AWSTestConstants.DynamoDbService;
+                            options.ServiceId = string.Empty;
                             options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                             options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                         });

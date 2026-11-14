@@ -39,10 +39,10 @@ SELECT
 	SET
 		IAmAliveTime = @IAmAliveTime
 	WHERE
-		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Address = @Address AND @Address IS NOT NULL
-		AND Port = @Port AND @Port IS NOT NULL
-		AND Generation = @Generation AND @Generation IS NOT NULL;
+		DeploymentId = @DeploymentId
+		AND Address = @Address
+		AND Port = @Port
+		AND Generation = @Generation;
 	'
 WHERE NOT EXISTS 
 ( 
@@ -84,6 +84,8 @@ SELECT
 	'SET XACT_ABORT, NOCOUNT ON;
 	DECLARE @ROWCOUNT AS INT;
 	BEGIN TRANSACTION;
+
+	-- Preserve the row-then-version lock order used by cached legacy inserts.
 	INSERT INTO OrleansMembershipTable
 	(
 		DeploymentId,
@@ -128,9 +130,9 @@ SELECT
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Version = @Version AND @Version IS NOT NULL
 		AND @@ROWCOUNT > 0;
-	
+
 	SET @ROWCOUNT = @@ROWCOUNT;
-	
+
 	IF @ROWCOUNT = 0
 		ROLLBACK TRANSACTION
 	ELSE
@@ -148,8 +150,9 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
 	'UpdateMembershipKey',
 	'SET XACT_ABORT, NOCOUNT ON;
+	DECLARE @ROWCOUNT AS INT;
 	BEGIN TRANSACTION;
-	
+
 	UPDATE OrleansMembershipVersionTable
 	SET
 		Timestamp = GETUTCDATE(),
@@ -157,21 +160,25 @@ SELECT
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Version = @Version AND @Version IS NOT NULL;
-	
+
 	UPDATE OrleansMembershipTable
 	SET
 		Status = @Status,
 		SuspectTimes = @SuspectTimes,
-		IAmAliveTime = @IAmAliveTime
+		IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Address = @Address AND @Address IS NOT NULL
 		AND Port = @Port AND @Port IS NOT NULL
 		AND Generation = @Generation AND @Generation IS NOT NULL
 		AND @@ROWCOUNT > 0;
-	
-	SELECT @@ROWCOUNT;
-	COMMIT TRANSACTION;
+
+	SET @ROWCOUNT = @@ROWCOUNT;
+	IF @ROWCOUNT = 0
+		ROLLBACK TRANSACTION;
+	ELSE
+		COMMIT TRANSACTION;
+	SELECT @ROWCOUNT;
 	'
 WHERE NOT EXISTS 
 ( 
@@ -285,11 +292,29 @@ SELECT
     WHERE DeploymentId = @DeploymentId
         AND @DeploymentId IS NOT NULL
         AND IAmAliveTime < @IAmAliveTime
-        AND Status != 3;
+        AND StartTime < @IAmAliveTime
+        AND COALESCE(SuspectTimes, '''') = ''''
+        AND Status = 6;
     '
 WHERE NOT EXISTS 
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'CleanupDefunctSiloEntriesKey'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
+    'CleanupDefunctSiloEntryKey',
+    'DELETE FROM OrleansMembershipTable
+    WHERE DeploymentId = @DeploymentId AND Status = 6
+        AND Address = @Address AND Port = @Port AND Generation = @Generation
+        AND IAmAliveTime = @IAmAliveTime AND StartTime = @StartTime
+        AND CONVERT(VARBINARY(8000), COALESCE(SuspectTimes, '''')) = CONVERT(VARBINARY(8000), CONVERT(VARCHAR(8000), COALESCE(@SuspectTimes, '''')));
+    '
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM OrleansQuery oqt
+    WHERE oqt.[QueryKey] = 'CleanupDefunctSiloEntryKey'
 );

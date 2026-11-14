@@ -788,6 +788,8 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -825,6 +827,8 @@ namespace OrleansCodeGen.Orleans.EventSourcing
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -888,6 +892,8 @@ namespace OrleansCodeGen.Orleans.EventSourcing
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 

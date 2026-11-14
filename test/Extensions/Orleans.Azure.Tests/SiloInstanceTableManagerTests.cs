@@ -163,10 +163,12 @@ namespace Tester.AzureUtils
             var after = await manager.ReadSingleTableEntryAsync(
                 clusterId,
                 SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX);
-            Assert.Equal("0", before.Entity?.MembershipVersion);
-            Assert.Equal("0", after.Entity?.MembershipVersion);
-            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, before.Entity?.Status);
-            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, after.Entity?.Status);
+            Assert.NotNull(before.Entity);
+            Assert.NotNull(after.Entity);
+            Assert.Equal("0", before.Entity.MembershipVersion);
+            Assert.Equal("0", after.Entity.MembershipVersion);
+            Assert.Null(before.Entity.Status);
+            Assert.Null(after.Entity.Status);
         }
 
         [Fact, TestCategory("Functional")]
@@ -236,12 +238,12 @@ namespace Tester.AzureUtils
             await manager.TryCreateTableVersionEntryAsync(TestContext.Current.CancellationToken);
             await RegisterSiloInstance();
 
-            var gateways = await manager.FindAllGatewayProxyEndpoints();
+            var gateways = await manager.FindAllGatewayProxyEndpoints(TestContext.Current.CancellationToken);
             Assert.Empty(gateways);  // "Number of gateways before Silo.Activate"
 
             await manager.ActivateSiloInstance(myEntry);
 
-            gateways = await manager.FindAllGatewayProxyEndpoints();
+            gateways = await manager.FindAllGatewayProxyEndpoints(TestContext.Current.CancellationToken);
             Assert.Single(gateways);  // "Number of gateways after Silo.Activate"
 
             Uri myGateway = gateways.First();

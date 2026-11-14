@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -9,7 +11,15 @@ namespace Orleans.Journaling;
 
 internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
 {
+    private const int MaximumDefaultJournalIdLength = 512;
     private static readonly string[] JournalIdSelect = [AzureTableJournalStorage.JournalIdPropertyName];
+    private static readonly string[] JournalMetadataSelect =
+    [
+        AzureTableJournalStorage.JournalIdPropertyName,
+        AzureTableJournalStorage.FormatPropertyName,
+        AzureTableJournalStorage.MetadataPropertyName,
+        nameof(TableEntity.Timestamp),
+    ];
 
     private readonly AzureTableJournalStorageOptions _options;
     private readonly AzureTableJournalStorage.InitializedTableClientProvider _tableClientProvider = new();
@@ -56,27 +66,44 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         return new AzureTableJournalStorage(_shared, journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
-        ListOptions? options = null,
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+        JournalCatalogListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty
+            || (_options.UsesDefaultPartitionKey
+                && range.Prefix is { } prefix
+                && (prefix.Length > MaximumDefaultJournalIdLength
+                    || prefix.AsSpan().IndexOfAnyExceptInRange(' ', '~') >= 0)))
+        {
+            yield break;
+        }
+
         var table = _tableClientProvider.GetTableClient();
-        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
+        var filter = GetCatalogFilter(range);
         await foreach (var page in table.QueryAsync<TableEntity>(
             filter,
             maxPerPage: 1000,
-            select: JournalIdSelect,
+            select: range.IncludeMetadata ? JournalMetadataSelect : JournalIdSelect,
             cancellationToken: cancellationToken).AsPages(pageSizeHint: 1000))
         {
+            _shared.Instruments.OnCatalogPage(page.Values.Count);
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var entity in page.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
+                if (TryGetJournalId(entity, out var journalId)
+                    && range.Contains(journalId.Value))
                 {
-                    yield return journalId;
+                    var entry = new JournalCatalogEntry(
+                        journalId,
+                        range.IncludeMetadata
+                            ? AzureTableJournalStorage.CreateJournalMetadataSnapshot(entity.ETag, entity)
+                            : null);
+                    _shared.Instruments.OnCatalogEntry();
+                    yield return entry;
                 }
             }
         }
@@ -84,22 +111,90 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)
+    private string GetCatalogFilter(JournalCatalogRange range)
     {
-        if (entity.GetString(AzureTableJournalStorage.JournalIdPropertyName) is { } journalIdValue)
+        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
+        if (_options.UsesDefaultPartitionKey)
         {
-            return TryParseJournalId(journalIdValue, out journalId);
+            if (range.LowerBound is { } lowerBound)
+            {
+                var lowerKey = GetPartitionKeyBound(lowerBound);
+                // A longer bound sorts after its longest possible stored prefix.
+                filter += lowerBound.Length > MaximumDefaultJournalIdLength
+                    ? TableClient.CreateQueryFilter($" and PartitionKey gt {lowerKey}")
+                    : TableClient.CreateQueryFilter($" and PartitionKey ge {lowerKey}");
+            }
+
+            if (range.MaxId is { } maxId)
+            {
+                var upperKey = GetPartitionKeyBound(maxId);
+                filter += TableClient.CreateQueryFilter($" and PartitionKey le {upperKey}");
+            }
+
+            if (range.Prefix is { } prefix)
+            {
+                var prefixKey = AzureTableJournalStorageOptions.EncodePartitionKey(prefix);
+                // At the length limit only the exact id can match; shorter prefixes can have descendants.
+                filter += prefix.Length == MaximumDefaultJournalIdLength
+                    ? TableClient.CreateQueryFilter($" and PartitionKey le {prefixKey}")
+                    : TableClient.CreateQueryFilter($" and PartitionKey lt {prefixKey + "G"}");
+            }
+        }
+        else
+        {
+            // Ordinal UTF-16 boundaries can contain unpaired surrogates. Keep those constraints local.
+            if (range.LowerBound is { } lowerBound && IsWellFormedUnicode(lowerBound))
+            {
+                filter += TableClient.CreateQueryFilter($" and JournalId ge {lowerBound}");
+            }
+
+            if (range.UpperBound is { } upperBound && IsWellFormedUnicode(upperBound))
+            {
+                filter += range.Contains(upperBound)
+                    ? TableClient.CreateQueryFilter($" and JournalId le {upperBound}")
+                    : TableClient.CreateQueryFilter($" and JournalId lt {upperBound}");
+            }
         }
 
-        // Legacy headers can only be listed when they use the reversible default partition mapping.
-        var decodedPartitionKey = Uri.UnescapeDataString(entity.PartitionKey);
-        if (TryParseJournalId(decodedPartitionKey, out journalId)
-            && string.Equals(
-                Uri.EscapeDataString(journalId.Value),
-                entity.PartitionKey,
-                StringComparison.Ordinal))
+        return filter;
+    }
+
+    private static string GetPartitionKeyBound(string value)
+    {
+        value = value[..Math.Min(value.Length, MaximumDefaultJournalIdLength)];
+        var index = value.AsSpan().IndexOfAnyExceptInRange(' ', '~');
+        if (index < 0)
         {
-            return true;
+            return AzureTableJournalStorageOptions.EncodePartitionKey(value);
+        }
+
+        // No stored id can equal an unsupported bound. At its first unsupported code unit,
+        // 1F sorts after the exact prefix but before any descendant; 7F sorts after all descendants.
+        return AzureTableJournalStorageOptions.EncodePartitionKey(value[..index])
+            + (value[index] < ' ' ? "1F" : "7F");
+    }
+
+    private static bool IsWellFormedUnicode(ReadOnlySpan<char> value)
+    {
+        while (!value.IsEmpty)
+        {
+            if (Rune.DecodeFromUtf16(value, out _, out var consumed) != OperationStatus.Done)
+            {
+                return false;
+            }
+
+            value = value[consumed..];
+        }
+
+        return true;
+    }
+
+    private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)
+    {
+        if (entity.TryGetValue(AzureTableJournalStorage.JournalIdPropertyName, out var value)
+            && value is string journalIdValue)
+        {
+            return TryParseJournalId(journalIdValue, out journalId);
         }
 
         journalId = default;

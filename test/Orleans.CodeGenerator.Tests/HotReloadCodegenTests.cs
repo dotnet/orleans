@@ -5,7 +5,6 @@ using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -102,12 +101,13 @@ public class HotReloadCodegenTests
     }
 
     [Fact]
-    public async Task ReleaseBuildsKeepEagerInitialization()
+    public async Task ReleaseBuildsUseStaticFieldAccessorsAndEagerCodecs()
     {
         var generated = await Generate(GreetingV2, OptimizationLevel.Release);
         var codec = GetClass(generated, "Codec_Greeting").NormalizeWhitespace().ToFullString();
 
-        Assert.Contains("private static readonly global::System.Action<global::TestProject.Greeting, string> setField_0 = ", codec);
+        Assert.Contains("private extern static ref string accessField_0(global::TestProject.Greeting instance);", codec);
+        Assert.DoesNotContain("Utilities.FieldAccessor", codec);
         Assert.Contains("private readonly global::Orleans.Serialization.Codecs.ListCodec<int> _codec_List_Int32_", codec);
         Assert.Contains("private readonly global::System.Type _type_List_Int32_", codec);
         Assert.Contains("= typeof(global::System.Collections.Generic.List<int>);", codec);
@@ -189,9 +189,9 @@ public class HotReloadCodegenTests
     {
         var codec = GetClass(await Generate(GreetingV2, OptimizationLevel.Release), "Codec_Greeting").NormalizeWhitespace().ToFullString();
 
-        Assert.Contains("setField_0 = ", codec);
-        Assert.Contains("setField_3 = ", codec);
-        Assert.Contains("setField_4 = ", codec);
+        Assert.Contains("accessField_0(global::TestProject.Greeting instance)", codec);
+        Assert.Contains("accessField_3(global::TestProject.Greeting instance)", codec);
+        Assert.Contains("accessField_4(global::TestProject.Greeting instance)", codec);
         Assert.DoesNotContain("setField0", codec);
         Assert.DoesNotContain("setField1", codec);
     }
@@ -312,20 +312,12 @@ public class HotReloadCodegenTests
         }
 
         using var module = ModuleMetadata.CreateFromImage(peImage);
-#if NET10_0_OR_GREATER
         var baseline = EmitBaseline.CreateInitialBaseline(
             compilationV1,
             module,
             static _ => default,
             static _ => default,
             true);
-#else
-        var baseline = EmitBaseline.CreateInitialBaseline(
-            module,
-            static _ => default,
-            static _ => default,
-            true);
-#endif
 
         using var metadataDelta = new MemoryStream();
         using var ilDelta = new MemoryStream();
@@ -398,7 +390,7 @@ public class HotReloadCodegenTests
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            optionsProvider: globalOptions is null ? null : new TestAnalyzerConfigOptionsProvider(globalOptions),
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(default));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics, TestContext.Current.CancellationToken);
         Assert.Empty(diagnostics);
@@ -420,7 +412,7 @@ public class HotReloadCodegenTests
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            optionsProvider: new TestAnalyzerConfigOptionsProvider(globalOptions),
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(default));
         driver.RunGeneratorsAndUpdateCompilation(
             compilation,
@@ -453,11 +445,7 @@ public class HotReloadCodegenTests
     }
 
     private static SemanticEdit CreateSemanticEdit(SemanticEditKind kind, ISymbol? oldSymbol, ISymbol? newSymbol)
-#if NET10_0_OR_GREATER
         => new(kind, oldSymbol, newSymbol, syntaxMap: null, runtimeRudeEdit: null, instrumentation: default);
-#else
-        => new(kind, oldSymbol, newSymbol, syntaxMap: null, preserveLocalVariables: false);
-#endif
 
     private static IMethodSymbol GetCopierConstructor(INamedTypeSymbol copier)
         => copier.InstanceConstructors.Single(constructor => constructor.Parameters.Length == 1);
@@ -477,14 +465,24 @@ public class HotReloadCodegenTests
     private static async Task<(int ExitCode, string Output, string Error)> RunHotReloadTestInEnabledProcess()
     {
         var assemblyPath = Assembly.GetExecutingAssembly().Location;
-        var startInfo = new ProcessStartInfo("dotnet")
+        // Reuse the parent's host so the child retains its runtime selection.
+        var startInfo = new ProcessStartInfo(Environment.ProcessPath!)
         {
-            Arguments = $"\"{assemblyPath}\" --filter-method \"*ExistingCopierCopiesAddedMemberWhoseTypeIsAddedByMetadataUpdate*\" --minimum-expected-tests 1",
+            ArgumentList =
+            {
+                "--filter-method", "*ExistingCopierCopiesAddedMemberWhoseTypeIsAddedByMetadataUpdate*",
+                "--minimum-expected-tests", "1",
+            },
             WorkingDirectory = Path.GetDirectoryName(assemblyPath)!,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+        if (string.Equals(Path.GetFileNameWithoutExtension(startInfo.FileName), "dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            startInfo.ArgumentList.Insert(0, assemblyPath);
+        }
+
         startInfo.Environment["DOTNET_MODIFIABLE_ASSEMBLIES"] = "debug";
         startInfo.Environment[HotReloadTestChild] = "1";
 
@@ -503,20 +501,5 @@ public class HotReloadCodegenTests
                 process.Kill(entireProcessTree: true);
             }
         }
-    }
-
-    private sealed class TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string> globalOptions) : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions EmptyOptions = new TestAnalyzerConfigOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _globalOptions = new TestAnalyzerConfigOptions(globalOptions);
-
-        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => EmptyOptions;
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => EmptyOptions;
-    }
-
-    private sealed class TestAnalyzerConfigOptions(IReadOnlyDictionary<string, string> options) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value) => options.TryGetValue(key, out value!);
     }
 }

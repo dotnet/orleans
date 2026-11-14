@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\StorageBackend.cs" Link="StorageBackend.cs" />
     <ProjectReference Include="..\DurableJobsJournaling.Abstractions\DurableJobsJournaling.Abstractions.csproj" />
     <ProjectReference Include="..\DurableJobsJournaling.ServiceDefaults\DurableJobsJournaling.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Server\Orleans.Server.csproj" />

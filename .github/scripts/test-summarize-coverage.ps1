@@ -17,6 +17,7 @@ $azureVariablesPath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
 $invokeRestoreScriptPath = Join-Path $PSScriptRoot 'invoke-restore.ps1'
+$invokeTestScriptPath = Join-Path $PSScriptRoot 'invoke-test.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $selectCoverageBaselineScriptPath = Join-Path $PSScriptRoot 'select-coverage-baseline.ps1'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
@@ -631,14 +632,26 @@ try {
             'Coverage file names must include the complete matrix identity.'
     }
 
-    Invoke-Test 'captures Linux net8 runtime crashes' {
+    Invoke-Test 'reports Linux and macOS runtime crashes' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        Assert-Matches `
+            $dotnetTestAction `
+            "(?ms)^  - name: Prepare runtime crash reports\r?\n    if: runner\.os != 'Windows'\r?\n.*?'DOTNET_EnableCrashReport=1'" `
+            'Linux and macOS jobs must report crashing managed stacks for every .NET process.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--crash-report-if-supported'")).Count `
+            'Both test launch paths must write test host crash reports where the runtime supports them.'
+    }
+
+    Invoke-Test 'captures Linux net10 runtime crashes' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         Assert-Matches `
             $dotnetTestAction `
-            "if: runner\.os == 'Linux' && inputs\.framework == 'net8\.0'" `
-            'Runtime crash dumps must be scoped to Linux net8 test jobs.'
+            "if: runner\.os == 'Linux' && inputs\.framework == 'net10\.0'" `
+            'Runtime crash dumps must be scoped to Linux net10 test jobs.'
         Assert-Matches `
             $dotnetTestAction `
             'DOTNET_DbgEnableMiniDump=1' `
@@ -667,6 +680,88 @@ try {
             $runTestsAction `
             '(?ms)^  - name: Archive test results\r?\n    if: always\(\)' `
             'Runtime crash dump upload must run after a failed test coordinator.'
+    }
+
+    Invoke-Test 'reduces hosted runner hang dump size' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump-type'")).Count `
+            'Only the two standard test launch paths may configure hang diagnostics.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump'\s*\r?\n")).Count `
+            'Both test launch paths must enable hang diagnostics.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump-timeout'\s*'10m'")).Count `
+            'Both test launch paths must preserve the inactivity threshold.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump-type'\s*'Heap'")).Count `
+            'Both test launch paths must retain managed heap and stack diagnostics while excluding mapped images.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--crashdump-type'\s*'Full'")).Count `
+            'Process crashes must retain full diagnostics independently of bounded hang capture.'
+    }
+
+    Invoke-Test 'captures Windows net10 test host diagnostics' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        $filterMatch = [regex]::Match(
+            $workflow,
+            '(?m)^\s*filter-query:\s+(?<filter>/\[\(Provider=None\)&\(Suite=\$\{\{ matrix\.suite \}\}\)&\(Area!=CodeGen\)\])\r?$'
+        )
+        Assert-Equal $true $filterMatch.Success 'The standard test filter was not found.'
+        $bvtFilter = $filterMatch.Groups['filter'].Value.Replace('${{ matrix.suite }}', 'BVT')
+        Assert-Matches `
+            $dotnetTestAction `
+            "if: runner\.os == 'Windows' && inputs\.framework == 'net10\.0' && inputs\.filter-query == '$([regex]::Escape($bvtFilter))'" `
+            'Test host diagnostics must target the Windows net10 BVT partition.'
+        $diagnosticsIndex = $dotnetTestAction.IndexOf('  - name: Prepare Windows test host diagnostics', [StringComparison]::Ordinal)
+        $testIndex = $dotnetTestAction.IndexOf('  - name: Test', [StringComparison]::Ordinal)
+        Assert-Equal `
+            $true `
+            ($diagnosticsIndex -ge 0 -and $diagnosticsIndex -lt $testIndex) `
+            'Windows test host diagnostics must be configured before test execution.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC=1' `
+            'Microsoft Testing Platform diagnostics must be enabled.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC_VERBOSITY=Trace' `
+            'Microsoft Testing Platform diagnostics must include controller lifecycle details.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC_SYNCHRONOUS_WRITE=1' `
+            'Microsoft Testing Platform diagnostics must be flushed before a host terminates.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_DIRECTORY=\$resultDirectory' `
+            'Microsoft Testing Platform diagnostics must flow through the test diagnostics artifact.'
+        Assert-Matches `
+            $dotnetTestAction `
+            "(?s)- name: Prepare Windows test host diagnostics.*?'DOTNET_CreateDumpDiagnostics=1'.*?- name: Restore" `
+            'Windows runtime dump diagnostics must be enabled before the test host starts.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'windows-net10-runner\.json' `
+            'The runner image and source commit must be retained with crash diagnostics.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'windows-net10-dotnet-info\.txt' `
+            'The installed SDK and runtime details must be retained with crash diagnostics.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'Failed to capture Windows test host metadata' `
+            'Advisory metadata capture must not prevent the test partition from running.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            '\*\*/TestResults/\*' `
+            'Windows test host diagnostics must be retained by the test diagnostics artifact.'
     }
 
     Invoke-Test 'uses external coverage collection for CI builds' {
@@ -714,7 +809,7 @@ try {
             'Coverage collection must reject empty reports from successful test runs.'
         Assert-Matches `
             $dotnetTestAction `
-            'dotnet test --solution Orleans\.slnx' `
+            "(?s)'test'\s*'--solution'\s*'\$\{\{ inputs\.solution \}\}'" `
             'Test partitions must use native solution discovery.'
         Assert-Equal 3 ([regex]::Matches($dotnetTestAction, "github\.event_name == 'push'.*?github\.event\.repository\.default_branch")).Count 'Current-main coverage condition count differs.'
         Assert-Matches `
@@ -741,7 +836,8 @@ param(
     [string[]] $Command
 )
 
-if (($Command -join ' ') -cne 'restore Orleans.slnx') {
+$solution = if ($env:ORLEANS_RESTORE_SOLUTION) { $env:ORLEANS_RESTORE_SOLUTION } else { 'Orleans.slnx' }
+if (($Command -join ' ') -cne "restore $solution") {
     Write-Output "Unexpected restore command: $Command"
     exit 2
 }
@@ -777,13 +873,14 @@ exit 0
 
         Assert-Matches `
             $dotnetTestAction `
-            '(?ms)^  - name: Restore\r?\n    shell: pwsh\r?\n    run: \./\.github/scripts/invoke-restore\.ps1\r?\n  - name: Prepare coverage report' `
+            '(?ms)^  - name: Restore\r?\n    shell: pwsh\r?\n    run: \./\.github/scripts/invoke-restore\.ps1 -Solution ''\$\{\{ inputs\.solution \}\}''\r?\n  - name: Prepare coverage report' `
             'Restore must run inside the replaceable test action before coverage preparation.'
         Assert-Equal 0 ([regex]::Matches($runTestsAction, '(?m)^  - name: Restore\r?$')).Count 'The test coordinator must not restore outside the replaceable test action.'
         Assert-Equal 2 ([regex]::Matches($dotnetTestAction, '''--no-restore''| --no-restore ')).Count 'Both test launch paths must reuse the explicit restore.'
 
         $previousAttemptFile = $env:ORLEANS_RESTORE_ATTEMPT_FILE
         $previousFailure = $env:ORLEANS_RESTORE_FAILURE
+        $previousSolution = $env:ORLEANS_RESTORE_SOLUTION
         try {
             $env:ORLEANS_RESTORE_ATTEMPT_FILE = $attemptFile
             foreach ($failure in 'metadata-remote-source', 'metadata-configured-feed') {
@@ -798,9 +895,215 @@ exit 0
             & $invokeRestoreScriptPath -RestoreCommand $fakeRestore
             Assert-Equal 1 $LASTEXITCODE 'A deterministic restore failure should be preserved.'
             Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The deterministic restore attempt count differs.'
+            Remove-Item -LiteralPath $attemptFile
+
+            $env:ORLEANS_RESTORE_SOLUTION = '.github/solutions/CodeGenerator.slnf'
+            $env:ORLEANS_RESTORE_FAILURE = 'metadata-remote-source'
+            & $invokeRestoreScriptPath -RestoreCommand $fakeRestore -Solution $env:ORLEANS_RESTORE_SOLUTION
+            Assert-Equal 0 $LASTEXITCODE 'Focused restore should succeed on retry.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'Both restore attempts must use the selected graph.'
         } finally {
             $env:ORLEANS_RESTORE_ATTEMPT_FILE = $previousAttemptFile
             $env:ORLEANS_RESTORE_FAILURE = $previousFailure
+            $env:ORLEANS_RESTORE_SOLUTION = $previousSolution
+        }
+    }
+
+    Invoke-Test 'uses the selected graph throughout each test attempt' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
+        foreach ($action in $dotnetTestAction, $runTestsAction) {
+            Assert-Matches $action '(?m)^  solution:\r?\n' 'Both test action boundaries must declare the solution input.'
+            Assert-Matches $action '(?m)^    default: Orleans\.slnx\r?$' 'Other partitions must retain full-solution discovery.'
+        }
+        Assert-Equal 2 ([regex]::Matches($runTestsAction, 'solution: \$\{\{ inputs\.solution \}\}')).Count 'Both attempts must forward the selected graph.'
+        Assert-Equal 2 ([regex]::Matches($dotnetTestAction, "'--solution'\s*'\$\{\{ inputs\.solution \}\}'")).Count 'Covered and uncovered tests must build and discover the selected graph.'
+
+        $repositoryRoot = Join-Path $PSScriptRoot '../..'
+        $filter = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot '.github/solutions/CodeGenerator.slnf') | ConvertFrom-Json
+        Assert-Equal '../../Orleans.slnx' $filter.solution.path 'The focused graph must use the canonical solution.'
+        Assert-Equal 2 $filter.solution.projects.Count 'CodeGen discovery root count differs.'
+        Assert-Equal 'test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj' $filter.solution.projects[0] 'Generator unit tests must be discovered.'
+        Assert-Equal 'test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj' $filter.solution.projects[1] 'Default-cluster CodeGen tests must be discovered.'
+        [xml] $solution = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'Orleans.slnx')
+        $solutionProjects = @($solution.SelectNodes('//Project') | ForEach-Object { $_.Path.Replace('\', '/') })
+        foreach ($project in $filter.solution.projects) {
+            Assert-Equal $true ($project -cin $solutionProjects) "$project must belong to the canonical solution."
+        }
+        foreach ($workflowFile in 'ci.yml', 'macos-tests.yml') {
+            $workflow = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "../workflows/$workflowFile")
+            Assert-Equal 1 ([regex]::Matches($workflow, 'solution: \.github/solutions/CodeGenerator\.slnf')).Count 'Only the CodeGen partition should select the focused graph.'
+            Assert-Matches $workflow '(?s)filter-query: /\[\(Provider=None\)&\(Area=CodeGen\).*?solution: \.github/solutions/CodeGenerator\.slnf' 'The existing CodeGen trait filter must select the focused graph.'
+        }
+        Assert-Equal $true (@(Get-Content -LiteralPath $coverageInputsPath) -ccontains '.github/solutions/CodeGenerator.slnf') 'Trusted coverage inputs must include the selected graph.'
+    }
+
+    Invoke-Test 'compares CodeGen inventories across all identity fields' {
+        $testCase = New-TestCase
+        $validator = Join-Path $PSScriptRoot 'test-codegenerator-graph.ps1'
+        $fakeDotnet = Join-Path $testCase.Root 'fake-dotnet.ps1'
+        $fullFile = Join-Path $testCase.Root 'full.json'
+        $focusedFile = Join-Path $testCase.Root 'focused.json'
+        [IO.File]::WriteAllText($fakeDotnet, @'
+param([Parameter(ValueFromRemainingArguments)] [string[]] $Command)
+if ($env:ORLEANS_GRAPH_FAILURE -eq 'true') { exit 5 }
+if (($Command -join ' ') -notmatch '^test --solution (Orleans.slnx|.github/solutions/CodeGenerator.slnf) --framework net(10|11).0 --no-build --filter-query /\[\(Provider=None\)&\(Area=CodeGen\)&\(\(Suite=BVT\)\|\(Suite=SlowBVT\)\|\(Suite=Functional\)\)\] --list-tests json --max-parallel-test-modules 1$') {
+    throw "Unexpected discovery command: $Command"
+}
+$file = if ($Command[2] -eq 'Orleans.slnx') { $env:ORLEANS_GRAPH_FULL } else { $env:ORLEANS_GRAPH_FOCUSED }
+Get-Content -Raw -LiteralPath $file
+exit 0
+'@)
+        $previousFull = $env:ORLEANS_GRAPH_FULL
+        $previousFocused = $env:ORLEANS_GRAPH_FOCUSED
+        $previousFailure = $env:ORLEANS_GRAPH_FAILURE
+        try {
+            $env:ORLEANS_GRAPH_FULL = $fullFile
+            $env:ORLEANS_GRAPH_FOCUSED = $focusedFile
+            $env:ORLEANS_GRAPH_FAILURE = 'false'
+            foreach ($framework in 'net10.0', 'net11.0') {
+                $baseline = @{
+                    version = '1.0'
+                    testContainers = @(@{
+                        assemblyPath = 'CodeGen.Tests.dll'
+                        targetFramework = $framework
+                        architecture = 'x64'
+                        tests = @(@{ uid = 'test-1'; displayName = 'GeneratorTest'; traits = @(@{ name = 'Area'; value = 'CodeGen' }) })
+                    })
+                }
+                $json = $baseline | ConvertTo-Json -Depth 20
+                Set-Content -LiteralPath $fullFile -Value $json
+                Set-Content -LiteralPath $focusedFile -Value $json
+                & $validator -Framework $framework -DotnetCommand $fakeDotnet
+                foreach ($field in 'assemblyPath', 'targetFramework', 'architecture', 'uid', 'displayName', 'traits') {
+                    $changed = $json | ConvertFrom-Json
+                    if ($field -eq 'traits') {
+                        $changed.testContainers[0].tests[0].traits = @()
+                    } elseif ($field -in 'uid', 'displayName') {
+                        $changed.testContainers[0].tests[0].$field = 'different'
+                    } else {
+                        $changed.testContainers[0].$field = 'different'
+                    }
+                    $changed | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $focusedFile
+                    Assert-Throws { & $validator -Framework $framework -DotnetCommand $fakeDotnet } 'inventories differ'
+                }
+                $baseline.testContainers[0].tests = @()
+                $baseline | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $focusedFile
+                Assert-Throws { & $validator -Framework $framework -DotnetCommand $fakeDotnet } 'empty CodeGen inventory'
+            }
+            $env:ORLEANS_GRAPH_FAILURE = 'true'
+            Assert-Throws { & $validator -Framework net10.0 -DotnetCommand $fakeDotnet } 'Test discovery failed.*exit code 5'
+        } finally {
+            $env:ORLEANS_GRAPH_FULL = $previousFull
+            $env:ORLEANS_GRAPH_FOCUSED = $previousFocused
+            $env:ORLEANS_GRAPH_FAILURE = $previousFailure
+        }
+    }
+
+    Invoke-Test 'retries only uninitialized test coordinator failures without results' {
+        $testCase = New-TestCase
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $attemptFile = Join-Path $testCase.Root 'test-attempt.txt'
+        $resultDirectory = $testCase.Root
+        $resultFilePattern = 'test_results_case_*.trx'
+        $fakeTest = Join-Path $testCase.Root 'fake-test.ps1'
+        [IO.File]::WriteAllText(
+            $fakeTest,
+            @'
+param(
+    [Parameter(ValueFromRemainingArguments)]
+    [string[]] $Command
+)
+
+if (($Command -join ' ') -cne 'test --forwarded-argument') {
+    Write-Output "Unexpected test command: $Command"
+    exit 3
+}
+
+$attempt = if (Test-Path -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE) {
+    [int] (Get-Content -Raw -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE)
+} else {
+    0
+}
+
+$attempt++
+Set-Content -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE -Value $attempt
+if ((($env:ORLEANS_TEST_FAILURE -eq 'handle' -or $env:ORLEANS_TEST_FAILURE -eq 'decorated-handle') -and $attempt -eq 1) -or
+    $env:ORLEANS_TEST_FAILURE -eq 'handle-always' -or
+    $env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
+    if ($env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
+        $testResults = Join-Path $env:ORLEANS_TEST_RESULT_DIRECTORY 'test/Example.Tests/bin/Debug/net10.0/TestResults'
+        [void] (New-Item -ItemType Directory -Force -Path $testResults)
+        Set-Content -LiteralPath (Join-Path $testResults 'test_results_case_Example.Tests_net10.0_x64.trx') -Value '<TestRun />'
+    }
+
+    if ($env:ORLEANS_TEST_FAILURE -eq 'decorated-handle') {
+        Write-Output '[runner] Unhandled exception: One or more errors occurred. (Handle is not initialized.) '
+    } else {
+        Write-Output 'Unhandled exception: One or more errors occurred. (Handle is not initialized.)'
+    }
+    exit 1
+}
+
+if ($env:ORLEANS_TEST_FAILURE -eq 'test') {
+    Write-Output 'A test failed.'
+    exit 2
+}
+
+exit 0
+'@,
+            [Text.UTF8Encoding]::new($false)
+        )
+
+        Assert-Matches `
+            $dotnetTestAction `
+            '(?ms)^  - name: Test\r?\n(?:(?!^  - name: ).)*?invoke-test\.ps1 -ResultFilePattern ''test_results_\$\{\{ inputs\.result-id \}\}_\*\.trx'' -Command \$command' `
+            'Ordinary test runs must use the coordinator retry wrapper.'
+        Assert-Matches `
+            (Get-Content -Raw -LiteralPath $invokeTestScriptPath) `
+            '(?s)if \(-not \$text\.Contains\(.*?\)\) \{\s*return \$false\s*\}.*?Get-ChildItem' `
+            'The test wrapper must check the rare failure signature before scanning for test results.'
+
+        $previousAttemptFile = $env:ORLEANS_TEST_ATTEMPT_FILE
+        $previousFailure = $env:ORLEANS_TEST_FAILURE
+        $previousResultDirectory = $env:ORLEANS_TEST_RESULT_DIRECTORY
+        try {
+            $env:ORLEANS_TEST_ATTEMPT_FILE = $attemptFile
+            $env:ORLEANS_TEST_RESULT_DIRECTORY = $resultDirectory
+
+            $env:ORLEANS_TEST_FAILURE = 'handle'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 0 $LASTEXITCODE 'The coordinator retry should succeed.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The coordinator attempt count differs.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_TEST_FAILURE = 'decorated-handle'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 0 $LASTEXITCODE 'A decorated coordinator failure should succeed on retry.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The decorated coordinator attempt count differs.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_TEST_FAILURE = 'test'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 2 $LASTEXITCODE 'An unrelated test failure should be preserved.'
+            Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'An unrelated test failure must not be retried.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_TEST_FAILURE = 'handle-with-results'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 1 $LASTEXITCODE 'A handle failure with test results should be preserved.'
+            Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'A failure with test results must not be retried.'
+
+            Remove-Item -LiteralPath $attemptFile
+            Remove-Item -LiteralPath (Join-Path $resultDirectory 'test') -Recurse
+            $env:ORLEANS_TEST_FAILURE = 'handle-always'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 1 $LASTEXITCODE 'A persistent coordinator failure should be preserved.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The coordinator must retry only once.'
+        } finally {
+            $env:ORLEANS_TEST_ATTEMPT_FILE = $previousAttemptFile
+            $env:ORLEANS_TEST_FAILURE = $previousFailure
+            $env:ORLEANS_TEST_RESULT_DIRECTORY = $previousResultDirectory
         }
     }
 
@@ -1283,7 +1586,11 @@ exit 0
             $reportingWorkflow `
             '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Summarize coverage' `
             'Pull request coverage inputs must match the pinned trusted reporter before aggregation.'
-        Assert-Equal 12 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
+        Assert-Equal 15 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
+        Assert-Equal `
+            $true `
+            (@(Get-Content -LiteralPath $coverageInputsPath) -contains '.github/actions/cache-dependencies/action.yml') `
+            'Trusted coverage inputs must include the cache action executed before coverage setup.'
         Assert-Matches `
             $reportingWorkflow `
             'github\.event\.workflow_run\.conclusion == ''success''' `
@@ -1357,9 +1664,9 @@ exit 0
         Assert-Equal 17 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
-        $directTestCommands = ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count
-        $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'Orleans\.slnx'")).Count
-        Assert-Equal 2 ($directTestCommands + $coveredTestCommands) 'Native test command count differs.'
+        $wrappedTestCommands = ([regex]::Matches($dotnetTestAction, 'invoke-test\.ps1')).Count
+        $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'\$\{\{ inputs\.solution \}\}'")).Count
+        Assert-Equal 2 ($wrappedTestCommands + $coveredTestCommands) 'Native test command count differs.'
         Assert-Equal 4 ([regex]::Matches($runTestsAction, "runner\.os == 'Linux' && inputs\.framework == 'net10\.0'")).Count 'Coverage selection boundary count differs.'
         Assert-Equal 0 ([regex]::Matches($workflow + $runTestsAction + $dotnetTestAction, 'static-instrumentation|coverage\.static\.config\.xml|IncludeFiles')).Count 'GitHub coverage must not use static instrumentation.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
@@ -1396,6 +1703,7 @@ exit 0
             $setupCoverageScript `
             'if \(-not \[string\]::IsNullOrWhiteSpace\(\$env:GITHUB_PATH\)\)' `
             'Coverage setup must continue adding the tool to the GitHub Actions path.'
+        Assert-Equal 1 ([regex]::Matches($setupCoverageScript, '--add-source https://api\.nuget\.org/v3/index\.json `\r?\n    --ignore-failed-sources')).Count 'Coverage setup must resolve pinned tool releases from NuGet.org when the repository proxy lags.'
         Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
     }
 

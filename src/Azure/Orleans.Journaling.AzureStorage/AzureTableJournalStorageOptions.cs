@@ -23,14 +23,20 @@ public sealed class AzureTableJournalStorageOptions
     /// Gets or sets the delegate used to generate the table partition key for a journal.
     /// </summary>
     /// <remarks>
-    /// The returned value must be a valid Azure Table partition key. The default value percent-encodes
-    /// <see cref="JournalId.Value"/> reversibly and rejects values whose encoded form exceeds the Azure
-    /// Table partition-key limit.
+    /// The returned value must be a valid Azure Table partition key. The default mapping accepts only
+    /// printable ASCII characters (U+0020 through U+007E) in <see cref="JournalId.Value"/> and encodes each
+    /// byte as two uppercase hexadecimal digits, preserving ordinal ordering and raw prefixes.
+    /// The 1,024-character partition-key limit permits journal ids of at most 512 characters.
+    /// Custom mappings are not subject to the default mapping's journal-id restrictions and use canonical
+    /// journal-id property filters for catalog queries, which can require a full table scan instead of
+    /// an indexed partition-key range. Catalog bounds need not satisfy the stored journal-id restrictions.
     /// </remarks>
     public Func<JournalId, string> GetPartitionKey { get; set; } = DefaultGetPartitionKey;
 
     private static readonly Func<JournalId, string> DefaultGetPartitionKey =
         static journalId => GetDefaultPartitionKey(journalId);
+
+    internal bool UsesDefaultPartitionKey => GetPartitionKey == DefaultGetPartitionKey;
 
     /// <summary>
     /// Options to be used when configuring the table storage client, or <see langword="null"/> to use the default options.
@@ -144,12 +150,37 @@ public sealed class AzureTableJournalStorageOptions
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        // Percent-encoding escapes every character disallowed in partition keys ('/', '\', '#', '?',
-        // control characters) and is reversible.
-        var partitionKey = Uri.EscapeDataString(journalId.Value);
+        if (journalId.Value.Length > 512)
+        {
+            throw new ArgumentException(
+                "Azure Table partition keys must not exceed 1,024 characters.",
+                nameof(journalId));
+        }
+
+        if (journalId.Value.AsSpan().IndexOfAnyExceptInRange(' ', '~') >= 0)
+        {
+            throw new ArgumentException(
+                "The default Azure Table partition key mapping requires journal ids to contain only printable ASCII characters (U+0020 through U+007E).",
+                nameof(journalId));
+        }
+
+        var partitionKey = EncodePartitionKey(journalId.Value);
         ValidatePartitionKey(partitionKey, nameof(journalId));
         return partitionKey;
     }
+
+    internal static string EncodePartitionKey(string value)
+        => string.Create(checked(value.Length * 2), value, static (destination, source) =>
+        {
+            const string HexDigits = "0123456789ABCDEF";
+            for (var index = 0; index < source.Length; index++)
+            {
+                var character = source[index];
+                var offset = index * 2;
+                destination[offset] = HexDigits[character >> 4];
+                destination[offset + 1] = HexDigits[character & 0xF];
+            }
+        });
 
     internal static void ValidateTableName(string? tableName)
     {

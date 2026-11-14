@@ -143,13 +143,8 @@ namespace Orleans.Runtime.MembershipService
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolStallDetector _stallDetector;
         private readonly TimeProvider _timeProvider;
-#if NET9_0_OR_GREATER
         private readonly Lock _historyLock = new();
         private readonly Lock _samplingLock = new();
-#else
-        private readonly object _historyLock = new();
-        private readonly object _samplingLock = new();
-#endif
         private Task? _runTask;
         private bool _isActive;
         private DateTime _lastHealthCheckTime;

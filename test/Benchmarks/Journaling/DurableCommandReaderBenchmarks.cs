@@ -160,7 +160,7 @@ public class DurableCommandReaderBenchmarks
 
     private sealed class ListReplayConsumer(
         IDurableListCommandCodec<int> codec,
-        int capacity) : IJournaledState, IDurableListCommandHandler<int>
+        int capacity) : IStateMachine, IDurableListCommandHandler<int>
     {
         private readonly List<int> _items = new(capacity);
         private long _checksum;
@@ -175,20 +175,19 @@ public class DurableCommandReaderBenchmarks
             _checksum = 0;
         }
 
-        void IJournaledState.Reset(JournalStreamWriter storage) => ResetForReplay();
+        void IStateMachine.Reset(JournalStreamWriter storage) => ResetForReplay();
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
 
-        void IJournaledState.AppendEntries(JournalStreamWriter writer)
+        void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
         {
         }
 
-        void IJournaledState.AppendSnapshot(JournalStreamWriter writer)
+        void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
         {
         }
 
-        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
         public void ApplyAdd(int item)
         {

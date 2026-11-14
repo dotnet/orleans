@@ -25,6 +25,7 @@ public ref struct JournalEntryScope : IDisposable
     /// <summary>
     /// Gets the writer for this entry.
     /// </summary>
+    /// <remarks>The destination is borrowed from the owning <see cref="JournalBufferWriter"/>, which releases its buffers.</remarks>
     public readonly IBufferWriter<byte> Writer => GetWriter();
 
     /// <summary>

@@ -13,6 +13,78 @@ namespace PackageJsonGenerator.Tests;
 
 public sealed class PackageJsonGeneratorTests
 {
+    [Theory]
+    [InlineData("System.CodeDom.Compiler.GeneratedCode(\"OrleansCodeGen\", \"1.0\")")]
+    [InlineData("System.Runtime.CompilerServices.CompilerGenerated")]
+    public void GeneratePackageJson_SelectsAuthoredApiAlongsideGeneratedImplementations(string generatedAttribute)
+    {
+        using var assembly = TestAssembly.Create(
+            $$"""
+            namespace Sample.Library;
+
+            [{{generatedAttribute}}]
+            public sealed class GeneratedImplementation
+            {
+                public sealed class Nested;
+            }
+
+            /// <summary>An authored context.</summary>
+            public partial class Context
+            {
+                /// <summary>An authored operation.</summary>
+                public void Run() { }
+
+                [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+                public void Advanced() { }
+
+                public sealed class AuthoredNested;
+            }
+
+            public partial class Context
+            {
+                [{{generatedAttribute}}]
+                protected void ConfigureInner() { }
+                [{{generatedAttribute}}]
+                public void GeneratedMethod() { }
+                [{{generatedAttribute}}]
+                public int GeneratedProperty { get; set; }
+                [{{generatedAttribute}}]
+                public int GeneratedField;
+                [{{generatedAttribute}}]
+                public event System.Action GeneratedEvent { add { } remove { } }
+                [{{generatedAttribute}}]
+                public sealed class GeneratedNested
+                {
+                    public sealed class Nested;
+                }
+            }
+
+            public enum Choice
+            {
+                Authored,
+                [{{generatedAttribute}}]
+                Generated
+            }
+            """);
+
+        var outputPath = Path.Combine(assembly.DirectoryPath, "Package.json");
+        Generate(assembly, outputPath);
+
+        using var document = JsonDocument.Parse(File.ReadAllBytes(outputPath));
+        var types = document.RootElement.GetProperty("types").EnumerateArray().ToArray();
+        Assert.Equal(
+            ["Sample.Library.Choice", "Sample.Library.Context", "Sample.Library.Context.AuthoredNested"],
+            types.Select(type => type.GetProperty("fullName").GetString()).OrderBy(static name => name, StringComparer.Ordinal));
+        var context = types.Single(type => type.GetProperty("name").GetString() == "Context");
+        Assert.Equal([".ctor", "Advanced", "Run"], GetMemberNames(types, "Sample.Library.Context"));
+        Assert.Equal(
+            ["Sample.Library.Context.AuthoredNested"],
+            context.GetProperty("nestedTypes").EnumerateArray().Select(type => type.GetString()));
+        Assert.Contains("authored context", context.GetProperty("docs").GetProperty("summary").GetRawText(), StringComparison.Ordinal);
+        var choice = types.Single(type => type.GetProperty("name").GetString() == "Choice");
+        Assert.Equal("Authored", Assert.Single(choice.GetProperty("enumMembers").EnumerateArray()).GetProperty("name").GetString());
+    }
+
     [Fact]
     public void GeneratePackageJson_WritesEmptyTypesForAssemblyWithoutPublicApi()
     {

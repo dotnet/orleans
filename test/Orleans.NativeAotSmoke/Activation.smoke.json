@@ -1,0 +1,5 @@
+{
+  "scenario": "Activation",
+  "diagnostics": "strict",
+  "rejectDiagnostics": []
+}

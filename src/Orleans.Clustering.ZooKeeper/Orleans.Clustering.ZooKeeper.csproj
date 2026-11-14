@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Polly" />
     <PackageReference Include="ZooKeeperNetEx" />
     <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
   </ItemGroup>

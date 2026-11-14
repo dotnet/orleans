@@ -47,6 +47,13 @@ Replace a bounded number of silos at a time. Pause when error rate, latency, mem
 
 Orleans grain versioning can route calls among compatible grain implementations, but it doesn't make arbitrary application or storage changes compatible. See [Deploy new versions of grains](../grains/grain-versioning/deploying-new-versions-of-grains.md) and [Backward compatibility guidelines](../grains/grain-versioning/backward-compatibility-guidelines.md).
 
+### Release-specific migration guidance
+
+<a id="uniform-silo-hash-api-compatibility"></a>
+<a id="distributed-directory-upgrade-compatibility"></a>
+
+Follow [Grain directory migration](../migration/grain-directory.md#legacy-to-distributed-directory-upgrade) for the legacy-directory cutover procedure, [existing distributed-directory upgrades](../migration/grain-directory.md#upgrade-existing-distributed-directory-clusters) for partition compatibility, and [uniform-hash API adaptation](../migration/grain-directory.md#uniform-silo-hash-api-compatibility) for affected callers.
+
 ## Blue-green upgrades
 
 Use blue-green deployment when versions can't safely coexist in one Orleans cluster.

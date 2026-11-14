@@ -8,7 +8,7 @@ namespace Benchmarks.Journaling;
 
 internal static class JournalReplayContextFactory
 {
-    public static JournalReplayContext Create(string journalFormatKey, JournalStreamId streamId, IJournaledState state)
+    public static JournalReplayContext Create(string journalFormatKey, JournalStreamId streamId, IStateMachine state)
     {
         journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
         var services = new ServiceCollection();

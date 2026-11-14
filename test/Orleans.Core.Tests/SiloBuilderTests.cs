@@ -5,8 +5,11 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
+using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Hosting;
 using Orleans.Statistics;
 using UnitTests.Grains;
 using Xunit;
@@ -104,6 +107,109 @@ namespace NonSilo.Tests
     [TestArea("Runtime")]
     public class SiloBuilderTests
     {
+        [Fact]
+        public void ConfigureServicesRejectsNullBuilderBeforeCallingDelegate()
+        {
+            var invoked = false;
+
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => ((ISiloBuilder)null!).ConfigureServices(_ => invoked = true));
+
+            Assert.Equal("builder", exception.ParamName);
+            Assert.False(invoked);
+        }
+
+        [Fact]
+        public void ConfigureServicesAppliesRegistrationsToBuilderCollection()
+        {
+            var marker = new object();
+            using var host = new HostBuilder().UseOrleans(builder =>
+            {
+                builder.UseLocalhostClustering();
+
+                var result = builder.ConfigureServices(services => services.AddSingleton(marker));
+
+                Assert.Same(builder, result);
+            }).Build();
+
+            Assert.Same(marker, host.Services.GetRequiredService<object>());
+        }
+
+        [Fact]
+        public void ActivityPropagationRejectsNullSiloBuilder()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => CoreHostingExtensions.AddActivityPropagation(null!));
+
+            Assert.Equal("builder", exception.ParamName);
+        }
+
+        [Fact]
+        public void LegacyGrainDirectoryRejectsNullSiloBuilder()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => CoreHostingExtensions.UseLegacyGrainDirectory(null!));
+
+            Assert.Equal("siloBuilder", exception.ParamName);
+        }
+
+        [Fact]
+        public void DistributedGrainDirectoryRejectsNullSiloBuilder()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => CoreHostingExtensions.AddDistributedGrainDirectory(null!));
+
+            Assert.Equal("siloBuilder", exception.ParamName);
+        }
+
+        [Fact]
+        public void ActivityPropagationPreservesBuilderAndRegistersCallFilters()
+        {
+            using var host = new HostBuilder().UseOrleans(builder =>
+            {
+                builder.UseLocalhostClustering();
+
+                Assert.Same(builder, builder.AddActivityPropagation());
+            }).Build();
+
+            Assert.Same(
+                System.Diagnostics.DistributedContextPropagator.Current,
+                host.Services.GetRequiredService<System.Diagnostics.DistributedContextPropagator>());
+            Assert.Single(host.Services.GetServices<IIncomingGrainCallFilter>(),
+                filter => filter is ActivityPropagationIncomingGrainCallFilter);
+            Assert.Single(host.Services.GetServices<IOutgoingGrainCallFilter>(),
+                filter => filter is ActivityPropagationOutgoingGrainCallFilter);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void GrainDirectorySelectionPreservesBuilderAndDefaultRegistration(bool useLegacy)
+        {
+            using var host = new HostBuilder().UseOrleans(builder =>
+            {
+                builder.UseLocalhostClustering();
+
+                var result = useLegacy ? builder.UseLegacyGrainDirectory() : builder.AddDistributedGrainDirectory();
+
+                Assert.Same(builder, result);
+                var registrations = builder.Services
+                    .Where(descriptor => !descriptor.IsKeyedService)
+                    .Select(descriptor => descriptor.ImplementationInstance)
+                    .OfType<NamedService<IGrainDirectory>>()
+                    .Where(registration => registration.Name == GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
+                if (useLegacy)
+                {
+                    Assert.Empty(registrations);
+                }
+                else
+                {
+                    Assert.Equal(typeof(Orleans.Runtime.GrainDirectory.DistributedGrainDirectory),
+                        Assert.Single(registrations).ImplementationType);
+                }
+            }).Build();
+        }
+
         /// <summary>
         /// Tests basic silo builder configuration, verifying that a silo can be successfully built
         /// with localhost clustering and required configuration options.
@@ -192,6 +298,16 @@ namespace NonSilo.Tests
                 {
                     siloBuilder
                         .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => options.DefunctSiloMinimumRetention = TimeSpan.FromTicks(-1));
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => options.ProbeTimeout = TimeSpan.Zero);
                 }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
@@ -259,6 +375,71 @@ namespace NonSilo.Tests
                         });
                 }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
+        }
+
+        [Fact]
+        public void FailureDetectionTimeout_PreservesRepresentableTickBoundary()
+        {
+            var options = new ClusterMembershipOptions
+            {
+                MaxProbeTimeout = TimeSpan.FromTicks(long.MaxValue / int.MaxValue),
+                NumMissedProbesLimit = int.MaxValue
+            };
+
+            Assert.Equal(TimeSpan.FromTicks(long.MaxValue - 1), options.GetFailureDetectionTimeout());
+        }
+
+        [Fact]
+        public void FailureDetectionTimeout_ReportsOverflowAsConfigurationError()
+        {
+            var options = new ClusterMembershipOptions
+            {
+                MaxProbeTimeout = TimeSpan.FromTicks(long.MaxValue / int.MaxValue + 1),
+                NumMissedProbesLimit = int.MaxValue
+            };
+
+            var exception = Assert.Throws<OrleansConfigurationException>(() => options.GetFailureDetectionTimeout());
+            Assert.IsType<OverflowException>(exception.InnerException);
+        }
+
+        [Theory]
+        [InlineData(0L, true)]
+        [InlineData(-1L, true)]
+        [InlineData(-TimeSpan.TicksPerMillisecond, true)]
+        [InlineData(-TimeSpan.TicksPerMillisecond, false)]
+        [InlineData(-TimeSpan.TicksPerMillisecond - 1, true)]
+        [InlineData(long.MinValue, true)]
+        public async Task SiloBuilder_ClusterMembershipOptionsRejectsInvalidTableRefreshTimeout(long ticks, bool useLivenessGossip)
+        {
+            using var host = new HostBuilder()
+                .UseOrleans(siloBuilder => siloBuilder
+                    .UseLocalhostClustering()
+                    .Configure<ClusterMembershipOptions>(options =>
+                    {
+                        options.TableRefreshTimeout = TimeSpan.FromTicks(ticks);
+                        options.UseLivenessGossip = useLivenessGossip;
+                    }))
+                .Build();
+
+            var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(
+                () => host.StartAsync(TestContext.Current.CancellationToken));
+
+            Assert.Contains("ClusterMembershipOptions.TableRefreshTimeout", exception.Message);
+            Assert.Contains("must be greater than 0.", exception.Message);
+        }
+
+        [Theory]
+        [InlineData(1L)]
+        [InlineData(TimeSpan.TicksPerMillisecond / 2)]
+        [InlineData(60L * TimeSpan.TicksPerDay)]
+        public void SiloBuilder_ClusterMembershipOptionsAcceptsValidTableRefreshTimeout(long ticks)
+        {
+            using var services = new ServiceCollection()
+                .AddSingleton<IMembershipTable, NoOpMembershipTable>()
+                .Configure<ClusterMembershipOptions>(options => options.TableRefreshTimeout = TimeSpan.FromTicks(ticks))
+                .BuildServiceProvider();
+
+            new SiloClusteringValidator(services).ValidateConfiguration();
         }
 
         /// <summary>

@@ -264,7 +264,7 @@ public static class PackageJsonGenerator
 
     private static void CollectTypeAndNested(INamedTypeSymbol type, List<INamedTypeSymbol> types)
     {
-        if (type.DeclaredAccessibility == Accessibility.Public && !IsCompilerGenerated(type)
+        if (type.DeclaredAccessibility == Accessibility.Public && !CanonicalModelBuilder.IsGenerated(type)
             && !string.IsNullOrEmpty(type.Name))
         {
             types.Add(type);
@@ -275,13 +275,6 @@ public static class PackageJsonGenerator
                 CollectTypeAndNested(nestedType, types);
             }
         }
-    }
-
-    private static bool IsCompilerGenerated(INamedTypeSymbol type)
-    {
-        return type.Name.StartsWith("<", StringComparison.Ordinal) ||
-               type.GetAttributes().Any(a =>
-                   a.AttributeClass?.Name == "CompilerGeneratedAttribute");
     }
 
     /// <summary>

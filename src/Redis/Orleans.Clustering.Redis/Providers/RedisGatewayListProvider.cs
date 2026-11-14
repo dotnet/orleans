@@ -19,14 +19,17 @@ internal sealed class RedisGatewayListProvider(RedisMembershipTable table, IOpti
 
     public bool IsUpdatable => true;
 
-    public async Task<IList<Uri>> GetGateways()
+    public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+    public async Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_table.IsInitialized)
         {
-            await _table.InitializeMembershipTableAsync(true, CancellationToken.None);
+            await _table.InitializeMembershipTableAsync(true, cancellationToken);
         }
 
-        var all = await _table.ReadAllAsync(CancellationToken.None);
+        var all = await _table.ReadAllAsync(cancellationToken);
         var result = all.Members
            .Where(x => x.Item1.Status == SiloStatus.Active && x.Item1.ProxyPort != 0)
            .Select(x =>
@@ -37,8 +40,10 @@ internal sealed class RedisGatewayListProvider(RedisMembershipTable table, IOpti
         return result;
     }
 
-    public async Task InitializeGatewayListProvider()
+    public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+    public async Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
     {
-        await _table.InitializeMembershipTableAsync(true, CancellationToken.None);
+        await _table.InitializeMembershipTableAsync(true, cancellationToken);
     }
 }

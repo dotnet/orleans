@@ -8,7 +8,7 @@ namespace Tester.EventSourcingTests
     /// <summary>
     /// Performance tests for event-sourced counters grain comparing different synchronization and reentrancy strategies.
     /// </summary>
-    [TestCaseOrderer(typeof(SimplePriorityOrderer))]
+    [TestMethodOrderer(typeof(SimplePriorityOrderer))]
     public partial class CountersGrainTests
     {
 
@@ -123,22 +123,20 @@ namespace Tester.EventSourcingTests
     {
     }
 
-    public class SimplePriorityOrderer : ITestCaseOrderer
+    public class SimplePriorityOrderer : ITestMethodOrderer
     {
-        private readonly string attrname = typeof(RunThisFirstAttribute).AssemblyQualifiedName!;
-
-        private static bool HasRunThisFirstAttribute(ITestCase testCase)
+        private static bool HasRunThisFirstAttribute(ITestMethod? testMethod)
         {
-            return testCase is IXunitTestCase xunitTestCase
-                && xunitTestCase.TestMethod.Method.GetCustomAttributes(typeof(RunThisFirstAttribute), inherit: true).Any();
+            return testMethod is IXunitTestMethod xunitTestMethod
+                && xunitTestMethod.Method.GetCustomAttributes(typeof(RunThisFirstAttribute), inherit: true).Any();
         }
 
-        public IReadOnlyCollection<TTestCase> OrderTestCases<TTestCase>(IReadOnlyCollection<TTestCase> testCases) where TTestCase : ITestCase
+        public IReadOnlyCollection<TTestMethod?> OrderTestMethods<TTestMethod>(IReadOnlyCollection<TTestMethod?> testMethods) where TTestMethod : notnull, ITestMethod
         {
             return
             [
-                .. testCases.Where(testCase => HasRunThisFirstAttribute(testCase)),
-                .. testCases.Where(testCase => !HasRunThisFirstAttribute(testCase)),
+                .. testMethods.Where(testMethod => HasRunThisFirstAttribute(testMethod)),
+                .. testMethods.Where(testMethod => !HasRunThisFirstAttribute(testMethod)),
             ];
         }
     }

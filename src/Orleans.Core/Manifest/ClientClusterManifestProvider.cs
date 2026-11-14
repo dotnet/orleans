@@ -21,7 +21,6 @@ namespace Orleans.Runtime
     /// </summary>
     internal partial class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
     {
-        private readonly TaskCompletionSource<bool> _initialized = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ILogger<ClientClusterManifestProvider> _logger;
         private readonly TypeManagementOptions _typeManagementOptions;
         private readonly IServiceProvider _services;
@@ -69,13 +68,36 @@ namespace Orleans.Runtime
         public GrainManifest LocalGrainManifest { get; }
 
         /// <summary>
-        /// Starts this service.
+        /// Starts this service and waits for the initial cluster manifest.
         /// </summary>
+        /// <remarks>
+        /// Callers serialize start attempts. After initialization succeeds, refreshes follow the service lifetime.
+        /// </remarks>
+        /// <param name="cancellationToken">The token used to cancel initialization and stop its background work.</param>
         /// <returns>A <see cref="Task"/> which completes once the service has started.</returns>
-        public Task StartAsync()
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
-            _runTask = Task.Run(RunAsync);
-            return _initialized.Task;
+            cancellationToken.ThrowIfCancellationRequested();
+            Debug.Assert(_runTask is null || _runTask.IsCompleted);
+            var shutdownToken = _shutdownCts.Token;
+            var initialization = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var runTask = _runTask = Task.Run(() => RunAsync(initialization), CancellationToken.None);
+            try
+            {
+                var initialized = await initialization.Task.WaitAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!initialized)
+                {
+                    await runTask.WaitAsync(cancellationToken);
+                    Debug.Assert(shutdownToken.IsCancellationRequested);
+                    throw new OperationCanceledException(shutdownToken);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await StopAsync(CancellationToken.None);
+                throw;
+            }
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -103,7 +125,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task RunAsync()
+        private async Task RunAsync(TaskCompletionSource<bool> initialization)
         {
             try
             {
@@ -177,7 +199,7 @@ namespace Orleans.Runtime
                         }
 
                         ManifestEvents.EmitClusterManifestUpdated(this, updatedManifest);
-                        _initialized.TrySetResult(true);
+                        initialization.TrySetResult(true);
 
                         LogRefreshedClusterManifest(_logger);
 
@@ -197,9 +219,13 @@ namespace Orleans.Runtime
                     }
                 }
             }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+                // Shutdown also interrupts the delay while waiting for an available gateway.
+            }
             finally
             {
-                _initialized.TrySetResult(false);
+                initialization.TrySetResult(false);
 
                 LogStoppedRefreshingClusterManifest(_logger);
             }
@@ -214,7 +240,10 @@ namespace Orleans.Runtime
             {
                 // First, attempt to call the new API, which provides more information.
                 // This returns null if there is no newer cluster manifest.
-                return await provider.GetClusterManifestUpdate(previousVersion, cancellationToken);
+                // The runtime owns the RPC callback. Bound this provider's wait even when RPC policy requires a cancellation acknowledgement.
+                var request = provider.GetClusterManifestUpdate(previousVersion, cancellationToken).AsTask();
+                request.Ignore();
+                return await request.WaitAsync(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -225,7 +254,9 @@ namespace Orleans.Runtime
                 LogFailedToFetchClusterManifestUpdate(_logger, exception, provider);
 
                 // If the provider does not support the new API, fall back to the old one.
-                var manifest = await provider.GetClusterManifest(cancellationToken);
+                var request = provider.GetClusterManifest(cancellationToken).AsTask();
+                request.Ignore();
+                var manifest = await request.WaitAsync(cancellationToken);
                 var result = new ClusterManifestUpdate(manifest.Version, manifest.Silos, includesAllActiveServers: true);
                 return result;
             }

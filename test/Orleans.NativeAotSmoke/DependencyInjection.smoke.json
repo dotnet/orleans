@@ -1,0 +1,5 @@
+{
+  "scenario": "DependencyInjection",
+  "diagnostics": "strict",
+  "rejectDiagnostics": []
+}

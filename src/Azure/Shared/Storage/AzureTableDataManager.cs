@@ -156,8 +156,17 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="data">Data to be inserted into the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> CreateTableEntryAsync(T data)
+        public Task<string> CreateTableEntryAsync(T data) => CreateTableEntryAsync(data, CancellationToken.None);
+
+        /// <summary>
+        /// Creates a new table entry using the supplied cancellation token.
+        /// </summary>
+        /// <param name="data">The entry to insert.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The new entry's ETag.</returns>
+        public async Task<string> CreateTableEntryAsync(T data, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "CreateTableEntry";
             var startTime = DateTime.UtcNow;
 
@@ -166,11 +175,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then CreateIfNotExistsAsync.
-                    var opResult = await Table.AddEntityAsync(data);
+                    var opResult = await Table.AddEntityAsync(data, cancellationToken);
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
-                catch (Exception exc)
+                catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     CheckAlertWriteError(operation, data, null, exc);
                     throw;
@@ -303,8 +311,18 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="data">Data to be updated into the table.</param>
         /// /// <param name="dataEtag">ETag to use.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> UpdateTableEntryAsync(T data, ETag dataEtag)
+        public Task<string> UpdateTableEntryAsync(T data, ETag dataEtag) => UpdateTableEntryAsync(data, dataEtag, CancellationToken.None);
+
+        /// <summary>
+        /// Replaces a table entry conditionally using the supplied cancellation token.
+        /// </summary>
+        /// <param name="data">The entry to update.</param>
+        /// <param name="dataEtag">The expected ETag.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The updated entry's ETag.</returns>
+        public async Task<string> UpdateTableEntryAsync(T data, ETag dataEtag, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "UpdateTableEntryAsync";
             var startTime = DateTime.UtcNow;
             LogTraceTableEntry(Logger, operation, data, TableName);
@@ -314,12 +332,12 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     data.ETag = dataEtag;
-                    var opResult = await Table.UpdateEntityAsync(data, data.ETag, TableUpdateMode.Replace);
+                    var opResult = await Table.UpdateEntityAsync(data, data.ETag, TableUpdateMode.Replace, cancellationToken);
 
                     //The ETag of data is needed in further operations.
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
-                catch (Exception exc)
+                catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     CheckAlertWriteError(operation, data, null, exc);
                     throw;
@@ -347,8 +365,18 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="data">Data entry to be deleted from the table.</param>
         /// <param name="eTag">ETag to use.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        public async Task DeleteTableEntryAsync(T data, ETag eTag)
+        public Task DeleteTableEntryAsync(T data, ETag eTag) => DeleteTableEntryAsync(data, eTag, CancellationToken.None);
+
+        /// <summary>
+        /// Deletes a table entry conditionally using the supplied cancellation token.
+        /// </summary>
+        /// <param name="data">The entry to delete.</param>
+        /// <param name="eTag">The expected ETag.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A task representing the deletion.</returns>
+        public async Task DeleteTableEntryAsync(T data, ETag eTag, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "DeleteTableEntryAsync";
             var startTime = DateTime.UtcNow;
             LogTraceTableEntry(Logger, operation, data, TableName);
@@ -357,13 +385,13 @@ namespace Orleans.GrainDirectory.AzureStorage
                 data.ETag = eTag;
                 try
                 {
-                    var response = await Table.DeleteEntityAsync(data.PartitionKey, data.RowKey, data.ETag);
+                    var response = await Table.DeleteEntityAsync(data.PartitionKey, data.RowKey, data.ETag, cancellationToken);
                     if (response is { Status: 404 })
                     {
                         throw new RequestFailedException(response.Status, "Resource not found", response.ReasonPhrase, null);
                     }
                 }
-                catch (Exception exc)
+                catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     LogWarningDeleteTableEntry(Logger, exc, data, TableName);
                     throw;
@@ -387,6 +415,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             string rowKey,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
             LogTraceTableOperation(Logger, operation, TableName, partitionKey, rowKey);

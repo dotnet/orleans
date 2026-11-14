@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using System.Threading;
 
 namespace Orleans.Runtime;
 
@@ -10,19 +11,20 @@ internal sealed class GrainInstruments
 
     public GrainInstruments(OrleansInstruments instruments)
     {
-        GrainMetricsListener.Start();
         _grainCounts = instruments.Meter.CreateUpDownCounter<int>(InstrumentNames.GRAIN_COUNTS);
         _systemTargetCounts = instruments.Meter.CreateUpDownCounter<int>(InstrumentNames.SYSTEM_TARGET_COUNTS);
     }
 
-    internal void IncrementGrainCounts(string grainTypeName)
+    internal void IncrementGrainCounts(GrainTypeMetrics metrics)
     {
-        _grainCounts.Add(1, new KeyValuePair<string, object?>("type", grainTypeName));
+        Interlocked.Increment(ref metrics.GrainCount);
+        _grainCounts.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, metrics.GrainTypeTagValue));
     }
 
-    internal void DecrementGrainCounts(string grainTypeName)
+    internal void DecrementGrainCounts(GrainTypeMetrics metrics)
     {
-        _grainCounts.Add(-1, new KeyValuePair<string, object?>("type", grainTypeName));
+        Interlocked.Decrement(ref metrics.GrainCount);
+        _grainCounts.Add(-1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, metrics.GrainTypeTagValue));
     }
 
     internal void IncrementSystemTargetCounts(string systemTargetTypeName)

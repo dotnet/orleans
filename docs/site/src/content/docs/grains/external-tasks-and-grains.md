@@ -1,7 +1,7 @@
 ---
 title: External tasks and grain scheduling
 description: Safely use asynchronous libraries, CPU work, and blocking APIs from Orleans grains.
-ms.date: 08/21/2026
+ms.date: 10/15/2026
 ms.topic: concept-article
 ---
 
@@ -41,6 +41,8 @@ Don't use `ConfigureAwait(false)` directly in grain methods. It can resume the c
 If an advanced integration passes an async delegate to <xref:System.Threading.Tasks.TaskFactory.StartNew*>, unwrap the nested task:
 
 :::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="start_async_worker":::
+To apply the result of a background callback to grain state, use <xref:Orleans.GrainBaseExtensions.RunRequestAsync*>. It runs the callback as a request on the activation. See [Run background work as a grain request](request-scheduling.md#run-background-work-as-a-grain-request).
+
 Keep background work under an observed runtime mechanism. Use [grain timers](timers.md), [reminders](reminders.md), a durable job abstraction, or a hosted service according to the required lifetime and reliability.
 
 ## Reentrancy still applies

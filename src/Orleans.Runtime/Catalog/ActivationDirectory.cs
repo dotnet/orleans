@@ -12,10 +12,12 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
     private int _activationsCount;
 
     private readonly ConcurrentDictionary<GrainId, IGrainContext> _activations = new();
+    private readonly CatalogInstruments _catalogInstruments;
 
     public ActivationDirectory(CatalogInstruments catalogInstruments)
     {
-        catalogInstruments.RegisterActivationCountObserve(() => Count);
+        _catalogInstruments = catalogInstruments;
+        catalogInstruments.RegisterActivationCountObserve();
     }
 
     public int Count => _activationsCount;
@@ -28,9 +30,11 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
 
     public void RecordNewTarget(IGrainContext target)
     {
+        var metrics = GetMetrics(target);
         if (_activations.TryAdd(target.GrainId, target))
         {
             Interlocked.Increment(ref _activationsCount);
+            metrics.OnActivationAdded();
         }
     }
 
@@ -39,11 +43,19 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
         if (_activations.TryRemove(KeyValuePair.Create(target.GrainId, target)))
         {
             Interlocked.Decrement(ref _activationsCount);
+            GetMetrics(target).OnActivationRemoved();
             return true;
         }
 
         return false;
     }
+
+    private GrainTypeMetrics GetMetrics(IGrainContext target) => target switch
+    {
+        ActivationData activation => activation.Shared.GrainTypeMetrics,
+        StatelessWorkerGrainContext worker => worker.GrainTypeMetrics,
+        _ => _catalogInstruments.GetGrainTypeMetrics(target.GrainId.Type)
+    };
 
     public IEnumerator<KeyValuePair<GrainId, IGrainContext>> GetEnumerator() => _activations.GetEnumerator();
 
@@ -69,6 +81,10 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
             {
                 // Ignore exceptions during disposal.
             }
+            finally
+            {
+                RemoveTarget(value);
+            }
         }
 
         await Task.WhenAll(tasks).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
@@ -88,6 +104,10 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
             catch
             {
                 // Ignore exceptions during disposal.
+            }
+            finally
+            {
+                RemoveTarget(value);
             }
         }
     }

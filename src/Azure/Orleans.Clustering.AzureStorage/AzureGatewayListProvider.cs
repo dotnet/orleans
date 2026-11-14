@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,18 +25,25 @@ namespace Orleans.AzureUtils
             this.options = options.Value;
         }
 
-        public async Task InitializeGatewayListProvider()
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+        public async Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.siloInstanceManager = await OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
                 this.loggerFactory,
-                this.options);
+                this.options,
+                cancellationToken);
         }
         // no caching
-        public Task<IList<Uri>> GetGateways()
+        public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+        public Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // FindAllGatewayProxyEndpoints already returns a deep copied List<Uri>.
-            return this.siloInstanceManager.FindAllGatewayProxyEndpoints();
+            return this.siloInstanceManager.FindAllGatewayProxyEndpoints(cancellationToken);
         }
 
         public TimeSpan MaxStaleness { get; }

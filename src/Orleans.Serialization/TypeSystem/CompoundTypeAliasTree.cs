@@ -72,6 +72,20 @@ public class CompoundTypeAliasTree
     public CompoundTypeAliasTree Add(string key, Type value) => AddInternal(key, value);
 
     /// <summary>
+    /// Gets or creates an intermediate node while preserving its registered type value.
+    /// </summary>
+    /// <param name="key">The component type.</param>
+    /// <returns>The existing or created node.</returns>
+    public CompoundTypeAliasTree GetOrAdd(Type key) => GetChildOrDefault(key) ?? AddInternal(key);
+
+    /// <summary>
+    /// Gets or creates an intermediate node while preserving its registered type value.
+    /// </summary>
+    /// <param name="key">The component name.</param>
+    /// <returns>The existing or created node.</returns>
+    public CompoundTypeAliasTree GetOrAdd(string key) => GetChildOrDefault(key) ?? AddInternal(key);
+
+    /// <summary>
     /// Adds a node to the tree.
     /// </summary>
     /// <param name="key">The key for the new node.</param>

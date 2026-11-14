@@ -24,11 +24,7 @@ namespace Orleans.Runtime
     /// </summary>
     public sealed class GrainContextActivator
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
-#else
-        private readonly object _lockObj = new();
-#endif
         private readonly IGrainContextActivatorProvider[] _activatorProviders;
         private readonly IConfigureGrainContextProvider[] _configuratorProviders;
         private readonly GrainPropertiesResolver _resolver;
@@ -205,6 +201,7 @@ namespace Orleans.Runtime
                 configurator.Configure(grainType, properties, result);
             }
 
+            result.CompleteConfiguration();
             return result;
         }
     }

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -7,7 +8,7 @@ internal static class JsonTypeInfoHelpers
 {
     public static JsonTypeInfo<T> GetTypeInfo<T>(JsonSerializerOptions? options)
     {
-        options ??= JsonSerializerOptions.Default;
+        options ??= GetDefaultOptions();
         try
         {
             var typeInfo = options.GetTypeInfo(typeof(T));
@@ -27,6 +28,12 @@ internal static class JsonTypeInfoHelpers
 
         throw CreateMissingMetadataException<T>();
     }
+
+    // When trimmed and Native AOT publishing disables System.Text.Json reflection, JsonSerializerOptions.Default uses an
+    // empty type-info resolver, so missing metadata surfaces as NotSupportedException and the configuration error above.
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "JsonSerializerOptions.Default resolves no reflection-based metadata when System.Text.Json reflection is disabled.")]
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "JsonSerializerOptions.Default resolves no reflection-based metadata when System.Text.Json reflection is disabled.")]
+    private static JsonSerializerOptions GetDefaultOptions() => JsonSerializerOptions.Default;
 
     private static InvalidOperationException CreateMissingMetadataException<T>(Exception? innerException = null)
     {

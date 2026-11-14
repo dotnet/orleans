@@ -4,7 +4,7 @@
 
 Microsoft Orleans Journaling for Redis provides a Redis-backed implementation of the Orleans Journaling storage and catalog abstractions. Orleans Durable Jobs can use Orleans Journaling as a backing store, so this provider can persist durable job state through the journaling layer.
 
-The provider stores each journal as Redis string data plus Redis hash metadata. Per-journal reads and mutations use atomic Lua scripts. Journal discovery scans metadata keys on each connected primary Redis server and reads the canonical journal id from each hash. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
+The provider stores each journal as Redis string data plus Redis hash metadata. Per-journal reads and mutations use atomic Lua scripts, so each append or replacement is written whole or not at all. Each journal is one Redis string, so the whole journal, including an append, fits the server's string size limit (`proto-max-bulk-len`, 512 MB by default); a write which exceeds it fails before the script changes any key. Journal discovery scans metadata keys on each connected primary Redis server. The default key mapping preserves journal ids in the keys, so discovery does not read the metadata hashes. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
 
 ## Getting Started
 
@@ -31,26 +31,67 @@ builder.UseOrleans(siloBuilder =>
 });
 ```
 
-If the Redis connection is already registered in dependency injection, configure it using a keyed service and the `GrainJournaling` provider configuration `ServiceKey`.
+Set `Orleans:Journaling:{name}:ProviderType` to `Redis` to configure a named journal storage provider. Use `Default` as the name for grain journaling. If the Redis connection is already registered in dependency injection, select the keyed client using `Orleans:Journaling:{name}:ServiceKey`. Each entry has its own connection and storage options.
+
+`AddRedisJournalStorage` also registers core services through `AddJournaling`. Inject
+`IDurableStateManager` into a grain and declare states during construction with
+`GetOrAddState<TState>(name)` or its typed helpers, such as `GetOrAddValue<int>("count")`.
+Orleans recovers those states before application methods run. Keyed injection resolves the same named
+object, and `DurableGrain` remains a convenience base class. After initialization, `GetOrAdd` resolves
+existing states; adding a missing name fails immediately. Await `WriteStateAsync` for the manager-wide
+journal acknowledgement before returning success.
 
 ## Journal discovery
 
-Use `IJournalStorageCatalog.ListAsync` with optional `ListOptions` to filter by a journal id prefix:
+Use `IJournalStorageCatalog.ListAsync` with optional `JournalCatalogListOptions` to filter by a journal id prefix:
 
 ```csharp
-await foreach (var journalId in catalog.ListAsync(
-    new ListOptions { Prefix = JournalId.Create("jobs") },
+await foreach (var entry in catalog.ListAsync(
+    new JournalCatalogListOptions { Prefix = JournalId.Create("jobs") },
     cancellationToken))
 {
-    // Process the discovered journal.
+    var journalId = entry.Id;
 }
 ```
 
-The prefix is read when enumeration begins. Discovery scans primary servers incrementally and reads canonical journal ids in batches of at most 128 metadata keys, yielding matching ids in traversal order without sorting or buffering the whole catalog. Duplicate ids are suppressed across the traversal using O(N) seen-id memory for N distinct matching ids; metadata keys are not retained for the whole traversal, so repeated scan results can cause repeated metadata reads.
+`JournalCatalogListOptions.Prefix` matches the raw journal id using ordinal `StartsWith`, including partial segments. For example, `new JournalId("jobs/2026/0")` matches both `jobs/2026/01` and `jobs/2026/09`. `JournalCatalogListOptions.MinId` and `MaxId` add inclusive ordinal lower and upper bounds; their default values are unlimited. All filters apply together and are snapshotted when enumeration begins. Empty intersections perform no scans or metadata reads.
 
-The Redis `SCAN COUNT` value of 250 is a hint, not a strict response-size or server-work bound. One enumerator advancement can traverse many empty or nonmatching scans, and Redis/client-side scan buffering is not bounded by the metadata batch size. Discovery observes live storage rather than a snapshot.
+Entries contain the journal `Id` and null `Metadata`, including when `IncludeMetadata` is requested.
+Redis key scans supply identities; callers requiring complete metadata retrieve it using
+`IJournalStorage.GetMetadataAsync`. The listing retains its existing key-scan and canonical-id read costs.
+
+`IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey` expose the stored format key.
+This API name leaves Redis metadata fields, key layout, and format-key values unchanged.
+
+With the default `GetKeyName` mapping, discovery supplies an escaped `SCAN MATCH` pattern for metadata keys beginning with the encoded raw prefix. A common prefix of `MinId` and `MaxId` can narrow this pattern further. Returned keys contain the journal id, which is decoded and filtered against both bounds locally without `HGET` requests. Malformed matching keys are errors, not silently ignored entries.
+
+Custom `GetKeyName` mappings cannot safely translate logical journal prefixes or bounds into Redis key names. Discovery therefore scans all metadata keys for the configured key prefix and reads canonical journal ids from their `$journal-id` fields in concurrent batches of at most 128, then applies the filters locally. Missing metadata is checked atomically to distinguish deletion from corruption.
+
+Discovery yields ids incrementally in traversal order, without sorting or buffering the whole catalog. Redis `SCAN` is unordered, so encountering a future id does not end traversal. Consumers requiring due order must sort the selected ids using `StringComparer.Ordinal`. Duplicate ids are suppressed across the traversal using O(N) seen-id memory for N distinct matching ids. Metadata keys are not retained for the whole traversal, so custom mappings can cause repeated metadata reads for repeated scan results.
+
+**`SCAN MATCH` still traverses the Redis keyspace on the server.** Prefix narrowing reduces returned keys and client work, not the server-side keyspace scan. Arbitrary ordinal ranges are filtered client-side, not sought through an index. The Redis `SCAN COUNT` value of 250 is a hint, not a strict response-size or server-work bound. One enumerator advancement can traverse many empty or nonmatching scans, and Redis/client-side scan buffering is not bounded by the metadata batch size. Discovery observes live storage rather than a snapshot. With the default mapping, a concurrently deleted metadata key can still yield its journal id; consumers must handle the journal no longer existing when they read it.
 
 Storage errors and cancellation propagate without provider-level retries, restarts, or success fallbacks. A disconnected primary or the absence of any primary is an error; failures on later servers can occur after earlier ids have been yielded. Dispose the enumerator when stopping early. Cancellation is checked between scan and metadata operations, but does not abort an in-flight Redis metadata request.
+
+## Catalog metrics
+
+The `Microsoft.Orleans` meter records `orleans-journaling-provider-catalog-items` for scan keys
+consumed by catalog traversal and `orleans-journaling-provider-catalog-entries` for identities yielded
+after filtering and duplicate suppression. Both use `provider=redis`, the short name defined by
+this library. Empty logical ranges produce
+zero measurements; early disposal and cancellation retain the consumed-key and delivered-entry
+counts.
+
+Existing journaling metrics supply storage latency and outcomes. The application supplies command
+telemetry through its hosting integration or instrumentation libraries. For targeted diagnosis,
+[StackExchange.Redis profiling](https://seredis.dev/Profiling_v2) on the same connection multiplexer
+provides command queue, send, and response timings. Reuse existing client instrumentation and scope
+additional profiling sessions to the investigated work. Shared connections retain their caller-owned
+lifetime and diagnostic configuration.
+
+## Redis key layout
+
+Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<encodedKeyName>:metadata` or the same base with a `:data` suffix. This layout applies to both default and custom `GetKeyName` mappings. The reversible key name is outside the SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI escaping encodes Unicode scalars, while `%uXXXX` encodes each unpaired UTF-16 surrogate using four uppercase hexadecimal digits. Literal percent signs are escaped as `%25`, so raw journal ids round-trip distinctly from escape sequences and replacement characters. The stored `$journal-id` uses the same encoding to preserve the identity through Redis string transport and custom-mapped discovery. Native scan patterns escape glob characters in the configured key prefix and broaden partial surrogate prefixes before applying the ordinal filters locally.
 
 ## Documentation
 

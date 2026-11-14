@@ -51,6 +51,8 @@ namespace Orleans.Journaling
     {
         public static Hosting.ISiloBuilder AddAzureBlobJournalStorage(this Hosting.ISiloBuilder builder, System.Action<AzureBlobJournalStorageOptions>? configure) { throw null; }
 
+        public static Hosting.ISiloBuilder AddAzureBlobJournalStorage(this Hosting.ISiloBuilder builder, string name, System.Action<AzureBlobJournalStorageOptions>? configure) { throw null; }
+
         public static Hosting.ISiloBuilder AddAzureBlobJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
@@ -98,6 +100,8 @@ namespace Orleans.Journaling
     public static partial class AzureTableStorageHostingExtensions
     {
         public static Hosting.ISiloBuilder AddAzureTableJournalStorage(this Hosting.ISiloBuilder builder, System.Action<AzureTableJournalStorageOptions>? configure) { throw null; }
+
+        public static Hosting.ISiloBuilder AddAzureTableJournalStorage(this Hosting.ISiloBuilder builder, string name, System.Action<AzureTableJournalStorageOptions>? configure) { throw null; }
 
         public static Hosting.ISiloBuilder AddAzureTableJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }

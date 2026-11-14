@@ -1,7 +1,7 @@
 # Microsoft Orleans Durable Jobs for Azure Storage
 
 ## Introduction
-Microsoft Orleans Durable Jobs for Azure Storage provides persistent storage for Orleans Durable Jobs using Azure Blob Storage. This allows your Orleans applications to schedule jobs that survive silo restarts, grain deactivation, and cluster reconfigurations. Jobs are stored in append blobs, providing efficient storage and retrieval for time-based job scheduling.
+Microsoft Orleans Durable Jobs for Azure Storage persists scheduled jobs through the Azure Blob or Azure Table journal provider. Jobs survive silo restarts, grain deactivation, and cluster reconfigurations. `UseAzureBlobDurableJobs` configures append-blob WALs and block-blob checkpoints; `UseAzureTableDurableJobs` configures Table journal headers and data generations. Both register the journal-backed shard manager and durable-job JSON serialization metadata.
 
 ## Getting Started
 
@@ -14,6 +14,90 @@ dotnet add package Microsoft.Orleans.DurableJobs.AzureStorage
 ```
 
 ### Configuration
+
+Choose `UseAzureBlobDurableJobs` with `AzureBlobJournalStorageOptions`, or
+`UseAzureTableDurableJobs` with `AzureTableJournalStorageOptions`. Both support
+`ISiloBuilder` and `IServiceCollection` registration. Table configuration accepts
+a `TableServiceClient` and `TableName`; Blob configuration accepts a
+`BlobServiceClient` and `ContainerName`. Clustering uses an appropriate Table
+service, including a separate standard account when journal storage uses a
+premium BlockBlobStorage account.
+
+The [Durable Jobs journaling playground](../../../playground/DurableJobsJournaling/README.md)
+provides runnable Blob/Table backend selection. The
+[Azure provider benchmarks](../../../test/Benchmarks/Journaling/Azure/README.md)
+measure append, checkpoint, recovery, and catalog workloads with bounded work
+and explicit resource ownership.
+
+### Named providers and account migration
+
+For explicit storage selection, register
+`AddAzureBlobJournalStorage("jobs-a", configure)` or
+`AddAzureTableJournalStorage("jobs-a", configure)` and call
+`UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs-a")`.
+Both builder and service-collection APIs are supported. Each name has its own
+backend options, storage provider, catalog, and state-manager factory. Named
+registrations leave default grain journaling independent.
+
+To move new work to another account, container, or table, retain A's original
+namespace under `"jobs-a"` and register B's namespace under `"jobs-b"`:
+
+```csharp
+siloBuilder
+    .AddAzureBlobJournalStorage("jobs-a", options =>
+    {
+        options.BlobServiceClient = originalAccountClient;
+        options.ContainerName = "jobs";
+    })
+    .AddAzureBlobJournalStorage("jobs-b", options =>
+    {
+        options.BlobServiceClient = newAccountClient;
+        options.ContainerName = "jobs";
+    })
+    .UseJournaledDurableJobs(options =>
+    {
+        options.ActiveProviderName = "jobs-b";
+        options.DrainingProviderNames.Add("jobs-a");
+    });
+```
+
+The same pattern works with separate Table names/clients, or a Blob-to-Table
+change. Register each physical namespace under one selected name; changing a
+name's account or mapping while it contains work changes where those jobs can
+be found.
+
+With one selected provider, uncached shard lookup reads its metadata directly.
+With B plus A selected, discovery reads both catalogs and known-ID lookup checks
+B then A as needed. Existing jobs, including retries, reschedules, cancellation,
+and deletion, continue writing A. New shards are created only in B. Shard IDs
+and `DurableJob` handles remain timestamp/GUID-based and provider-independent.
+Storage errors remain distinct from successful absence.
+
+Before enabling B writes, deploy both selected bindings to all scheduling silos
+with A as write provider and B as draining. Then roll out B as write provider
+and A as draining. These settings take effect at startup. Pause scheduling for
+a strict cutover boundary; otherwise A-configured silos can keep creating A
+shards until the rollout and their admitted scheduling requests finish.
+
+Keep A's identity authorized for listing, reads, conditional metadata updates,
+journal writes, compaction, and deletes for the entire drain. These permissions
+allow existing jobs to progress and their shards to be cleaned up.
+Preserve WAL/checkpoint or Table partition mappings and the
+readers needed to recover both providers.
+
+Use `IDurableJobsStorageInspector.InspectAsync("jobs-a", cancellationToken)`
+for a full `jobs/shards/` inventory, including future-dated and poisoned work.
+Report inventory failures as unknown. After **all writers** have cut over,
+require successful complete inventories with a total shard count of zero,
+including unrecognized entries, before removing A. Retirement combines these
+live observations with independent evidence of completed cluster-wide writer
+cutover.
+
+The [migration sample](../../../samples/DurableJobsMigration/README.md)
+uses disk-backed Azurite, two Blob namespaces, separate prepare/drain processes,
+and local inventory reporting. See the
+[core migration guidance](../../Orleans.DurableJobs/README.md#cut-over-and-retire-a-provider)
+for rollback and retirement criteria.
 
 #### Using Connection String
 ```csharp
@@ -392,14 +476,15 @@ public enum OrderStatus
 ## How It Works
 
 ### Storage Architecture
-1. **Blob Container**: All jobs are stored in a single Azure Blob Storage container
-2. **Append Blobs**: Each job shard is stored as an append blob, providing efficient sequential writes
-3. **Blob Naming**: Blobs are named with the pattern: `{ShardStartTime:yyyyMMddHHmm}-{SiloAddress}-{Index}`
-4. **Metadata**: Blob metadata stores ownership and time range information:
-   - `Owner`: The silo currently processing this shard
-   - `Creator`: The silo that created this shard
-   - `MinDueTime`: Start of the time range for jobs in this shard
-   - `MaxDueTime`: End of the time range for jobs in this shard
+Each durable-job shard has a journal identity and persisted ownership metadata.
+The journal-backed shard manager discovers shard identities through the storage
+catalog and recovers state through the configured journal format.
+
+The Blob provider stores the WAL at `wal/{journalId}` and checkpoints at
+`checkpoints/{journalId}/{snapshotId}` within the configured container. The
+Table provider stores journal headers and data generations in the configured
+table. Provider metadata selects the committed checkpoint or generation; caller
+metadata carries the durable-job shard's discovery and ownership properties.
 
 ### Shard Ownership and High Availability
 1. **Optimistic Concurrency**: ETags prevent conflicting updates when multiple silos try to claim a shard
@@ -410,12 +495,12 @@ public enum OrderStatus
 ### Job Lifecycle with Azure Storage
 ```
 ┌─────────────────────┐
-│  Job Scheduled      │ ──▶ Written to append blob
+│  Job Scheduled      │ ──▶ Committed to the shard journal
 └─────────────────────┘
          │
          ▼
 ┌─────────────────────┐
-│  Waiting in Shard   │ ──▶ Persisted in Azure Blob Storage
+│  Waiting in Shard   │ ──▶ Persisted in Azure journal storage
 └─────────────────────┘
          │
          ▼
@@ -428,9 +513,9 @@ public enum OrderStatus
 │  Job Executed       │ ──▶ Handler invoked on target grain
 └─────────────────────┘
          │
-         ├──▶ Success ──▶ Job entry removed from blob
+         ├──▶ Success ──▶ Completion persisted in the journal
          │
-         └──▶ Failure ──▶ Retry: Updated due time in blob
+         └──▶ Failure ──▶ Retry: Updated due time in the journal
                           No Retry: Job entry removed
 ```
 
@@ -446,12 +531,21 @@ services.Configure<DurableJobsOptions>(options =>
 ```
 
 ### Storage Costs
-- **Container**: One container per cluster
-- **Blobs**: One blob per active time shard
-- **Operations**: 
-  - Schedule job: 1-2 append operations
-  - Execute job: 1 read + 1 delete operation
-  - Shard ownership transfer: 1 metadata update
+Account for stored WAL/checkpoint bytes or Table generations, append batches,
+recovery reads, checkpoint publication and cleanup, ownership metadata updates,
+and catalog listing pages. Standard and premium Blob use the same provider
+operations with different account pricing and service characteristics.
+
+Use `orleans-journaling-provider-catalog-pages`, `catalog-items`, and
+`catalog-entries` (with the same prefix) to compare catalog traversal and
+delivered results. `orleans-journaling-provider-retries` counts explicit
+provider retries. The benchmarks pair these counters with independently
+measured operation counts, outcomes, payload bytes, and latency.
+
+Configure request counts, timing, and outcomes through host-owned Azure SDK
+diagnostics, Aspire integrations, or other application instrumentation.
+Reconcile transaction cost with Azure service metrics and the SDK's retry and
+upload behavior.
 
 ## Monitoring and Troubleshooting
 
@@ -495,7 +589,7 @@ var blobServiceClient = new BlobServiceClient(storageAccountUri, credential);
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
 - [Azure Blob Storage Documentation](https://learn.microsoft.com/azure/storage/blobs/)
-- [Orleans Durable Jobs Core Package](../../../Orleans.DurableJobs/README.md)
+- [Orleans Durable Jobs Core Package](../../Orleans.DurableJobs/README.md)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

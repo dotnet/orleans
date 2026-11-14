@@ -49,13 +49,22 @@ internal sealed class TestClusterHostTerminator(ILogger<TestClusterHostTerminato
 
         _ = Task.Run(async () =>
         {
+            // Fatal errors model process loss: cancel draining while completing in-process cleanup.
+            var cancellationToken = new CancellationToken(canceled: true);
             try
             {
-                await host.StopAsync();
+                await host.StopAsync(cancellationToken);
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Failed to stop a test silo after a fatal error.");
+                if (exception.IsCancellation())
+                {
+                    logger.LogDebug("Canceled graceful draining after a fatal test silo error.");
+                }
+                else
+                {
+                    logger.LogError(exception, "Failed to stop a test silo after a fatal error.");
+                }
             }
         });
     }

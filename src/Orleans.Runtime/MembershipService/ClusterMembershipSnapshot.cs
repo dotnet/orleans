@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -10,15 +12,36 @@ namespace Orleans.Runtime
     [Serializable, GenerateSerializer, Immutable]
     public sealed class ClusterMembershipSnapshot : ISpanFormattable
     {
+        [Id(3)]
+        private readonly IReadOnlySet<SiloAddress>? _recentlyDeadSilos;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterMembershipSnapshot"/> class.
         /// </summary>
         /// <param name="members">The cluster members.</param>
         /// <param name="version">The cluster membership version.</param>
         public ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember> members, MembershipVersion version)
+            : this(members, version, 0)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a cluster view with local generation-retirement knowledge.
+        /// </summary>
+        /// <param name="members">The cluster members.</param>
+        /// <param name="version">The cluster membership version.</param>
+        /// <param name="minimumSiloGeneration">The exclusive upper bound of retired positive silo generations.</param>
+        /// <param name="recentlyDeadSilos">Known dead identities whose records have been removed.</param>
+        internal ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember> members,
+            MembershipVersion version,
+            int minimumSiloGeneration,
+            IReadOnlySet<SiloAddress>? recentlyDeadSilos = null)
         {
             this.Members = members;
             this.Version = version;
+            this.MinimumSiloGeneration = minimumSiloGeneration;
+            _recentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
         }
 
         internal static ClusterMembershipSnapshot Default => new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue);
@@ -38,26 +61,46 @@ namespace Orleans.Runtime
         public MembershipVersion Version { get; }
 
         /// <summary>
+        /// Gets the exclusive upper bound of retired positive silo generations.
+        /// Absent silos below this bound are dead; present members retain their recorded status.
+        /// </summary>
+        [Id(2)]
+        internal int MinimumSiloGeneration { get; }
+
+        // Snapshots from older silos omit field 3 and carry no retained death history.
+        internal IReadOnlySet<SiloAddress> RecentlyDeadSilos => _recentlyDeadSilos ?? FrozenSet<SiloAddress>.Empty;
+
+        internal bool IsSuccessorTo(ClusterMembershipSnapshot previous)
+        {
+            if (Version != previous.Version)
+            {
+                return Version > previous.Version;
+            }
+
+            if (MinimumSiloGeneration < previous.MinimumSiloGeneration)
+            {
+                return false;
+            }
+
+            return MinimumSiloGeneration > previous.MinimumSiloGeneration
+                || Members.Count < previous.Members.Count
+                || RecentlyDeadSilos.IsProperSupersetOf(previous.RecentlyDeadSilos);
+        }
+
+        /// <summary>
         /// Gets status of the specified silo.
         /// </summary>
+        /// <remarks>
+        /// Present members retain their recorded status. Absent identities are classified using
+        /// the snapshot's fixed generation cutoff, retained death evidence, and successor incarnations.
+        /// </remarks>
         /// <param name="silo">The silo.</param>
         /// <returns>The status of the specified silo.</returns>
         public SiloStatus GetSiloStatus(SiloAddress silo)
         {
-            var status = this.Members.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
-            if (status == SiloStatus.None)
-            {
-                foreach (var member in this.Members)
-                {
-                    if (member.Key.IsSuccessorOf(silo))
-                    {
-                        status = SiloStatus.Dead;
-                        break;
-                    }
-                }
-            }
-
-            return status;
+            return this.Members.TryGetValue(silo, out var entry)
+                ? entry.Status
+                : MembershipTableSnapshot.GetMissingSiloStatus(silo, MinimumSiloGeneration, RecentlyDeadSilos, Members.Keys);
         }
 
         /// <summary>

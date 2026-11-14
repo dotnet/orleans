@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
@@ -14,33 +15,37 @@ internal partial class SiloMetadataCache(
     ISiloMetadataClient siloMetadataClient,
     IMembershipManager membershipManager,
     IOptions<ClusterMembershipOptions> clusterMembershipOptions,
+    ILocalSiloDetails localSiloDetails,
     ILogger<SiloMetadataCache> logger)
-    : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable, IAsyncDisposable
 {
     private readonly ConcurrentDictionary<SiloAddress, SiloMetadata> _metadata = new();
     private readonly Dictionary<SiloAddress, DateTime> _negativeCache = new();
     private readonly CancellationTokenSource _cts = new();
+    private Task? _runTask;
+    private Task? _disposeTask;
     private TimeSpan negativeCachePeriod;
+    private long _updateSequence;
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
-        Task? task = null;
         Task OnStart(CancellationToken _)
         {
             // This gives time for the cluster to be voted Dead and for membership updates to propagate that out
             negativeCachePeriod = clusterMembershipOptions.Value.GetFailureDetectionTimeout()
                                   + (2 * clusterMembershipOptions.Value.TableRefreshTimeout);
-            task = Task.Run(() => this.ProcessMembershipUpdates(_cts.Token), CancellationToken.None);
+            lock (_cts)
+            {
+                ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
+                var cancellationToken = _cts.Token;
+                _runTask = Task.Run(() => this.ProcessMembershipUpdates(cancellationToken), CancellationToken.None);
+            }
             return Task.CompletedTask;
         }
 
         async Task OnStop(CancellationToken ct)
         {
-            await _cts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-            if (task is not null)
-            {
-                await task.WaitAsync(ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-            }
+            await DisposeAsync().AsTask().WaitAsync(ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
 
         lifecycle.Subscribe(
@@ -106,6 +111,11 @@ internal partial class SiloMetadataCache(
                         _negativeCache.Remove(silo, out _);
                     }
                 }
+
+                if (SiloMetadataEvents.IsCacheUpdatedEnabled)
+                {
+                    SiloMetadataEvents.EmitCacheUpdated(localSiloDetails.SiloAddress, ++_updateSequence, update.Version, _metadata.Keys);
+                }
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -126,7 +136,68 @@ internal partial class SiloMetadataCache(
 
     public void SetMetadata(SiloAddress siloAddress, SiloMetadata metadata) => _metadata.TryAdd(siloAddress, metadata);
 
-    public void Dispose() => _cts.Cancel();
+    public void Dispose()
+    {
+        var task = StartDisposal(out var started);
+        // Concurrent synchronous callers, including cancellation callbacks, return while the owner drains.
+        // DisposeAsync always returns the shared task for callers which require completed disposal.
+        if (started || task.IsCompleted)
+        {
+            task.GetAwaiter().GetResult();
+        }
+    }
+
+    public ValueTask DisposeAsync() => new(StartDisposal(out _));
+
+    private Task StartDisposal(out bool started)
+    {
+        TaskCompletionSource completion;
+        lock (_cts)
+        {
+            if (_disposeTask is { } task)
+            {
+                started = false;
+                return task;
+            }
+
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Publish completion before cancellation callbacks can reenter disposal.
+            _disposeTask = completion.Task;
+            started = true;
+        }
+
+        _ = DisposeCoreAsync(completion);
+        return completion.Task;
+    }
+
+    private async Task DisposeCoreAsync(TaskCompletionSource completion)
+    {
+        try
+        {
+            try
+            {
+#pragma warning disable CA1849 // Notify on the caller's scheduler before asynchronously draining metadata requests.
+                _cts.Cancel();
+#pragma warning restore CA1849
+            }
+            finally
+            {
+                // The subscription and its metadata requests retain the source until the processor exits.
+                if (_runTask is { } task)
+                {
+                    await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                }
+
+                _cts.Dispose();
+            }
+
+            completion.SetResult();
+        }
+        catch (AggregateException exception)
+        {
+            completion.SetException(exception);
+        }
+    }
 
     [LoggerMessage(
         Level = LogLevel.Debug,

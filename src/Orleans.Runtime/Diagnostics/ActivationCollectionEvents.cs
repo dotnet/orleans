@@ -11,6 +11,8 @@ internal static class ActivationCollectionEvents
 
     public static IObservable<CollectionEvent> AllEvents { get; } = new Observable();
 
+    internal static bool IsCollectionCompletedEnabled => Listener.IsEnabled(nameof(CollectionCompleted));
+
     public enum CollectionSource
     {
         Stale,
@@ -44,7 +46,7 @@ internal static class ActivationCollectionEvents
         CollectionSource source,
         TimeSpan ageLimit,
         DeactivationReason reason,
-        IReadOnlyList<ICollectibleGrainContext> activations)
+        IReadOnlyList<CollectedActivation> activations)
     {
         if (!Listener.IsEnabled(nameof(CollectionCompleted)))
         {
@@ -58,20 +60,13 @@ internal static class ActivationCollectionEvents
             CollectionSource source,
             TimeSpan ageLimit,
             DeactivationReason reason,
-            IReadOnlyList<ICollectibleGrainContext> activations)
+            IReadOnlyList<CollectedActivation> activations)
         {
-            var collectedActivations = new CollectedActivation[activations.Count];
-            for (var i = 0; i < activations.Count; i++)
-            {
-                var activation = activations[i];
-                collectedActivations[i] = new(activation.GrainId, activation.ActivationId);
-            }
-
             Listener.Write(nameof(CollectionCompleted), new CollectionCompleted(
                 source,
                 ageLimit,
                 reason,
-                collectedActivations));
+                activations));
         }
     }
 

@@ -74,6 +74,10 @@ You can replace the default with <xref:Orleans.Hosting.ClientBuilderExtensions.U
 - Honor the supplied cancellation token.
 - Let startup fail when the cluster or configuration is persistently unavailable.
 
+Startup cancellation interrupts gateway discovery, connection attempts, and initial cluster-manifest retrieval. The client stops initialization work and releases partially started client resources before the cancelled start completes. After startup succeeds, gateway and manifest refreshes follow the client's lifetime.
+
+Custom gateway providers implement <xref:Orleans.Messaging.IGatewayListProvider.InitializeGatewayListProviderAsync*> and <xref:Orleans.Messaging.IGatewayListProvider.GetGatewaysAsync*> and pass the supplied token to their cancellation-aware I/O operations. For providers which implement the tokenless methods, default interface implementations cancel the caller's wait and observe the provider operation's eventual completion.
+
 ### Client lifetime and registration
 
 For generic-host and ASP.NET Core applications, treat <xref:Orleans.IClusterClient> as a singleton for the lifetime of the application process. Register it once with <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> and resolve it from dependency injection instead of creating a second client per request, per controller, or in a static field.
@@ -97,3 +101,11 @@ Use [grain observers](../grains/observers.md) for best-effort, one-way callbacks
 ## Dependency injection
 
 Let the Generic Host own client startup and shutdown. Don't create a client per request, cache a second client in a static field, or dispose the dependency-injected singleton. When the host receives a termination signal, it closes the client as part of normal shutdown.
+
+## Observer invocations during shutdown
+
+Graceful client shutdown closes admission for new observer invocations and waits for admitted work to finish before shutting down transport. The drain includes queued invocations, running invocations, interleaved invocations, and response handling. Queued work keeps its per-observer order. Cancellation-control calls remain available while admitted application work drains, and then Orleans closes and drains that control path. New request-response calls receive a <xref:Orleans.Runtime.SiloUnavailableException>; rejected one-way calls are logged.
+
+External clients complete outstanding outbound calls with a shutdown exception before waiting for observer invocations, allowing observers awaiting those calls to finish. Co-hosted clients first drain their incoming dispatch queue, then drain observer execution. Incoming responses and callback timeouts continue completing their outbound calls during that drain. Their owned dependency-injection scope is released after execution actually finishes.
+
+The host shutdown token bounds the shutdown wait. When that token is canceled, the host advances its shutdown sequence and owns disposal of root and singleton services. Orleans continues accounting for admitted observer work and defers disposal of the co-hosted client's owned scope until that work exits. Size the [shutdown budget](configuration-guide/shutting-down-orleans.md#configure-a-shutdown-budget) for observer completion, and keep observer operations and cancellation callbacks bounded.

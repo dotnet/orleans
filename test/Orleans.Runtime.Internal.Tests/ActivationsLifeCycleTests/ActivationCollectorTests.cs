@@ -760,6 +760,90 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorShouldCollectAfterReleasingKeepAliveHolds()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
+
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
+            var grain = this.testCluster.GrainFactory!.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            await grain.AcquireKeepAliveHold();
+            await grain.AcquireKeepAliveHold();
+
+            // Holds are counted, so the activation stays alive until every hold is released.
+            var mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
+            Assert.Equal(1, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+
+            await grain.ReleaseKeepAliveHold();
+            await mgmtGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
+            Assert.Equal(1, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+
+            await grain.ReleaseKeepAliveHold();
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
+            Assert.Equal(0, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+        }
+
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorShouldRestartIdlePeriodWhenLastKeepAliveHoldIsReleased()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
+
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
+            var grain = this.testCluster.GrainFactory!.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            await grain.AcquireKeepAliveHold();
+
+            var directory = ((InProcessSiloHandle)this.testCluster.Primary!).SiloHost.Services.GetRequiredService<ActivationDirectory>();
+            var keepAlive = Assert.IsAssignableFrom<IActivationKeepAlive>(directory.FindTarget(((GrainReference)grain).GrainId));
+
+            // The idle period which began after the last request expires while the hold is outstanding.
+            await Task.Delay(DEFAULT_IDLE_TIMEOUT + DEFAULT_COLLECTION_QUANTUM, cancellationToken);
+            var mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceActivationCollection(DEFAULT_IDLE_TIMEOUT, cancellationToken);
+            Assert.Equal(1, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+
+            // Releasing the last hold outside request processing starts a fresh idle period.
+            keepAlive.ReleaseKeepAlive();
+            await mgmtGrain.ForceActivationCollection(DEFAULT_IDLE_TIMEOUT, cancellationToken);
+            Assert.Equal(1, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
+        }
+
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [Theory, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task RunRequestKeepAliveOptionControlsIdlePeriod(bool keepAlive)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
+
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
+            var grain = this.testCluster.GrainFactory!.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            var requestDuration = TimeSpan.FromSeconds(2);
+            await grain.QueueRequest(requestDuration, keepAlive);
+
+            var directory = ((InProcessSiloHandle)this.testCluster.Primary!).SiloHost.Services.GetRequiredService<ActivationDirectory>();
+            var activation = Assert.IsType<ActivationData>(directory.FindTarget(((GrainReference)grain).GrainId));
+            while (!activation.IsInactive)
+            {
+                await Task.Delay(10, cancellationToken);
+            }
+
+            // The idle period began when the grain call completed, before the request ran, unless the request restarted it.
+            var mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceActivationCollection(TimeSpan.FromSeconds(1), cancellationToken);
+            Assert.Equal(keepAlive ? 1 : 0, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+        }
+
         [TestSuite("SlowBVT")]
         [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]

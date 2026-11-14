@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -8,26 +9,67 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
 
-internal class MetadataGenerator(MetadataAggregateModel metadataModel, string assemblyName, bool supportsModuleInitializers)
+internal class MetadataGenerator(
+    MetadataAggregateModel metadataModel,
+    string assemblyName,
+    bool supportsModuleInitializers)
 {
-    private static readonly TypeSyntax TypeManifestOptionsType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestOptions");
-    private static readonly TypeSyntax TypeManifestProviderBaseType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestProviderBase");
-    private static readonly TypeSyntax ProviderMetadataProviderType = ParseTypeName("global::Orleans.Serialization.Configuration.IProviderMetadataProvider");
-    private static readonly TypeSyntax ProviderDictionaryType = ParseTypeName(
-        "global::System.Collections.Generic.IDictionary<(string Target, string Kind, string Name), global::System.Type>");
+    private const string TypeManifestOptionsType = "global::Orleans.Serialization.Configuration.TypeManifestOptions";
+    private const string TypeManifestProviderBaseType = "global::Orleans.Serialization.Configuration.TypeManifestProviderBase";
+    private const string ProviderMetadataProviderType = "global::Orleans.Serialization.Configuration.IProviderMetadataProvider";
+    private const string ProviderDictionaryType = "global::System.Collections.Generic.IDictionary<(string Target, string Kind, string Name), global::System.Type>";
+    private const string SerializationType = "global::Orleans.Serialization.Configuration.SerializationType";
 
     private readonly MetadataAggregateModel _metadataModel = metadataModel;
     private readonly string _assemblyName = assemblyName ?? "Assembly";
     private readonly bool _supportsModuleInitializers = supportsModuleInitializers;
 
-    public ClassDeclarationSyntax GenerateMetadata()
-        => GenerateIncrementalMetadata();
+    /// <summary>The simple name of the generated metadata provider class.</summary>
+    public string ClassName => "Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_assemblyName);
 
-    private ClassDeclarationSyntax GenerateIncrementalMetadata()
+    public void WriteMetadata(SourceWriter writer)
     {
-        var configParam = "config".ToIdentifierName();
-        var body = new List<StatementSyntax>();
-        var providerBody = new List<StatementSyntax>();
+        var model = _metadataModel;
+        var providers = model.ReferenceAssemblyData.RegisteredProviders
+            .Select(static provider => $"providers[({CodeText.StringLiteral(provider.Target)}, {CodeText.StringLiteral(provider.Kind)}, {CodeText.StringLiteral(provider.Name)})] = typeof({CodeText.Type(provider.Type.ToTypeSyntax())});")
+            .ToList();
+
+        writer.WriteLine(GeneratedCodeUtilities.GeneratedCodeAttributeText);
+        writer.WriteLine(providers.Count > 0
+            ? $"internal sealed class {ClassName} : {TypeManifestProviderBaseType}, {ProviderMetadataProviderType}"
+            : $"internal sealed class {ClassName} : {TypeManifestProviderBaseType}");
+        writer.OpenBlock();
+        writer.WriteLine($"protected override void ConfigureInner({TypeManifestOptionsType} config)");
+        writer.OpenBlock();
+        WriteConfigurationStatements(writer);
+        writer.CloseBlock();
+
+        if (providers.Count > 0)
+        {
+            writer.WriteLine($"public void ConfigureProviders({ProviderDictionaryType} providers)");
+            writer.OpenBlock();
+            foreach (var provider in providers)
+            {
+                writer.WriteLine(provider);
+            }
+
+            writer.CloseBlock();
+
+            if (_supportsModuleInitializers)
+            {
+                writer.WriteLine("[global::System.Runtime.CompilerServices.ModuleInitializerAttribute]");
+                writer.WriteLine("internal static void RegisterProviders()");
+                writer.OpenBlock();
+                writer.WriteLine($"global::Orleans.Serialization.Configuration.ProviderMetadataRegistry.Register(new {ClassName}());");
+                writer.CloseBlock();
+            }
+        }
+
+        writer.CloseBlock();
+    }
+
+    private void WriteConfigurationStatements(SourceWriter writer)
+    {
         var model = _metadataModel;
         var orderedProxyInterfaces = GetOrderedProxyInterfaces(model.ProxyInterfaces);
         var generatedInvokableActivatorMetadataNames = new HashSet<string>(
@@ -42,168 +84,93 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             generatedInvokableActivatorMetadataNames);
         var serializableRegistrations = GetOrderedSerializableRegistrations(model, generatedInvokables);
 
-        var addSerializerMethod = configParam.Member("AddSerializer");
         foreach (var registration in serializableRegistrations)
         {
-            AddRegistration(body, addSerializerMethod, registration.SerializerTypeSyntax);
+            var sourceType = OpenType(registration.SourceType);
+            var serializer = CodeText.Type(registration.SerializerTypeSyntax);
+            WriteRegistration(writer, "AddSerializer", serializer, sourceType);
+            if (registration.BaseCodec)
+            {
+                WriteRegistration(writer, "AddBaseCodec", serializer, sourceType);
+            }
+
+            if (registration.ValueSerializer)
+            {
+                WriteRegistration(writer, "AddValueSerializer", serializer, sourceType);
+            }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Serializer))
         {
-            AddRegistration(body, addSerializerMethod, GetOpenTypeSyntax(type.Type));
+            WriteContracts(writer, type, "AddSerializer");
         }
 
-        var addCopierMethod = configParam.Member("AddCopier");
         foreach (var registration in serializableRegistrations)
         {
             if (registration.CopierTypeSyntax is not null)
             {
-                AddRegistration(body, addCopierMethod, registration.CopierTypeSyntax);
+                var sourceType = OpenType(registration.SourceType);
+                var copier = CodeText.Type(registration.CopierTypeSyntax);
+                WriteRegistration(writer, "AddCopier", copier, sourceType);
+                if (registration.BaseCopier)
+                {
+                    WriteRegistration(writer, "AddBaseCopier", copier, sourceType);
+                }
             }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Copier))
         {
-            AddRegistration(body, addCopierMethod, GetOpenTypeSyntax(type.Type));
+            WriteContracts(writer, type, "AddCopier");
         }
 
-        var addConverterMethod = configParam.Member("AddConverter");
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Converter))
         {
-            AddRegistration(body, addConverterMethod, GetOpenTypeSyntax(type.Type));
+            WriteContracts(writer, type, "AddConverter");
         }
 
-        var addProxyMethod = configParam.Member("AddInterfaceProxy");
         foreach (var type in orderedProxyInterfaces)
         {
-            AddRegistration(body, addProxyMethod, GetGeneratedProxyTypeSyntax(type));
+            WriteRegistration(writer, "AddInterfaceProxy", CodeText.Type(GetGeneratedProxyTypeSyntax(type)));
         }
 
-        var addInterfaceMethod = configParam.Member("AddInterface");
         foreach (var type in orderedProxyInterfaces.Select(static proxy => proxy.InterfaceType).Distinct())
         {
-            AddRegistration(body, addInterfaceMethod, GetOpenTypeSyntax(type));
+            WriteRegistration(writer, "AddInterface", OpenType(type));
         }
 
         foreach (var type in GetOrderedInterfaceImplementations(model.InterfaceImplementations))
         {
-            AddRegistration(body, configParam.Member("AddInterfaceImplementation"), GetOpenTypeSyntax(type.ImplementationType));
+            WriteRegistration(writer, "AddInterfaceImplementation", OpenType(type.ImplementationType));
         }
 
-        var addActivatorMethod = configParam.Member("AddActivator");
         foreach (var registration in serializableRegistrations)
         {
             if (registration.ActivatorTypeSyntax is not null)
             {
-                AddRegistration(body, addActivatorMethod, registration.ActivatorTypeSyntax);
+                WriteRegistration(writer, "AddActivator", CodeText.Type(registration.ActivatorTypeSyntax), OpenType(registration.SourceType));
             }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Activator))
         {
-            AddRegistration(body, addActivatorMethod, GetOpenTypeSyntax(type.Type));
+            WriteContracts(writer, type, "AddActivator");
         }
 
-        var addWellKnownTypeIdMethod = configParam.Member("WellKnownTypeIds").Member("Add");
         foreach (var type in model.ReferenceAssemblyData.WellKnownTypeIds)
         {
-            body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
-                ArgumentList(SeparatedList(
-                [
-                    Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))),
-                    Argument(CreateTypeOfExpression(type.Type)),
-                ])))));
+            WriteTypeMetadataRegistration(writer, "config.WellKnownTypeIds", CodeText.Literal(type.Id), $"typeof({OpenType(type.Type)})");
         }
 
-        var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
         foreach (var type in model.ReferenceAssemblyData.TypeAliases)
         {
-            body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
-                ArgumentList(SeparatedList(
-                [
-                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))),
-                    Argument(CreateTypeOfExpression(type.Type)),
-                ])))));
+            WriteTypeMetadataRegistration(writer, "config.WellKnownTypeAliases", CodeText.StringLiteral(type.Alias), $"typeof({OpenType(type.Type)})");
         }
 
-        foreach (var provider in model.ReferenceAssemblyData.RegisteredProviders)
-        {
-            var key = TupleExpression(SeparatedList(
-            [
-                Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target))),
-                Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
-                Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name))),
-            ]));
-            var registeredProvider = ElementAccessExpression(IdentifierName("providers"))
-                .WithArgumentList(BracketedArgumentList(SingletonSeparatedList(Argument(key))));
-            providerBody.Add(ExpressionStatement(AssignmentExpression(
-                SyntaxKind.SimpleAssignmentExpression,
-                registeredProvider,
-                TypeOfExpression(provider.Type.ToTypeSyntax()))));
-        }
-
-        AddCompoundTypeAliases(configParam, body, generatedInvokables);
-        return CreateMetadataClass(body, providerBody, configParam);
+        WriteCompoundTypeAliases(writer, generatedInvokables);
     }
 
-    private ClassDeclarationSyntax CreateMetadataClass(
-        List<StatementSyntax> body,
-        List<StatementSyntax> providerBody,
-        IdentifierNameSyntax configParam)
-    {
-        var configureMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "ConfigureInner")
-            .AddModifiers(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword))
-            .AddParameterListParameters(
-                Parameter(configParam.Identifier).WithType(TypeManifestOptionsType))
-            .AddBodyStatements([.. body]);
-
-        var result = ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_assemblyName))
-            .AddBaseListTypes(SimpleBaseType(TypeManifestProviderBaseType))
-            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-            .AddMembers(configureMethod);
-
-        if (providerBody.Count > 0)
-        {
-            var configureProvidersMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "ConfigureProviders")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .AddParameterListParameters(
-                    Parameter(Identifier("providers")).WithType(ProviderDictionaryType))
-                .AddBodyStatements([.. providerBody]);
-
-            result = result
-                .AddBaseListTypes(SimpleBaseType(ProviderMetadataProviderType))
-                .AddMembers(configureProvidersMethod);
-
-            if (_supportsModuleInitializers)
-            {
-                var registerProvidersMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "RegisterProviders")
-                    .AddAttributeLists(
-                        AttributeList(
-                            SingletonSeparatedList(
-                                Attribute(ParseName("global::System.Runtime.CompilerServices.ModuleInitializerAttribute")))))
-                    .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
-                    .AddBodyStatements(
-                        ExpressionStatement(
-                            InvocationExpression(
-                                ParseExpression("global::Orleans.Serialization.Configuration.ProviderMetadataRegistry.Register"),
-                                ArgumentList(
-                                    SingletonSeparatedList(
-                                        Argument(
-                                            ObjectCreationExpression(IdentifierName(result.Identifier))
-                                                .WithArgumentList(ArgumentList())))))));
-
-                result = result.AddMembers(registerProvidersMethod);
-            }
-        }
-
-        return result;
-    }
-
-    private void AddCompoundTypeAliases(
-        IdentifierNameSyntax configParam,
-        List<StatementSyntax> body,
-        ImmutableArray<GeneratedInvokableMetadata> generatedInvokables)
+    private void WriteCompoundTypeAliases(SourceWriter writer, ImmutableArray<GeneratedInvokableMetadata> generatedInvokables)
     {
         var aliases = _metadataModel.ReferenceAssemblyData.CompoundTypeAliases
             .OrderBy(static entry => entry.Components.Length)
@@ -221,57 +188,48 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         }
 
         var nodeId = 0;
-        AddCompoundTypeAliases(body, configParam.Member("CompoundTypeAliases"), aliasTree, ref nodeId);
+        WriteCompoundTypeAliases(writer, "config.CompoundTypeAliases", aliasTree, ref nodeId);
     }
 
-    private void AddCompoundTypeAliases(
-        List<StatementSyntax> body,
-        ExpressionSyntax tree,
+    private static void WriteCompoundTypeAliases(
+        SourceWriter writer,
+        string tree,
         CompoundTypeAliasEmissionTree aliases,
         ref int nodeId)
     {
-        ExpressionSyntax node;
+        string node;
         if (!aliases.HasKey)
         {
             node = tree;
         }
         else
         {
-            var nodeName = IdentifierName($"n{++nodeId}");
-            node = nodeName;
-            var addArguments = new List<ArgumentSyntax>(2) { CreateCompoundAliasArgument(aliases.Key) };
+            // Every keyed node consumes an identifier, including leaves which declare no local.
+            node = $"n{++nodeId}";
+            var invocation = new StringBuilder();
+            invocation.Append(tree).Append(aliases.HasValue ? ".Add(" : ".GetOrAdd(").Append(CreateCompoundAliasArgument(aliases.Key));
             if (aliases.HasValue)
             {
-                addArguments.Add(Argument(CreateTypeOfExpression(aliases.Value)));
+                invocation.Append(", typeof(").Append(OpenType(aliases.Value)).Append(')');
             }
 
-            if (aliases.Children is { Count: > 0 })
-            {
-                body.Add(LocalDeclarationStatement(VariableDeclaration(
-                    ParseTypeName("var"),
-                    SingletonSeparatedList(VariableDeclarator(nodeName.Identifier).WithInitializer(EqualsValueClause(InvocationExpression(
-                        tree.Member("Add"),
-                        ArgumentList(SeparatedList(addArguments)))))))));
-            }
-            else
-            {
-                body.Add(ExpressionStatement(InvocationExpression(tree.Member("Add"), ArgumentList(SeparatedList(addArguments)))));
-            }
+            invocation.Append(')');
+            writer.WriteLine(aliases.Children is { Count: > 0 } ? $"var {node} = {invocation};" : $"{invocation};");
         }
 
         if (aliases.Children is { Count: > 0 })
         {
             foreach (var child in aliases.Children.Values)
             {
-                AddCompoundTypeAliases(body, node, child, ref nodeId);
+                WriteCompoundTypeAliases(writer, node, child, ref nodeId);
             }
         }
     }
 
-    private static ArgumentSyntax CreateCompoundAliasArgument(CompoundAliasComponentModel component)
+    private static string CreateCompoundAliasArgument(CompoundAliasComponentModel component)
         => component.IsType
-            ? Argument(CreateTypeOfExpression(component.TypeValue))
-            : Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(component.StringValue!)));
+            ? $"typeof({OpenType(component.TypeValue)})"
+            : CodeText.StringLiteral(component.StringValue!);
 
     private static ImmutableArray<ProxyInterfaceModel> GetOrderedProxyInterfaces(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
         => OrderBySourceLocation(proxyInterfaces, static proxy => proxy.SourceLocation, static proxy => proxy.InterfaceType.SyntaxString);
@@ -357,13 +315,17 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
                 serializerTypeSyntax: GetCodecTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Length),
                 copierTypeSyntax: copierType,
                 activatorTypeSyntax: activatorType,
-                sourceLocation: type.SourceLocation));
+                sourceLocation: type.SourceLocation,
+                baseCodec: !type.IsValueType && !type.IsSealedType,
+                valueSerializer: type.IsValueType && !type.IsEnumType,
+                baseCopier: !type.IsShallowCopyable && (!type.IsSealedType
+                    || type.IsExceptionType && type.SerializationHooks.IsEmpty)));
         }
 
         foreach (var type in generatedInvokables)
         {
             registrations.Add(new SerializableMetadataRegistration(
-                sourceType: type.SourceType,
+                sourceType: new TypeRef(type.TypeSyntax.ToString()),
                 sortKey: type.TypeSyntax.ToString(),
                 serializerTypeSyntax: type.CodecTypeSyntax,
                 copierTypeSyntax: type.CopierTypeSyntax,
@@ -514,61 +476,28 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
         var typeSyntax = syntax switch
         {
-            "bool" or "System.Boolean" => ParseName("bool"),
-            "byte" or "System.Byte" => ParseName("byte"),
-            "sbyte" or "System.SByte" => ParseName("sbyte"),
-            "short" or "System.Int16" => ParseName("short"),
-            "ushort" or "System.UInt16" => ParseName("ushort"),
-            "int" or "System.Int32" => ParseName("int"),
-            "uint" or "System.UInt32" => ParseName("uint"),
-            "long" or "System.Int64" => ParseName("long"),
-            "ulong" or "System.UInt64" => ParseName("ulong"),
-            "float" or "System.Single" => ParseName("float"),
-            "double" or "System.Double" => ParseName("double"),
-            "decimal" or "System.Decimal" => ParseName("decimal"),
-            "char" or "System.Char" => ParseName("char"),
-            "string" or "System.String" => ParseName("string"),
-            "object" or "System.Object" => ParseName("object"),
+            "bool" or "System.Boolean" => ParseTypeName("bool"),
+            "byte" or "System.Byte" => ParseTypeName("byte"),
+            "sbyte" or "System.SByte" => ParseTypeName("sbyte"),
+            "short" or "System.Int16" => ParseTypeName("short"),
+            "ushort" or "System.UInt16" => ParseTypeName("ushort"),
+            "int" or "System.Int32" => ParseTypeName("int"),
+            "uint" or "System.UInt32" => ParseTypeName("uint"),
+            "long" or "System.Int64" => ParseTypeName("long"),
+            "ulong" or "System.UInt64" => ParseTypeName("ulong"),
+            "float" or "System.Single" => ParseTypeName("float"),
+            "double" or "System.Double" => ParseTypeName("double"),
+            "decimal" or "System.Decimal" => ParseTypeName("decimal"),
+            "char" or "System.Char" => ParseTypeName("char"),
+            "string" or "System.String" => ParseTypeName("string"),
+            "object" or "System.Object" => ParseTypeName("object"),
             _ => typeRef.ToTypeSyntax(),
         };
 
         return (TypeSyntax)OpenGenericTypeSyntaxRewriter.Instance.Visit(typeSyntax);
     }
 
-    private static TypeOfExpressionSyntax CreateTypeOfExpression(TypeRef typeRef)
-    {
-        var result = TypeOfExpression(GetOpenTypeSyntax(typeRef));
-        return IsPredefinedTypeRef(typeRef)
-            ? result
-                .WithOpenParenToken(Token(TriviaList(Space), SyntaxKind.OpenParenToken, TriviaList(Space)))
-                .WithCloseParenToken(Token(TriviaList(Space), SyntaxKind.CloseParenToken, TriviaList(Space)))
-            : result;
-    }
-
-    private static bool IsPredefinedTypeRef(TypeRef typeRef)
-    {
-        var syntax = typeRef.SyntaxString.Trim();
-        if (syntax.StartsWith("global::", StringComparison.Ordinal))
-        {
-            syntax = syntax.Substring("global::".Length);
-        }
-
-        return syntax is "bool" or "System.Boolean"
-            or "byte" or "System.Byte"
-            or "sbyte" or "System.SByte"
-            or "short" or "System.Int16"
-            or "ushort" or "System.UInt16"
-            or "int" or "System.Int32"
-            or "uint" or "System.UInt32"
-            or "long" or "System.Int64"
-            or "ulong" or "System.UInt64"
-            or "float" or "System.Single"
-            or "double" or "System.Double"
-            or "decimal" or "System.Decimal"
-            or "char" or "System.Char"
-            or "string" or "System.String"
-            or "object" or "System.Object";
-    }
+    private static string OpenType(TypeRef typeRef) => CodeText.Type(GetOpenTypeSyntax(typeRef));
 
     private sealed class OpenGenericTypeSyntaxRewriter : CSharpSyntaxRewriter
     {
@@ -614,10 +543,108 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         return null;
     }
 
-    private static void AddRegistration(List<StatementSyntax> body, ExpressionSyntax addMethod, TypeSyntax typeSyntax)
+    private static void WriteRegistration(SourceWriter writer, string method, string type)
+        => writer.WriteLine($"config.{method}(typeof({type}));");
+
+    private static void WriteRegistration(SourceWriter writer, string method, string type, string target)
+        => writer.WriteLine($"config.{method}(typeof({type}), typeof({target}));");
+
+    private static void WriteContracts(
+        SourceWriter writer,
+        RegisteredCodecModel implementation,
+        string legacyMethod)
     {
-        body.Add(ExpressionStatement(InvocationExpression(addMethod,
-            ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(typeSyntax)))))));
+        var implementationType = OpenType(implementation.Type);
+        if (implementation.Contracts.IsEmpty)
+        {
+            WriteRegistration(writer, legacyMethod, implementationType);
+            return;
+        }
+
+        foreach (var contract in implementation.Contracts)
+        {
+            var arguments = new StringBuilder();
+            arguments.Append("typeof(").Append(implementationType).Append(')');
+            if (contract.TargetDescription is { } targetDescription)
+            {
+                var contractType = contract.RegistrationMethod switch
+                {
+                    "AddSerializer" => "global::Orleans.Serialization.Codecs.IFieldCodec<>",
+                    "AddBaseCodec" => "global::Orleans.Serialization.Serializers.IBaseCodec<>",
+                    "AddValueSerializer" => "global::Orleans.Serialization.Serializers.IValueSerializer<>",
+                    "AddCopier" => "global::Orleans.Serialization.Cloning.IDeepCopier<>",
+                    "AddBaseCopier" => "global::Orleans.Serialization.Cloning.IBaseCopier<>",
+                    "AddActivator" => "global::Orleans.Serialization.Activators.IActivator<>",
+                    _ => "global::Orleans.IConverter<, >"
+                };
+                arguments.Append(", typeof(").Append(contractType).Append("), ").Append(GetSerializationTypeExpression(targetDescription));
+                if (contract.SurrogateDescription is { } describedSurrogate)
+                {
+                    arguments.Append(", ").Append(GetSerializationTypeExpression(describedSurrogate));
+                }
+                else if (contract.Surrogate is { } concreteSurrogate)
+                {
+                    arguments.Append(", ").Append(SerializationType).Append(".Create(").Append(GetTargetExpression(concreteSurrogate)).Append(')');
+                }
+
+                writer.WriteLine($"config.AddSerializationContract({arguments});");
+                continue;
+            }
+
+            arguments.Append(", ").Append(GetTargetExpression(contract.Target));
+            if (contract.SurrogateDescription is { } description)
+            {
+                arguments.Append(", ").Append(GetSerializationTypeExpression(description));
+            }
+            else if (contract.Surrogate is { } surrogate)
+            {
+                arguments.Append(", ").Append(GetTargetExpression(surrogate));
+            }
+
+            writer.WriteLine($"config.{CodeText.Identifier(contract.RegistrationMethod)}({arguments});");
+        }
+    }
+
+    private static string GetTargetExpression(ContractTargetModel target)
+        => target.IsAccessible
+            ? $"typeof({CodeText.Type(target.Type.ToTypeSyntax())})"
+            : $"global::System.Type.GetType({CodeText.StringLiteral(target.RuntimeTypeName)}, true)!";
+
+    private static string GetSerializationTypeExpression(SerializationTypeModel description)
+    {
+        if (description.ParameterIndex >= 0)
+        {
+            return $"{SerializationType}.Parameter({CodeText.Literal(description.ParameterIndex)})";
+        }
+
+        if (description.ArrayRank > 0)
+        {
+            return $"{SerializationType}.Array({GetSerializationTypeExpression(description.Arguments[0])}, {CodeText.Literal(description.ArrayRank)})";
+        }
+
+        var arguments = new StringBuilder(GetTargetExpression(description.Type!.Value));
+        foreach (var argument in description.Arguments)
+        {
+            arguments.Append(", ").Append(GetSerializationTypeExpression(argument));
+        }
+
+        return $"{SerializationType}.Create({arguments})";
+    }
+
+    /// <summary>
+    /// Writes a block which registers <paramref name="type"/> for <paramref name="key"/> in <paramref name="dictionary"/>,
+    /// failing when another type is already registered for the key.
+    /// </summary>
+    internal static void WriteTypeMetadataRegistration(SourceWriter writer, string dictionary, string key, string type)
+    {
+        writer.OpenBlock();
+        writer.WriteLine($"var registeredType = {type};");
+        writer.WriteLine($"if ({dictionary}.TryGetValue({key}, out var existingType) && existingType != registeredType)");
+        writer.OpenBlock();
+        writer.WriteLine($"throw new global::System.InvalidOperationException(\"Conflicting type metadata registration for \" + {key} + \".\");");
+        writer.CloseBlock();
+        writer.WriteLine($"{dictionary}[{key}] = registeredType;");
+        writer.CloseBlock();
     }
 
     private static bool ShouldGenerateActivator(SerializableTypeModel type)
@@ -757,7 +784,10 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         TypeSyntax serializerTypeSyntax,
         TypeSyntax? copierTypeSyntax,
         TypeSyntax? activatorTypeSyntax,
-        SourceLocationModel sourceLocation)
+        SourceLocationModel sourceLocation,
+        bool baseCodec = false,
+        bool valueSerializer = false,
+        bool baseCopier = false)
     {
         public TypeRef SourceType { get; } = sourceType;
         public string SortKey { get; } = sortKey;
@@ -765,5 +795,8 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         public TypeSyntax? CopierTypeSyntax { get; } = copierTypeSyntax;
         public TypeSyntax? ActivatorTypeSyntax { get; } = activatorTypeSyntax;
         public SourceLocationModel SourceLocation { get; } = sourceLocation;
+        public bool BaseCodec { get; } = baseCodec;
+        public bool ValueSerializer { get; } = valueSerializer;
+        public bool BaseCopier { get; } = baseCopier;
     }
 }

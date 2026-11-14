@@ -123,6 +123,20 @@ namespace ExampleGrains;
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/PostgreSQL-Clustering.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/Oracle-Clustering.sql)
 
+### Optional membership SQL enhancements
+
+Each silo owns its heartbeat. A heartbeat is one primary-key-targeted assignment to `IAmAliveTime`, sent as a single database command. Heartbeats preserve the logical membership row and table tokens, so a membership update can use tokens captured before a heartbeat. Canonical membership consistency is governed by those logical tokens; heartbeat timestamps are best-effort liveness observations.
+
+Upgrading silos or ADO.NET gateway-discovery clients preserves support for existing query installations. Database updates are optional. With an existing catalog, cleanup continues using its installed `CleanupDefunctSiloEntriesKey` query and behavior.
+
+The existing `*-Clustering.sql` installation scripts include improved conditional-write rollback and Dead-row cleanup. Their optional `CleanupDefunctSiloEntryKey` enables cleanup based on the latest start, heartbeat, and suspicion timestamps, with a captured-row condition protecting concurrent changes. Fresh installations receive these definitions through the usual database setup.
+
+SQL Server joined membership reads use statement snapshots provided by `READ_COMMITTED_SNAPSHOT`, which the existing `SQLServer-Main.sql` setup enables.
+
+Providers load and cache queries during initialization. Existing deployments continue using their installed definitions. Operators choosing to adopt revised definitions can use their normal database change-management process; reinitialize providers afterward to load the revised catalog. The original query keys and parameter sets remain supported.
+
+The SQL enhancements take effect per process as it adopts the updated queries. Until then, cached SQL Server/MySQL updates retain their previous missing-row version-increment behavior, and cached cleanup retains its previous status filter. The enhanced behavior applies cluster-wide once all membership writers use those definitions. SQL Server and MySQL inserts retain the original row-then-version statement order.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

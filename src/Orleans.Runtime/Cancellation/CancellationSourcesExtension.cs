@@ -8,6 +8,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
+#pragma warning disable CS0618 // This extension provides distributed cancellation for the legacy token.
     /// <summary>
     /// Contains list of cancellation token source corresponding to the tokens
     /// passed to the related grain activation.
@@ -61,6 +62,11 @@ namespace Orleans.Runtime
             IGrainContext target,
             IInvokable request)
         {
+            if (request is RequestBase { MayHaveGrainCancellationToken: false })
+            {
+                return;
+            }
+
             var argumentCount = request.GetArgumentCount();
             for (var i = 0; i < argumentCount; i++)
             {
@@ -141,4 +147,5 @@ namespace Orleans.Runtime
         )]
         private partial void LogCancellationFailed(Guid tokenId);
     }
+#pragma warning restore CS0618
 }

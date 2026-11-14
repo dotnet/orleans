@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -33,6 +34,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private readonly ILogger<LocalDurableJobManager> _logger;
     private readonly DurableJobsOptions _options;
     private readonly CancellationTokenSource _cts = new();
+    private readonly CancellationTokenSource _requestCts = new();
+    private readonly CancellationTokenSource _cleanupCts = new();
     private Task? _listenForClusterChangesTask;
     private Task? _periodicCheckTask;
 
@@ -40,7 +43,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private readonly ConcurrentDictionary<string, IJobShard> _shardCache = new();
     private readonly ConcurrentDictionary<WritableShardKey, IJobShard> _writeableShards = new();
     private readonly ConcurrentDictionary<string, WritableShardKey> _writeableShardKeys = new();
-    private readonly ConcurrentDictionary<string, Task> _runningShards = new();
+    private readonly ConcurrentDictionary<string, RunningShard> _runningShards = new();
+    private readonly AdmissionGate _admission = new();
     private readonly SemaphoreSlim _shardCreationLock = new(1, 1);
     private readonly SemaphoreSlim _shardCheckSignal = new(0);
 
@@ -80,9 +84,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var startTimestamp = _timeProvider.GetTimestamp();
         using var activity = DurableJobsDiagnostics.StartScheduleActivity(in request);
         request = EnsureScheduleRequestHasTraceContext(request, activity);
+        using var admission = _admission.TryEnter();
         try
         {
             request.Validate();
+            if (!admission.Entered)
+            {
+                throw new OperationCanceledException("The durable job manager is stopping.", _requestCts.Token);
+            }
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _requestCts.Token);
+            var schedulingToken = linkedCts.Token;
             LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
             var shardKey = GetWritableShardKey(request);
@@ -90,13 +102,15 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
             while (true)
             {
+                schedulingToken.ThrowIfCancellationRequested();
+
                 // Fast path: shard already exists
                 if (_writeableShards.TryGetValue(shardKey, out var existingShard))
                 {
                     DurableJob? job;
                     try
                     {
-                        job = await existingShard.TryScheduleJobAsync(request, cancellationToken);
+                        job = await existingShard.TryScheduleJobAsync(request, schedulingToken);
                     }
                     catch (ObjectDisposedException ex) when (TryRemoveWritableShard(shardKey, existingShard) || !IsWritableShard(shardKey, existingShard))
                     {
@@ -120,9 +134,11 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 }
 
                 // Slow path: need to create shard
-                await _shardCreationLock.WaitAsync(cancellationToken);
+                await _shardCreationLock.WaitAsync(schedulingToken);
                 try
                 {
+                    schedulingToken.ThrowIfCancellationRequested();
+
                     // Double-check after acquiring lock
                     if (_writeableShards.TryGetValue(shardKey, out existingShard))
                     {
@@ -130,11 +146,16 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     }
 
                     // Create new shard
-                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
                     var endTime = shardKey.StartTime.Add(_options.ShardDuration);
-                    var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, CreateShardMetadata(shardKey), linkedCts.Token);
+                    var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, CreateShardMetadata(shardKey), schedulingToken);
+                    if (IsRetiredShard(newShard))
+                    {
+                        continue;
+                    }
 
                     LogCreatingNewShard(_logger, shardKey.StartTime, shardKey.Stripe);
+                    // Own successful creations even if cancellation raced with the provider returning.
+                    // Shutdown waits for this scheduling call before draining the cache.
                     _writeableShards[shardKey] = newShard;
                     _writeableShardKeys[newShard.Id] = shardKey;
                     _shardCache.TryAdd(newShard.Id, newShard);
@@ -224,24 +245,70 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private async Task Stop(CancellationToken ct)
     {
-        var runningShards = _runningShards.Values.ToArray();
-        LogStopping(_logger, runningShards.Length);
+        var admissionDrained = _admission.CloseAsync();
+        using var cleanupCancellation = ct.Register(() => CancelForShutdown(_cleanupCts, "cleanup"));
+        LogStopping(_logger, _runningShards.Count);
 
-        _cts.Cancel();
+        CancelForShutdown(_requestCts, "requests");
+        // Drain requests and activation publication before taking the execution snapshot.
+        await admissionDrained;
+        var runningShards = _runningShards.Values.Select(static entry => entry.Task).ToArray();
+        CancelForShutdown(_cts, "execution");
 
-        if (_listenForClusterChangesTask is not null)
+        try
         {
-            await _listenForClusterChangesTask.SuppressThrowing();
-        }
+            if (_listenForClusterChangesTask is not null)
+            {
+                await _listenForClusterChangesTask.SuppressThrowing();
+            }
 
-        if (_periodicCheckTask is not null)
+            if (_periodicCheckTask is not null)
+            {
+                await _periodicCheckTask.SuppressThrowing();
+            }
+        }
+        finally
         {
-            await _periodicCheckTask.SuppressThrowing();
-        }
+            try
+            {
+                // Admission is closed; every accepted activation already has its execution task in this snapshot.
+                await Task.WhenAll(runningShards);
+            }
+            finally
+            {
+                // Running tasks remove their shards before completing; the remaining shards never activated.
+                foreach (var shard in _shardCache.Values)
+                {
+                    TryRemoveWritableShard(shard);
+                    TryRemoveCachedShard(shard);
+                    try
+                    {
+                        await _shardManager.UnregisterShardAsync(shard, ct);
+                        LogUnregisteredShard(_logger, shard.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogErrorUnregisteringShard(_logger, ex, shard.Id);
+                    }
 
-        await Task.WhenAll(runningShards);
+                    await DisposeShardAsync(shard);
+                }
+            }
+        }
 
         LogStopped(_logger);
+    }
+
+    private void CancelForShutdown(CancellationTokenSource cancellation, string phase)
+    {
+        try
+        {
+            cancellation.Cancel(throwOnFirstException: false);
+        }
+        catch (AggregateException exception)
+        {
+            LogErrorCancelingOperations(_logger, exception, phase);
+        }
     }
 
     /// <inheritdoc/>
@@ -249,40 +316,59 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         ArgumentNullException.ThrowIfNull(job);
         var startTimestamp = _timeProvider.GetTimestamp();
+        using var admission = _admission.TryEnter();
         try
         {
+            if (!admission.Entered)
+            {
+                throw new OperationCanceledException("The durable job manager is stopping.", _requestCts.Token);
+            }
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(requestCancellationToken, _requestCts.Token);
+            var cancellationToken = linkedCts.Token;
             LogRequestingJobCancellation(_logger, job.Id, job.Name, job.ShardId);
 
             for (var routingAttempt = 0; routingAttempt < 2; routingAttempt++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (_shardCache.TryGetValue(job.ShardId, out var shard))
                 {
-                    if (!await _shardManager.IsShardOwnedByLocalSiloAsync(job.ShardId, requestCancellationToken))
+                    if (!await _shardManager.IsShardOwnedByLocalSiloAsync(job.ShardId, cancellationToken))
                     {
-                        var entry = new KeyValuePair<string, IJobShard>(job.ShardId, shard);
-                        ((ICollection<KeyValuePair<string, IJobShard>>)_shardCache).Remove(entry);
+                        TryRemoveCachedShard(shard);
                     }
                     else
                     {
-                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(requestCancellationToken, _cts.Token);
-                        var removeResult = await shard.RemoveJobAsync(job.Id, linkedCts.Token);
-                        var cancellationRequested = removeResult == DurableJobMutationResult.Applied;
-                        if (cancellationRequested)
+                        DurableJobMutationResult? removeResult = null;
+                        try
                         {
-                            LogJobCancellationRequested(_logger, job.Id, job.Name, job.ShardId);
-                            _durableJobsInstruments.OnJobCancellationRequested();
+                            removeResult = await shard.RemoveJobAsync(job.Id, cancellationToken);
                         }
-                        else
+                        catch (ObjectDisposedException ex) when (!IsCachedShard(shard))
                         {
-                            LogJobCancellationRequestNotRecorded(_logger, job.Id, job.Name, job.ShardId);
+                            LogShardRetiredDuringCancellation(_logger, ex, shard.Id);
                         }
 
-                        _durableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), cancellationRequested);
-                        return cancellationRequested;
+                        if (removeResult.HasValue)
+                        {
+                            var cancellationRequested = removeResult == DurableJobMutationResult.Applied;
+                            if (cancellationRequested)
+                            {
+                                LogJobCancellationRequested(_logger, job.Id, job.Name, job.ShardId);
+                                _durableJobsInstruments.OnJobCancellationRequested();
+                            }
+                            else
+                            {
+                                LogJobCancellationRequestNotRecorded(_logger, job.Id, job.Name, job.ShardId);
+                            }
+
+                            _durableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), cancellationRequested);
+                            return cancellationRequested;
+                        }
                     }
                 }
 
-                var owner = await _shardManager.GetShardOwnerAsync(job.ShardId, requestCancellationToken);
+                var owner = await _shardManager.GetShardOwnerAsync(job.ShardId, cancellationToken);
                 if (owner is null)
                 {
                     break;
@@ -294,7 +380,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 }
 
                 var remote = _grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(JobManagerGrainType, owner);
-                var routed = await remote.CancelAsync(job, requestCancellationToken);
+                var routed = await remote.CancelAsync(job, cancellationToken);
                 if (!routed)
                 {
                     LogJobCancellationRequestNotRecorded(_logger, job.Id, job.Name, job.ShardId);
@@ -323,7 +409,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private async Task ProcessMembershipUpdates()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var current = new HashSet<SiloAddress>();
+        ClusterMembershipSnapshot? previous = null;
 
         try
         {
@@ -331,17 +417,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             {
                 try
                 {
-                    // Get active members
-                    var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
-                        .Where(member => member.Status == SiloStatus.Active)
-                        .Select(member => member.SiloAddress));
-
-                    // If active list has changed, trigger immediate shard check
-                    if (!current.SetEquals(update))
+                    if (previous is null || ShouldCheckShards(previous, membershipSnapshot))
                     {
-                        current = update;
                         _shardCheckSignal.Release();
                     }
+
+                    previous = membershipSnapshot;
                 }
                 catch (Exception exception)
                 {
@@ -358,40 +439,69 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
     }
 
+    /// <summary>
+    /// Returns <see langword="true"/> when a silo joins or leaves the active set, or is declared dead.
+    /// </summary>
+    /// <remarks>
+    /// Discovery claims a shard once its owner is dead. A stopping or shutting-down owner leaves the active set
+    /// before it is declared dead, so the dead declaration triggers its own sweep.
+    /// </remarks>
+    internal static bool ShouldCheckShards(ClusterMembershipSnapshot previous, ClusterMembershipSnapshot current)
+    {
+        foreach (var member in current.CreateUpdate(previous).Changes)
+        {
+            var previousStatus = previous.Members.TryGetValue(member.SiloAddress, out var previousMember) ? previousMember.Status : SiloStatus.None;
+            if (member.Status == SiloStatus.Dead
+                ? previousStatus != SiloStatus.Dead
+                : member.Status == SiloStatus.Active || previousStatus == SiloStatus.Active)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private async Task PeriodicShardCheck()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(10), _timeProvider);
+        using var timer = new PeriodicTimer(_options.ShardCheckInterval, _timeProvider);
 
-        Task timerTask = Task.CompletedTask;
+        var timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
+        var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
         while (!_cts.Token.IsCancellationRequested)
         {
             try
             {
-                // Wait for either periodic timer OR signal from membership changes
-                if (timerTask.IsCompleted)
+                var completedTask = await Task.WhenAny(timerTask, signalTask);
+                await completedTask;
+                // Retain the other pending wait: it can complete during discovery.
+                if (ReferenceEquals(completedTask, timerTask))
                 {
                     timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
                 }
-
-                var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
-                await Task.WhenAny(timerTask, signalTask);
+                else
+                {
+                    signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
+                }
 
                 await ProcessShardCheckCycleAsync(_cts.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
             {
                 break;
             }
             catch (Exception ex)
             {
                 LogErrorInPeriodicCheck(_logger, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token).SuppressThrowing();
+                await Task.Delay(TimeSpan.FromSeconds(5), _timeProvider, _cts.Token).SuppressThrowing();
             }
         }
     }
 
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "Writable-index expiry closes admission; running-shard cleanup or the shutdown cache drain owns final disposal.")]
     internal async Task ProcessShardCheckCycleAsync(CancellationToken cancellationToken)
     {
         LogCheckingPendingShards(_logger);
@@ -415,29 +525,46 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             }
         }
 
-        // Compute the slow-start budget for this cycle
+        await ProcessShardDiscoveryAsync(cancellationToken);
+    }
+
+    private async Task ProcessShardDiscoveryAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var now = _timeProvider.GetUtcNow();
+        var maxDueTime = new DateTimeOffset(now.UtcDateTime.AddClamped(_options.ShardLoadLookaheadPeriod));
+        // Compute the slow-start budget for this sweep.
         var budget = ComputeClaimBudget();
-
-        // Query ShardManager for assigned shards (source of truth)
-        var shards = await _shardManager.AssignJobShardsAsync(now.AddHours(1), budget, cancellationToken);
-
-        // Count newly claimed shards (those not already in our cache)
         var newClaimsThisCycle = 0;
-        if (shards.Count > 0)
+        var assignedCount = 0;
+        await foreach (var shard in _shardManager.DiscoverJobShardsAsync(maxDueTime, budget, cancellationToken))
         {
-            LogAssignedShards(_logger, shards.Count);
-            foreach (var shard in shards)
+            // A result can outlive its runner while discovery is awaiting its next yield.
+            if (IsRetiredShard(shard))
             {
-                if (_shardCache.TryAdd(shard.Id, shard))
-                {
-                    newClaimsThisCycle++;
-                }
-
-                if (!_runningShards.ContainsKey(shard.Id))
-                {
-                    TryActivateShard(shard);
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                continue;
             }
+
+            // Running tasks own their exact shard instance through cleanup, including after cache withdrawal.
+            if ((!_runningShards.TryGetValue(shard.Id, out var running) || !ReferenceEquals(running.Shard, shard))
+                && _shardCache.TryAdd(shard.Id, shard))
+            {
+                newClaimsThisCycle++;
+                _totalClaimedShards++;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            assignedCount++;
+            if (!_runningShards.ContainsKey(shard.Id))
+            {
+                TryActivateShard(shard);
+            }
+        }
+
+        if (assignedCount > 0)
+        {
+            LogAssignedShards(_logger, assignedCount);
         }
         else
         {
@@ -446,7 +573,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         if (newClaimsThisCycle > 0)
         {
-            _totalClaimedShards += newClaimsThisCycle;
             LogOrphanedShardsClaimed(_logger, newClaimsThisCycle, _totalClaimedShards);
         }
     }
@@ -513,8 +639,16 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private void TryActivateShard(IJobShard shard)
     {
+        if (IsRetiredShard(shard))
+        {
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
+            return;
+        }
+
+        var shardId = shard.Id;
         // Only start if not already running
-        if (_runningShards.ContainsKey(shard.Id))
+        if (_runningShards.ContainsKey(shardId))
         {
             return;
         }
@@ -526,51 +660,84 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             return;
         }
 
-        if (_runningShards.TryAdd(shard.Id, Task.CompletedTask))
+        using var admission = _admission.TryEnter();
+        if (!admission.Entered)
         {
-            LogStartingShard(_logger, shard.Id, shard.StartTime, shard.EndTime);
-            using var _ = new ExecutionContextSuppressor();
-            _runningShards[shard.Id] = this.RunOrQueueTask(() => RunShardWithCleanupAsync(shard));
+            return;
         }
+
+        var workItem = new AsyncClosureWorkItem(() => RunShardWithCleanupAsync(shard), this);
+        var running = new RunningShard(shard, workItem.Task);
+        if (!_runningShards.TryAdd(shardId, running))
+        {
+            return;
+        }
+
+        // A previous runner can finish retirement between the lifetime check and registration.
+        if (IsRetiredShard(shard))
+        {
+            var entry = new KeyValuePair<string, RunningShard>(shardId, running);
+            ((ICollection<KeyValuePair<string, RunningShard>>)_runningShards).Remove(entry);
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
+            return;
+        }
+
+        LogStartingShard(_logger, shardId, shard.StartTime, shard.EndTime);
+        using var _ = new ExecutionContextSuppressor();
+        WorkItemGroup.QueueWorkItem(workItem);
     }
 
     private async Task RunShardWithCleanupAsync(IJobShard shard)
     {
+        var running = _runningShards[shard.Id];
         try
         {
-            await _shardExecutor.RunShardAsync(shard, _cts.Token);
-
-            // Unregister the shard from the manager
             try
             {
-                await _shardManager.UnregisterShardAsync(shard, _cts.Token);
-                LogUnregisteredShard(_logger, shard.Id);
+                await _shardExecutor.RunShardAsync(shard, _cts.Token);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
             {
-                LogErrorUnregisteringShard(_logger, ex, shard.Id);
+                // Execution cancellation leaves ownership cleanup with this runner.
             }
-        }
-        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
-        {
-            // Cancellation initiated by Stop is expected.
         }
         finally
         {
-            // Clean up tracking and dispose the shard
+            // Unregistering can dispose the shard. Withdraw its references before releasing ownership.
             TryRemoveWritableShard(shard);
-            _shardCache.TryRemove(shard.Id, out _);
+            TryRemoveCachedShard(shard);
 
+            // Cleanup is canceled by the shutdown deadline, independently of execution.
             try
             {
-                await shard.DisposeAsync();
+                await _shardManager.UnregisterShardAsync(shard, _cleanupCts.Token);
+                LogUnregisteredShard(_logger, shard.Id);
             }
             catch (Exception ex)
             {
-                LogErrorDisposingShard(_logger, ex, shard.Id);
+                LogErrorUnregisteringShard(_logger, ex, shard.Id);
             }
 
-            _runningShards.TryRemove(shard.Id, out _);
+            await DisposeShardAsync(shard);
+
+            // Scheduling can publish a retained creation result during cleanup.
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
+            var runningEntry = new KeyValuePair<string, RunningShard>(shard.Id, running);
+            ((ICollection<KeyValuePair<string, RunningShard>>)_runningShards).Remove(runningEntry);
+        }
+    }
+
+    private async ValueTask DisposeShardAsync(IJobShard shard)
+    {
+        try
+        {
+            await shard.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            LogErrorDisposingShard(_logger, ex, shard.Id);
         }
     }
 
@@ -582,6 +749,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private bool IsWritableShard(WritableShardKey shardKey, IJobShard shard)
         => _writeableShards.TryGetValue(shardKey, out var existingShard) && ReferenceEquals(existingShard, shard);
+
+    private static bool IsRetiredShard(IJobShard shard) => shard is JournaledJobShard { IsRetired: true };
+
+    private bool IsCachedShard(IJobShard shard)
+        => _shardCache.TryGetValue(shard.Id, out var existingShard) && ReferenceEquals(existingShard, shard);
+
+    private bool TryRemoveCachedShard(IJobShard shard)
+    {
+        var entry = new KeyValuePair<string, IJobShard>(shard.Id, shard);
+        return ((ICollection<KeyValuePair<string, IJobShard>>)_shardCache).Remove(entry);
+    }
 
     private bool TryRemoveWritableShard(WritableShardKey shardKey, IJobShard shard)
     {
@@ -608,6 +786,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     internal sealed class TestAccessor(LocalDurableJobManager manager)
     {
+        public void SignalShardCheck() => manager._shardCheckSignal.Release();
+
         public Task ProcessShardCheckCycleAsync(CancellationToken cancellationToken) => manager.ProcessShardCheckCycleAsync(cancellationToken);
 
         public void AddWritableShard(DateTimeOffset shardKey, IJobShard shard, int stripe = 0)
@@ -626,11 +806,27 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         public int WritableShardCount => manager._writeableShards.Count;
 
+        public int WritableShardKeyCount => manager._writeableShardKeys.Count;
+
+        public int CachedShardCount => manager._shardCache.Count;
+
         public void TryActivateShard(IJobShard shard) => manager.TryActivateShard(shard);
 
-        public bool TryGetRunningShardTask(string shardId, out Task? task) => manager._runningShards.TryGetValue(shardId, out task);
+        public bool TryGetRunningShardTask(string shardId, out Task? task)
+        {
+            if (manager._runningShards.TryGetValue(shardId, out var running))
+            {
+                task = running.Task;
+                return true;
+            }
+
+            task = null;
+            return false;
+        }
 
         public bool HasCachedShard(string shardId) => manager._shardCache.ContainsKey(shardId);
+
+        public bool TryGetCachedShard(string shardId, out IJobShard? shard) => manager._shardCache.TryGetValue(shardId, out shard);
     }
 
     private WritableShardKey GetWritableShardKey(ScheduleJobRequest request)
@@ -670,4 +866,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     }
 
     private readonly record struct WritableShardKey(DateTimeOffset StartTime, int Stripe);
+
+    private readonly record struct RunningShard(IJobShard Shard, Task Task);
 }

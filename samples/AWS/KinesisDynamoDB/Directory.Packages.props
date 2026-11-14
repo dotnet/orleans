@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.DynamoDB" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.DynamoDB" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Reminders.DynamoDB" Version="10.2.2" />

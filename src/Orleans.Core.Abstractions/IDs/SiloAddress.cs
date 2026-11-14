@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Buffers.Text;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -35,7 +36,7 @@ namespace Orleans.Runtime
         private bool hashCodeSet;
 
         [NonSerialized]
-        private uint[]? uniformHashCache;
+        private ImmutableArray<uint> uniformHashCache;
 
         /// <summary>
         /// Gets the endpoint.
@@ -69,8 +70,10 @@ namespace Orleans.Runtime
         /// <param name="ep">IP endpoint address of the silo.</param>
         /// <param name="gen">Generation number of the silo.</param>
         /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="ep"/> is <see langword="null"/>.</exception>
         public static SiloAddress New(IPEndPoint ep, int gen)
         {
+            ArgumentNullException.ThrowIfNull(ep);
             return siloAddressInterningCache.FindOrCreate((ep.Address, ep.Port, gen),
                 // Normalize endpoints
                 (k, ep) => k.Address.IsIPv4MappedToIPv6 ? New(k.Address.MapToIPv4(), k.Port, k.Generation) : new(ep, k.Generation), ep);
@@ -120,6 +123,21 @@ namespace Orleans.Runtime
             }
 
             return unchecked((int)elapsed); // Unchecked to truncate any bits beyond the lower 32
+        }
+
+        internal static int GetGenerationRetirementFloor(DateTime utcNow, TimeSpan retirementAge)
+        {
+            var elapsedTicks = utcNow.Ticks - epoch;
+            if (retirementAge.Ticks >= elapsedTicks)
+            {
+                return 0;
+            }
+
+            // Generations identify whole seconds. Round up so the exclusive floor includes
+            // generations strictly older than a cutoff falling between seconds.
+            return (int)Math.Min(
+                (elapsedTicks - retirementAge.Ticks + TimeSpan.TicksPerSecond - 1) / TimeSpan.TicksPerSecond,
+                int.MaxValue);
         }
 
         /// <summary>
@@ -410,6 +428,19 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
 
+        /// <summary>Determines whether two silo addresses have the same endpoint and generation.</summary>
+        /// <param name="left">The first address.</param>
+        /// <param name="right">The second address.</param>
+        /// <returns><see langword="true"/> if both addresses are null or represent the same silo; otherwise, <see langword="false"/>.</returns>
+        public static bool operator ==(SiloAddress? left, SiloAddress? right)
+            => ReferenceEquals(left, right) || (left is not null && left.Equals(right));
+
+        /// <summary>Determines whether two silo addresses differ in endpoint or generation.</summary>
+        /// <param name="left">The first address.</param>
+        /// <param name="right">The second address.</param>
+        /// <returns><see langword="true"/> if the addresses differ; otherwise, <see langword="false"/>.</returns>
+        public static bool operator !=(SiloAddress? left, SiloAddress? right) => !(left == right);
+
         /// <summary>Returns a consistent hash value for this silo address.</summary>
         /// <returns>Consistent hash value for this silo address.</returns>
         public int GetConsistentHashCode() => hashCodeSet ? hashCode : CalculateConsistentHashCode();
@@ -454,18 +485,21 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Returns a collection of uniform hash codes variants for this instance.
+        /// Returns an immutable collection of uniform hash code variants for this instance.
         /// </summary>
         /// <param name="numHashes">The number of hash codes to return.</param>
-        /// <returns>A collection of uniform hash codes variants for this instance.</returns>
-        public uint[] GetUniformHashCodes(int numHashes)
+        /// <returns>An immutable collection of uniform hash code variants for this instance.</returns>
+        /// <remarks>
+        /// Results are cached and share their backing storage across calls requesting the same number of hashes.
+        /// </remarks>
+        public ImmutableArray<uint> GetUniformHashCodes(int numHashes)
         {
             var cache = uniformHashCache;
-            if (cache is not null && cache.Length == numHashes) return cache;
+            if (!cache.IsDefault && cache.Length == numHashes) return cache;
             return uniformHashCache = GetUniformHashCodesImpl(numHashes);
         }
 
-        private uint[] GetUniformHashCodesImpl(int numHashes)
+        private ImmutableArray<uint> GetUniformHashCodesImpl(int numHashes)
         {
             Span<byte> bytes = stackalloc byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
 
@@ -498,7 +532,7 @@ namespace Orleans.Runtime
                 hashes[extraBit] = StableHash.ComputeHash(bytes);
             }
 
-            return hashes;
+            return ImmutableCollectionsMarshal.AsImmutableArray(hashes);
         }
 
         /// <summary>
@@ -508,13 +542,13 @@ namespace Orleans.Runtime
         /// <returns>Returns <c>true</c> if the two SiloAddresses are considered to match -- if they are equal or if one generation or the other is 0. </returns>
         internal bool Matches([NotNullWhen(true)] SiloAddress? other)
         {
-            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
+            return other is not null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
                 (Generation == other.Generation || Generation == 0 || other.Generation == 0);
         }
 
         /// <inheritdoc/>
         public bool Equals([NotNullWhen(true)] SiloAddress? other)
-            => other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
+            => other is not null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
@@ -526,34 +560,36 @@ namespace Orleans.Runtime
         /// <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
         /// </returns>
         internal bool IsSameLogicalSilo([NotNullWhen(true)] SiloAddress? other)
-            => other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
+            => other is not null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </summary>
         /// <param name="other">
-        /// The other instance.
+        /// The other instance, or <see langword="null"/> to return <see langword="false"/>.
         /// </param>
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </returns>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "IsSameLogicalSilo returns false for null, short-circuiting the dereference and preserving the null-tolerant predicate contract.")]
         public bool IsSuccessorOf(SiloAddress other) => IsSameLogicalSilo(other) && other.Generation > 0 && Generation > other.Generation;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </summary>
         /// <param name="other">
-        /// The other instance.
+        /// The other instance, or <see langword="null"/> to return <see langword="false"/>.
         /// </param>
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </returns>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "IsSameLogicalSilo returns false for null, short-circuiting the dereference and preserving the null-tolerant predicate contract.")]
         public bool IsPredecessorOf(SiloAddress other) => IsSameLogicalSilo(other) && Generation > 0 && Generation < other.Generation;
 
         /// <inheritdoc/>
         public int CompareTo(SiloAddress? other)
         {
-            if (other == null) return 1;
+            if (other is null) return 1;
             // Compare Generation first. It gives a cheap and fast way to compare, avoiding allocations 
             // and is also semantically meaningful - older silos (with smaller Generation) will appear first in the comparison order.
             // Only if Generations are the same, go on to compare Ports and IPAddress (which is more expansive to compare).
@@ -578,12 +614,24 @@ namespace Orleans.Runtime
             => SiloAddress.FromParsableString(reader.GetString() ?? throw new JsonException($"Could not deserialize {nameof(SiloAddress)}."));
 
         /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
+        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WriteStringValue(value.ToUtf8String());
+        }
 
         /// <inheritdoc />
         public override SiloAddress ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
-        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] SiloAddress value, JsonSerializerOptions options) => writer.WritePropertyName(value.ToUtf8String());
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] SiloAddress value, JsonSerializerOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WritePropertyName(value.ToUtf8String());
+        }
     }
 }

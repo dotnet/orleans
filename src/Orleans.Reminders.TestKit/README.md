@@ -183,7 +183,11 @@ exact-due recovery, stale-owner registration reconciliation, one-silo join/leave
 
 Use `ReminderTestClock` as the sole time driver and `ReminderDiagnosticObserver` as the lifecycle/tick source. The
 `ReminderServiceLifecycleHarness` adapter for `InProcessTestCluster` supplies explicit membership and reminder-range
-reconciliation barriers:
+reconciliation barriers.
+
+Join scenarios start a silo with its natural address hashes and wait for topology reconciliation before selecting
+a deterministic grain identity in that silo's actual ownership range. Identity selection is bounded and reports a
+structured conformance failure when no matching candidate is found; scenario cleanup still removes the joined silo.
 
 ```csharp
 var clock = builder.AddReminderTestClock();

@@ -31,6 +31,13 @@ namespace Orleans.Transactions.TestKit
         Task<int[]> Get();
 
         /// <summary>
+        /// Reads the committed value of every transactional state without a transaction.
+        /// </summary>
+        /// <returns>The committed values.</returns>
+        [Transaction(TransactionOption.Supported)]
+        Task<int[]> GetCommitted();
+
+        /// <summary>
         /// Adds a value to every transactional state and then throws an exception to abort the transaction.
         /// </summary>
         /// <param name="numberToAdd">The value to add before throwing.</param>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.4" />
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.5" />
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -9,6 +9,7 @@
     <Nullable>enable</Nullable>
     <IsAspireHost>true</IsAspireHost>
     <UserSecretsId>809ee43f-2f9d-47ca-a162-ee03f0856c17</UserSecretsId>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\StorageBackend.cs" Link="StorageBackend.cs" />
     <ProjectReference Include="..\DurableJobsJournaling.Silo\DurableJobsJournaling.Silo.csproj" />
     <ProjectReference Include="..\DurableJobsJournaling.Web\DurableJobsJournaling.Web.csproj" />
   </ItemGroup>

@@ -67,7 +67,9 @@ internal sealed class GrainMigratabilityChecker(
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool IsImmovable(GrainType grainType)
         {
-            if (_localManifest.Grains.TryGetValue(grainType, out var props))
+            // The manifest describes a generic grain class by its unconstructed type, as GrainPropertiesResolver does.
+            var lookupKey = GenericGrainType.TryParse(grainType, out var generic) ? generic.GetUnconstructedGrainType().GrainType : grainType;
+            if (_localManifest.Grains.TryGetValue(lookupKey, out var props))
             {
                 // If there is no 'Immovable' property, it is not immovable.
                 if (!props.Properties.TryGetValue(WellKnownGrainTypeProperties.Immovable, out var value))

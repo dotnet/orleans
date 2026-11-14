@@ -93,7 +93,8 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         var logger = NullLogger<AdoNetStreamFailureHandler>.Instance;
 
         // act
-        var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, logger);
+        var positions = new AdoNetStreamPositions();
+        var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, positions, logger);
 
         // assert
         Assert.Equal(faultOnFailure, handler.ShouldFaultSubsriptionOnError);
@@ -125,7 +126,8 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         };
         var mapper = new AdoNetStreamQueueMapper(new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), "MyQueuePrefix"));
         var logger = NullLogger<AdoNetStreamFailureHandler>.Instance;
-        var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, logger);
+        var positions = new AdoNetStreamPositions();
+        var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, positions, logger);
 
         // arrange - queue an expired message
         var streamId = StreamId.Create("MyNamespace", "MyKey");
@@ -150,7 +152,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
             TestContext.Current.CancellationToken));
 
         // act - clean up with max attempts of one so the message above is flagged
-        await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
+        await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(positions.Add(ack.MessageId)));
 
         // assert
         var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
@@ -189,7 +191,8 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         };
         var mapper = new AdoNetStreamQueueMapper(new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), "MyQueuePrefix"));
         var logger = NullLogger<AdoNetStreamFailureHandler>.Instance;
-        var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, logger);
+        var positions = new AdoNetStreamPositions();
+        var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, positions, logger);
 
         // arrange - queue an expired message
         var streamId = StreamId.Create("MyNamespace", "MyKey");
@@ -210,12 +213,46 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
             streamOptions.EvictionBatchSize);
 
         // act - clean up with max attempts of one so the message above is flagged
-        await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
+        await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(positions.Add(ack.MessageId)));
 
         // assert
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
             "SELECT * FROM OrleansStreamDeadLetter",
             TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    /// Tests that a <see cref="AdoNetStreamFailureHandler"/> leaves a message alone when its position no longer resolves.
+    /// </summary>
+    [Fact]
+    public async Task AdoNetStreamFailureHandler_OnDeliveryFailure_SkipsRemovedPosition()
+    {
+        var providerId = $"Provider-{Guid.NewGuid()}";
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = invariant,
+            ConnectionString = _storage.ConnectionString,
+            MaxAttempts = 1
+        };
+        var clusterOptions = new ClusterOptions { ServiceId = $"Service-{Guid.NewGuid()}" };
+        var mapper = new AdoNetStreamQueueMapper(new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), "MyQueuePrefix"));
+        var positions = new AdoNetStreamPositions();
+        var handler = new AdoNetStreamFailureHandler(false, streamOptions, clusterOptions, mapper, _queries, positions, NullLogger<AdoNetStreamFailureHandler>.Instance);
+        var streamId = StreamId.Create("MyNamespace", "MyKey");
+        var queueId = mapper.GetAdoNetQueueId(streamId);
+        var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, [0xFF], streamOptions.ExpiryTimeout.TotalSecondsCeiling());
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, 1, streamOptions.MaxAttempts, 0, 600, 600, 0);
+        var position = positions.Add(ack.MessageId);
+        positions.Remove(position);
+
+        await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(position));
+
+        Assert.DoesNotContain(
+            await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter", TestContext.Current.CancellationToken),
+            dead => dead.ServiceId == clusterOptions.ServiceId);
+        Assert.Contains(
+            await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage", TestContext.Current.CancellationToken),
+            message => message.ServiceId == clusterOptions.ServiceId && message.MessageId == ack.MessageId);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

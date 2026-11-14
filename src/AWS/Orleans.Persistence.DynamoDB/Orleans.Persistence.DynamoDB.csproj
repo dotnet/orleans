@@ -6,6 +6,7 @@
     <Description>Microsoft Orleans persistence providers backed by AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

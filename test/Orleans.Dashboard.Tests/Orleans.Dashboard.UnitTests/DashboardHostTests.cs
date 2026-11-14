@@ -1,16 +1,24 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenTelemetry.Metrics;
 using Orleans;
+using Orleans.Concurrency;
 using Orleans.Dashboard;
 using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Implementation;
+using Orleans.Dashboard.Model;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Xunit;
 
@@ -32,14 +40,115 @@ public class DashboardHostTests
         .Single(field => field.FieldType == typeof(MeterProvider));
 
     [Fact]
+    public void SiloWithoutDashboard_DoesNotEnableMessageSizeHistograms()
+    {
+        using var host = new HostBuilder()
+            .ConfigureLogging(logging => logging.ClearProviders())
+            .UseOrleans(silo => silo.UseLocalhostClustering())
+            .Build();
+        host.Services.GetRequiredService<Silo>();
+        var meter = host.Services.GetRequiredService<OrleansInstruments>().Meter;
+
+        Assert.False(meter.CreateHistogram<int>("orleans-messaging-received-messages-size", "bytes").Enabled);
+        Assert.False(meter.CreateHistogram<int>("orleans-messaging-sent-messages-size", "bytes").Enabled);
+    }
+
+    [Fact]
+    public async Task Participate_CollectsClientConnectionsBeforeHostedServiceStartup()
+    {
+        using var fixture = new HostFixture();
+        var clients = fixture.Instruments.Meter.CreateUpDownCounter<int>("orleans-gateway-connected-clients");
+        await using var host = fixture.CreateHost();
+        await StartTelemetryAsync(host);
+
+        clients.Add(2);
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        Assert.True(GetMeterProvider(host).ForceFlush());
+        AssertCounter(Assert.Single(fixture.CounterReports), clients.Name, "2", "2");
+    }
+
+    [Fact]
+    public async Task StartAsync_ExportsRuntimeMeterCounters()
+    {
+        using var fixture = new HostFixture();
+        var counter = fixture.Instruments.Meter.CreateCounter<long>("dashboard.test.messages");
+        await using var host = fixture.CreateHost();
+        await StartHostAsync(host);
+
+        counter.Add(7);
+        Assert.True(GetMeterProvider(host).ForceFlush());
+
+        var report = Assert.Single(fixture.CounterReports);
+        var exported = Assert.Single(report, value => value.Name == counter.Name);
+        Assert.Equal("7", exported.Value);
+        Assert.Equal("7", exported.Delta);
+    }
+
+    [Fact]
+    public async Task StartAsync_EnablesOnlyTheSilosMeterUntilDisposal()
+    {
+        using var fixture = new HostFixture();
+        using var otherServices = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var otherInstruments = new OrleansInstruments(otherServices.GetRequiredService<IMeterFactory>());
+        var ownHistogram = fixture.Instruments.Meter.CreateHistogram<int>("dashboard.test.bytes");
+        var otherHistogram = otherInstruments.Meter.CreateHistogram<int>(ownHistogram.Name);
+        Assert.Equal(fixture.Instruments.Meter.Name, otherInstruments.Meter.Name);
+        Assert.False(ownHistogram.Enabled);
+        Assert.False(otherHistogram.Enabled);
+        ownHistogram.Record(999);
+
+        await using var host = fixture.CreateHost();
+        await StartHostAsync(host);
+        Assert.True(ownHistogram.Enabled);
+        Assert.False(otherHistogram.Enabled);
+        ownHistogram.Record(123, new KeyValuePair<string, object?>("direction", "request"));
+        ownHistogram.Record(456, new KeyValuePair<string, object?>("direction", "response"));
+        otherHistogram.Record(999);
+        Assert.True(GetMeterProvider(host).ForceFlush());
+        AssertCounter(Assert.Single(fixture.CounterReports), ownHistogram.Name, "579", "579");
+
+        await host.DisposeAsync();
+        Assert.False(ownHistogram.Enabled);
+        Assert.False(otherHistogram.Enabled);
+    }
+
+    [Fact]
+    public async Task StartAsync_PreservesTaggedGaugeTotals()
+    {
+        using var fixture = new HostFixture();
+        var count = 2L;
+        fixture.Instruments.Meter.CreateObservableGauge("dashboard.test.tagged-gauge", () => new[]
+        {
+            new Measurement<long>(count, new KeyValuePair<string, object?>("grain_type", "one")),
+            new Measurement<long>(3, new KeyValuePair<string, object?>("grain_type", "two")),
+        });
+        await using var host = fixture.CreateHost();
+        await StartHostAsync(host);
+
+        Assert.True(GetMeterProvider(host).ForceFlush());
+        AssertCounter(Assert.Single(fixture.CounterReports), "dashboard.test.tagged-gauge", "5", "5");
+        count = 7;
+        Assert.True(GetMeterProvider(host).ForceFlush());
+        Assert.Equal(2, fixture.CounterReports.Count);
+        AssertCounter(fixture.CounterReports.Last(), "dashboard.test.tagged-gauge", "10", "5");
+    }
+
+    private static void AssertCounter(StatCounter[] report, string name, string value, string delta)
+    {
+        var counter = Assert.Single(report, counter => counter.Name == name);
+        Assert.Equal(value, counter.Value);
+        Assert.Equal(delta, counter.Delta);
+    }
+
+    [Fact]
     public async Task StartAsync_ValidDependencies_ActivatesDashboardGrainAndSiloGrainServiceOnce()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
 
         try
         {
-            await host.StartAsync(TestContext.Current.CancellationToken);
+            await StartHostAsync(host);
 
             AssertDashboardActivation(fixture);
             AssertSiloActivation(fixture);
@@ -56,12 +165,12 @@ public class DashboardHostTests
     public async Task StartAsync_DashboardGrainActivationThrows_LogsWarningAndContinues()
     {
         var expectedException = new InvalidOperationException("dashboard initialization failed");
-        var fixture = new HostFixture { DashboardInitializeException = expectedException };
+        using var fixture = new HostFixture { DashboardInitializeException = expectedException };
         var host = fixture.CreateHost();
 
         try
         {
-            await host.StartAsync(TestContext.Current.CancellationToken);
+            await StartHostAsync(host);
 
             AssertDashboardActivation(fixture);
             AssertSiloActivation(fixture);
@@ -80,12 +189,12 @@ public class DashboardHostTests
     public async Task StartAsync_SiloGrainServiceActivationThrows_LogsWarningAndContinues()
     {
         var expectedException = new InvalidOperationException("version update failed");
-        var fixture = new HostFixture { SiloSetVersionException = expectedException };
+        using var fixture = new HostFixture { SiloSetVersionException = expectedException };
         var host = fixture.CreateHost();
 
         try
         {
-            await host.StartAsync(TestContext.Current.CancellationToken);
+            await StartHostAsync(host);
 
             AssertDashboardActivation(fixture);
             AssertSiloActivation(fixture);
@@ -105,7 +214,7 @@ public class DashboardHostTests
     {
         var dashboardException = new InvalidOperationException("dashboard initialization failed");
         var siloException = new InvalidOperationException("version update failed");
-        var fixture = new HostFixture
+        using var fixture = new HostFixture
         {
             DashboardInitializeException = dashboardException,
             SiloSetVersionException = siloException,
@@ -114,7 +223,7 @@ public class DashboardHostTests
 
         try
         {
-            await host.StartAsync(TestContext.Current.CancellationToken);
+            await StartHostAsync(host);
 
             AssertDashboardActivation(fixture);
             AssertSiloActivation(fixture);
@@ -137,9 +246,9 @@ public class DashboardHostTests
     [Fact]
     public async Task StopAsync_AfterStart_CompletesAndDoesNotReactivateServices()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
-        await host.StartAsync(TestContext.Current.CancellationToken);
+        await StartHostAsync(host);
         var originalProvider = GetMeterProvider(host);
         var trackingProvider = new TrackingMeterProvider();
         SetMeterProvider(host, trackingProvider);
@@ -164,7 +273,7 @@ public class DashboardHostTests
     [Fact]
     public async Task StopAsync_CalledTwice_RemainsSafe()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var trackingProvider = new TrackingMeterProvider();
         SetMeterProvider(host, trackingProvider);
@@ -187,7 +296,7 @@ public class DashboardHostTests
     [Fact]
     public void Dispose_TelemetryDisposalThrows_DoesNotThrow()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var expectedException = new InvalidOperationException("synchronous telemetry disposal failed");
         var throwingProvider = new ThrowingMeterProvider(expectedException);
@@ -203,7 +312,7 @@ public class DashboardHostTests
     [Fact]
     public async Task DisposeAsync_TelemetryDisposalThrows_DoesNotThrowOrSynchronouslyDispose()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var expectedException = new InvalidOperationException("asynchronous telemetry disposal failed");
         var throwingProvider = new ThrowingAsyncMeterProvider(expectedException);
@@ -220,7 +329,7 @@ public class DashboardHostTests
     [Fact]
     public async Task DisposeAsync_SynchronousTelemetryProvider_DisposesExactlyOnce()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var trackingProvider = new TrackingMeterProvider();
         SetMeterProvider(host, trackingProvider);
@@ -283,6 +392,27 @@ public class DashboardHostTests
     private static MeterProvider GetMeterProvider(DashboardHost host) =>
         Assert.IsAssignableFrom<MeterProvider>(MeterProviderField.GetValue(host));
 
+    private static async Task StartHostAsync(DashboardHost host)
+    {
+        await StartTelemetryAsync(host);
+        await host.StartAsync(TestContext.Current.CancellationToken);
+    }
+
+    private static async Task StartTelemetryAsync(DashboardHost host)
+    {
+        ILifecycleObserver? observer = null;
+        var lifecycle = CreateProxy<ISiloLifecycle>((method, arguments) =>
+        {
+            Assert.Equal(nameof(ISiloLifecycle.Subscribe), method.Name);
+            Assert.Equal(ServiceLifecycleStage.BecomeActive, Assert.IsType<int>(arguments![1]));
+            observer = Assert.IsAssignableFrom<ILifecycleObserver>(arguments[2]);
+            return NullScope.Instance;
+        });
+        host.Participate(lifecycle);
+        Assert.NotNull(observer);
+        await observer.OnStart(TestContext.Current.CancellationToken);
+    }
+
     private static void SetMeterProvider(DashboardHost host, MeterProvider meterProvider) =>
         MeterProviderField.SetValue(host, meterProvider);
 
@@ -294,8 +424,9 @@ public class DashboardHostTests
         return result;
     }
 
-    private sealed class HostFixture
+    private sealed class HostFixture : IDisposable
     {
+        private readonly ServiceProvider _services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         private readonly IDashboardGrain _dashboardGrain;
         private readonly IGrainFactory _grainFactory;
         private readonly ISiloGrainService _siloGrainService;
@@ -304,6 +435,7 @@ public class DashboardHostTests
 
         public HostFixture()
         {
+            Instruments = new OrleansInstruments(_services.GetRequiredService<IMeterFactory>());
             LocalSiloDetails = new TestLocalSiloDetails();
             SiloAddress = LocalSiloDetails.SiloAddress;
             _dashboardGrain = CreateProxy<IDashboardGrain>((method, _) =>
@@ -343,10 +475,16 @@ public class DashboardHostTests
                 _siloGrainService,
                 destination => SiloGrainDestinations.Add(destination));
 
-            var telemetryService = CreateProxy<ISiloGrainService>((method, _) =>
-                method.Name == nameof(ISiloGrainService.ReportCounters)
-                    ? Task.CompletedTask
-                    : throw new NotSupportedException(method.Name));
+            var telemetryService = CreateProxy<ISiloGrainService>((method, arguments) =>
+            {
+                if (method.Name != nameof(ISiloGrainService.ReportCounters))
+                {
+                    throw new NotSupportedException(method.Name);
+                }
+
+                CounterReports.Enqueue(Assert.IsType<Immutable<StatCounter[]>>(arguments![0]).Value);
+                return Task.CompletedTask;
+            });
             var telemetryClient = new RecordingSiloGrainClient(telemetryService);
             _telemetryExporter = new DashboardTelemetryExporter(
                 LocalSiloDetails,
@@ -355,6 +493,8 @@ public class DashboardHostTests
         }
 
         public CapturingLogger<DashboardHost> Logger { get; } = new();
+
+        public OrleansInstruments Instruments { get; }
 
         public TestLocalSiloDetails LocalSiloDetails { get; }
 
@@ -378,8 +518,15 @@ public class DashboardHostTests
 
         public List<(string OrleansVersion, string HostVersion)> SetVersionCalls { get; } = [];
 
+        public ConcurrentQueue<StatCounter[]> CounterReports { get; } = new();
+
         public DashboardHost CreateHost() =>
-            new(Logger, LocalSiloDetails, _grainFactory, _telemetryExporter, _siloGrainClient);
+            new(Logger, LocalSiloDetails, Instruments, _grainFactory, _telemetryExporter, _siloGrainClient)
+            {
+                ExportIntervalMilliseconds = Timeout.Infinite,
+            };
+
+        public void Dispose() => _services.Dispose();
     }
 
     private sealed class TestLocalSiloDetails : ILocalSiloDetails

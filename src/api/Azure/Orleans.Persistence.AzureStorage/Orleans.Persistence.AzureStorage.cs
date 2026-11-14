@@ -177,11 +177,17 @@ namespace Orleans.Storage
     {
         public AzureBlobGrainStorage(string name, Configuration.AzureBlobStorageOptions options, IBlobContainerFactory blobContainerFactory, Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<AzureBlobGrainStorage> logger) { }
 
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
     }
@@ -195,13 +201,19 @@ namespace Orleans.Storage
     {
         public AzureTableGrainStorage(string name, Configuration.AzureTableStorageOptions options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILogger<AzureTableGrainStorage> logger, Serialization.Serializers.IActivatorProvider activatorProvider) { }
 
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
         public bool DecodeException(System.Exception e, out System.Net.HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false) { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
     }

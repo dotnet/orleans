@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
+using Orleans.Providers;
 
 namespace Orleans.Hosting;
 
@@ -14,6 +15,19 @@ namespace Orleans.Hosting;
 /// </summary>
 public sealed class DurableJobsOptions
 {
+    /// <summary>
+    /// Gets or sets the active journal provider used to create new job shards.
+    /// Defaults to <see cref="ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME"/>.
+    /// </summary>
+    public string ActiveProviderName { get; set; } = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
+
+    /// <summary>
+    /// Gets the additional named journal providers whose existing shards are discovered and drained.
+    /// Existing jobs retain their provider for retries, cancellation, and cleanup.
+    /// Provider selection is fixed when the silo starts.
+    /// </summary>
+    public List<string> DrainingProviderNames { get; } = [];
+
     /// <summary>
     /// Gets or sets the duration of each job shard. Smaller values reduce latency but increase overhead.
     /// For optimal alignment with hour boundaries, choose durations that evenly divide 60 minutes
@@ -28,6 +42,22 @@ public sealed class DurableJobsOptions
     /// Default: 5 minutes.
     /// </summary>
     public TimeSpan ShardActivationBufferPeriod { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Gets or sets how far ahead of the current time shard discovery loads eligible shards.
+    /// A value of zero discovers shards whose start time is at or before the current time.
+    /// The resulting discovery horizon is capped at <see cref="DateTimeOffset.MaxValue"/>.
+    /// Must be non-negative. Default: 10 minutes.
+    /// </summary>
+    public TimeSpan ShardLoadLookaheadPeriod { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Gets or sets the interval between periodic shard discovery and writable-shard cleanup checks.
+    /// A silo joining or leaving the active set, or being declared dead, also triggers a fresh discovery sweep,
+    /// which adopts a dead silo's shards.
+    /// Must be between 1 and 4294967294 milliseconds, inclusive. Default: 5 minutes.
+    /// </summary>
+    public TimeSpan ShardCheckInterval { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Gets or sets the number of writable shards to use for each shard time bucket.
@@ -198,9 +228,19 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
     public void ValidateConfiguration()
     {
         var options = _options.Value;
+        DurableJobsJournalProviders.GetProviderNames(options);
         if (options.ShardDuration <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
+        }
+        if (options.ShardLoadLookaheadPeriod < TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardLoadLookaheadPeriod must be non-negative.");
+        }
+        if (options.ShardCheckInterval < TimeSpan.FromMilliseconds(1) ||
+            options.ShardCheckInterval > TimeSpan.FromMilliseconds(uint.MaxValue - 1))
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardCheckInterval must be between 1 and 4294967294 milliseconds, inclusive.");
         }
         if (options.ShardStripeCount <= 0)
         {
@@ -277,57 +317,12 @@ internal sealed class DurableJobsJournalingConfigurationValidator : IConfigurati
 
     public void ValidateConfiguration()
     {
-        var missingServices = new List<string>();
-        var serviceProviderIsService = _serviceProvider.GetService<IServiceProviderIsService>();
-
-        CheckService<IJournalStorageProvider>(serviceProviderIsService, missingServices);
-        CheckService<IJournalStorageCatalog>(serviceProviderIsService, missingServices);
-        CheckService<IJournaledStateManagerFactory>(serviceProviderIsService, missingServices);
-        CheckService<JobShardManager>(serviceProviderIsService, missingServices);
-
-        if (missingServices.Count > 0)
-        {
-            throw new OrleansConfigurationException(
-                $"DurableJobs requires Orleans.Journaling storage. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...) before starting the silo. Missing services: {string.Join(", ", missingServices)}.");
-        }
-
+        _ = ResolveRequiredService<DurableJobsJournalProviders>();
         var shardManager = ResolveRequiredService<JobShardManager>();
         if (shardManager is not JournaledJobShardManager)
         {
             throw new OrleansConfigurationException(
-                $"DurableJobs requires the journaled shard manager, but '{shardManager.GetType().FullName}' is registered. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...).");
-        }
-    }
-
-    private void CheckService<TService>(IServiceProviderIsService? serviceProviderIsService, List<string> missingServices)
-        where TService : class
-    {
-        if (serviceProviderIsService is not null)
-        {
-            if (!serviceProviderIsService.IsService(typeof(TService)))
-            {
-                missingServices.Add(typeof(TService).Name);
-            }
-
-            return;
-        }
-
-        if (ResolveService<TService>() is null)
-        {
-            missingServices.Add(typeof(TService).Name);
-        }
-    }
-
-    private TService? ResolveService<TService>()
-        where TService : class
-    {
-        try
-        {
-            return _serviceProvider.GetService<TService>();
-        }
-        catch (Exception exception)
-        {
-            throw CreateServiceResolutionException<TService>(exception);
+                $"DurableJobs requires the journaled shard manager, but '{shardManager.GetType().FullName}' is registered. Configure DurableJobs storage using UseJournaledDurableJobs(...).");
         }
     }
 
@@ -338,6 +333,10 @@ internal sealed class DurableJobsJournalingConfigurationValidator : IConfigurati
         {
             return _serviceProvider.GetRequiredService<TService>();
         }
+        catch (OrleansConfigurationException)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             throw CreateServiceResolutionException<TService>(exception);
@@ -346,6 +345,6 @@ internal sealed class DurableJobsJournalingConfigurationValidator : IConfigurati
 
     private static OrleansConfigurationException CreateServiceResolutionException<TService>(Exception exception)
         => new(
-            $"DurableJobs requires Orleans.Journaling storage, but service '{typeof(TService).Name}' could not be resolved. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...).",
+            $"DurableJobs requires Orleans.Journaling storage, but service '{typeof(TService).Name}' could not be resolved. Configure named journal storage and select it using UseJournaledDurableJobs(...).",
             exception);
 }

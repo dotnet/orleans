@@ -23,6 +23,8 @@ public sealed class GrainTypeSharedContext
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, object> _components = [];
+    private Action<IGrainContext>? _activationSetup;
+    private bool _configurationCompleted;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GrainTypeSharedContext"/> class.
@@ -59,8 +61,10 @@ public sealed class GrainTypeSharedContext
             throw new KeyNotFoundException($"Could not find corresponding grain class for grain of type {grainType}");
         }
 
+        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
+        GrainTypeMetrics = CatalogInstruments.GetGrainTypeMetrics(grainType);
+        Interlocked.CompareExchange(ref GrainTypeMetrics.GrainClassName, RuntimeTypeNameFormatter.Format(grainClass), null);
         SerializerSessionPool = serializerSessionPool;
-        GrainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
         Logger = loggerFactory.CreateLogger("Orleans.Grain");
         SchedulerLogger = loggerFactory.CreateLogger<WorkItemGroup>();
         MessagingOptions = messagingOptions.Value;
@@ -74,7 +78,6 @@ public sealed class GrainTypeSharedContext
         SchedulingOptions = schedulingOptions.Value;
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
-        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
         MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
 
@@ -88,8 +91,50 @@ public sealed class GrainTypeSharedContext
     /// <summary>
     /// Gets the grain instance type name, if available.
     /// </summary>
-    public string GrainTypeName { get; }
+    public string GrainTypeName => GrainTypeMetrics.GrainClassName!;
 
+    /// <summary>
+    /// Adds a synchronous setup action to run for each activation of this grain type.
+    /// </summary>
+    /// <param name="setup">The setup action.</param>
+    /// <remarks>
+    /// <para>
+    /// Add actions during <see cref="IConfigureGrainTypeComponents.Configure"/>. Orleans caches the composed actions
+    /// with this shared context and runs them in registration order after the grain constructor completes and
+    /// <see cref="IGrainContext.GrainInstance"/> is assigned, before the grain object's lifecycle participation and
+    /// before lifecycle startup. Each addition runs once per activation, including each stateless worker activation.
+    /// </para>
+    /// <para>
+    /// Actions are shared across activations and can execute concurrently for different activations. Keep captured
+    /// state safe for concurrent use. Resolve activation-scoped state from <see cref="IGrainContext.ActivationServices"/>
+    /// inside the action. An action can enroll that state using <see cref="ILifecycleParticipant{TLifecycleObservable}"/>
+    /// or subscribe callbacks to <see cref="IGrainContext.ObservableLifecycle"/>.
+    /// Use lifecycle callbacks for asynchronous startup and shutdown, with distinct stages for ordered work.
+    /// </para>
+    /// <para>
+    /// A setup exception fails activation, skips subsequent setup actions and lifecycle startup, and triggers normal
+    /// grain and activation-scope cleanup. Each action owns enrollment of the services it resolves.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="setup"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">Shared grain type configuration has completed.</exception>
+    public void AddActivationSetup(Action<IGrainContext> setup)
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        if (_configurationCompleted)
+        {
+            throw new InvalidOperationException("Activation setup actions must be added during grain type configuration.");
+        }
+
+        _activationSetup += setup;
+    }
+
+    internal void CompleteConfiguration() => _configurationCompleted = true;
+
+    internal void SetupActivation(IGrainContext context) => _activationSetup?.Invoke(context);
+
+    internal GrainTypeMetrics GrainTypeMetrics { get; }
+    internal string GrainTypeMetricName => GrainTypeMetrics.GrainTypeTagValue;
     internal CatalogInstruments CatalogInstruments { get; }
     internal GrainInstruments GrainInstruments { get; }
     internal MessagingProcessingInstruments MessagingProcessingInstruments { get; }
@@ -249,7 +294,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnCreateActivation(IGrainContext grainContext)
     {
-        GrainInstruments.IncrementGrainCounts(GrainTypeName);
+        GrainInstruments.IncrementGrainCounts(GrainTypeMetrics);
     }
 
     /// <summary>
@@ -258,7 +303,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnDestroyActivation(IGrainContext grainContext)
     {
-        GrainInstruments.DecrementGrainCounts(GrainTypeName);
+        GrainInstruments.DecrementGrainCounts(GrainTypeMetrics);
     }
 }
 

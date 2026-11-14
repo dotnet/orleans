@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Text;
 using System.Text.Json;
 using NATS.Client.Serializers.Json;
 using Orleans.Runtime;
@@ -32,6 +33,88 @@ public sealed class NatsStreamMessageTests : IClassFixture<TestEnvironmentFixtur
         yield return [123.5];
         yield return [79228162514264337593543950335m];
         yield return [Guid.Parse("9b8219ed-9d58-4fe9-a5f4-51a17bd3d75d")];
+    }
+
+    public static IEnumerable<object[]> StreamIdentities()
+    {
+        (string Namespace, string Key)[] identities =
+        [
+            ("chat", "key"),
+            ("energymeter.DataChangedEvent", "key"),
+            ("chat", "key.with.dots"),
+            ("namespace/slash", "key/slash"),
+            ("", "key"),
+            ("null", "key"),
+            ("~63686174", "~6B6579"),
+            ("namespace with whitespace", "key \t\r\n"),
+            ("*", ">"),
+            (".", "."),
+            ("caf\u00e9", "\u03ba\u03bb\u03b5\u03b9\u03b4\u03af"),
+            ("chat", "null"),
+        ];
+
+        foreach (var (streamNamespace, key) in identities)
+        {
+            yield return [Encoding.UTF8.GetBytes(streamNamespace), Encoding.UTF8.GetBytes(key)];
+        }
+
+        yield return [new byte[] { 0xFF }, new byte[] { 0xFE }];
+        yield return [new byte[] { 0xFE }, new byte[] { 0xFF }];
+        yield return [Enumerable.Range(0, 256).Select(value => (byte)value).ToArray(), new byte[] { 0, 0xFF, (byte)'/' }];
+    }
+
+    [Theory]
+    [MemberData(nameof(StreamIdentities))]
+    public void StreamIdentityBytesRoundTripThroughNatsStreamSerialization(byte[] streamNamespace, byte[] streamKey)
+    {
+        var message = new NatsStreamMessage { StreamId = StreamId.Create(streamNamespace, streamKey), Payload = [42] };
+
+        var received = RoundTrip(message);
+
+        Assert.Equal(streamNamespace, received.StreamId.Namespace.ToArray());
+        Assert.Equal(streamKey, received.StreamId.Key.ToArray());
+        Assert.Equal(message.Payload, received.Payload);
+    }
+
+    [Theory]
+    [InlineData("\"chat/key\"", "chat", "key")]
+    [InlineData("\"energymeter.DataChangedEvent/key\"", "energymeter.DataChangedEvent", "key")]
+    [InlineData("\"null/key\"", "null", "key")]
+    public void StreamIdentityReadsLegacyJson(string json, string streamNamespace, string streamKey)
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new Orleans.Streaming.NATS.StreamIdJsonConverter());
+
+        var streamId = JsonSerializer.Deserialize<StreamId>(json, options);
+
+        Assert.Equal(Encoding.UTF8.GetBytes(streamNamespace), streamId.Namespace.ToArray());
+        Assert.Equal(Encoding.UTF8.GetBytes(streamKey), streamId.Key.ToArray());
+    }
+
+    [Fact]
+    public void StreamIdentityWritesLegacyJsonForTextIdentities()
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new Orleans.Streaming.NATS.StreamIdJsonConverter());
+
+        var json = JsonSerializer.Serialize(StreamId.Create("chat", "key"), options);
+
+        Assert.Equal("\"chat/key\"", json);
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("[null,\"a2V5\"]")]
+    [InlineData("[\"Y2hhdA==\"]")]
+    [InlineData("[\"Y2hhdA==\",null]")]
+    [InlineData("[\"Y2hhdA==\",\"\"]")]
+    [InlineData("[\"Y2hhdA==\",\"a2V5\",\"extra\"]")]
+    public void StreamIdentityRejectsMalformedByteComponents(string json)
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new Orleans.Streaming.NATS.StreamIdJsonConverter());
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<StreamId>(json, options));
     }
 
     [Theory]

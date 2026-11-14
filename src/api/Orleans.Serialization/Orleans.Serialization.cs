@@ -128,6 +128,13 @@ namespace Orleans.Serialization
         public FieldTypeMissingException(System.Type type) { }
     }
 
+    public abstract partial class GeneratedContext : Configuration.TypeManifestProviderBase
+    {
+        protected static Codecs.IFieldCodec<T> CreateCodecHolder<T>(Serializers.ICodecProvider provider) { throw null; }
+
+        protected static Cloning.IDeepCopier<T> CreateCopierHolder<T>(Serializers.ICodecProvider provider) { throw null; }
+    }
+
     [GenerateSerializer]
     public sealed partial class IllegalTypeException : SerializerException
     {
@@ -353,6 +360,8 @@ namespace Orleans.Serialization
     {
         public static ISerializerBuilder AddAssembly(this ISerializerBuilder builder, System.Reflection.Assembly assembly) { throw null; }
 
+        public static ISerializerBuilder AddGeneratedContext(this ISerializerBuilder builder, GeneratedContext context) { throw null; }
+
         public static ISerializerBuilder Configure(this ISerializerBuilder builder, Microsoft.Extensions.Options.IConfigureOptions<Configuration.TypeManifestOptions> configure) { throw null; }
 
         public static ISerializerBuilder Configure(this ISerializerBuilder builder, System.Action<Configuration.TypeManifestOptions> configure) { throw null; }
@@ -457,6 +466,8 @@ namespace Orleans.Serialization
 
     public static partial class ServiceCollectionExtensions
     {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddGeneratedContext(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, GeneratedContext context) { throw null; }
+
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder>? configure = null) { throw null; }
     }
 
@@ -500,6 +511,12 @@ namespace Orleans.Serialization
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
+    }
+
+    [GenerateSerializer]
+    public sealed partial class UnknownUnionCaseException : SerializerException
+    {
+        public UnknownUnionCaseException(System.Type unionType, uint caseId) { }
     }
 
     [GenerateSerializer]
@@ -597,12 +614,16 @@ namespace Orleans.Serialization.Buffers
     public partial struct ArcBuffer : System.IDisposable
     {
         private int _dummyPrimitive;
-        public readonly ArcBufferPage First;
+        public readonly ArcBufferPage? First;
         public readonly int Length;
         public readonly int Offset;
-        public ArcBuffer(ArcBufferPage first, int token, int offset, int length) { }
+        public ArcBuffer(ArcBufferPage? first, int token, int offset, int length) { }
 
         public ArraySegmentEnumerator ArraySegments { get { throw null; } }
+
+        public static ArcBuffer Empty { get { throw null; } }
+
+        public bool IsEmpty { get { throw null; } }
 
         public MemoryEnumerator MemorySegments { get { throw null; } }
 
@@ -762,6 +783,8 @@ namespace Orleans.Serialization.Buffers
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        public ArcBufferReader(ArcBufferWriter writer) { }
+
         public int Length { get { throw null; } }
 
         public readonly void Consume(System.Span<byte> output) { }
@@ -784,10 +807,12 @@ namespace Orleans.Serialization.Buffers
     [Immutable]
     public sealed partial class ArcBufferWriter : System.Buffers.IBufferWriter<byte>, System.IDisposable
     {
-        public const int MinimumPageSize = 1024;
+        public const int MinimumPageSize = 16384;
         public int Length { get { throw null; } }
 
         public ArcBufferReader Reader { get { throw null; } }
+
+        public int UnconsumedLength { get { throw null; } }
 
         public void AdvanceReader(int count) { }
 
@@ -1040,6 +1065,8 @@ namespace Orleans.Serialization.Buffers
         public int ReadInt32() { throw null; }
 
         public long ReadInt64() { throw null; }
+
+        public ArcBuffer ReadOwnedBuffer(int length) { throw null; }
 
         public uint ReadUInt32() { throw null; }
 
@@ -1406,6 +1433,21 @@ namespace Orleans.Serialization.Cloning
 namespace Orleans.Serialization.Codecs
 {
     [RegisterSerializer]
+    public sealed partial class ArcBufferCodec : IFieldCodec<Buffers.ArcBuffer>, IFieldCodec
+    {
+        public Buffers.ArcBuffer ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, Buffers.ArcBuffer value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class ArcBufferCopier : Cloning.IDeepCopier<Buffers.ArcBuffer>, Cloning.IDeepCopier
+    {
+        public Buffers.ArcBuffer DeepCopy(Buffers.ArcBuffer input, Cloning.CopyContext context) { throw null; }
+    }
+
+    [RegisterSerializer]
     public sealed partial class ArrayCodec<T> : IFieldCodec<T[]>, IFieldCodec
     {
         public ArrayCodec(IFieldCodec<T> fieldCodec) { }
@@ -1764,7 +1806,10 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed partial class DictionaryCodec<TKey, TValue> : IFieldCodec<System.Collections.Generic.Dictionary<TKey, TValue>>, IFieldCodec
     {
+        [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
         public DictionaryCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec, IFieldCodec<System.Collections.Generic.IEqualityComparer<TKey>> comparerCodec) { }
+
+        public DictionaryCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec) { }
 
         public System.Collections.Generic.Dictionary<TKey, TValue> ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
@@ -3352,6 +3397,17 @@ namespace Orleans.Serialization.Configuration
         public static void Register(IProviderMetadataProvider provider) { }
     }
 
+    public sealed partial class SerializationType
+    {
+        internal SerializationType() { }
+
+        public static SerializationType Array(SerializationType element, int rank = 1) { throw null; }
+
+        public static SerializationType Create(System.Type type, params SerializationType[] arguments) { throw null; }
+
+        public static SerializationType Parameter(int index) { throw null; }
+    }
+
     public sealed partial class TypeManifestOptions
     {
         public System.Collections.Generic.HashSet<System.Type> Activators { get { throw null; } }
@@ -3384,15 +3440,29 @@ namespace Orleans.Serialization.Configuration
 
         public System.Collections.Generic.Dictionary<uint, System.Type> WellKnownTypeIds { get { throw null; } }
 
+        public void AddActivator(System.Type type, System.Type targetType) { }
+
         public void AddActivator(System.Type type) { }
 
         public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
 
         public void AddAllowedType(System.Type type) { }
 
+        public void AddBaseCodec(System.Type type, System.Type targetType) { }
+
+        public void AddBaseCopier(System.Type type, System.Type targetType) { }
+
+        public void AddConverter(System.Type type, System.Type targetType, SerializationType surrogateType) { }
+
+        public void AddConverter(System.Type type, System.Type targetType, System.Type surrogateType) { }
+
         public void AddConverter(System.Type type) { }
 
+        public void AddCopier(System.Type type, System.Type targetType) { }
+
         public void AddCopier(System.Type type) { }
+
+        public void AddFieldCodec(System.Type type, System.Type targetType) { }
 
         public void AddFieldCodec(System.Type type) { }
 
@@ -3402,7 +3472,18 @@ namespace Orleans.Serialization.Configuration
 
         public void AddInterfaceProxy(System.Type type) { }
 
+        public void AddSerializationContract(System.Type type, System.Type contractType, SerializationType targetType, SerializationType? surrogateType = null) { }
+
+        public void AddSerializer(System.Type type, System.Type targetType) { }
+
         public void AddSerializer(System.Type type) { }
+
+        public void AddSerializer<T>(System.Func<Serializers.ICodecProvider, Codecs.IFieldCodec<T>> codecFactory, System.Func<Serializers.ICodecProvider, Cloning.IDeepCopier<T>> copierFactory) { }
+
+        public void AddSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory)
+            where TService : class { }
+
+        public void AddValueSerializer(System.Type type, System.Type targetType) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
@@ -3445,7 +3526,16 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static void SerializeUnexpectedType<TBufferWriter>(this ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        public static TField ThrowUnknownUnionCase<TField>(uint caseId) { throw null; }
+
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        public static void ThrowUnsupportedUnionValue<TField>(object value) { }
+
         public static TService UnwrapService<TService>(object caller, TService service) { throw null; }
+
+        public static void WriteStartUnion<TBufferWriter>(this ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, System.Type unionType)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public abstract partial class ExceptionCopier<T, B> : Cloning.IDeepCopier<T>, Cloning.IDeepCopier, Cloning.IBaseCopier<T>, Cloning.IBaseCopier where T : B where B : System.Exception
         {
@@ -4038,6 +4128,10 @@ namespace Orleans.Serialization.TypeSystem
         public CompoundTypeAliasTree Add(System.Type key) { throw null; }
 
         public static CompoundTypeAliasTree Create() { throw null; }
+
+        public CompoundTypeAliasTree GetOrAdd(string key) { throw null; }
+
+        public CompoundTypeAliasTree GetOrAdd(System.Type key) { throw null; }
     }
 
     public partial class ConstructedGenericTypeSpec : TypeSpec
@@ -4617,6 +4711,24 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_UnknownUnionCaseException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownUnionCaseException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_UnknownUnionCaseException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.UnknownUnionCaseException> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.UnknownUnionCaseException instance) { }
+
+        public global::Orleans.Serialization.UnknownUnionCaseException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Serialization.UnknownUnionCaseException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.UnknownUnionCaseException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_UnknownWellKnownTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownWellKnownTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_UnknownWellKnownTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.UnknownWellKnownTypeException> _activator) { }
@@ -4768,6 +4880,14 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_UnknownReferencedTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
 
         public override void DeepCopy(global::Orleans.Serialization.UnknownReferencedTypeException input, global::Orleans.Serialization.UnknownReferencedTypeException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_UnknownUnionCaseException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnknownUnionCaseException, global::Orleans.Serialization.SerializerException>
+    {
+        public Copier_UnknownUnionCaseException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

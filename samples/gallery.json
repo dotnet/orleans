@@ -154,6 +154,17 @@
     "featured": true
   },
   {
+    "slug": "durable-jobs-migration",
+    "title": "Durable Jobs provider migration",
+    "description": "Drain existing jobs from Azure Blob provider A while provider B accepts new work, with process restart and full-inventory checks.",
+    "path": "DurableJobsMigration",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["durable-jobs", "journaling", "azure-storage", "aspire"],
+    "featured": false
+  },
+  {
     "slug": "journaling-azure-blob-json",
     "title": "Journaling with Azure Blob JSON",
     "description": "An Aspire sample using Orleans journaling with JSON events stored in Azure Blob Storage.",

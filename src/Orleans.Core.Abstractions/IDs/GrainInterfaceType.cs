@@ -1,4 +1,5 @@
 using System;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -93,6 +94,12 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if a <see cref="GrainInterfaceType"/> corresponding to the provided type was found, otherwise <see langword="false"/>.
         /// </returns>
+        /// <remarks>
+        /// Implementations must return a stable success result and identifier for each CLR interface type
+        /// for the lifetime of the resolver using this provider. The resolver caches resolved identities,
+        /// including closed generic interface types. Implementations must support concurrent calls;
+        /// concurrent cache misses can invoke this method more than once for the same type.
+        /// </remarks>
         bool TryGetGrainInterfaceType(Type type, out GrainInterfaceType grainInterfaceType);
     }
 
@@ -145,6 +152,11 @@ namespace Orleans.Runtime
         /// <returns>
         /// The <see cref="GrainInterfaceType"/> corresponding to the provided type.
         /// </returns>
+        /// <remarks>
+        /// The identifier must remain stable for each CLR interface type for the lifetime of the resolver
+        /// using this attribute. Implementations must support concurrent calls, including repeated calls
+        /// for the same type during concurrent identity resolution.
+        /// </remarks>
         GrainInterfaceType GetGrainInterfaceType(IServiceProvider services, Type type);
     }
 
@@ -162,8 +174,13 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a <see cref="GrainInterfaceTypeAttribute"/> instance.
         /// </summary>
+        /// <param name="value">A non-empty identity containing no quotes, whitespace, control characters, or reserved type-name delimiters (<c>[](),*&amp;</c>).</param>
+        /// <remarks>Generic arity suffixes must be decimal integers at the end of each nested type name, totaling at most 64.</remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="value"/> is empty, contains a quote, whitespace, a control character, or a reserved type-name delimiter, or has an invalid generic arity suffix.</exception>
         public GrainInterfaceTypeAttribute(string value)
         {
+            IdentityNameValidator.Validate(value, nameof(value));
             _value = GrainInterfaceType.Create(value);
         }
 

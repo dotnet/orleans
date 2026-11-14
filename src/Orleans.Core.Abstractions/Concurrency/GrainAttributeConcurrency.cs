@@ -4,6 +4,7 @@ using Orleans.Placement;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace Orleans.Concurrency
@@ -15,6 +16,11 @@ namespace Orleans.Concurrency
     /// that may significantly improve the performance of your application.
     /// </para>
     /// </summary>
+    /// <remarks>
+    /// Apply this attribute to a grain interface method declaration. Read-only requests can interleave with other
+    /// read-only requests. Writable requests wait until all active read-only requests complete unless another
+    /// interleaving policy permits them to overlap.
+    /// </remarks>
     [InvokableCustomInitializer(nameof(IRequest.AddInvokeMethodOptions), InvokeMethodOptions.ReadOnly)]
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class ReadOnlyAttribute : Attribute
@@ -33,6 +39,8 @@ namespace Orleans.Concurrency
     public sealed class ReentrantAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods",
+            Justification = "AttributeGrainPropertiesProvider validates the properties collection before dispatching to attributes.")]
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[WellKnownGrainTypeProperties.Reentrant] = "true";
@@ -137,6 +145,8 @@ namespace Orleans.Concurrency
 
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods",
+            Justification = "AttributeGrainPropertiesProvider validates the properties collection before dispatching to attributes.")]
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[WellKnownGrainTypeProperties.MayInterleavePredicate] = this.CallbackMethodName;

@@ -10,19 +10,19 @@ namespace Orleans.Serialization.UnitTests
 {
     /// <summary>
     /// Tests for Orleans' PooledBuffer implementation.
-    /// 
+    ///
     /// PooledBuffer is a high-performance buffer management system that:
     /// - Uses ArrayPool to minimize allocations and GC pressure
     /// - Supports efficient slicing operations without copying
     /// - Handles large data through segmented storage
     /// - Provides zero-copy access to buffer contents
-    /// 
+    ///
     /// Key features tested:
     /// - Large buffer handling (multi-megabyte)
     /// - Slicing operations at various offsets
     /// - Memory safety and bounds checking
     /// - Proper cleanup and return to pool
-    /// 
+    ///
     /// This infrastructure is critical for Orleans' serialization performance,
     /// especially when handling large object graphs or streaming scenarios.
     /// </summary>
@@ -305,14 +305,12 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(length, spanPos);
             Assert.Equal(expected, spanConcat);
 
-            // Act & Assert: MemoryEnumerator
             var memConcat = new byte[length];
-            int memPos = 0;
+            var memPos = 0;
             foreach (var mem in slice.MemorySegments)
             {
-                var span = mem.Span;
-                span.CopyTo(memConcat.AsSpan(memPos));
-                memPos += span.Length;
+                mem.Span.CopyTo(memConcat.AsSpan(memPos));
+                memPos += mem.Length;
             }
             Assert.Equal(length, memPos);
             Assert.Equal(expected, memConcat);
@@ -356,14 +354,12 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(length, spanPos);
             Assert.Equal(expected, spanConcat);
 
-            // Act & Assert: MemoryEnumerator
             var memConcat = new byte[length];
-            int memPos = 0;
+            var memPos = 0;
             foreach (var mem in slice.MemorySegments)
             {
-                var span = mem.Span;
-                span.CopyTo(memConcat.AsSpan(memPos));
-                memPos += span.Length;
+                mem.Span.CopyTo(memConcat.AsSpan(memPos));
+                memPos += mem.Length;
             }
             Assert.Equal(length, memPos);
             Assert.Equal(expected, memConcat);

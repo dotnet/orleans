@@ -176,7 +176,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="valueCopier">The value copier.</param>
         public ListCopier(IDeepCopier<T> valueCopier)
         {
-            _copier = valueCopier;
+            _copier = OrleansGeneratedCodeHelper.UnwrapService(this, valueCopier);
         }
 
         /// <inheritdoc/>

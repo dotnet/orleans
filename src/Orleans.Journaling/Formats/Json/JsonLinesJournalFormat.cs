@@ -5,18 +5,30 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Json;
 
-internal sealed class JsonLinesJournalFormat : IJournalFormat
+/// <summary>
+/// Encodes journal entries as UTF-8 JSON Lines and replays complete records in order.
+/// </summary>
+public sealed class JsonLinesJournalFormat : IJournalFormat
 {
+    /// <summary>
+    /// The well-known key for the JSON Lines journal format.
+    /// </summary>
+    public const string JournalFormatKey = "json";
+
     private static readonly byte[] Bom = [0xEF, 0xBB, 0xBF];
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
 
-    public string FormatKey => JsonJournalExtensions.JournalFormatKey;
+    /// <inheritdoc/>
+    public string FormatKey => JournalFormatKey;
 
+    /// <inheritdoc/>
     public string? MimeType => "application/jsonl";
 
+    /// <inheritdoc/>
     public JournalBufferWriter CreateWriter() => new JsonLinesJournalBufferWriter();
 
+    /// <inheritdoc/>
     public void Replay(JournalBufferReader input, JournalReplayContext context)
     {
         var offset = 0L;
@@ -91,11 +103,11 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             }
 
             var stream = new JournalStreamId(streamId);
-            var state = context.ResolveState(stream);
+            var state = context.ResolveStateMachine(stream);
             var payloadContent = ReadEntryPayload(ref reader, offset);
             using var payloadBuffer = new ArcBufferWriter();
             WriteEntryPayload(line, payloadContent, payloadBuffer);
-            var entry = new JournalEntry(JsonJournalExtensions.JournalFormatKey, new JournalBufferReader(payloadBuffer.Reader, isCompleted: true));
+            var entry = new JournalEntry(JsonLinesJournalFormat.JournalFormatKey, new JournalBufferReader(payloadBuffer.Reader, isCompleted: true));
             using var commandReader = new JsonCommandReader(entry.Reader);
             state.ReplayEntry(entry, context);
         }
@@ -232,7 +244,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
         {
-            if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
+            if (!string.Equals(entry.FormatKey, JsonLinesJournalFormat.JournalFormatKey, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     $"The JSON journal buffer writer cannot append preserved entry of type '{entry.GetType().FullName}'.");

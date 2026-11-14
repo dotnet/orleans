@@ -8,6 +8,7 @@ namespace Orleans.Journaling;
 
 internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
 {
+    private const string ProviderName = "redis";
     private const int JournalIdReadBatchSize = 128;
     private const int ScanPageSize = 250;
     private const string ReadJournalIdScript =
@@ -27,6 +28,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
     private readonly RedisJournalStorageOptions _options;
     private readonly string _keyPrefix;
     private readonly string _journalFormatKey;
+    private readonly JournalStorageTelemetry _telemetry;
     private IConnectionMultiplexer? _connection;
     private IDatabase? _database;
     private bool _isSharedConnection;
@@ -34,7 +36,8 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
     public RedisJournalStorageProvider(
         IOptions<RedisJournalStorageOptions> options,
         IOptions<ClusterOptions> clusterOptions,
-        IOptions<JournaledStateManagerOptions> managerOptions)
+        IOptions<JournaledStateManagerOptions> managerOptions,
+        OrleansInstruments? instruments = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clusterOptions);
@@ -43,6 +46,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         _options = options.Value;
         _keyPrefix = _options.GetKeyPrefix(clusterOptions.Value.ServiceId);
         _journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
+        _telemetry = instruments is null ? JournalStorageTelemetry.CreateForDirectConstruction() : new JournalStorageTelemetry(instruments);
     }
 
     public IJournalStorage CreateStorage(JournalId journalId)
@@ -56,17 +60,23 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         return new RedisJournalStorage(GetDatabase(), _keyPrefix, keyName, _journalFormatKey, _options, journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
-        ListOptions? options = null,
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+        JournalCatalogListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var prefix = options?.Prefix ?? default;
         cancellationToken.ThrowIfCancellationRequested();
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        var identityKeyMapping = _options.UsesDefaultKeyName;
         var connection = GetConnection();
         var database = GetDatabase();
         var journalIds = new HashSet<JournalId>();
-        var batch = new RedisKey[JournalIdReadBatchSize];
-        var pattern = RedisJournalStorage.GetMetadataKeyPattern(_keyPrefix);
+        var batch = identityKeyMapping ? [] : new RedisKey[JournalIdReadBatchSize];
+        var pattern = RedisJournalStorage.GetMetadataKeyPattern(_keyPrefix, identityKeyMapping ? range.ListingPrefix : null);
         var scannedServer = false;
         foreach (var endpoint in connection.GetEndPoints())
         {
@@ -88,6 +98,29 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                 database.Database,
                 pattern,
                 pageSize: ScanPageSize).GetAsyncEnumerator(cancellationToken);
+            if (identityKeyMapping)
+            {
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!await metadataKeys.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        break;
+                    }
+
+                    _telemetry.OnCatalogItems(ProviderName, 1);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var journalId = RedisJournalStorage.GetJournalIdFromMetadataKey(_keyPrefix, metadataKeys.Current);
+                    if (range.Contains(journalId.Value) && journalIds.Add(journalId))
+                    {
+                        _telemetry.OnCatalogEntry(ProviderName);
+                        yield return new JournalCatalogEntry(journalId);
+                    }
+                }
+
+                continue;
+            }
+
             while (true)
             {
                 var count = 0;
@@ -99,6 +132,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         break;
                     }
 
+                    _telemetry.OnCatalogItems(ProviderName, 1);
                     batch[count++] = metadataKeys.Current;
                 }
 
@@ -146,16 +180,17 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         value = (RedisValue)result[1];
                     }
 
-                    if (!RedisJournalStorage.TryParseJournalId(value.ToString(), out var journalId))
+                    if (!RedisJournalStorage.TryDecodeJournalId(value.ToString(), out var journalId))
                     {
                         throw new InvalidOperationException(
                             $"Redis journal metadata '{batch[i]}' contains an invalid '{RedisJournalStorage.JournalIdMetadataKey}' value.");
                     }
 
-                    if (prefix.IsPrefixOf(journalId) && journalIds.Add(journalId))
+                    if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        yield return journalId;
+                        _telemetry.OnCatalogEntry(ProviderName);
+                        yield return new JournalCatalogEntry(journalId);
                     }
                 }
 

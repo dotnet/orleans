@@ -21,7 +21,7 @@ public interface IJournalMetadata
     /// <summary>
     /// Gets the journal format key stored with the journal data, or <see langword="null"/> if no key is present.
     /// </summary>
-    string? Format { get; }
+    string? FormatKey { get; }
 
     /// <summary>
     /// Gets the storage metadata ETag, or <see langword="null"/> if none is available.
@@ -42,23 +42,23 @@ public sealed class JournalMetadata : IJournalMetadata
     /// <summary>
     /// Gets an empty metadata instance.
     /// </summary>
-    public static IJournalMetadata Empty { get; } = new JournalMetadata(format: null, eTag: null, properties: null);
+    public static IJournalMetadata Empty { get; } = new JournalMetadata(formatKey: null, eTag: null, properties: null);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JournalMetadata"/> class.
     /// </summary>
-    /// <param name="format">The journal format key stored with the journal data, or <see langword="null"/> if no key is present.</param>
+    /// <param name="formatKey">The journal format key stored with the journal data, or <see langword="null"/> if no key is present.</param>
     /// <param name="eTag">The storage metadata ETag, or <see langword="null"/> if none is available.</param>
     /// <param name="properties">Caller-owned storage metadata properties.</param>
-    public JournalMetadata(string? format, string? eTag = null, IReadOnlyDictionary<string, string>? properties = null)
+    public JournalMetadata(string? formatKey, string? eTag = null, IReadOnlyDictionary<string, string>? properties = null)
     {
-        Format = format;
+        FormatKey = formatKey;
         ETag = eTag;
         Properties = CopyProperties(properties);
     }
 
     /// <inheritdoc/>
-    public string? Format { get; }
+    public string? FormatKey { get; }
 
     /// <inheritdoc/>
     public string? ETag { get; }

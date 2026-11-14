@@ -6,6 +6,18 @@ namespace Orleans.Journaling;
 
 internal sealed class AzureTableJournalStorageInstruments(OrleansInstruments instruments)
 {
+    private const string ProviderName = "azure_table";
+    private readonly JournalStorageTelemetry _telemetry = new(instruments);
+
+    internal void OnCatalogPage(long items)
+        => _telemetry.OnCatalogPage(ProviderName, items);
+
+    internal void OnCatalogEntry()
+        => _telemetry.OnCatalogEntry(ProviderName);
+
+    internal void OnRetry(string reason)
+        => _telemetry.OnRetry(ProviderName, reason);
+
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
     private const string OperationTagName = "operation";

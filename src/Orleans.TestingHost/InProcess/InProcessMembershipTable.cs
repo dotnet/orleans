@@ -12,10 +12,22 @@ namespace Orleans.TestingHost.InProcess;
 /// <summary>
 /// An in-memory implementation of <see cref="IMembershipTable"/> for testing purposes.
 /// </summary>
-internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTable, IGatewayListProvider
+internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListProvider
 {
-    private readonly Table _table = new();
-    private readonly string _clusterId = clusterId;
+    private readonly Table _table;
+    private readonly string _clusterId;
+
+    public InProcessMembershipTable(string clusterId) : this(clusterId, new Table())
+    {
+    }
+
+    private InProcessMembershipTable(string clusterId, Table table)
+    {
+        _clusterId = clusterId;
+        _table = table;
+    }
+
+    internal InProcessMembershipTable CreateClient() => new(_clusterId, _table);
 
     public TimeSpan MaxStaleness => TimeSpan.Zero;
     public bool IsUpdatable => true;
@@ -43,13 +55,15 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         return Task.CompletedTask;
     }
 
-    [Obsolete("Use ReadRowAsync instead.")]
-    public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+    public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+        Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
 
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(_table.Read(key));
+        return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
     }
 
     [Obsolete("Use ReadAllAsync instead.")]
@@ -99,10 +113,19 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         return Task.CompletedTask;
     }
 
-    public Task InitializeGatewayListProvider() => Task.CompletedTask;
+    public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
 
-    public Task<IList<Uri>> GetGateways()
+    public Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+    public Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var table = _table.ReadAll();
         var result = table.Members
            .Where(x => x.Item1.Status == SiloStatus.Active && x.Item1.ProxyPort != 0)
@@ -118,11 +141,7 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
 
     private sealed class Table
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _lock = new();
-#else
-        private readonly object _lock = new();
-#endif
         private readonly Dictionary<SiloAddress, (MembershipEntry Entry, string ETag)> _table = [];
         private TableVersion _tableVersion;
         private long _lastETagCounter;
@@ -136,16 +155,6 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
             lock (_lock)
             {
                 return _table.TryGetValue(key, out var data) ? data.Entry.Status : SiloStatus.None;
-            }
-        }
-
-        public MembershipTableData Read(SiloAddress key)
-        {
-            lock (_lock)
-            {
-                return _table.TryGetValue(key, out var data) ?
-                    new MembershipTableData(Tuple.Create(data.Entry.Copy(), data.ETag), _tableVersion)
-                    : new MembershipTableData(_tableVersion);
             }
         }
 
@@ -209,7 +218,6 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 }
 
                 data.Entry.IAmAliveTime = entry.IAmAliveTime;
-                _table[entry.SiloAddress] = (data.Entry, NewETag());
             }
         }
 
@@ -220,8 +228,8 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 var entries = _table.Values.ToList();
                 foreach (var (entry, _) in entries)
                 {
-                    if (entry.Status != SiloStatus.Active
-                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                    if (entry.Status == SiloStatus.Dead
+                        && entry.EffectiveUpdateTime < beforeDate)
                     {
                         _table.Remove(entry.SiloAddress, out _);
                     }

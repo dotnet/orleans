@@ -30,7 +30,7 @@ namespace Orleans.Analyzers
         public override void Initialize(AnalysisContext context)
         {
             context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterCompilationStartAction(context =>
             {
                 var idAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
@@ -53,16 +53,16 @@ namespace Orleans.Analyzers
             {
                 if (declaration.TryGetAttribute(context.SemanticModel, generateSerializerAttributeSymbol, out var attribute))
                 {
+                    if (GetGenerateFieldIdsValue(attribute) == GenerateFieldIds.PublicProperties)
+                    {
+                        return;
+                    }
+
                     var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(context.SemanticModel, declaration,
                         idAttributeSymbol, generateSerializerAttributeSymbol, nonSerializedAttributeSymbol);
                     if (analysis.UnannotatedMembers.Count > 0)
                     {
-                        // Check if GenerateFieldIds is set to PublicProperties
-                        var generateFieldIds = GetGenerateFieldIdsValue(attribute);
-                        if (generateFieldIds != GenerateFieldIds.PublicProperties)
-                        {
-                            context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
-                        }
+                        context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
                     }
                 }
             }

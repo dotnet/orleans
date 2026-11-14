@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Orleans.CodeGenerator.Diagnostics;
 
@@ -11,6 +12,217 @@ namespace Orleans.CodeGenerator.Tests;
 /// </summary>
 public class IncrementalCachingTests
 {
+    private const string ProxyHierarchySource = """
+        using Orleans;
+        using System.Threading.Tasks;
+
+        namespace TestProject;
+
+        [Alias("base-wire-name")]
+        public interface IBase<T> : IGrainWithIntegerKey
+        {
+            [Alias("call-wire-name")]
+            Task<T> Call(T value);
+        }
+        public interface ILeft : IBase<int> { }
+        public interface IRight : IBase<int> { }
+        public interface IDiamond : ILeft, IRight { }
+        public interface IIndependent : IGrainWithIntegerKey
+        {
+            Task Ping();
+        }
+        public static class Helper
+        {
+            public static int Value() => 1;
+        }
+        """;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreparedProxies_UnrelatedBodyEdit_PreservesGenericDiamond(bool compatibilityInvokers)
+    {
+        var compilation = await CreateCompilation(ProxyHierarchySource);
+        var updated = ReplaceSource(compilation, ProxyHierarchySource.Replace("=> 1", "=> 2", StringComparison.Ordinal));
+        var options = CompatibilityOptions(compatibilityInvokers);
+        var (first, second) = await RunTwice(compilation, updated, options, options);
+        var (fresh, _) = await RunTwice(updated, updated, options, options);
+
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        // A new compilation still runs semantic preparation and source construction.
+        Assert.All(second.TrackedSteps[OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName]
+            .SelectMany(static step => step.Outputs), static output => Assert.Equal(IncrementalStepRunReason.Unchanged, output.Reason));
+        AssertGeneratedSourcesIdentical(first, second);
+        AssertGeneratedSourcesIdentical(fresh, second);
+        AssertCompiles(updated, second);
+
+        var declarations = second.GeneratedSources
+            .Where(static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal))
+            .SelectMany(static source => CSharpSyntaxTree.ParseText(source.SourceText).GetRoot().DescendantNodes())
+            .OfType<ClassDeclarationSyntax>()
+            .Where(static declaration => declaration.Identifier.ValueText.StartsWith("Invokable_", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(compatibilityInvokers ? 5 : 2, declarations.Length);
+        Assert.Equal(declarations.Length, declarations.Select(static declaration => declaration.Identifier.ValueText).Distinct().Count());
+        Assert.Contains("base-wire-name", ConcatenateGeneratedSources(second), StringComparison.Ordinal);
+        Assert.Contains("call-wire-name", ConcatenateGeneratedSources(second), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreparedProxies_BaseRpcEdit_UpdatesInheritanceClosure(bool compatibilityInvokers)
+    {
+        var compilation = await CreateCompilation(ProxyHierarchySource);
+        var updated = ReplaceSource(compilation, ProxyHierarchySource.Replace(
+            "Task<T> Call(T value);", "Task<T> Call(T value); Task<int> Count();", StringComparison.Ordinal));
+        var options = CompatibilityOptions(compatibilityInvokers);
+        var (first, second) = await RunTwice(compilation, updated, options, options);
+        var (fresh, _) = await RunTwice(updated, updated, options, options);
+
+        foreach (var owner in new[] { "IBase", "ILeft", "IRight", "IDiamond" })
+        {
+            AssertSourcesChanged(first, second, hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal)
+                && hint.Contains(owner, StringComparison.Ordinal));
+        }
+
+        AssertSourcesUnchanged(first, second, static hint => hint.Contains("IIndependent", StringComparison.Ordinal));
+        AssertGeneratedSourcesIdentical(fresh, second);
+        AssertCompiles(updated, second);
+    }
+
+    [Fact]
+    public async Task PreparedProxies_ParameterIdEdit_ChangesOnlyAffectedSource()
+    {
+        const string source = """
+            using Orleans;
+            using System.Threading.Tasks;
+            public interface IAlpha : IGrainWithIntegerKey { Task Call([Id(7)] string value); }
+            public interface IBeta : IGrainWithIntegerKey { Task Call(string value); }
+            """;
+        var compilation = await CreateCompilation(source);
+        var updated = ReplaceSource(compilation, source.Replace("Id(7)", "Id(8)", StringComparison.Ordinal));
+        var (first, second) = await RunTwice(compilation, updated);
+        var (fresh, _) = await RunTwice(updated, updated);
+        AssertSourcesChanged(first, second, static hint => hint.Contains("IAlpha", StringComparison.Ordinal));
+        AssertSourcesUnchanged(first, second, static hint => hint.Contains("IBeta", StringComparison.Ordinal));
+        AssertGeneratedSourcesIdentical(fresh, second);
+        AssertCompiles(updated, second);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreparedProxies_GenericBaseSubstitution_RefreshesCurrentTypes(bool compatibilityInvokers)
+    {
+        var compilation = await CreateCompilation(ProxyHierarchySource);
+        var updated = ReplaceSource(compilation, ProxyHierarchySource.Replace("IBase<int>", "IBase<string>", StringComparison.Ordinal));
+        var options = CompatibilityOptions(compatibilityInvokers);
+        var (first, second) = await RunTwice(compilation, updated, options, options);
+        var (fresh, _) = await RunTwice(updated, updated, options, options);
+
+        AssertTrackedStepModifiedOrNew(second, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
+        AssertSourcesChanged(first, second, static hint => hint.Contains("IDiamond", StringComparison.Ordinal));
+        AssertGeneratedSourcesIdentical(fresh, second);
+        AssertCompiles(updated, second);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreparedProxies_ReplacedReference_RefreshesInheritedMethods(bool compatibilityInvokers)
+    {
+        const string librarySource = """
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace Library;
+            public interface IBase<T> : IGrainWithIntegerKey
+            {
+                Task<T> Call(T value);
+            }
+            """;
+        var library = await CreateCompilation(librarySource, "Library");
+        var updatedLibrary = ReplaceSource(library, librarySource.Replace("Task<T>", "Task<string>", StringComparison.Ordinal));
+        var reference = library.ToMetadataReference();
+        var compilation = await TestCompilationHelper.CreateCompilation(
+            "public interface IConsumer : Library.IBase<int> { }", "Consumer", reference);
+        var updated = compilation.ReplaceReference(reference, updatedLibrary.ToMetadataReference());
+        var options = CompatibilityOptions(compatibilityInvokers);
+        var (first, second) = await RunTwice(compilation, updated, options, options);
+        var (fresh, _) = await RunTwice(updated, updated, options, options);
+
+        AssertSourcesChanged(first, second, static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        AssertGeneratedSourcesIdentical(fresh, second);
+        AssertCompiles(updated, second);
+    }
+
+    [Fact]
+    public async Task ProxyDiagnostics_ReplacedTreeAtSameSpan_UsesCurrentLocation()
+    {
+        const string source = """
+            using Orleans;
+            using System.Threading;
+            using System.Threading.Tasks;
+            public interface IExample : IGrainWithIntegerKey
+            {
+                Task Call(CancellationToken cancellationToken, int value);
+            }
+            public static class Helper { public static int Value() => 1; }
+            """;
+        var compilation = await CreateCompilation(source);
+        var updated = ReplaceSource(compilation, source.Replace("=> 1", "=> 2", StringComparison.Ordinal));
+        var (first, second) = await RunTwice(compilation, updated);
+        var (fresh, _) = await RunTwice(updated, updated);
+        var diagnostic = Assert.Single(second.Diagnostics);
+
+        Assert.Equal(Assert.Single(first.Diagnostics).Location.SourceSpan, diagnostic.Location.SourceSpan);
+        Assert.Same(updated.SyntaxTrees.First(), diagnostic.Location.SourceTree);
+        AssertDiagnosticsIdentical(fresh.Diagnostics, second.Diagnostics);
+    }
+
+    [Fact]
+    public async Task GenericContext_UnrelatedChange_PreservesOneCachedGraph()
+    {
+        const string source = """
+            [Orleans.GeneratedContextType<System.Collections.Generic.List<int>>]
+            [Orleans.GeneratedContextType<int?>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
+            [Orleans.GeneratedContextType<System.Collections.Generic.List<int>>]
+            public partial class DemoContext { }
+            """;
+        var compilation = await CreateCompilation(source);
+        var updated = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            "public class Unrelated { }", cancellationToken: TestContext.Current.CancellationToken));
+        var (first, second) = await RunTwice(compilation, updated);
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        Assert.Single(first.GeneratedSources, static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
+        Assert.Single(second.GeneratedSources, static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
+        AssertTrackedStepsCachedOrUnchanged(second, OrleansSerializationSourceGenerator.SerializerContextOutputsTrackingName);
+        AssertGeneratedSourcesIdentical(first, second);
+    }
+
+    [Fact]
+    public async Task GenericContext_ChangedRoot_InvalidatesGraph()
+    {
+        const string source = """
+            [Orleans.GeneratedContextType<System.Collections.Generic.List<int>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
+            """;
+        var compilation = await CreateCompilation(source);
+        var updated = ReplaceSource(compilation, source.Replace("List<int>", "List<long>", StringComparison.Ordinal));
+        var (first, second) = await RunTwice(compilation, updated);
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        AssertTrackedStepModifiedOrNew(second, OrleansSerializationSourceGenerator.SerializerContextOutputsTrackingName);
+        AssertSourcesChanged(first, second, static hint => hint.Contains(".context.", StringComparison.Ordinal));
+        var context = Assert.Single(second.GeneratedSources,
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("AddSerializer<long>", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddSerializer<int>", context, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task UnchangedSource_ProducesCachedOutput()
     {
@@ -503,6 +715,9 @@ public class IncrementalCachingTests
         AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
         AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.ProxyOutputsTrackingName);
         AssertSourcesChanged(result1, result2, static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        var (fresh, _) = await RunTwice(updatedCompilation, updatedCompilation);
+        AssertGeneratedSourcesIdentical(fresh, result2);
+        AssertDiagnosticsIdentical(fresh.Diagnostics, result2.Diagnostics);
     }
 
     [Fact]
@@ -998,6 +1213,21 @@ public class IncrementalCachingTests
     }
 
     #region Helpers
+
+    private static IReadOnlyDictionary<string, string> CompatibilityOptions(bool enabled)
+        => new Dictionary<string, string>
+        {
+            ["build_property.orleansgeneratecompatibilityinvokers"] = enabled ? "true" : "false",
+        };
+
+    private static void AssertCompiles(CSharpCompilation compilation, GeneratorRunResult result)
+    {
+        Assert.Empty(result.Diagnostics);
+        var updated = compilation.AddSyntaxTrees(result.GeneratedSources
+            .Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
 
     private static CSharpCompilation ReplaceSource(CSharpCompilation compilation, string newSource)
     {

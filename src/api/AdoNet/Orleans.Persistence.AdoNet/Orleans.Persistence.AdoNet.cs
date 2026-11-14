@@ -8,6 +8,12 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Configuration
 {
+    public enum AdoNetGrainStorageKeyFormat
+    {
+        Legacy = 0,
+        GrainTypeQualified = 1
+    }
+
     public partial class AdoNetGrainStorageOptions : Storage.IStorageProviderSerializerOptions
     {
         public const string DEFAULT_ADONET_INVARIANT = "Microsoft.Data.SqlClient";
@@ -27,6 +33,8 @@ namespace Orleans.Configuration
         public int InitStage { get { throw null; } set { } }
 
         public string Invariant { get { throw null; } set { } }
+
+        public AdoNetGrainStorageKeyFormat KeyFormat { get { throw null; } set { } }
 
         public void UseOrleans3CompatibleHasher() { }
     }
@@ -86,11 +94,17 @@ namespace Orleans.Storage
 
         public IGrainStorageSerializer Serializer { get { throw null; } set { } }
 
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState) { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState) { throw null; }
     }

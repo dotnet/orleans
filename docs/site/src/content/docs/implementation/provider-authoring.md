@@ -73,15 +73,21 @@ Ownership must be explicit. If the application supplies a keyed SDK client, the 
 
 The persistent stream provider illustrates staged lifecycle composition: it creates the adapter during initialization, starts pulling agents at the active stage, then stops agents before closing. See <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider.Participate*?displayProperty=nameWithType> and its [implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs).
 
-Membership callers use the `Async`-suffixed, cancellation-aware methods of <xref:Orleans.IMembershipTable> for initialization, reads, and writes. Built-in providers forward tokens to backend APIs which support cancellation and bound waits on tokenless SDK operations while observing late faults. Custom providers can implement these methods directly; their default implementations adapt existing tokenless providers by canceling the caller's wait while the operation completes. The original tokenless method names remain as obsolete compatibility entry points. Cancellation can race with a committed write, so conditional writes and table versions continue to govern subsequent updates.
+Membership callers use the cancellation-aware methods of <xref:Orleans.IMembershipTable> for initialization, reads, and writes. Built-in providers forward tokens to backend APIs which support cancellation and bound waits on tokenless SDK operations while observing late faults. Custom providers implement cancellation according to their backend's operation and resource lifetimes. Cancellation can race with a committed write, so conditional writes and table versions govern subsequent updates.
 
 Return completed backend results, and observe cancellation before starting further I/O. Mapping an already-returned result preserves that operation's outcome.
 
 Shared membership refreshes live until the membership manager is disposed. Each caller owns its wait, while periodic maintenance and its queued cleanup requests stop with the silo lifecycle. This keeps membership reads available during shutdown.
 
-Membership table RPCs retain their existing operation aliases and application-argument payloads, with cancellation propagated separately. The original generated request types remain available for calls through obsolete tokenless methods. During rolling upgrades, each receiver uses its implementation's cancellation behavior.
+Membership table RPCs propagate cancellation separately from application arguments. Each receiver applies its implementation's cancellation behavior.
 
 When a lifecycle callback must execute its cancellation or cleanup logic, schedule it with <xref:System.Threading.Tasks.Task.Run*> and pass the cancellation token to the operation inside the callback. The callback then owns how cancellation completes its work.
+
+## Membership snapshots
+
+Use <xref:Orleans.IMembershipTable.ReadAllAsync*> to obtain the membership rows and their corresponding table version in one atomic snapshot. <xref:Orleans.MembershipTableData.TryGet*> selects a silo's entry and row ETag from that snapshot.
+
+Conditional writes use <xref:Orleans.TableVersion.Next*> from the observed snapshot and return their success status. Refresh the snapshot to obtain the current table ETag before selecting another mutation. Row ETags follow each provider's metadata policy and can change during heartbeat-only activity. Canonical updates require an existing row and a matching table ETag; additional row conditions remain heartbeat-neutral.
 
 ## Testing a provider
 
@@ -97,3 +103,11 @@ Contract tests should cover more than successful round trips:
 - rolling-upgrade compatibility of stored or transmitted data.
 
 Use [TestingHost architecture](testing.md) to understand which runtime services a test cluster substitutes. Provider tests which depend on a real backend should state those preconditions and should not treat an emulator's weaker consistency as proof of the production contract.
+
+### Membership provider conformance
+
+`Microsoft.Orleans.Clustering.TestKit` supplies framework-neutral tests for <xref:Orleans.IMembershipTable>. Create a fresh fixture for each direct scenario, with independent provider handles sharing a backend and using the fixture's isolated cluster IDs. The fixture owns initialization and teardown.
+
+Supply the fixture's read-only deletion probe over the original backing scope. The kit checks populated data before deletion and verifies native deletion or store invalidation before owner disposal. Deletion ends that history; subsequent generated cases use fresh fixtures and owners.
+
+Expose the direct runner methods as individual tests and run the Accordant-generated suite with a fresh-fixture factory. The tests cover atomic table-version CAS on existing rows, coherent canonical reads, heartbeat noninterference with the table version and previously captured update inputs, Dead-row cleanup, and cluster isolation. Row ETags are provider-defined metadata and can change after a heartbeat. Raw liveness reads can lag, and full-row writes can overwrite a heartbeat. Provider-native instrumentation verifies that each periodic heartbeat performs one blind liveness write with zero prerequisite reads or compare-and-swap operations. Retain failure diagnostics to reproduce generated histories. The [package README](https://github.com/dotnet/orleans/blob/main/src/Orleans.Clustering.TestKit/README.md) provides factory examples and the scenario inventory.

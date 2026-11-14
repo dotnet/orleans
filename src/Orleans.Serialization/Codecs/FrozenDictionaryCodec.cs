@@ -66,8 +66,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class FrozenDictionaryCopier<TKey, TValue> : IDeepCopier<FrozenDictionary<TKey, TValue>>, IOptionalDeepCopier, IDerivedTypeCopier where TKey : notnull
     {
-        private readonly IDeepCopier<TKey>? _keyCopier;
-        private readonly IDeepCopier<TValue>? _valueCopier;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<TKey> _keyCopier;
+        private readonly IDeepCopier<TValue> _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FrozenDictionaryCopier{TKey, TValue}"/> class.
@@ -76,12 +77,13 @@ namespace Orleans.Serialization.Codecs
         /// <param name="valueCopier">The value copier.</param>
         public FrozenDictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
         {
-            _keyCopier = OrleansGeneratedCodeHelper.GetOptionalCopier(keyCopier);
-            _valueCopier = OrleansGeneratedCodeHelper.GetOptionalCopier(valueCopier);
+            _keyCopier = OrleansGeneratedCodeHelper.UnwrapService(this, keyCopier);
+            _valueCopier = OrleansGeneratedCodeHelper.UnwrapService(this, valueCopier);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._keyCopier) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._valueCopier));
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -93,17 +95,19 @@ namespace Orleans.Serialization.Codecs
                 return result!;
 
             System.Diagnostics.Debug.Assert(input is not null);
-            if (input.Count == 0 || _keyCopier is null && _valueCopier is null)
+            if (input.Count == 0 || IsShallowCopyable())
                 return input;
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
             // Mitigate that by returning a shallow-copy in such a case.
             context.RecordCopy(input, input);
 
+            var shallowKeys = OrleansGeneratedCodeHelper.IsShallowCopyable(_keyCopier);
+            var shallowValues = OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier);
             var items = new List<KeyValuePair<TKey, TValue>>(input.Count);
             foreach (var item in input)
-                items.Add(new(_keyCopier is null ? item.Key : _keyCopier.DeepCopy(item.Key, context)!,
-                    _valueCopier is null ? item.Value : _valueCopier.DeepCopy(item.Value, context)!));
+                items.Add(new(shallowKeys ? item.Key : _keyCopier.DeepCopy(item.Key, context),
+                    shallowValues ? item.Value : _valueCopier.DeepCopy(item.Value, context)!));
 
             var res = items.ToFrozenDictionary(input.Comparer);
             context.RecordCopy(input, res);

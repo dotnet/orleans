@@ -1,13 +1,13 @@
 ---
 title: Redis journal storage
 description: Configure Redis as a storage provider for experimental Orleans Journaling durable state.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: how-to
 ---
 
 # Redis journal storage
 
-Orleans Journaling persists durable state changes as ordered journal data which is replayed to recover in-memory durable values and collections in <xref:Orleans.Journaling.DurableGrain> grains. See the [Journaling overview](index.md) for its programming model and the [Event Sourcing comparison](../event-sourcing/index.md#event-sourcing-and-experimental-journaling) for the boundary between the two features.
+Orleans Journaling persists durable state changes as ordered journal data which is replayed to recover in-memory durable values and collections managed by <xref:Orleans.Journaling.IDurableStateManager>. Ordinary grains can inject the manager, and <xref:Orleans.Journaling.DurableGrain> provides a convenience base class. See the [Journaling overview](index.md) for its programming model and the [Event Sourcing comparison](../event-sourcing/index.md#event-sourcing-and-experimental-journaling) for the boundary between the two features.
 
 The pre-release [`Microsoft.Orleans.Journaling.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) package stores journal data in [Redis](https://redis.io/docs/latest/develop/data-types/). Its APIs carry diagnostic `ORLEANSEXP005`.
 
@@ -19,11 +19,29 @@ Configure the provider with <xref:Orleans.Journaling.RedisJournalStorageHostingE
 
 The [runnable Redis Journaling sample](samples.md#run-the-redis-sample) uses the same provider with a <xref:Orleans.Journaling.DurableGrain>, acknowledges a durable value update, deactivates the grain, and verifies recovery on a new activation.
 
+The named overload accepts a provider name followed by the options delegate.
+Use distinct names with independent connections or key prefixes for separate
+journal namespaces. A named provider's options, catalog, storage, and
+state-manager factory resolve together; the unnamed overload continues to
+configure default grain journaling. Set `Orleans:Journaling:{name}:ProviderType` to
+`Redis` to configure each named storage binding, and use
+`Orleans:Journaling:{name}:ServiceKey` to select its client connection from dependency
+injection. Use `Default` as the name for grain journaling, for example
+`Orleans:Journaling:Default:ProviderType`.
+
+Durable Jobs can select a Redis write provider and retain another provider for
+draining. Keep the old prefix, credentials, and mutation permissions until every
+old shard is resolved: claims, retries, cancellation, compaction, and deletion
+continue there. A Redis catalog scan has live-listing semantics, so successful
+inventory is an observation rather than a transactionally frozen cluster view.
+Follow [Migrate Durable Jobs storage](durable-jobs-migration.md), including
+repeated complete inventories after all scheduling silos have cut over.
+
 ## Storage behavior
 
 The provider stores journal data in Redis strings and journal metadata in Redis hashes. Per-journal reads and mutations use atomic Lua scripts. Catalog operations discover journals by scanning metadata keys on each connected primary Redis server.
 
-Optimistic concurrency protects append, replace, and delete operations. A stale writer receives <xref:Orleans.Storage.InconsistentStateException>, and the Journaling state manager recovers the stored journal before processing later work. Concurrent reads observe either the journal before a replacement or the complete replacement.
+Optimistic concurrency protects append, replace, and delete operations. A stale writer receives <xref:Orleans.Storage.InconsistentStateException>, and the Journaling state manager permanently fences operations and requests grain deactivation. A fresh activation recovers the stored journal. Concurrent reads observe either the journal before a replacement or the complete replacement.
 
 <xref:Orleans.Journaling.RedisJournalStorageOptions> supports:
 
@@ -36,7 +54,7 @@ Optimistic concurrency protects append, replace, and delete operations. A stale 
 
 The key prefix and key-name function define the location of existing journals. Retain the previous mapping or migrate the stored data before deploying a new mapping.
 
-The default compaction threshold is 128 MiB and the default recovery chunk size is 1 MiB. Compaction replaces the append history with a snapshot of the grain's current durable states.
+The default compaction threshold is 128 MiB and the default recovery chunk size is 1 MiB. Each journal is one Redis string, so the whole journal, including an append, fits the server's string size limit (proto-max-bulk-len, 512 MB by default). A write which exceeds that limit fails before the script changes any key. Compaction replaces the append history with a snapshot of the grain's current durable states.
 
 Redis returns the journal string as one value. <xref:Orleans.Journaling.RedisJournalStorageOptions.ReadChunkSize> divides that value into replay segments after retrieval; capacity planning should account for the full journal value in the Redis client and silo process.
 

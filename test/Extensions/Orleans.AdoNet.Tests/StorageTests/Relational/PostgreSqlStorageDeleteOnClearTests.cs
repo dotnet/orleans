@@ -19,6 +19,13 @@ namespace UnitTests.StorageTests.Relational
         {
         }
 
+        [Fact]
+        [TestCategory("Functional")]
+        public async Task VersionWrapsAfterMaximum()
+        {
+            await Relational_VersionWrapsAfterMaximum();
+        }
+
         [Theory, ClassData(typeof(StorageDataSetPlain<long>))]
         [TestCategory("Functional")]
         internal async Task StorageDataSetPlain_IntegerKey_WriteClearRead(int testNum)

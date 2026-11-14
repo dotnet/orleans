@@ -51,7 +51,7 @@ AS $function$
         UPDATE OrleansStorage
         SET
             PayloadBinary = _PayloadBinary,
-            ModifiedOn = (now() at time zone 'utc'),
+            ModifiedOn = now(),
             Version = Version + 1
 
         WHERE

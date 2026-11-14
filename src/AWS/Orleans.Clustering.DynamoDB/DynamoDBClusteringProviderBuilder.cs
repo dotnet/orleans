@@ -33,13 +33,13 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
                     options.Service = region;
                 }
 
-                var token = configurationSection[nameof(options.SecretKey)];
+                var token = configurationSection[nameof(options.Token)];
                 if (!string.IsNullOrEmpty(token))
                 {
                     options.Token = token;
                 }
 
-                var profileName = configurationSection[nameof(options.SecretKey)];
+                var profileName = configurationSection[nameof(options.ProfileName)];
                 if (!string.IsNullOrEmpty(profileName))
                 {
                     options.ProfileName = profileName;
@@ -51,30 +51,11 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
                     options.TableName = tableName;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.ReadCapacityUnits)], out var rcu))
-                {
-                    options.ReadCapacityUnits = rcu;
-                }
-
-                if (int.TryParse(configurationSection[nameof(options.WriteCapacityUnits)], out var wcu))
-                {
-                    options.WriteCapacityUnits = wcu;
-                }
-
-                if (bool.TryParse(configurationSection[nameof(options.UseProvisionedThroughput)], out var upt))
-                {
-                    options.UseProvisionedThroughput = upt;
-                }
-
-                if (bool.TryParse(configurationSection[nameof(options.CreateIfNotExists)], out var cine))
-                {
-                    options.CreateIfNotExists = cine;
-                }
-
-                if (bool.TryParse(configurationSection[nameof(options.UpdateIfExists)], out var uie))
-                {
-                    options.UpdateIfExists = uie;
-                }
+                options.ReadCapacityUnits = configurationSection.GetValue(nameof(options.ReadCapacityUnits), options.ReadCapacityUnits);
+                options.WriteCapacityUnits = configurationSection.GetValue(nameof(options.WriteCapacityUnits), options.WriteCapacityUnits);
+                options.UseProvisionedThroughput = configurationSection.GetValue(nameof(options.UseProvisionedThroughput), options.UseProvisionedThroughput);
+                options.CreateIfNotExists = configurationSection.GetValue(nameof(options.CreateIfNotExists), options.CreateIfNotExists);
+                options.UpdateIfExists = configurationSection.GetValue(nameof(options.UpdateIfExists), options.UpdateIfExists);
             });
     }
 
@@ -100,13 +81,13 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
                     options.Service = region;
                 }
 
-                var token = configurationSection[nameof(options.SecretKey)];
+                var token = configurationSection[nameof(options.Token)];
                 if (!string.IsNullOrEmpty(token))
                 {
                     options.Token = token;
                 }
 
-                var profileName = configurationSection[nameof(options.SecretKey)];
+                var profileName = configurationSection[nameof(options.ProfileName)];
                 if (!string.IsNullOrEmpty(profileName))
                 {
                     options.ProfileName = profileName;
@@ -118,30 +99,11 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
                     options.TableName = tableName;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.ReadCapacityUnits)], out var rcu))
-                {
-                    options.ReadCapacityUnits = rcu;
-                }
-
-                if (int.TryParse(configurationSection[nameof(options.WriteCapacityUnits)], out var wcu))
-                {
-                    options.WriteCapacityUnits = wcu;
-                }
-
-                if (bool.TryParse(configurationSection[nameof(options.UseProvisionedThroughput)], out var upt))
-                {
-                    options.UseProvisionedThroughput = upt;
-                }
-
-                if (bool.TryParse(configurationSection[nameof(options.CreateIfNotExists)], out var cine))
-                {
-                    options.CreateIfNotExists = cine;
-                }
-
-                if (bool.TryParse(configurationSection[nameof(options.UpdateIfExists)], out var uie))
-                {
-                    options.UpdateIfExists = uie;
-                }
+                options.ReadCapacityUnits = configurationSection.GetValue(nameof(options.ReadCapacityUnits), options.ReadCapacityUnits);
+                options.WriteCapacityUnits = configurationSection.GetValue(nameof(options.WriteCapacityUnits), options.WriteCapacityUnits);
+                options.UseProvisionedThroughput = configurationSection.GetValue(nameof(options.UseProvisionedThroughput), options.UseProvisionedThroughput);
+                options.CreateIfNotExists = configurationSection.GetValue(nameof(options.CreateIfNotExists), options.CreateIfNotExists);
+                options.UpdateIfExists = configurationSection.GetValue(nameof(options.UpdateIfExists), options.UpdateIfExists);
             });
     }
 }

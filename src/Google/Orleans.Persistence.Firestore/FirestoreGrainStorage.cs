@@ -43,13 +43,17 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
         this._loggerFactory = loggerFactory;
     }
 
-    public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+    public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) =>
+        ReadStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (this._dataManager is null) throw new InvalidOperationException("FirestoreGrainStorage is not initialized.");
 
         LogReadingState(stateName, grainId);
 
-        var entity = await this._dataManager.ReadEntity<GrainStateEntity>(GetDocumentId(stateName, grainId)).ConfigureAwait(false);
+        var entity = await this._dataManager.ReadEntity<GrainStateEntity>(GetDocumentId(stateName, grainId), cancellationToken).ConfigureAwait(false);
 
         if (entity?.Payload is not { Length: > 0 })
         {
@@ -69,8 +73,12 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
         }
     }
 
-    public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+    public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) =>
+        WriteStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (this._dataManager is null) throw new InvalidOperationException("FirestoreGrainStorage is not initialized.");
 
         LogWritingState(stateName, grainId, grainState.ETag);
@@ -87,16 +95,16 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
             string newETag;
             if (grainState.ETag == "*")
             {
-                newETag = await this._dataManager.UpdateUnconditionally(entity).ConfigureAwait(false);
+                newETag = await this._dataManager.UpdateUnconditionally(entity, cancellationToken).ConfigureAwait(false);
             }
             else if (!string.IsNullOrWhiteSpace(grainState.ETag))
             {
                 entity.ETag = Utils.ParseTimestamp(grainState.ETag);
-                newETag = await this._dataManager.Update(entity).ConfigureAwait(false);
+                newETag = await this._dataManager.Update(entity, cancellationToken).ConfigureAwait(false);
             }
             else
             {
-                newETag = await this._dataManager.CreateEntity(entity).ConfigureAwait(false);
+                newETag = await this._dataManager.CreateEntity(entity, cancellationToken).ConfigureAwait(false);
             }
 
             grainState.ETag = newETag;
@@ -110,15 +118,19 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
         {
             throw CreateInconsistentStateException(nameof(WriteStateAsync), stateName, grainId, grainState.ETag, ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogWriteError(ex, grainId, grainState.ETag);
             throw;
         }
     }
 
-    public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+    public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) =>
+        ClearStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (this._dataManager is null) throw new InvalidOperationException("FirestoreGrainStorage is not initialized.");
 
         LogClearingState(stateName, grainId, grainState.ETag);
@@ -133,12 +145,12 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
                 var documentId = GetDocumentId(stateName, grainId);
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                 {
-                    if (await this._dataManager.EntityExists(documentId).ConfigureAwait(false))
+                    if (await this._dataManager.EntityExists(documentId, cancellationToken).ConfigureAwait(false))
                     {
                         throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag);
                     }
                 }
-                else if (!await this._dataManager.DeleteEntity(documentId, grainState.ETag).ConfigureAwait(false))
+                else if (!await this._dataManager.DeleteEntity(documentId, grainState.ETag, cancellationToken).ConfigureAwait(false))
                 {
                     throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag);
                 }
@@ -155,9 +167,9 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
 
                 grainState.ETag = grainState.ETag switch
                 {
-                    "*" => await this._dataManager.UpdateUnconditionally(entity).ConfigureAwait(false),
-                    { Length: > 0 } etag => await UpdateClearedEntity(entity, etag).ConfigureAwait(false),
-                    _ => await this._dataManager.CreateEntity(entity).ConfigureAwait(false),
+                    "*" => await this._dataManager.UpdateUnconditionally(entity, cancellationToken).ConfigureAwait(false),
+                    { Length: > 0 } etag => await UpdateClearedEntity(entity, etag, cancellationToken).ConfigureAwait(false),
+                    _ => await this._dataManager.CreateEntity(entity, cancellationToken).ConfigureAwait(false),
                 };
             }
 
@@ -172,17 +184,17 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
         {
             throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag, ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogClearError(ex, operation, stateName, grainId, grainState.ETag);
             throw;
         }
     }
 
-    private async Task<string> UpdateClearedEntity(GrainStateEntity entity, string etag)
+    private async Task<string> UpdateClearedEntity(GrainStateEntity entity, string etag, CancellationToken cancellationToken)
     {
         entity.ETag = Utils.ParseTimestamp(etag);
-        return await this._dataManager.Update(entity).ConfigureAwait(false);
+        return await this._dataManager.Update(entity, cancellationToken).ConfigureAwait(false);
     }
 
     private static string GetDocumentId(string stateName, GrainId grainId) =>

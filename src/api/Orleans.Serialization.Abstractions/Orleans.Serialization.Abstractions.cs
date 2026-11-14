@@ -24,6 +24,22 @@ namespace Orleans
         public string AssemblyName { get { throw null; } }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
+    public sealed partial class CaseAttribute : System.Attribute
+    {
+        public CaseAttribute(uint id) { }
+
+        public uint Id { get { throw null; } }
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Struct, Inherited = false)]
+    public sealed partial class CaseIdsAttribute : System.Attribute
+    {
+        public CaseIdsAttribute(params uint[] ids) { }
+
+        public uint[] Ids { get { throw null; } }
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Enum | System.AttributeTargets.Interface, AllowMultiple = true)]
     public sealed partial class CompoundTypeAliasAttribute : System.Attribute
     {
@@ -64,6 +80,16 @@ namespace Orleans
 
     [System.AttributeUsage(System.AttributeTargets.Constructor)]
     public sealed partial class GeneratedActivatorConstructorAttribute : Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute
+    {
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class GeneratedContextImportAttribute<TContext> : System.Attribute
+    {
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class GeneratedContextTypeAttribute<T> : System.Attribute
     {
     }
 

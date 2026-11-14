@@ -8,6 +8,7 @@ internal sealed class SharedCallbackData
     public readonly Action<Message> Unregister;
     public readonly ILogger Logger;
     public readonly TimeProvider TimeProvider;
+    public readonly ApplicationRequestInstruments ApplicationRequests;
     private TimeSpan _responseTimeout;
     public long ResponseTimeoutTimestampTicks;
 
@@ -18,7 +19,8 @@ internal sealed class SharedCallbackData
         TimeSpan responseTimeout,
         bool cancelOnTimeout,
         bool waitForCancellationAcknowledgement,
-        IGrainCallCancellationManager? cancellationManager)
+        IGrainCallCancellationManager? cancellationManager,
+        ApplicationRequestInstruments applicationRequestInstruments)
     {
         Unregister = unregister;
         Logger = logger;
@@ -27,6 +29,7 @@ internal sealed class SharedCallbackData
         CancelRequestOnTimeout = cancelOnTimeout;
         WaitForCancellationAcknowledgement = waitForCancellationAcknowledgement;
         CancellationManager = cancellationManager;
+        ApplicationRequests = applicationRequestInstruments;
     }
 
     public TimeSpan ResponseTimeout

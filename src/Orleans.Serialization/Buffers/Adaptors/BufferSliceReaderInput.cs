@@ -123,7 +123,14 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
     private ArcBufferPage? _page = slice.First;
     private int _position;
 
-    internal readonly ArcBufferPage First => _slice.First;
+    internal readonly ArcBufferPage? First => _slice.First;
+    // The offset is relative to the span most recently returned by GetNext.
+    internal readonly ArcBuffer Slice(int offset, int length)
+    {
+        Debug.Assert(_page is not null);
+        var pageOffset = _page == First ? Offset : 0;
+        return new ArcBuffer(_page, pageOffset + offset, length).Slice(0, length);
+    }
     internal readonly int Position => _position;
     internal readonly int Offset => _slice.Offset;
     internal readonly int Length => _slice.Length;
@@ -138,28 +145,23 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
 
     internal ReadOnlySpan<byte> GetNext()
     {
+        _slice.CheckValidity();
         Debug.Assert(_position <= Length);
-        if (_page is not null)
+        if (Length == 0) return default;
+        var page = _position == 0 ? _page : _page?.Next;
+        while (page is not null && _position < Length)
         {
-            if (_page == First)
+            var offset = page == First ? Offset : 0;
+            var length = Math.Min(Length - _position, page.Length - offset);
+            _page = page;
+            if (length == 0)
             {
-                Debug.Assert(_position == 0);
-                var offset = Offset;
-                var length = Math.Min(Length, _page.Length - offset);
-                _position += length;
-                var result = _page.AsSpan(offset, length);
-                _page = _page.Next;
-                return result;
+                page = page.Next;
+                continue;
             }
 
-            if (_position != Length)
-            {
-                var length = Math.Min(Length - _position, _page.Length);
-                _position += length;
-                var result = _page.AsSpan(0, length);
-                _page = _page.Next;
-                return result;
-            }
+            _position += length;
+            return page.AsSpan(offset, length);
         }
 
         ThrowInsufficientData();

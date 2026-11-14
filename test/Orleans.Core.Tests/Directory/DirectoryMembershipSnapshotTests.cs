@@ -1,7 +1,16 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using Documentation.Deployment;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime.GrainDirectory;
 using CsCheck;
+using UnitTests.Directory;
 using Xunit;
 
 namespace NonSilo.Tests.Directory;
@@ -41,7 +50,7 @@ public sealed class DirectoryMembershipSnapshotTests
                 {
                     var i = 0;
                     return new DirectoryMembershipSnapshotTestCase(
-                        new DirectoryMembershipSnapshot(snapshot, null!, partitionCount, (_, _) => hashes[i++]),
+                        new DirectoryMembershipSnapshot(snapshot, null!, partitionCount, (_, _) => hashes[i++].ToImmutableArray()),
                         hashes);
                 }));
         });
@@ -105,6 +114,463 @@ public sealed class DirectoryMembershipSnapshotTests
         var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 1), 1);
 
         Assert.Equal(RingRange.Empty, DirectoryMembershipSnapshot.Default.GetRange(member, 2));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(30)]
+    public void DefaultPartitionBoundariesPreserveCurrentMapping(int partitionCount)
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11111), 1);
+        var options = new GrainDirectoryOptions();
+        var expected = partitionCount == 1
+            ? [unchecked((uint)member.GetConsistentHashCode())]
+            : member.GetUniformHashCodes(partitionCount);
+
+        Assert.Equal(expected, options.GetPartitionBoundaries(member, partitionCount));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(30)]
+    public void UniformHashCodesAreImmutableAndReuseCachedStorage(int count)
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11200 + count), 1);
+        var hashes = member.GetUniformHashCodes(count);
+
+        Assert.False(hashes.IsDefault);
+        Assert.Equal(count, hashes.Length);
+        Assert.True(hashes.Equals(member.GetUniformHashCodes(count)));
+        Assert.True(((ICollection<uint>)hashes).IsReadOnly);
+        if (count > 0)
+        {
+            var originalHash = hashes[0];
+            var copy = hashes.ToArray();
+            copy[0] ^= uint.MaxValue;
+
+            Assert.Throws<NotSupportedException>(() => ((IList<uint>)hashes)[0] = 0);
+            Assert.Equal(originalHash, member.GetUniformHashCodes(count)[0]);
+        }
+    }
+
+    [Fact]
+    public void UniformHashCodesRemainStableWhenCacheCountChanges()
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11231), 1);
+        var hashes = member.GetUniformHashCodes(30);
+        var expected = hashes.ToArray();
+
+        Assert.Single(member.GetUniformHashCodes(1));
+
+        Assert.Equal(expected, hashes);
+        Assert.Equal(expected, member.GetUniformHashCodes(30));
+    }
+
+    [Fact]
+    public void LegacyPartitionBoundariesPreserveCachedHashOrder()
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11112), 1);
+        var generated = member.GetUniformHashCodes(30);
+
+        var options = GetDocumentedLegacyOptions();
+        var boundaries = options.GetPartitionBoundaries(member, generated.Length);
+
+        Assert.Equal(generated.Order(), boundaries);
+        Assert.True(generated.Equals(member.GetUniformHashCodes(generated.Length)));
+    }
+
+    [Fact]
+    public void LegacyPartitionBoundariesMatchOrleans10_1PartitionRanges()
+    {
+        const int partitionCount = 30;
+        var members = Enumerable.Range(0, 3)
+            .Select(index => SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11120 + index), 1))
+            .Order()
+            .ToArray();
+        var membership = new ClusterMembershipSnapshot(
+            members.ToImmutableDictionary(member => member, member => new ClusterMember(member, SiloStatus.Active, member.ToString())),
+            new(1));
+        var options = GetDocumentedLegacyOptions();
+        Assert.Equal(partitionCount, options.PartitionsPerSilo);
+        var snapshot = new DirectoryMembershipSnapshot(membership, null!, options.PartitionsPerSilo, options.GetPartitionBoundaries);
+        var legacyHashes = members.Select(member => member.GetUniformHashCodes(partitionCount).Order().ToArray()).ToArray();
+
+        Assert.Equal(members, snapshot.Members);
+        Assert.Equal(members.Length * partitionCount, snapshot.RangeOwners.Count);
+        for (var memberIndex = 0; memberIndex < members.Length; memberIndex++)
+        {
+            for (var partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++)
+            {
+                var expectedRange = GetExpectedRange(legacyHashes, memberIndex, partitionIndex);
+                Assert.Equal(expectedRange, snapshot.GetRange(members[memberIndex], partitionIndex));
+                Assert.True(snapshot.TryGetOwner(expectedRange.End, out var owner, out _));
+                Assert.Equal(members[memberIndex], owner);
+                Assert.Contains((expectedRange, memberIndex, partitionIndex), snapshot.RangeOwners);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public void PartitionBoundariesRejectIncorrectCount(int returnedCount)
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11113), 1);
+        var membership = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(member, new ClusterMember(member, SiloStatus.Active, "Silo")),
+            new(1));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => new uint[returnedCount].ToImmutableArray()));
+
+        Assert.Contains("exactly 3 boundaries", exception.Message);
+        Assert.Contains(member.ToString(), exception.Message);
+    }
+
+    [Fact]
+    public void PartitionBoundariesRejectDefaultResult()
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11114), 1);
+        var membership = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(member, new ClusterMember(member, SiloStatus.Active, "Silo")),
+            new(1));
+
+        Assert.Throws<InvalidOperationException>(() => new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => default));
+    }
+
+    [Fact]
+    public void PartitionBoundariesRejectNullFunction()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new DirectoryMembershipService(null!, null!, null!, 3, null!));
+    }
+
+    private static GrainDirectoryOptions GetDocumentedLegacyOptions()
+    {
+        var services = new ServiceCollection();
+        var siloBuilder = Substitute.For<ISiloBuilder>();
+        siloBuilder.Services.Returns(services);
+        DirectoryPartitioningSnippet.Configure(siloBuilder);
+        using var serviceProvider = services.BuildServiceProvider();
+        return serviceProvider.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value;
+    }
+
+    [Theory]
+    [InlineData(-2)]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public async Task BoundaryFailureStopsProcessingAndFaultsMembershipReaders(int returnedCount)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11115), 1);
+        var membership = new MockClusterMembershipService();
+        var clusterMembershipService = Substitute.For<IClusterMembershipService>();
+        clusterMembershipService.MembershipUpdates.Returns(membership.Target.MembershipUpdates);
+        clusterMembershipService.Refresh(Arg.Any<MembershipVersion>(), Arg.Any<CancellationToken>())
+            .Returns(call => membership.Target.Refresh(call.ArgAt<MembershipVersion>(0), call.ArgAt<CancellationToken>(1)));
+        var logger = Substitute.For<ILogger<DirectoryMembershipService>>();
+        logger.IsEnabled(LogLevel.Error).Returns(true);
+        var boundaryCalls = 0;
+        var callbackFailure = new InvalidOperationException("The partition boundary callback failed.");
+
+        await using var directoryMembership = new DirectoryMembershipService(
+            clusterMembershipService,
+            null!,
+            logger,
+            3,
+            (_, _) =>
+            {
+                if (Interlocked.Increment(ref boundaryCalls) > 1)
+                {
+                    // Bound a regression which resubscribes to the same invalid snapshot.
+                    timeout.Cancel();
+                }
+
+                if (returnedCount == -2)
+                {
+                    throw callbackFailure;
+                }
+
+                return returnedCount == -1 ? default : new uint[returnedCount].ToImmutableArray();
+            });
+        var initialView = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+        Assert.Equal(membership.CurrentVersion, initialView.Version);
+        Assert.Equal(0, boundaryCalls);
+
+        await using var updates = directoryMembership.ViewUpdates.GetAsyncEnumerator(timeout.Token);
+        Assert.True(await updates.MoveNextAsync());
+        var nextUpdate = updates.MoveNextAsync().AsTask();
+        var nextVersion = new MembershipVersion(membership.CurrentVersion.Value + 1);
+        var refresh = directoryMembership.RefreshViewAsync(nextVersion, timeout.Token).AsTask();
+        Assert.False(nextUpdate.IsCompleted);
+        Assert.False(refresh.IsCompleted);
+
+        membership.UpdateSiloStatus(member, SiloStatus.Active, "Silo");
+
+        var failure = await Assert.ThrowsAsync<OrleansConfigurationException>(() => nextUpdate);
+        Assert.Same(failure, await Assert.ThrowsAsync<OrleansConfigurationException>(() => refresh));
+        Assert.Same(failure, Assert.Throws<OrleansConfigurationException>(() => directoryMembership.CurrentView));
+        Assert.Same(failure, await Assert.ThrowsAsync<OrleansConfigurationException>(() =>
+            directoryMembership.RefreshViewAsync(nextVersion, timeout.Token).AsTask()));
+        await using var futureUpdates = directoryMembership.ViewUpdates.GetAsyncEnumerator(timeout.Token);
+        Assert.Same(failure, await Assert.ThrowsAsync<OrleansConfigurationException>(() => futureUpdates.MoveNextAsync().AsTask()));
+        if (returnedCount == -2)
+        {
+            Assert.Same(callbackFailure, failure.InnerException);
+        }
+        else
+        {
+            Assert.Contains("exactly 3 boundaries", Assert.IsType<InvalidOperationException>(failure.InnerException).Message);
+        }
+
+        await directoryMembership.DisposeAsync();
+        Assert.Equal(1, boundaryCalls);
+        _ = clusterMembershipService.Received(1).MembershipUpdates;
+        var log = Assert.Single(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger<DirectoryMembershipService>.Log));
+        Assert.Equal(LogLevel.Error, log.GetArguments()[0]);
+        Assert.Same(failure, log.GetArguments()[3]);
+    }
+
+    [Fact]
+    public async Task MembershipStreamFailureCanResubscribe()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11116), 1);
+        var membership = new MockClusterMembershipService(new() { [member] = (SiloStatus.Active, "Silo") });
+        var streamFailure = new InvalidOperationException("The membership subscription failed.");
+        var failedEnumerator = Substitute.For<IAsyncEnumerator<ClusterMembershipSnapshot>>();
+        failedEnumerator.MoveNextAsync().Returns(ValueTask.FromException<bool>(streamFailure));
+        var failedUpdates = Substitute.For<IAsyncEnumerable<ClusterMembershipSnapshot>>();
+        failedUpdates.GetAsyncEnumerator(Arg.Any<CancellationToken>()).Returns(failedEnumerator);
+        var clusterMembershipService = Substitute.For<IClusterMembershipService>();
+        clusterMembershipService.MembershipUpdates.Returns(failedUpdates, membership.Target.MembershipUpdates);
+        var logger = Substitute.For<ILogger<DirectoryMembershipService>>();
+        logger.IsEnabled(LogLevel.Error).Returns(true);
+
+        await using var directoryMembership = new DirectoryMembershipService(
+            clusterMembershipService, null!, logger, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+        var view = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+
+        Assert.Equal(membership.CurrentVersion, view.Version);
+        Assert.Equal(member, Assert.Single(view.Members));
+        _ = clusterMembershipService.Received(2).MembershipUpdates;
+        var log = Assert.Single(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger<DirectoryMembershipService>.Log));
+        Assert.Same(streamFailure, log.GetArguments()[3]);
+    }
+
+    [Fact]
+    public async Task DisposeCompletesMembershipReadersNormally()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var membership = new MockClusterMembershipService();
+        await using var directoryMembership = new DirectoryMembershipService(
+            membership.Target, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+        await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+        await using var updates = directoryMembership.ViewUpdates.GetAsyncEnumerator(timeout.Token);
+        Assert.True(await updates.MoveNextAsync());
+        var nextUpdate = updates.MoveNextAsync().AsTask();
+        Assert.False(nextUpdate.IsCompleted);
+
+        await directoryMembership.DisposeAsync();
+
+        Assert.False(await nextUpdate);
+    }
+
+    [Fact]
+    public async Task DisposeWithoutCallbacksWaitsForSubscriptionAndClosesRetainedWaitHandle()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var processing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProcessing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var subscriptionStopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSubscription = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken subscriptionToken = default;
+        var membership = Substitute.For<IClusterMembershipService>();
+        membership.MembershipUpdates.Returns(Updates(CancellationToken.None));
+        var directoryMembership = new DirectoryMembershipService(
+            membership, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+
+        try
+        {
+            await processing.Task.WaitAsync(timeout.Token);
+            var waitHandle = subscriptionToken.WaitHandle;
+            Assert.False(waitHandle.WaitOne(0));
+
+            var firstDisposal = directoryMembership.DisposeAsync().AsTask();
+            var secondDisposal = directoryMembership.DisposeAsync().AsTask();
+            // Observe cancellation without registering a callback: CancelAsync's no-callback path must not leak this handle.
+            Assert.True(await Task.Run(() => waitHandle.WaitOne(TimeSpan.FromSeconds(10)), timeout.Token).WaitAsync(timeout.Token));
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.Same(firstDisposal, secondDisposal);
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseProcessing.SetResult();
+            await subscriptionStopping.Task.WaitAsync(timeout.Token);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseSubscription.SetResult();
+            await Task.WhenAll(firstDisposal, secondDisposal).WaitAsync(timeout.Token);
+            var repeatedDisposal = directoryMembership.DisposeAsync().AsTask();
+            Assert.Same(firstDisposal, repeatedDisposal);
+            await repeatedDisposal.WaitAsync(timeout.Token);
+            Assert.Throws<ObjectDisposedException>(() => subscriptionToken.WaitHandle);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        }
+        finally
+        {
+            releaseProcessing.TrySetResult();
+            releaseSubscription.TrySetResult();
+            await directoryMembership.DisposeAsync();
+        }
+
+        async IAsyncEnumerable<ClusterMembershipSnapshot> Updates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            subscriptionToken = cancellationToken;
+            try
+            {
+                yield return new ClusterMembershipSnapshot(
+                    ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(1));
+                processing.SetResult();
+                // Neither phase barrier registers with the owner token.
+                await releaseProcessing.Task;
+            }
+            finally
+            {
+                subscriptionStopping.SetResult();
+                await releaseSubscription.Task;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DisposeWaitsForSubscriptionAndReleasesCancellationResources(bool callbackThrows)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var subscribed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var subscriptionStopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSubscription = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var notifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseNotification = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken subscriptionToken = default;
+        var membership = Substitute.For<IClusterMembershipService>();
+        membership.MembershipUpdates.Returns(Updates(CancellationToken.None));
+        var directoryMembership = new DirectoryMembershipService(
+            membership, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+        var expected = new InvalidOperationException("Cancellation callback failed.");
+        Task? firstDisposal = null;
+        var callerThread = 0;
+        var callbackThread = 0;
+
+        try
+        {
+            await subscribed.Task.WaitAsync(timeout.Token);
+            var waitHandle = subscriptionToken.WaitHandle;
+            using var registration = subscriptionToken.Register(() =>
+            {
+                callbackThread = Environment.CurrentManagedThreadId;
+                notifying.SetResult();
+                releaseNotification.Task.WaitAsync(timeout.Token).GetAwaiter().GetResult();
+                if (callbackThrows)
+                {
+                    throw expected;
+                }
+            });
+
+            var initiateDisposal = Task.Run(() =>
+            {
+                callerThread = Environment.CurrentManagedThreadId;
+                firstDisposal = directoryMembership.DisposeAsync().AsTask();
+            }, timeout.Token);
+            await notifying.Task.WaitAsync(timeout.Token);
+            var secondDisposal = directoryMembership.DisposeAsync().AsTask();
+
+            Assert.Equal(callerThread, callbackThread);
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(initiateDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseNotification.SetResult();
+            await initiateDisposal.WaitAsync(timeout.Token);
+            Assert.NotNull(firstDisposal);
+            Assert.Same(firstDisposal, secondDisposal);
+            await subscriptionStopping.Task.WaitAsync(timeout.Token);
+
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+            releaseSubscription.SetResult();
+
+            if (callbackThrows)
+            {
+                var firstFailure = await Assert.ThrowsAsync<AggregateException>(() => firstDisposal.WaitAsync(timeout.Token));
+                Assert.Same(expected, Assert.Single(firstFailure.InnerExceptions));
+                foreach (var disposal in new[] { secondDisposal, directoryMembership.DisposeAsync().AsTask() })
+                {
+                    var failure = await Assert.ThrowsAsync<AggregateException>(() => disposal.WaitAsync(timeout.Token));
+                    Assert.Same(firstFailure, failure);
+                    Assert.Same(expected, Assert.Single(failure.InnerExceptions));
+                }
+            }
+            else
+            {
+                await Task.WhenAll(firstDisposal, secondDisposal).WaitAsync(timeout.Token);
+                await directoryMembership.DisposeAsync();
+            }
+
+            Assert.Throws<ObjectDisposedException>(() => subscriptionToken.WaitHandle);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        }
+        finally
+        {
+            releaseNotification.TrySetResult();
+            releaseSubscription.TrySetResult();
+            if (callbackThrows && firstDisposal is not null)
+            {
+                await Assert.ThrowsAsync<AggregateException>(() => directoryMembership.DisposeAsync().AsTask());
+            }
+            else
+            {
+                await directoryMembership.DisposeAsync();
+            }
+        }
+
+        async IAsyncEnumerable<ClusterMembershipSnapshot> Updates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            subscriptionToken = cancellationToken;
+            subscribed.SetResult();
+            try
+            {
+                yield return new ClusterMembershipSnapshot(
+                    ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(1));
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            finally
+            {
+                subscriptionStopping.SetResult();
+                await releaseSubscription.Task;
+            }
+        }
     }
 
     private static RingRange GetExpectedRange(uint[][] hashesByMember, int memberIndex, int partitionIndex)

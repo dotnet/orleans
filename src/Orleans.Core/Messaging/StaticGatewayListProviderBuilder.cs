@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
@@ -18,7 +19,7 @@ internal sealed class StaticGatewayListProviderBuilder : IProviderBuilder<IClien
         var gatewaysSection = configurationSection.GetSection("Gateways");
         foreach (var child in gatewaysSection.GetChildren())
         {
-            if (IPEndPoint.TryParse(child.Value!, out var ep))
+            if (ConfigurationValueParser.TryParseIPEndPoint(gatewaysSection, child.Key, out var ep))
             {
                 endpoints.Add(ep);
             }

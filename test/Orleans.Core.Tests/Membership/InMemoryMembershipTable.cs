@@ -149,20 +149,14 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (this.tableLock)
-            {
-                this.calls.Add((nameof(ReadRowAsync), key));
-                var result = new MembershipTableData(
-                    this.entries.Where(e => e.Item1.SiloAddress.Equals(key)).Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
-                    this.Version);
-                return Task.FromResult(result);
-            }
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use UpdateIAmAliveAsync instead.")]

@@ -14,6 +14,8 @@ Projects are discovered from `src/**/*.csproj` using evaluated MSBuild propertie
 
 Each output file is named `{PackageId}.{PackageVersion}.json`. Only public types and members declared by that package assembly are emitted; project, package, and framework dependencies are resolution-only Roslyn references. Portable PDB paths are resolved against the verified local repository tree and a tracked-file allowlist from the advertised commit, avoiding network-dependent output and broken generated/inferred links. The script validates XML documentation, package metadata, source repository/commit information, and duplicate type identities before removing stale generator-owned JSON files.
 
+API selection uses `GeneratedCodeAttribute` and `CompilerGeneratedAttribute` to filter implementation types and members, including nested types and enum members. Authored partial types retain their API entries when generated members carry these attributes individually.
+
 By default, source links target the latest commit which changed `src`. Generation fails when `src` has uncommitted changes. Automation can pass `-SourceCommit` to select an explicit full commit SHA.
 
 ## Upstream attribution

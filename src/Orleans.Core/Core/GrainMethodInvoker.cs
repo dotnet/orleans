@@ -132,7 +132,11 @@ namespace Orleans.Runtime
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
-                    this.Response = this.responseCopier.Copy(this.Response);
+                    // A local request is passed by reference, and so is its response.
+                    if (!message.IsLocalOnly)
+                    {
+                        this.Response = this.responseCopier.Copy(this.Response);
+                    }
 
                     return;
                 }

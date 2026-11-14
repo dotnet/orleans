@@ -116,9 +116,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoClass));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoClass));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_DemoClass));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoClass), typeof(global::TestProject.DemoClass));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_DemoClass), typeof(global::TestProject.DemoClass));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoClass), typeof(global::TestProject.DemoClass));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoClass), typeof(global::TestProject.DemoClass));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_DemoClass), typeof(global::TestProject.DemoClass));
         }
     }
 }

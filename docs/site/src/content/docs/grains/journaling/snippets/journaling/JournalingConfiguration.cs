@@ -17,6 +17,18 @@ internal partial class JournalJsonContext : JsonSerializerContext;
 
 public static class JournalingConfiguration
 {
+    public static ISiloBuilder ConfigureVolatile(ISiloBuilder siloBuilder)
+    {
+        // <volatile_journal_thresholds>
+        siloBuilder.AddVolatileJournalStorage(options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 100;
+            options.MaxBytesBeforeSnapshot = 1024 * 1024;
+        });
+        // </volatile_journal_thresholds>
+        return siloBuilder;
+    }
+
     public static IHost ConfigureJson()
     {
         // <configure_json_format>

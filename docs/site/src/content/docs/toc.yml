@@ -98,6 +98,8 @@ items:
         items:
           - name: Overview
             href: grains/journaling/index.md
+          - name: Migrate Durable Jobs storage
+            href: grains/journaling/durable-jobs-migration.md
           - name: Use durable state
             href: grains/journaling/durable-state.md
           - name: Runtime behavior and consistency
@@ -122,6 +124,8 @@ items:
         href: host/configuration-guide/serialization-immutability.md
       - name: Configure serialization
         href: host/configuration-guide/serialization-configuration.md
+      - name: Compile-time serializer contexts
+        href: host/configuration-guide/serializer-contexts.md
       - name: Customize serialization
         href: host/configuration-guide/serialization-customization.md
       - name: Code generation overview
@@ -343,6 +347,8 @@ items:
         href: implementation/grain-directory.md
       - name: Cluster membership
         href: implementation/cluster-management.md
+      - name: Cluster manifest retrieval
+        href: implementation/cluster-manifest-retrieval.md
       - name: Runtime lifecycle
         href: implementation/orleans-lifecycle.md
       - name: Scheduling and turn execution
@@ -439,6 +445,8 @@ items:
             href: diagnostics/orleans0026.md
           - name: ORLEANS0027
             href: diagnostics/orleans0027.md
+          - name: ORLEANS0028
+            href: diagnostics/orleans0028.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices
@@ -455,10 +463,14 @@ items:
         href: resources/frequently-asked-questions.md
       - name: Symptom and signal catalog
         href: host/monitoring/troubleshooting-symptom-catalog.md
-  - name: Upgrade to Orleans 10
+  - name: Upgrade and migration
     items:
       - name: Migration overview
         href: migration-guide.md
+      - name: Migrate contract identities
+        href: migration/contract-identities.md
+      - name: Grain directory migration
+        href: migration/grain-directory.md
       - name: Deployment and rollback
         href: migration/deployment-and-rollback.md
       - name: Upgrade from Orleans 9

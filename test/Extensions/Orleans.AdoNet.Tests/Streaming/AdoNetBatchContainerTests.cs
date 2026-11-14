@@ -47,13 +47,14 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         var message = new AdoNetStreamMessage("MyServiceId", "MyProviderId", "MyQueueId", 123, 234, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, payload);
 
         // act
-        var container = AdoNetBatchContainer.FromMessage(serializer, message);
+        var container = AdoNetBatchContainer.FromMessage(serializer, message, 7);
 
         // assert
         Assert.Equal(streamId, container.StreamId);
         Assert.Equal(events, container.Events);
         Assert.Equal(requestContext, container.RequestContext);
-        Assert.Equal(new EventSequenceTokenV2(123), container.SequenceToken);
+        Assert.Equal(new EventSequenceTokenV2(7), container.SequenceToken);
+        Assert.Equal(123, container.MessageId);
         Assert.Equal(234, container.Dequeued);
     }
 
@@ -107,13 +108,13 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         var message = new AdoNetStreamMessage("MyServiceId", "MyProviderId", "MyQueueId", 123, 234, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, payload);
 
         // act
-        var container = AdoNetBatchContainer.FromMessage(serializer, message);
+        var container = AdoNetBatchContainer.FromMessage(serializer, message, 7);
 
         // assert
         Assert.Equal([new TestModel(1), new TestModel(3)], container.GetEvents<TestModel>().Select(x => x.Item1));
-        Assert.Equal([new EventSequenceTokenV2(123, 0), new EventSequenceTokenV2(123, 1)], container.GetEvents<TestModel>().Select(x => x.Item2));
+        Assert.Equal([new EventSequenceTokenV2(7, 0), new EventSequenceTokenV2(7, 1)], container.GetEvents<TestModel>().Select(x => x.Item2));
         Assert.Equal([new OtherModel(2), new OtherModel(4)], container.GetEvents<OtherModel>().Select(x => x.Item1));
-        Assert.Equal([new EventSequenceTokenV2(123, 0), new EventSequenceTokenV2(123, 1)], container.GetEvents<OtherModel>().Select(x => x.Item2));
+        Assert.Equal([new EventSequenceTokenV2(7, 0), new EventSequenceTokenV2(7, 1)], container.GetEvents<OtherModel>().Select(x => x.Item2));
     }
 
     [Fact]

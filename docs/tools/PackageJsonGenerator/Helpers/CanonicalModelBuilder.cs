@@ -76,7 +76,7 @@ internal sealed class CanonicalModelBuilder(Compilation compilation)
         {
             type.EnumMembers = [.. symbol.GetMembers()
                 .OfType<IFieldSymbol>()
-                .Where(f => f.HasConstantValue)
+                .Where(f => f.HasConstantValue && !IsGenerated(f))
                 .Select(f => new CanonicalEnumMember
                 {
                     Name = f.Name,
@@ -115,9 +115,14 @@ internal sealed class CanonicalModelBuilder(Compilation compilation)
     {
         return type.DeclaredAccessibility == Accessibility.Public
             && !string.IsNullOrEmpty(type.Name)
-            && !type.Name.StartsWith('<')
-            && !type.GetAttributes().Any(a => a.AttributeClass?.Name == "CompilerGeneratedAttribute");
+            && !IsGenerated(type);
     }
+
+    internal static bool IsGenerated(ISymbol symbol) =>
+        symbol.Name.StartsWith('<')
+        || symbol.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() is
+            "System.Runtime.CompilerServices.CompilerGeneratedAttribute"
+            or "System.CodeDom.Compiler.GeneratedCodeAttribute");
 
     private List<CanonicalMember> BuildMembers(INamedTypeSymbol type)
     {
@@ -125,7 +130,7 @@ internal sealed class CanonicalModelBuilder(Compilation compilation)
 
         foreach (var member in type.GetMembers().OrderBy(m => m.Name))
         {
-            if (!IsExternallyVisible(member.DeclaredAccessibility) || member.IsImplicitlyDeclared)
+            if (!IsExternallyVisible(member.DeclaredAccessibility) || member.IsImplicitlyDeclared || IsGenerated(member))
             {
                 continue;
             }

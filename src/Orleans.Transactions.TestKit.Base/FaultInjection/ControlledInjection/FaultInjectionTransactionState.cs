@@ -235,8 +235,7 @@ namespace Orleans.Transactions.TestKit
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe<FaultInjectionTransactionalState<TState>>(GrainLifecycleStage.SetupState,
-                (ct) => this.txState.OnSetupState(this.SetupResourceFactory, ct));
+            this.txState.Participate(lifecycle, this.SetupResourceFactory);
         }
 
         internal void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
@@ -251,6 +250,11 @@ namespace Orleans.Transactions.TestKit
         public Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction)
         {
             return this.txState.PerformRead(readFunction);
+        }
+
+        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction, ReadIsolation isolation)
+        {
+            return this.txState.PerformRead(readFunction, isolation);
         }
 
         public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction)

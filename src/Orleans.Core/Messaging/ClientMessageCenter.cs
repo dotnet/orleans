@@ -39,11 +39,7 @@ namespace Orleans.Messaging
     // </summary>
     internal partial class ClientMessageCenter : IMessageCenter, IDisposable
     {
-#if NET9_0_OR_GREATER
         private readonly Lock grainBucketUpdateLock = new();
-#else
-        private readonly object grainBucketUpdateLock = new();
-#endif
 
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
@@ -143,6 +139,10 @@ namespace Orleans.Messaging
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception exception)
             {
                 throw new ConnectionFailedException(
@@ -177,6 +177,7 @@ namespace Orleans.Messaging
             if (!Running)
             {
                 LogNotRunning(msg);
+                msg.Dispose();
                 return;
             }
 
@@ -366,9 +367,17 @@ namespace Orleans.Messaging
             this.messageHandler = handler;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the rejection message is transferred to the local message dispatcher.")]
         public void RejectMessage(Message msg, string reason, Exception? exc = null)
         {
-            if (!Running) return;
+            if (!Running)
+            {
+                msg.Dispose();
+                return;
+            }
 
             if (msg.Direction != Message.Directions.Request)
             {
@@ -381,6 +390,8 @@ namespace Orleans.Messaging
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
             }
+
+            msg.Dispose();
         }
 
         internal void OnGatewayConnectionOpen()

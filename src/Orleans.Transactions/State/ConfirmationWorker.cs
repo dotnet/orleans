@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,7 +20,7 @@ namespace Orleans.Transactions.State
         private readonly Func<StorageBatch<TState>> getStorageBatch;
         private readonly ILogger logger;
         private readonly ITimerManager timerManager;
-        private readonly IActivationLifetime activationLifetime;
+        private readonly CancellationToken onDeactivating;
         private readonly HashSet<Guid> pending;
 
         public ConfirmationWorker(
@@ -29,7 +30,7 @@ namespace Orleans.Transactions.State
             Func<StorageBatch<TState>> getStorageBatch,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
+            CancellationToken onDeactivating)
         {
             this.options = options.Value;
             this.me = me;
@@ -37,7 +38,7 @@ namespace Orleans.Transactions.State
             this.getStorageBatch = getStorageBatch;
             this.logger = logger;
             this.timerManager = timerManager;
-            this.activationLifetime = activationLifetime;
+            this.onDeactivating = onDeactivating;
             this.pending = new HashSet<Guid>();
         }
 
@@ -77,23 +78,20 @@ namespace Orleans.Transactions.State
             if (confirmations.Count == 0) return;
 
             // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
-            var ct = this.activationLifetime.OnDeactivating;
+            var ct = this.onDeactivating;
 
             bool hasPendingConfirmations = true;
             while (!ct.IsCancellationRequested && hasPendingConfirmations)
             {
-                using (this.activationLifetime.BlockDeactivation())
+                var confirmationResults = await Task.WhenAll(confirmations.Select(c => c.Confirmed()));
+                hasPendingConfirmations = false;
+                foreach (var confirmed in confirmationResults)
                 {
-                    var confirmationResults = await Task.WhenAll(confirmations.Select(c => c.Confirmed()));
-                    hasPendingConfirmations = false;
-                    foreach (var confirmed in confirmationResults)
+                    if (!confirmed)
                     {
-                        if (!confirmed)
-                        {
-                            hasPendingConfirmations = true;
-                            await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
-                            break;
-                        }
+                        hasPendingConfirmations = true;
+                        await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
+                        break;
                     }
                 }
             }
@@ -102,16 +100,13 @@ namespace Orleans.Transactions.State
         // retries collect until it succeeds
         private async Task Collect(Guid transactionId)
         {
-            var ct = this.activationLifetime.OnDeactivating;
+            var ct = this.onDeactivating;
             while (!ct.IsCancellationRequested)
             {
-                using (this.activationLifetime.BlockDeactivation())
-                {
-                    if (await TryCollect(transactionId)) break;
-                    if (ct.IsCancellationRequested) break;
+                if (await TryCollect(transactionId)) break;
+                if (ct.IsCancellationRequested) break;
 
-                    await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
-                }
+                await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
             }
         }
 
@@ -138,9 +133,9 @@ namespace Orleans.Transactions.State
                 storageWorker.Notify();
 
                 // wait for storage call, so we don't free spin
-                return await storeComplete.Task.WaitAsync(this.activationLifetime.OnDeactivating);
+                return await storeComplete.Task.WaitAsync(this.onDeactivating);
             }
-            catch (OperationCanceledException) when (this.activationLifetime.OnDeactivating.IsCancellationRequested)
+            catch (OperationCanceledException) when (this.onDeactivating.IsCancellationRequested)
             {
                 return false;
             }

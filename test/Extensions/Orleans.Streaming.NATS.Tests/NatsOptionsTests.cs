@@ -1,9 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using Orleans.Runtime;
 using Orleans.Streaming.NATS;
+using Orleans.Streaming.NATS.Hosting;
 using TestExtensions;
 using Xunit;
 
@@ -29,6 +32,31 @@ public sealed class NatsOptionsTests
         var options = new NatsOptions();
 
         Assert.Equal(StreamConfigStorage.File, options.StorageType);
+    }
+
+    [Theory]
+    [InlineData(int.MinValue, 1, 0)]
+    [InlineData(int.MinValue, 3, 2)]
+    [InlineData(int.MinValue, 8, 0)]
+    [InlineData(int.MinValue, int.MaxValue, 1)]
+    [InlineData(-1, 1, 0)]
+    [InlineData(-1, 3, 0)]
+    [InlineData(-1, 8, 7)]
+    [InlineData(-1, int.MaxValue, 1)]
+    [InlineData(0, 1, 0)]
+    [InlineData(0, 3, 0)]
+    [InlineData(0, 8, 0)]
+    [InlineData(0, int.MaxValue, 0)]
+    [InlineData(int.MaxValue, 1, 0)]
+    [InlineData(int.MaxValue, 3, 1)]
+    [InlineData(int.MaxValue, 8, 7)]
+    [InlineData(int.MaxValue, int.MaxValue, 0)]
+    public void ProducerIndex_IsAlwaysWithinBounds(int hashCode, int producerCount, int expectedIndex)
+    {
+        var index = NatsConnectionManager.GetProducerIndex(hashCode, producerCount);
+
+        Assert.Equal(expectedIndex, index);
+        Assert.InRange(index, 0, producerCount - 1);
     }
 
     [Theory]
@@ -63,6 +91,84 @@ public sealed class NatsOptionsTests
         var validator = new NatsStreamOptionsValidator(options, "test-provider");
 
         validator.ValidateConfiguration();
+    }
+
+    [Theory]
+    [InlineData(false, 0, 8, 8, nameof(NatsOptions.BatchSize))]
+    [InlineData(false, -1, 8, 8, nameof(NatsOptions.BatchSize))]
+    [InlineData(false, 100, 0, 8, nameof(NatsOptions.PartitionCount))]
+    [InlineData(false, 100, -1, 8, nameof(NatsOptions.PartitionCount))]
+    [InlineData(false, 100, 8, 0, nameof(NatsOptions.ProducerCount))]
+    [InlineData(false, 100, 8, -1, nameof(NatsOptions.ProducerCount))]
+    [InlineData(true, 0, 8, 8, nameof(NatsOptions.BatchSize))]
+    [InlineData(true, -1, 8, 8, nameof(NatsOptions.BatchSize))]
+    [InlineData(true, 100, 0, 8, nameof(NatsOptions.PartitionCount))]
+    [InlineData(true, 100, -1, 8, nameof(NatsOptions.PartitionCount))]
+    [InlineData(true, 100, 8, 0, nameof(NatsOptions.ProducerCount))]
+    [InlineData(true, 100, 8, -1, nameof(NatsOptions.ProducerCount))]
+    public void Validator_InvalidDimensions_ShouldThrow(
+        bool useClient, int batchSize, int partitionCount, int producerCount, string optionName)
+    {
+        const string providerName = "test-provider";
+        using var host = CreateHost(useClient, providerName, options =>
+        {
+            options.StreamName = "test-stream";
+            options.BatchSize = batchSize;
+            options.PartitionCount = partitionCount;
+            options.ProducerCount = producerCount;
+        });
+        var validator = Assert.Single(
+            host.Services.GetServices<IConfigurationValidator>(),
+            value => value is NatsStreamOptionsValidator);
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Equal(
+            $"The {optionName} must be at least 1 for the NATS stream provider '{providerName}'.",
+            exception.Message);
+    }
+
+    [Theory]
+    [InlineData(false, 1, 1, 1)]
+    [InlineData(false, 100, 8, 8)]
+    [InlineData(false, int.MaxValue, int.MaxValue, int.MaxValue)]
+    [InlineData(true, 1, 1, 1)]
+    [InlineData(true, 100, 8, 8)]
+    [InlineData(true, int.MaxValue, int.MaxValue, int.MaxValue)]
+    public void Validator_ValidDimensions_ShouldNotThrow(
+        bool useClient, int batchSize, int partitionCount, int producerCount)
+    {
+        using var host = CreateHost(useClient, "test-provider", options =>
+        {
+            options.StreamName = "test-stream";
+            options.BatchSize = batchSize;
+            options.PartitionCount = partitionCount;
+            options.ProducerCount = producerCount;
+        });
+        var validator = Assert.Single(
+            host.Services.GetServices<IConfigurationValidator>(),
+            value => value is NatsStreamOptionsValidator);
+
+        validator.ValidateConfiguration();
+    }
+
+    private static IHost CreateHost(bool useClient, string providerName, Action<NatsOptions> configureOptions)
+    {
+        var builder = new HostBuilder();
+        if (useClient)
+        {
+            builder.UseOrleansClient(client => client
+                .UseLocalhostClustering()
+                .AddNatsStreams(providerName, configureOptions));
+        }
+        else
+        {
+            builder.UseOrleans(silo => silo
+                .UseLocalhostClustering()
+                .AddNatsStreams(providerName, configureOptions));
+        }
+
+        return builder.Build();
     }
 
     [Fact]

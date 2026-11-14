@@ -63,11 +63,17 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     }
 
     /// <inheritdoc/>
-    public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+    /// <inheritdoc/>
+    public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(grainState);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
+        cancellationToken.ThrowIfCancellationRequested();
 
         LogTraceReadingState(grainType, id, grainId, _options.ContainerName, partitionKey);
 
@@ -76,10 +82,10 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             var pk = new PartitionKey(partitionKey);
             var entity = await _executor.ExecuteOperation(static args =>
             {
-                var (self, id, pk) = args;
-                return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
+                var (self, id, pk, cancellationToken) = args;
+                return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk, cancellationToken: cancellationToken);
             },
-            (this, id, pk)).ConfigureAwait(false);
+            (this, id, pk, cancellationToken), cancellationToken).ConfigureAwait(false);
 
             if (entity.Resource.State != null)
             {
@@ -107,7 +113,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             WrappedException.CreateAndRethrow(dce);
             throw;
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogErrorReadingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
@@ -116,11 +122,17 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     }
 
     /// <inheritdoc/>
-    public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+    /// <inheritdoc/>
+    public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(grainState);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
+        cancellationToken.ThrowIfCancellationRequested();
 
         LogTraceWritingState(grainType, id, grainId, grainState.ETag, _options.ContainerName, partitionKey);
 
@@ -143,10 +155,10 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                 response = await _executor.ExecuteOperation(
                     static args =>
                     {
-                        var (self, entity, pk) = args;
-                        return self._container.CreateItemAsync(entity, pk);
+                        var (self, entity, pk, cancellationToken) = args;
+                        return self._container.CreateItemAsync(entity, pk, cancellationToken: cancellationToken);
                     },
-                    (this, entity, pk)).ConfigureAwait(false);
+                    (this, entity, pk, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
             else if (grainState.ETag == ANY_ETAG)
             {
@@ -154,10 +166,10 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                 response = await _executor.ExecuteOperation(
                     static args =>
                     {
-                        var (self, entity, pk, requestOptions) = args;
-                        return self._container.UpsertItemAsync(entity, pk, requestOptions);
+                        var (self, entity, pk, requestOptions, cancellationToken) = args;
+                        return self._container.UpsertItemAsync(entity, pk, requestOptions, cancellationToken);
                     },
-                    (this, entity, pk, requestOptions)).ConfigureAwait(false);
+                    (this, entity, pk, requestOptions, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -165,10 +177,10 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                 response = await _executor.ExecuteOperation(
                     static args =>
                     {
-                        var (self, entity, pk, requestOptions) = args;
-                        return self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions);
+                        var (self, entity, pk, requestOptions, cancellationToken) = args;
+                        return self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions, cancellationToken);
                     },
-                    (this, entity, pk, requestOptions)).ConfigureAwait(false);
+                    (this, entity, pk, requestOptions, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
             grainState.ETag = response.Resource.ETag;
@@ -178,7 +190,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         {
             throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag);
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogErrorWritingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
@@ -187,11 +199,17 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     }
 
     /// <inheritdoc/>
-    public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+    /// <inheritdoc/>
+    public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(grainState);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
+        cancellationToken.ThrowIfCancellationRequested();
 
         LogTraceClearingState(grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.ContainerName, partitionKey);
 
@@ -207,10 +225,10 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                     {
                         var entity = await _executor.ExecuteOperation(static args =>
                         {
-                            var (self, id, pk) = args;
-                            return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
+                            var (self, id, pk, cancellationToken) = args;
+                            return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk, cancellationToken: cancellationToken);
                         },
-                        (this, id, pk)).ConfigureAwait(false);
+                        (this, id, pk, cancellationToken), cancellationToken).ConfigureAwait(false);
 
                         // State exists but the current activation has not observed state creation. Therefore, we have inconsistent
                         // state and should throw to give the grain a chance to deactivate and recover.
@@ -226,10 +244,10 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                 {
                     await _executor.ExecuteOperation(static args =>
                     {
-                        var (self, id, pk, requestOptions) = args;
-                        return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
+                        var (self, id, pk, requestOptions, cancellationToken) = args;
+                        return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions, cancellationToken);
                     },
-                    (this, id, pk, requestOptions));
+                    (this, id, pk, requestOptions, cancellationToken), cancellationToken);
                 }
 
                 ResetGrainState(grainState);
@@ -247,15 +265,15 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
 
                 var response = await _executor.ExecuteOperation(static args =>
                 {
-                    var (self, grainState, entity, pk, requestOptions) = args;
+                    var (self, grainState, entity, pk, requestOptions, cancellationToken) = args;
                     return grainState.ETag switch
                     {
-                        null or { Length: 0 } => self._container.CreateItemAsync(entity, pk),
-                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
-                        _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
+                        null or { Length: 0 } => self._container.CreateItemAsync(entity, pk, cancellationToken: cancellationToken),
+                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions, cancellationToken),
+                        _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions, cancellationToken),
                     };
                 },
-                (this, grainState, entity, pk, requestOptions)).ConfigureAwait(false);
+                (this, grainState, entity, pk, requestOptions, cancellationToken), cancellationToken).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
                 grainState.RecordExists = false;
@@ -266,7 +284,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         {
             throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag ?? "Unknown");
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogErrorClearingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);

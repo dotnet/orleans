@@ -10,3 +10,7 @@ ORLEANS0110 | Usage | Error | ReferenceAssemblyWithGenerateSerializerDiagnostic
 ORLEANS0111 | Usage | Error | Invalid invokable base type mapping
 ORLEANS0112 | Usage | Error | Invalid RPC parameter field identifier
 ORLEANS0113 | Usage | Warning | CancellationToken parameter is not last
+ORLEANS0114 | Usage | Error | Invalid generated context declaration
+ORLEANS0115 | Usage | Error | Unsupported generated context dependency
+ORLEANS0116 | Usage | Error | Inaccessible compound type alias
+ORLEANS0117 | Usage | Error | Invalid union or closed type case

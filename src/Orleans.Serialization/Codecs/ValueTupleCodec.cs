@@ -127,16 +127,18 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T> : IDeepCopier<ValueTuple<T>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T>? _copier;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T> _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T}"/> class.
         /// </summary>
         /// <param name="copier">The copier.</param>
-        public ValueTupleCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+        public ValueTupleCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.UnwrapService(this, copier);
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((ValueTuple<T>)input!, context);
@@ -144,7 +146,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T> DeepCopy(ValueTuple<T> input, CopyContext context)
         {
-            if (_copier != null) input.Item1 = _copier.DeepCopy(input.Item1, context)!;
+            if (IsShallowCopyable()) return input;
+
+            input.Item1 = _copier.DeepCopy(input.Item1, context)!;
             return input;
         }
     }
@@ -229,8 +233,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T1, T2> : IDeepCopier<ValueTuple<T1, T2>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2}"/> class.
@@ -239,12 +244,13 @@ namespace Orleans.Serialization.Codecs
         /// <param name="copier2">The copier for <typeparamref name="T2"/>.</param>
         public ValueTupleCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2)
         {
-            _copier1 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier1);
-            _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
+            _copier1 = OrleansGeneratedCodeHelper.UnwrapService(this, copier1);
+            _copier2 = OrleansGeneratedCodeHelper.UnwrapService(this, copier2);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier1 is null && _copier2 is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2))input!, context);
@@ -252,8 +258,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2> DeepCopy(ValueTuple<T1, T2> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (IsShallowCopyable()) return input;
+
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1)) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2)) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
             return input;
         }
     }
@@ -349,9 +357,10 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T1, T2, T3> : IDeepCopier<ValueTuple<T1, T2, T3>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3}"/> class.
@@ -364,13 +373,14 @@ namespace Orleans.Serialization.Codecs
             IDeepCopier<T2> copier2,
             IDeepCopier<T3> copier3)
         {
-            _copier1 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier1);
-            _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
-            _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
+            _copier1 = OrleansGeneratedCodeHelper.UnwrapService(this, copier1);
+            _copier2 = OrleansGeneratedCodeHelper.UnwrapService(this, copier2);
+            _copier3 = OrleansGeneratedCodeHelper.UnwrapService(this, copier3);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3))input!, context);
@@ -378,9 +388,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3> DeepCopy(ValueTuple<T1, T2, T3> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (IsShallowCopyable()) return input;
+
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1)) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2)) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3)) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
             return input;
         }
     }
@@ -485,10 +497,11 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T1, T2, T3, T4> : IDeepCopier<ValueTuple<T1, T2, T3, T4>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4}"/> class.
@@ -503,14 +516,15 @@ namespace Orleans.Serialization.Codecs
             IDeepCopier<T3> copier3,
             IDeepCopier<T4> copier4)
         {
-            _copier1 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier1);
-            _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
-            _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
-            _copier4 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier4);
+            _copier1 = OrleansGeneratedCodeHelper.UnwrapService(this, copier1);
+            _copier2 = OrleansGeneratedCodeHelper.UnwrapService(this, copier2);
+            _copier3 = OrleansGeneratedCodeHelper.UnwrapService(this, copier3);
+            _copier4 = OrleansGeneratedCodeHelper.UnwrapService(this, copier4);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4))input!, context);
@@ -518,10 +532,12 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4> DeepCopy(ValueTuple<T1, T2, T3, T4> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (IsShallowCopyable()) return input;
+
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1)) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2)) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3)) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4)) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
             return input;
         }
     }
@@ -634,11 +650,12 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5}"/> class.
@@ -655,15 +672,16 @@ namespace Orleans.Serialization.Codecs
             IDeepCopier<T4> copier4,
             IDeepCopier<T5> copier5)
         {
-            _copier1 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier1);
-            _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
-            _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
-            _copier4 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier4);
-            _copier5 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier5);
+            _copier1 = OrleansGeneratedCodeHelper.UnwrapService(this, copier1);
+            _copier2 = OrleansGeneratedCodeHelper.UnwrapService(this, copier2);
+            _copier3 = OrleansGeneratedCodeHelper.UnwrapService(this, copier3);
+            _copier4 = OrleansGeneratedCodeHelper.UnwrapService(this, copier4);
+            _copier5 = OrleansGeneratedCodeHelper.UnwrapService(this, copier5);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5))input!, context);
@@ -671,11 +689,13 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5> DeepCopy(ValueTuple<T1, T2, T3, T4, T5> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
+            if (IsShallowCopyable()) return input;
+
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1)) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2)) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3)) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4)) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5)) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
             return input;
         }
     }
@@ -798,12 +818,13 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5, T6>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
-        private readonly IDeepCopier<T6>? _copier6;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
+        private readonly IDeepCopier<T6> _copier6;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5, T6}"/> class.
@@ -822,16 +843,17 @@ namespace Orleans.Serialization.Codecs
             IDeepCopier<T5> copier5,
             IDeepCopier<T6> copier6)
         {
-            _copier1 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier1);
-            _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
-            _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
-            _copier4 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier4);
-            _copier5 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier5);
-            _copier6 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier6);
+            _copier1 = OrleansGeneratedCodeHelper.UnwrapService(this, copier1);
+            _copier2 = OrleansGeneratedCodeHelper.UnwrapService(this, copier2);
+            _copier3 = OrleansGeneratedCodeHelper.UnwrapService(this, copier3);
+            _copier4 = OrleansGeneratedCodeHelper.UnwrapService(this, copier4);
+            _copier5 = OrleansGeneratedCodeHelper.UnwrapService(this, copier5);
+            _copier6 = OrleansGeneratedCodeHelper.UnwrapService(this, copier6);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier6));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5, T6))input!, context);
@@ -839,12 +861,14 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
-            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
+            if (IsShallowCopyable()) return input;
+
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1)) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2)) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3)) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4)) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5)) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier6)) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
             return input;
         }
     }
@@ -977,13 +1001,14 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5, T6, T7> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5, T6, T7>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
-        private readonly IDeepCopier<T6>? _copier6;
-        private readonly IDeepCopier<T7>? _copier7;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
+        private readonly IDeepCopier<T6> _copier6;
+        private readonly IDeepCopier<T7> _copier7;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5, T6, T7}"/> class.
@@ -1004,17 +1029,18 @@ namespace Orleans.Serialization.Codecs
             IDeepCopier<T6> copier6,
             IDeepCopier<T7> copier7)
         {
-            _copier1 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier1);
-            _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
-            _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
-            _copier4 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier4);
-            _copier5 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier5);
-            _copier6 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier6);
-            _copier7 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier7);
+            _copier1 = OrleansGeneratedCodeHelper.UnwrapService(this, copier1);
+            _copier2 = OrleansGeneratedCodeHelper.UnwrapService(this, copier2);
+            _copier3 = OrleansGeneratedCodeHelper.UnwrapService(this, copier3);
+            _copier4 = OrleansGeneratedCodeHelper.UnwrapService(this, copier4);
+            _copier5 = OrleansGeneratedCodeHelper.UnwrapService(this, copier5);
+            _copier6 = OrleansGeneratedCodeHelper.UnwrapService(this, copier6);
+            _copier7 = OrleansGeneratedCodeHelper.UnwrapService(this, copier7);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier6) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier7));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5, T6, T7))input!, context);
@@ -1022,13 +1048,15 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
-            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
-            if (_copier7 != null) input.Item7 = _copier7.DeepCopy(input.Item7, context)!;
+            if (IsShallowCopyable()) return input;
+
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1)) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2)) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3)) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4)) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5)) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier6)) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier7)) input.Item7 = _copier7.DeepCopy(input.Item7, context)!;
             return input;
         }
     }
@@ -1170,14 +1198,15 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier where T8 : struct
     {
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
-        private readonly IDeepCopier<T6>? _copier6;
-        private readonly IDeepCopier<T7>? _copier7;
-        private readonly IDeepCopier<T8>? _copier8;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
+        private readonly IDeepCopier<T6> _copier6;
+        private readonly IDeepCopier<T7> _copier7;
+        private readonly IDeepCopier<T8> _copier8;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5, T6, T7, T8}"/> class.
@@ -1200,18 +1229,19 @@ namespace Orleans.Serialization.Codecs
             IDeepCopier<T7> copier7,
             IDeepCopier<T8> copier8)
         {
-            _copier1 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier1);
-            _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
-            _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
-            _copier4 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier4);
-            _copier5 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier5);
-            _copier6 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier6);
-            _copier7 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier7);
-            _copier8 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier8);
+            _copier1 = OrleansGeneratedCodeHelper.UnwrapService(this, copier1);
+            _copier2 = OrleansGeneratedCodeHelper.UnwrapService(this, copier2);
+            _copier3 = OrleansGeneratedCodeHelper.UnwrapService(this, copier3);
+            _copier4 = OrleansGeneratedCodeHelper.UnwrapService(this, copier4);
+            _copier5 = OrleansGeneratedCodeHelper.UnwrapService(this, copier5);
+            _copier6 = OrleansGeneratedCodeHelper.UnwrapService(this, copier6);
+            _copier7 = OrleansGeneratedCodeHelper.UnwrapService(this, copier7);
+            _copier8 = OrleansGeneratedCodeHelper.UnwrapService(this, copier8);
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null && _copier8 is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier6) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier7) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier8));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>)input!, context);
@@ -1219,14 +1249,16 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
-            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
-            if (_copier7 != null) input.Item7 = _copier7.DeepCopy(input.Item7, context)!;
-            if (_copier8 != null) input.Rest = _copier8.DeepCopy(input.Rest, context);
+            if (IsShallowCopyable()) return input;
+
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1)) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2)) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3)) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4)) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5)) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier6)) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier7)) input.Item7 = _copier7.DeepCopy(input.Item7, context)!;
+            if (!OrleansGeneratedCodeHelper.IsShallowCopyable(_copier8)) input.Rest = _copier8.DeepCopy(input.Rest, context);
             return input;
         }
     }

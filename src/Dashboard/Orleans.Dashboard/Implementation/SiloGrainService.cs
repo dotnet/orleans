@@ -23,7 +23,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
     private readonly IGrainFactory _grainFactory;
     private readonly ISiloLifecycleSubject _siloLifecycle;
     private readonly ILogger<SiloGrainService> _logger;
-    private IDisposable? _timer;
+    private IGrainTimer? _timer;
     private string? _versionOrleans;
     private string? _versionHost;
 
@@ -56,9 +56,9 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         );
         try
         {
-            _timer = RegisterTimer(x => CollectStatistics((bool)x!), true, updateInterval, updateInterval);
+            _timer = RegisterGrainTimer(ct => CollectStatistics(true, ct), updateInterval, updateInterval);
 
-            await CollectStatistics(false);
+            await CollectStatistics(false, StoppedCancellationTokenSource.Token);
         }
         catch (InvalidOperationException)
         {
@@ -68,14 +68,31 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         await base.Start();
     }
 
-    private async Task CollectStatistics(bool canDeactivate)
+    public override Task Stop()
     {
-        var managementGrain = _grainFactory.GetGrain<IManagementGrain>(0);
+        _timer?.Dispose();
+        _timer = null;
+        return base.Stop();
+    }
+
+    private async Task CollectStatistics(bool canDeactivate, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested || StoppedCancellationTokenSource.IsCancellationRequested)
+        {
+            return;
+        }
+
         try
         {
+            var managementGrain = _grainFactory.GetGrain<IManagementGrain>(0);
             var siloAddress = SiloAddress.FromParsableString(this.GetPrimaryKeyString());
 
-            var results = (await managementGrain.GetRuntimeStatistics([siloAddress], CancellationToken.None)).FirstOrDefault();
+            var results = (await managementGrain.GetRuntimeStatistics([siloAddress], cancellationToken)).FirstOrDefault();
+
+            if (cancellationToken.IsCancellationRequested || StoppedCancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
 
             _statistics.Enqueue(results);
 

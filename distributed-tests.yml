@@ -1,7 +1,7 @@
 variables:
   clusterId: '{{ "now" | date: "%s" }}'
   serviceId: '{{ "now" | date: "%s" }}'
-  framework: net8.0
+  framework: net10.0
 
 jobs:
   server:
@@ -9,7 +9,7 @@ jobs:
       localFolder: Artifacts/DistributedTests/DistributedTests.Server/{{framework}}
     executable: DistributedTests.Server.exe
     readyStateText: Orleans Silo started.
-    framework: net8.0
+    framework: net10.0
     arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --azureQueueUri {{azureQueueUri}} --azureTableUri {{azureTableUri}} {{configuratorOptions}}"
     onConfigure:
       - if (job.endpoints.Count > 0) {
@@ -20,7 +20,7 @@ jobs:
       localFolder: Artifacts/DistributedTests/DistributedTests.Client/{{framework}}
     executable: DistributedTests.Client.exe
     waitForExit: true
-    framework: net8.0
+    framework: net10.0
     arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --azureQueueUri {{azureQueueUri}} --azureTableUri {{azureTableUri}} {{commandOptions}}"
     onConfigure:
       - if (job.endpoints.Count > 0) {

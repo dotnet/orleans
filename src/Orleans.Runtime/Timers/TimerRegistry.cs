@@ -5,12 +5,10 @@ using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Timers;
 
-internal class TimerRegistry(ILoggerFactory loggerFactory, [FromKeyedServices(TimeProviderNames.Grains)] TimeProvider timeProvider, MessageFactory messageFactory, ILocalSiloDetails localSiloDetails) : ITimerRegistry
+internal class TimerRegistry(ILoggerFactory loggerFactory, [FromKeyedServices(TimeProviderNames.Grains)] TimeProvider timeProvider) : ITimerRegistry
 {
     public ILogger TimerLogger { get; } = loggerFactory.CreateLogger<GrainTimer>();
     public TimeProvider TimeProvider { get; } = timeProvider;
-    public MessageFactory MessageFactory { get; } = messageFactory;
-    public ILocalSiloDetails LocalSiloDetails { get; } = localSiloDetails;
 
     public IDisposable RegisterTimer(IGrainContext grainContext, Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period)
     {

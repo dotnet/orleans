@@ -237,7 +237,7 @@ namespace UnitTests.SchedulerTests
                     return 2;
                 });
 
-                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2)));
+                join = Task.WhenAny(task1, task2);
 
                 finish.SetResult(true);
             });
@@ -254,7 +254,7 @@ namespace UnitTests.SchedulerTests
             }
 
             pause1.Set();
-            await join;
+            await join.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
             Assert.True(join.IsCompleted && !join.IsFaulted, "Join Status " + join.Status);
             Assert.False(task1.IsFaulted, "Task-1 Faulted " + task1.Exception);
             Assert.False(task2.IsFaulted, "Task-2 Faulted " + task2.Exception);
@@ -292,7 +292,7 @@ namespace UnitTests.SchedulerTests
                     return 2;
                 });
 
-                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2), fakeTimeProvider));
+                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2), fakeTimeProvider, TestContext.Current.CancellationToken));
 
                 finish.SetResult(true);
             });
@@ -671,6 +671,44 @@ namespace UnitTests.SchedulerTests
             await Run_ActivationSched_Test1(scheduler, true, TestContext.Current.CancellationToken);
         }
 
+        [Theory, TestCategory("Functional"), TestCategory("Scheduler")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ActivationSched_Test1_FromDisposedLoggerContext(bool bounceToThreadPool)
+        {
+            using var previousLoggerFactory = new LoggerFactory();
+            using var previousContext = UnitTestSchedulingContext.Create(previousLoggerFactory);
+            previousLoggerFactory.Dispose();
+            Assert.Throws<ObjectDisposedException>(() => previousLoggerFactory.CreateLogger("Disposed"));
+
+            Task run;
+            RuntimeContext.SetExecutionContext(previousContext, out var originalContext);
+            try
+            {
+                run = Run_ActivationSched_Test1(scheduler, bounceToThreadPool, TestContext.Current.CancellationToken);
+            }
+            finally
+            {
+                // RuntimeContext is thread-local, so restore it before awaiting.
+                RuntimeContext.ResetExecutionContext(originalContext);
+            }
+
+            await run;
+        }
+
+        [Theory, TestCategory("Functional"), TestCategory("Scheduler")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ActivationSched_Test1_WithDisposedLoggerFactory(bool bounceToThreadPool)
+        {
+            loggerFactory.Dispose();
+
+            var exception = await Assert.ThrowsAsync<ObjectDisposedException>(() =>
+                Run_ActivationSched_Test1(scheduler, bounceToThreadPool, TestContext.Current.CancellationToken));
+
+            Assert.Equal(nameof(LoggerFactory), exception.ObjectName);
+        }
+
         internal async Task Run_ActivationSched_Test1(
             TaskScheduler scheduler,
             bool bounceToThreadPool,
@@ -681,9 +719,13 @@ namespace UnitTests.SchedulerTests
             {
                 SiloAddress = SiloAddressUtils.NewLocalSiloAddress(23)
             };
-            var grain = new NonReentrantStressGrainWithoutState();
-
-            await Task.Factory.StartNew(() => grain.OnActivateAsync(CancellationToken.None), CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
+            var grain = await Task.Factory.StartNew(async () =>
+            {
+                var activation = new NonReentrantStressGrainWithoutState();
+                Assert.Same(context, activation.GrainContext);
+                await activation.OnActivateAsync(CancellationToken.None);
+                return activation;
+            }, CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
 
             Task wrapped = null!;
             var wrapperDone = new TaskCompletionSource<bool>();
@@ -695,18 +737,22 @@ namespace UnitTests.SchedulerTests
 
                 Task t1 = grain.Test1();
 
-                void wrappedDoneAction() { wrappedDone.SetResult(true); }
+                void wrappedDoneAction(Task task)
+                {
+                    task.GetAwaiter().GetResult();
+                    wrappedDone.SetResult(true);
+                }
 
                 if (bounceToThreadPool)
                 {
-                    wrapped = t1.ContinueWith(_ => wrappedDoneAction(),
+                    wrapped = t1.ContinueWith(wrappedDoneAction,
                         CancellationToken.None,
                         TaskContinuationOptions.ExecuteSynchronously,
                         TaskScheduler.Default);
                 }
                 else
                 {
-                    wrapped = t1.ContinueWith(_ => wrappedDoneAction());
+                    wrapped = t1.ContinueWith(wrappedDoneAction);
                 }
                 wrapperDone.SetResult(true);
                 return wrapped;

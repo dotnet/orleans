@@ -617,7 +617,7 @@ public sealed class JsonCodecSnapshotTests
 
     private Task SnapshotSingleOp(
         object codec,
-        IJournaledState state,
+        IStateMachine state,
         Action<JournalStreamWriter> write,
         Action assertCommands)
     {
@@ -633,7 +633,7 @@ public sealed class JsonCodecSnapshotTests
 
     private Task SnapshotMultiOp(
         object codec,
-        IJournaledState state,
+        IStateMachine state,
         Action<JournalStreamWriter> writeSequence,
         string[] expectedCommands,
         Func<IReadOnlyList<string>> getActualCommands)
@@ -661,7 +661,7 @@ public sealed class JsonCodecSnapshotTests
     /// </summary>
     private static void AssertNoCarriageReturns(string text) => Assert.DoesNotContain('\r', text);
 
-    private static void ReadAndAssert(JsonLinesJournalFormat format, byte[] bytes, IJournaledState state, Action assertCommands)
+    private static void ReadAndAssert(JsonLinesJournalFormat format, byte[] bytes, IStateMachine state, Action assertCommands)
     {
         if (bytes.Length == 0)
         {
@@ -672,7 +672,7 @@ public sealed class JsonCodecSnapshotTests
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
         var buffer = new JournalBufferReader(writer.Reader, isCompleted: true);
-        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, (new JournalStreamId(SnapshotStreamId), state));
+        var context = JournalTestReplayContext.Create(JsonLinesJournalFormat.JournalFormatKey, (new JournalStreamId(SnapshotStreamId), state));
         ((IJournalFormat)format).Replay(buffer, context);
         Assert.Equal(0, buffer.Length);
         assertCommands();

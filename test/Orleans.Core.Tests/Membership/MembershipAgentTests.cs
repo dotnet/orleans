@@ -79,7 +79,8 @@ namespace NonSilo.Tests.Membership
             this.clusterMembershipOptions = Options.Create(new ClusterMembershipOptions() { MaxJoinAttemptTime = TimeSpan.FromSeconds(45) });
             this.manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                // These fixtures use fixed generations unrelated to the clock.
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions { SiloGenerationRetirementAge = null }),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,

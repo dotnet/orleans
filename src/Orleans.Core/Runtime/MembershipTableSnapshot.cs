@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -7,11 +8,19 @@ using System.Text;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Represents an immutable snapshot of cluster membership state.
+    /// Represents an immutable snapshot of a canonical membership view and per-silo liveness timestamps.
     /// </summary>
+    /// <remarks>
+    /// A version identifies the same canonical membership rows throughout the cluster.
+    /// Updates retain versioned fields at the same version and the maximum observed IAmAliveTime for each silo.
+    /// Each peer retains local status knowledge separately from those rows.
+    /// </remarks>
     [GenerateSerializer, Immutable]
     internal sealed class MembershipTableSnapshot : ISpanFormattable
     {
+        [Id(3)]
+        private readonly IReadOnlySet<SiloAddress>? _recentlyDeadSilos;
+
         private static readonly MembershipTableSnapshot InitialValue = new(MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
 
         /// <summary>
@@ -19,12 +28,19 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="version">The membership version represented by this snapshot.</param>
         /// <param name="entries">The membership entries contained in this snapshot.</param>
+        /// <param name="minimumSiloGeneration">The local exclusive upper bound of retired positive silo generations.</param>
+        /// <param name="recentlyDeadSilos">Known dead identities whose records have been removed.</param>
         public MembershipTableSnapshot(
             MembershipVersion version,
-            ImmutableDictionary<SiloAddress, MembershipEntry> entries)
+            ImmutableDictionary<SiloAddress, MembershipEntry> entries,
+            int minimumSiloGeneration = 0,
+            IReadOnlySet<SiloAddress>? recentlyDeadSilos = null)
         {
             this.Version = version;
             this.Entries = entries;
+            this.MinimumSiloGeneration = minimumSiloGeneration;
+            // Freeze caller-owned sets so published snapshots remain immutable.
+            _recentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
         }
 
         /// <summary>
@@ -47,7 +63,7 @@ namespace Orleans.Runtime
             var version = (table.Version.Version == 0 && table.Version.VersionEtag == "0")
               ? MembershipVersion.MinValue
               : new MembershipVersion(table.Version.Version);
-            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1));
+            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1), FrozenSet<SiloAddress>.Empty);
         }
 
         /// <summary>
@@ -60,36 +76,96 @@ namespace Orleans.Runtime
         {
             ArgumentNullException.ThrowIfNull(previousSnapshot);
             ArgumentNullException.ThrowIfNull(updated);
-            return Update(previousSnapshot, updated.Version, updated.Entries.Values);
+            return Update(previousSnapshot, updated.Version, updated.Entries.Values, updated.RecentlyDeadSilos);
         }
 
-        private static MembershipTableSnapshot Update(MembershipTableSnapshot previousSnapshot, MembershipVersion version, IEnumerable<MembershipEntry> updatedEntries)
+        private static MembershipTableSnapshot Update(
+            MembershipTableSnapshot previousSnapshot,
+            MembershipVersion version,
+            IEnumerable<MembershipEntry> updatedEntries,
+            IReadOnlySet<SiloAddress> recentlyDeadSilos)
         {
-            ArgumentNullException.ThrowIfNull(previousSnapshot);
-            ArgumentNullException.ThrowIfNull(updatedEntries);
-
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
+            var dead = new HashSet<SiloAddress>(previousSnapshot.RecentlyDeadSilos);
+            dead.UnionWith(recentlyDeadSilos);
             foreach (var item in updatedEntries)
             {
                 var entry = item;
-                entry = PreserveIAmAliveTime(previousSnapshot, entry);
+                if (version == previousSnapshot.Version
+                    && entry.Status == SiloStatus.Dead
+                    && !previousSnapshot.Entries.ContainsKey(entry.SiloAddress))
+                {
+                    // An equal-version read can predate pruning of a Dead row.
+                    dead.Add(entry.SiloAddress);
+                    continue;
+                }
+
+                if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
+                {
+                    var iAmAliveTime = entry.IAmAliveTime > previousEntry.IAmAliveTime
+                        ? entry.IAmAliveTime
+                        : previousEntry.IAmAliveTime;
+                    if (version == previousSnapshot.Version)
+                    {
+                        entry = previousEntry;
+                    }
+
+                    if (entry.IAmAliveTime < iAmAliveTime)
+                    {
+                        entry = entry.WithIAmAliveTime(iAmAliveTime);
+                    }
+                }
+
                 entries.Add(entry.SiloAddress, entry);
             }
 
-            return new MembershipTableSnapshot(version, entries.ToImmutable());
-        }
-
-        private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
-        {
-            // Retain the maximum IAmAliveTime, since IAmAliveTime updates do not increase membership version
-            // and therefore can be clobbered by torn reads.
-            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
-                && previousEntry.IAmAliveTime > entry.IAmAliveTime)
+            var incomingEntries = entries.ToImmutable();
+            var incomingIsOlder = version < previousSnapshot.Version;
+            var canonicalEntries = incomingIsOlder ? previousSnapshot.Entries : incomingEntries;
+            var olderEntries = incomingIsOlder ? incomingEntries : previousSnapshot.Entries;
+            foreach (var (silo, entry) in olderEntries)
             {
-                entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
+                // Delayed reads and successful write completions can reveal a registration
+                // which was already removed from the published, newer view.
+                if (!canonicalEntries.ContainsKey(silo)
+                    && (version != previousSnapshot.Version || entry.Status == SiloStatus.Dead))
+                {
+                    dead.Add(silo);
+                }
             }
 
-            return entry;
+            dead.RemoveWhere(silo => canonicalEntries.ContainsKey(silo)
+                || IsGenerationRetired(silo, previousSnapshot.MinimumSiloGeneration));
+            var retainedDeaths = dead.SetEquals(previousSnapshot.RecentlyDeadSilos)
+                ? previousSnapshot.RecentlyDeadSilos
+                : dead.ToFrozenSet();
+            return new MembershipTableSnapshot(
+                incomingIsOlder ? previousSnapshot.Version : version,
+                canonicalEntries,
+                previousSnapshot.MinimumSiloGeneration,
+                retainedDeaths);
+        }
+
+        internal MembershipTableSnapshot RetireGenerations(DateTime utcNow, TimeSpan? retirementAge)
+        {
+            if (retirementAge is not { } age)
+            {
+                return this;
+            }
+
+            var minimum = Math.Max(MinimumSiloGeneration, SiloAddress.GetGenerationRetirementFloor(utcNow, age));
+            if (minimum == MinimumSiloGeneration)
+            {
+                return this;
+            }
+
+            var dead = RecentlyDeadSilos;
+            if (dead.Any(silo => IsGenerationRetired(silo, minimum)))
+            {
+                dead = dead.Where(silo => !IsGenerationRetired(silo, minimum)).ToFrozenSet();
+            }
+
+            return new(Version, Entries, minimum, dead);
         }
 
         /// <summary>
@@ -103,6 +179,18 @@ namespace Orleans.Runtime
         /// </summary>
         [Id(1)]
         public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
+
+        /// <summary>
+        /// Gets this peer's exclusive upper bound of retired positive silo generations.
+        /// </summary>
+        [Id(2)]
+        public int MinimumSiloGeneration { get; }
+
+        /// <summary>
+        /// Gets known dead identities retained separately from the canonical membership rows.
+        /// </summary>
+        // Snapshots from older silos omit field 3 and carry no retained death history.
+        public IReadOnlySet<SiloAddress> RecentlyDeadSilos => _recentlyDeadSilos ?? FrozenSet<SiloAddress>.Empty;
 
         /// <summary>
         /// Gets the number of active silos in this snapshot.
@@ -129,27 +217,55 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="silo">The silo address.</param>
         /// <returns>The silo status.</returns>
-        public SiloStatus GetSiloStatus(SiloAddress silo)
+        public SiloStatus GetSiloStatus(SiloAddress silo) => GetSiloStatus(silo, includeRetirement: true);
+
+        internal SiloStatus GetSiloStatus(SiloAddress silo, bool includeRetirement)
         {
-            var status = this.Entries.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
-            if (status == SiloStatus.None)
+            return this.Entries.TryGetValue(silo, out var entry)
+                ? entry.Status
+                : GetMissingSiloStatus(silo, includeRetirement ? MinimumSiloGeneration : 0, RecentlyDeadSilos, Entries.Keys);
+        }
+
+        internal static SiloStatus GetMissingSiloStatus(
+            SiloAddress silo,
+            int minimumSiloGeneration,
+            IReadOnlySet<SiloAddress> recentlyDeadSilos,
+            IEnumerable<SiloAddress> members)
+        {
+            if (IsGenerationRetired(silo, minimumSiloGeneration) || recentlyDeadSilos.Contains(silo))
             {
-                foreach (var member in this.Entries)
+                return SiloStatus.Dead;
+            }
+
+            foreach (var member in members)
+            {
+                if (member.IsSuccessorOf(silo))
                 {
-                    if (member.Key.IsSuccessorOf(silo))
-                    {
-                        status = SiloStatus.Dead;
-                        break;
-                    }
+                    return SiloStatus.Dead;
                 }
             }
 
-            return status;
+            foreach (var member in recentlyDeadSilos)
+            {
+                if (member.IsSuccessorOf(silo))
+                {
+                    return SiloStatus.Dead;
+                }
+            }
+
+            return SiloStatus.None;
         }
+
+        private static bool IsGenerationRetired(SiloAddress silo, int minimumSiloGeneration) =>
+            silo.Generation > 0 && silo.Generation < minimumSiloGeneration;
 
         /// <summary>
         /// Determines whether this snapshot is a successor to another snapshot.
         /// </summary>
+        /// <remarks>
+        /// At the same canonical membership version, progress consists of newer liveness timestamps
+        /// or pruning previously Dead rows. Non-Dead rows are retained.
+        /// </remarks>
         /// <param name="other">The snapshot to compare against.</param>
         /// <returns><see langword="true"/> if this snapshot is a successor to <paramref name="other"/>; otherwise, <see langword="false"/>.</returns>
         public bool IsSuccessorTo(MembershipTableSnapshot other)
@@ -164,37 +280,51 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            if (Entries.Count > other.Entries.Count)
+            if (MinimumSiloGeneration < other.MinimumSiloGeneration)
             {
-                // Something is amiss.
                 return false;
             }
 
-            foreach (var entry in Entries)
+            if (Entries.Count > other.Entries.Count)
             {
-                if (!other.Entries.TryGetValue(entry.Key, out var otherEntry))
+                // Adding a row requires a new canonical membership version.
+                return false;
+            }
+
+            var heartbeatAdvanced = false;
+            foreach (var (silo, entry) in Entries)
+            {
+                if (!other.Entries.TryGetValue(silo, out var otherEntry))
                 {
-                    // Something is amiss.
+                    // Membership changes require a table-version advance.
+                    return false;
+                }
+
+                heartbeatAdvanced |= entry.IAmAliveTime > otherEntry.IAmAliveTime;
+            }
+
+            if (Entries.Count == other.Entries.Count)
+            {
+                return heartbeatAdvanced
+                    || MinimumSiloGeneration > other.MinimumSiloGeneration
+                    || !RecentlyDeadSilos.SetEquals(other.RecentlyDeadSilos);
+            }
+
+            foreach (var (silo, previousEntry) in other.Entries)
+            {
+                if (previousEntry.Status != SiloStatus.Dead && !Entries.ContainsKey(silo))
+                {
                     return false;
                 }
             }
 
-            // This is a successor if any silo has a later EffectiveIAmAliveTime.
-            foreach (var entry in Entries)
-            {
-                if (entry.Value.EffectiveIAmAliveTime > other.Entries[entry.Key].EffectiveIAmAliveTime)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return true;
         }
 
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append($"[Version: {this.Version}, {this.Entries.Count} silos");
+            sb.Append($"[Version: {this.Version}, MinimumSiloGeneration: {MinimumSiloGeneration}, {RecentlyDeadSilos.Count} retained deaths, {this.Entries.Count} silos");
             foreach (var entry in this.Entries) sb.Append($", {entry.Value}");
             sb.Append(']');
             return sb.ToString();
@@ -206,7 +336,7 @@ namespace Orleans.Runtime
         {
             var written = 0;
 
-            if (!destination.TryWrite($"[Version: {this.Version}, {this.Entries.Count} silos", out var length))
+            if (!destination.TryWrite($"[Version: {this.Version}, MinimumSiloGeneration: {MinimumSiloGeneration}, {RecentlyDeadSilos.Count} retained deaths, {this.Entries.Count} silos", out var length))
             {
                 goto fail;
             }

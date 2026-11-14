@@ -627,7 +627,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
 
     private Task SnapshotSingleOp(
         object codec,
-        IJournaledState state,
+        IStateMachine state,
         Action<JournalStreamWriter> write,
         Action assertCommands)
     {
@@ -640,7 +640,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
 
     private Task SnapshotMultiOp(
         object codec,
-        IJournaledState state,
+        IStateMachine state,
         Action<JournalStreamWriter> writeSequence,
         string[] expectedCommands)
     {
@@ -651,7 +651,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         return VerifyBinarySnapshot(bytes);
     }
 
-    private static void AssertCommandsEqual(string[] expected, IJournaledState state)
+    private static void AssertCommandsEqual(string[] expected, IStateMachine state)
     {
         var commands = state switch
         {
@@ -671,7 +671,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         return slice.ToArray();
     }
 
-    private void ReadAndAssert(byte[] bytes, IJournaledState state, Action assertCommands)
+    private void ReadAndAssert(byte[] bytes, IStateMachine state, Action assertCommands)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);

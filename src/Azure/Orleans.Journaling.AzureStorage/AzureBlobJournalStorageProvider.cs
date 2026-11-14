@@ -1,8 +1,6 @@
 using System.Runtime.CompilerServices;
-using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -56,38 +54,88 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         return new AzureBlobJournalStorage(_shared, journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
-        ListOptions? options = null,
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+        JournalCatalogListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
-        var container = GetDefaultContainerClient();
-
-        await foreach (var page in container.GetBlobsAsync(
-            traits: BlobTraits.None,
-            states: BlobStates.None,
-            prefix: prefix.IsDefault ? null : prefix.Value,
-            cancellationToken: cancellationToken).AsPages(pageSizeHint: 5000))
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
         {
+            yield break;
+        }
+
+        var container = GetDefaultContainerClient();
+        var prefix = range.ListingPrefix ?? string.Empty;
+        var maxBlobName = GetNativeBound(range.MaxId, prefix, isUpperBound: true);
+        var startFrom = GetNativeBound(range.LowerBound, prefix, isUpperBound: false);
+        await foreach (var page in container.GetBlobsAsync(
+            new GetBlobsOptions
+            {
+                Traits = range.IncludeMetadata ? BlobTraits.Metadata : BlobTraits.None,
+                Prefix = AzureBlobJournalStorageLayout.GetWalBlobName(prefix),
+                StartFrom = startFrom,
+            },
+            cancellationToken).AsPages(pageSizeHint: 5000))
+        {
+            _shared.Instruments.OnCatalogPage(page.Values.Count);
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var item in page.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append
-                    || !item.Name.EndsWith("/wal", StringComparison.Ordinal))
+                // The native bound encloses every ordinal match in both flat and HNS traversal.
+                if (maxBlobName is not null && string.CompareOrdinal(item.Name, maxBlobName) > 0)
+                {
+                    yield break;
+                }
+
+                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append)
                 {
                     continue;
                 }
 
-                if (TryParseJournalId(item.Name[..^"/wal".Length], out var journalId) && prefix.IsPrefixOf(journalId))
+                if (AzureBlobJournalStorageLayout.TryGetJournalId(item.Name, out var journalId)
+                    && range.Contains(journalId.Value))
                 {
-                    yield return journalId;
+                    var entry = new JournalCatalogEntry(
+                        journalId,
+                        range.IncludeMetadata
+                            ? AzureBlobJournalStorage.CreateJournalMetadata(item.Properties.ETag!.Value, item.Metadata)
+                            : null);
+                    _shared.Instruments.OnCatalogEntry();
+                    yield return entry;
                 }
             }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private static string? GetNativeBound(string? bound, string prefix, bool isUpperBound)
+    {
+        if (bound is null || !System.Text.Ascii.IsValid(bound))
+        {
+            return null;
+        }
+
+        var index = 0;
+        while (index < bound.Length && index < prefix.Length && bound[index] == prefix[index])
+        {
+            index++;
+        }
+
+        // HNS sorts '/' first. Beyond the shared prefix, keep boundary characters above '/'
+        // so both service orderings agree, widening the requested interval where necessary.
+        for (; index < bound.Length; index++)
+        {
+            if (bound[index] <= '/')
+            {
+                var widened = isUpperBound ? string.Concat(bound.AsSpan(0, index), "0") : bound[..index];
+                return AzureBlobJournalStorageLayout.GetWalBlobName(widened);
+            }
+        }
+
+        return AzureBlobJournalStorageLayout.GetWalBlobName(bound);
     }
 
     public void Participate(ISiloLifecycle observer)
@@ -101,20 +149,6 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
     private BlobContainerClient GetDefaultContainerClient()
         => _defaultContainer ?? throw new InvalidOperationException(
             $"{nameof(AzureBlobJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
-
-    private static bool TryParseJournalId(string value, out JournalId journalId)
-    {
-        try
-        {
-            journalId = new JournalId(value);
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            journalId = default;
-            return false;
-        }
-    }
 
     private static IJournalFormat GetJournalFormat(IServiceProvider serviceProvider, string journalFormatKey)
     {

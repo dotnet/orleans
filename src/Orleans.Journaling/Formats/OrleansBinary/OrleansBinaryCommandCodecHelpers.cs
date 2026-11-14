@@ -10,6 +10,28 @@ namespace Orleans.Journaling;
 /// </summary>
 internal static class OrleansBinaryCommandCodecHelpers
 {
+    public static void WriteHeader(IBufferWriter<byte> output, params ReadOnlySpan<uint> values)
+    {
+#pragma warning disable CA2000 // The active entry lends its destination; disposing this writer would dispose the owning JournalBufferWriter.
+        var writer = Writer.Create(output, session: null!);
+#pragma warning restore CA2000
+        foreach (var value in values)
+        {
+            writer.WriteVarUInt32(value);
+        }
+
+        writer.Commit();
+    }
+
+    public static void WriteVersion(IBufferWriter<byte> output, ulong version)
+    {
+#pragma warning disable CA2000 // The active entry lends its destination; the JournalBufferWriter owns disposal.
+        var writer = Writer.Create(output, session: null!);
+#pragma warning restore CA2000
+        writer.WriteVarUInt64(version);
+        writer.Commit();
+    }
+
     public static void WriteValue<T>(
         IFieldCodec<T> codec,
         T value,

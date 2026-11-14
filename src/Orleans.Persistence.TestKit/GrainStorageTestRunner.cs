@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Assert = Orleans.Persistence.TestKit.StorageTestAssertions;
@@ -164,6 +165,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateExceptionAsync(
         CancellationToken cancellationToken)
     {
@@ -189,6 +192,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateExceptionAsync(
         CancellationToken cancellationToken)
     {
@@ -307,6 +312,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ReadNonExistentState()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ReadNonExistentStateAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -329,6 +336,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_WriteClearWrite()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_WriteClearWriteAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -369,6 +378,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_WriteClearRead()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_WriteClearReadAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -441,6 +452,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_WriteRead_IntegerKey()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_WriteRead_IntegerKeyAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -471,6 +484,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ETagChangesOnWrite()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ETagChangesOnWriteAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -508,6 +523,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ClearBeforeWrite()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ClearBeforeWriteAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -530,6 +547,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ClearStateDoesNotNullifyState()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ClearStateDoesNotNullifyStateAsync(
         CancellationToken cancellationToken)
     {
@@ -560,6 +579,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ClearUpdatesETag()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ClearUpdatesETagAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -590,6 +611,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ReadAfterClear()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ReadAfterClearAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -620,6 +643,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_MultipleClearOperations()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_MultipleClearOperationsAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -650,6 +675,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ReadNonExistentStateHasNonNullState()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ReadNonExistentStateHasNonNullStateAsync(
         CancellationToken cancellationToken)
     {
@@ -702,6 +729,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_ClearInconsistentFailsWithInconsistentStateExceptionAsync(
         CancellationToken cancellationToken)
     {
@@ -741,6 +770,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_WriteReadClearReadCycle()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_WriteReadClearReadCycleAsync(CancellationToken cancellationToken)
     {
         var grainTypeName = "TestGrain";
@@ -782,6 +813,8 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="PersistenceStorage_WriteWithSameValuesUpdatesETag()"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+        Justification = "Randomness selects test-data grain identifiers for storage conformance scenarios.")]
     public virtual async Task PersistenceStorage_WriteWithSameValuesUpdatesETagAsync(
         CancellationToken cancellationToken)
     {

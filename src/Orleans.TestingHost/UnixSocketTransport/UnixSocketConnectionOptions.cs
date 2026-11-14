@@ -1,9 +1,7 @@
 using System;
-using System.Buffers;
 using System.IO;
 using System.Net;
 using System.Text.RegularExpressions;
-using Orleans.Networking.Shared;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
@@ -16,11 +14,6 @@ public partial class UnixSocketConnectionOptions
     /// Gets or sets the function which maps an endpoint to a Unix domain socket path.
     /// </summary>
     public Func<EndPoint, string> ConvertEndpointToPath { get; set; } = DefaultConvertEndpointToPath;
-
-    /// <summary>
-    /// Gets or sets the memory pool factory.
-    /// </summary>
-    internal Func<MemoryPool<byte>> MemoryPoolFactory { get; set; } = () => KestrelMemoryPool.Create();
 
     [GeneratedRegex("[^a-zA-Z0-9]")]
     private static partial Regex ConvertEndpointRegex();

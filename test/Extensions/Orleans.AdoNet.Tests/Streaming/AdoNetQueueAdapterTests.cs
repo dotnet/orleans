@@ -98,7 +98,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var serviceProvider = _fixture.Services;
 
         // act
-        var adapter = new AdoNetQueueAdapter(name, streamOptions, clusterOptions, cacheOptions, mapper, _queries, serializer, logger, serviceProvider);
+        var adapter = new AdoNetQueueAdapter(name, streamOptions, clusterOptions, cacheOptions, mapper, _queries, new AdoNetStreamPositions(), serializer, logger, serviceProvider);
 
         // assert
         Assert.Equal(name, adapter.Name);
@@ -133,7 +133,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var hashMapper = new HashRingBasedStreamQueueMapper(hashOptions, "MyQueue");
         var adoNetMapper = new AdoNetStreamQueueMapper(hashMapper);
         var adoNetQueueId = adoNetMapper.GetAdoNetQueueId(streamId);
-        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, adoNetMapper, _queries, serializer, logger, _fixture.Services);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, adoNetMapper, _queries, new AdoNetStreamPositions(), serializer, logger, _fixture.Services);
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
 
         // act - enqueue (via adapter) some messages
@@ -202,7 +202,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var queueId = hashMapper.GetQueueForStream(streamId);
         var adoMapper = new AdoNetStreamQueueMapper(hashMapper);
         var adoNetQueueId = adoMapper.GetAdoNetQueueId(streamId);
-        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, adoMapper, _queries, new AdoNetStreamPositions(), serializer, logger, _fixture.Services);
 
         // act - enqueue (via adapter) some messages
         var beforeEnqueued = DateTime.UtcNow.AddSeconds(-1);

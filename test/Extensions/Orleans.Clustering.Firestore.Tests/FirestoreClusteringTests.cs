@@ -95,33 +95,70 @@ public class FirestoreClusteringTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task UpdateIAmAliveDoesNotOverwriteNewerHeartbeat()
+    public async Task UpdateIAmAlivePreservesMembershipFieldsAndVersion()
     {
         var current = TestStartTime.AddMinutes(2);
         await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken, current);
 
+        var before = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        var original = Assert.IsType<Tuple<MembershipEntry, string>>(before.TryGet(this._siloAddress));
+        Assert.Equal(Utils.FormatTimestamp(this._entity.ETag!.Value), original.Item2);
+        var expected = original.Item1;
+        expected.IAmAliveTime = current.AddMinutes(1).UtcDateTime;
         var entry = this._entity.ToMembershipEntry();
-        entry.IAmAliveTime = current.AddMinutes(-1).UtcDateTime;
+        entry.IAmAliveTime = expected.IAmAliveTime;
+        entry.HostName = "stale-host";
+        entry.Status = SiloStatus.Joining;
         await this._membershipTable.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
-        var row = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
-        Assert.Equal(current.UtcDateTime, Assert.Single(row.Members).Item1.IAmAliveTime);
-
-        entry.IAmAliveTime = current.AddMinutes(1).UtcDateTime;
-        await this._membershipTable.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
-
-        row = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
-        Assert.Equal(entry.IAmAliveTime, Assert.Single(row.Members).Item1.IAmAliveTime);
+        var after = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        var updated = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(entry.SiloAddress));
+        Assert.Equal(expected.ToFullString(), updated.Item1.ToFullString());
+        var stored = await this._storage.ReadEntity<SiloInstanceEntity>(this._entity.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal(Utils.FormatTimestamp(stored.ETag!.Value), updated.Item2);
+        Assert.NotEqual(original.Item2, updated.Item2);
+        Assert.Equal(before.Version.Version, after.Version.Version);
+        Assert.Equal(before.Version.VersionEtag, after.Version.VersionEtag);
     }
 
     [Fact]
-    public async Task ReadRowReturnsVersionWhenSiloDoesNotExist()
+    public async Task UpdateRowUsesOriginalRowETagAndTableVersionAfterHeartbeat()
+    {
+        await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken);
+        var before = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        var original = Assert.IsType<Tuple<MembershipEntry, string>>(before.TryGet(this._siloAddress));
+        var heartbeat = this._entity.ToMembershipEntry();
+        heartbeat.IAmAliveTime = TestStartTime.AddMinutes(1).UtcDateTime;
+        await this._membershipTable.UpdateIAmAliveAsync(heartbeat, TestContext.Current.CancellationToken);
+
+        original.Item1.Status = SiloStatus.ShuttingDown;
+        Assert.True(await this._membershipTable.UpdateRowAsync(
+            original.Item1, original.Item2, before.Version.Next(), TestContext.Current.CancellationToken));
+
+        var after = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        var updated = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(this._siloAddress));
+        Assert.Equal(original.Item1.SiloAddress, updated.Item1.SiloAddress);
+        Assert.Equal(SiloStatus.ShuttingDown, updated.Item1.Status);
+        Assert.Equal(original.Item1.HostName, updated.Item1.HostName);
+        Assert.Equal(original.Item1.SiloName, updated.Item1.SiloName);
+        Assert.Equal(original.Item1.ProxyPort, updated.Item1.ProxyPort);
+        Assert.Equal(original.Item1.StartTime, updated.Item1.StartTime);
+        Assert.Equal(before.Version.Version + 1, after.Version.Version);
+        Assert.NotEqual(before.Version.VersionEtag, after.Version.VersionEtag);
+        var stored = await this._storage.ReadEntity<SiloInstanceEntity>(this._entity.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal(Utils.FormatTimestamp(stored.ETag!.Value), updated.Item2);
+    }
+
+    [Fact]
+    public async Task ReadAllReturnsVersionWhenSiloDoesNotExist()
     {
         var expected = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        var actual = await this._membershipTable.ReadRowAsync(SiloAddressUtils.NewLocalSiloAddress(this._generation + 1), TestContext.Current.CancellationToken);
+        var actual = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        Assert.Empty(actual.Members);
+        Assert.Null(actual.TryGet(SiloAddressUtils.NewLocalSiloAddress(this._generation + 1)));
         Assert.Equal(expected.Version.Version, actual.Version.Version);
         Assert.Equal(expected.Version.VersionEtag, actual.Version.VersionEtag);
     }
@@ -140,13 +177,13 @@ public class FirestoreClusteringTests : IAsyncLifetime
         };
         var table = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.True(await this._membershipTable.InsertRowAsync(entry, table.Version.Next(), TestContext.Current.CancellationToken));
-        var inserted = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
-        var insertedEtag = Assert.Single(inserted.Members).Item2;
+        var inserted = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        var insertedEtag = inserted.TryGet(entry.SiloAddress)!.Item2;
 
         Assert.True(await this._membershipTable.UpdateRowAsync(entry, insertedEtag, inserted.Version.Next(), TestContext.Current.CancellationToken));
 
-        var updated = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
-        Assert.NotEqual(insertedEtag, Assert.Single(updated.Members).Item2);
+        var updated = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        Assert.NotEqual(insertedEtag, updated.TryGet(entry.SiloAddress)!.Item2);
     }
 
     private async Task WriteSiloInstance(

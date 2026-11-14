@@ -116,6 +116,8 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped signature and AWS SDK List<KeySchemaElement>, List<AttributeDefinition>, and List<GlobalSecondaryIndex> request contracts.")]
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -147,49 +149,56 @@ namespace Orleans.Transactions.DynamoDB
         [MemberNotNull(nameof(_ddbClient))]
         private void CreateClient()
         {
-            if (this._service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                this._service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            var isServiceUrl = Uri.TryCreate(this._service, UriKind.Absolute, out var serviceUri)
+                && (serviceUri.Scheme == Uri.UriSchemeHttp || serviceUri.Scheme == Uri.UriSchemeHttps);
+            var config = isServiceUrl
+                ? new AmazonDynamoDBConfig { ServiceURL = this._service }
+                : new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) };
+            var credentials = GetClientCredentials(serviceUri);
+
+            this._ddbClient = credentials is null
+                ? new AmazonDynamoDBClient(config)
+                : new AmazonDynamoDBClient(credentials, config);
+        }
+
+        private AWSCredentials? GetClientCredentials(Uri? serviceUri)
+        {
+            var credentials = GetExplicitCredentials();
+            if (credentials is null && serviceUri?.Scheme == Uri.UriSchemeHttp)
             {
-                // Local DynamoDB instance (for testing)
-                var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this._service });
+                credentials = new BasicAWSCredentials("dummy", "dummyKey");
             }
-            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey) && !string.IsNullOrEmpty(this._token))
+
+            return credentials;
+        }
+
+        private AWSCredentials? GetExplicitCredentials()
+        {
+            if (!string.IsNullOrEmpty(this._accessKey)
+                && !string.IsNullOrEmpty(this.secretKey)
+                && !string.IsNullOrEmpty(this._token))
             {
-                // AWS DynamoDB instance (auth via explicit credentials and token)
-                var credentials = new SessionAWSCredentials(this._accessKey, this.secretKey, this._token);
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
+                return new SessionAWSCredentials(this._accessKey, this.secretKey, this._token);
             }
-            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey))
+
+            if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {
-                // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(this._accessKey, this.secretKey);
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
+                return new BasicAWSCredentials(this._accessKey, this.secretKey);
             }
-            else if (!string.IsNullOrEmpty(this._profileName))
+
+            if (!string.IsNullOrEmpty(this._profileName))
             {
-                // AWS DynamoDB instance (auth via explicit credentials and token found in a named profile)
                 var chain = new CredentialProfileStoreChain();
                 if (chain.TryGetAWSCredentials(this._profileName, out var credentials))
                 {
-                    this._ddbClient = new AmazonDynamoDBClient(
-                        credentials,
-                        new AmazonDynamoDBConfig
-                        {
-                            RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service)
-                        });
+                    return credentials;
                 }
-                else
-                {
-                    throw new InvalidOperationException(
-                        $"AWS named profile '{this._profileName}' provided, but credentials could not be retrieved");
-                }
+
+                throw new InvalidOperationException(
+                    $"AWS named profile '{this._profileName}' provided, but credentials could not be retrieved");
             }
-            else
-            {
-                // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this._ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
-            }
+
+            return null;
         }
 
         private async Task<TableDescription?> GetTableDescription(string tableName, CancellationToken cancellationToken = default)
@@ -656,7 +665,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
+            => DeleteEntryAsync(tableName, keys, CancellationToken.None, conditionExpression, conditionValues);
+
+        internal Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, CancellationToken cancellationToken,
+            string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntry(_logger, tableName, new(keys));
 
             try
@@ -673,7 +687,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (conditionValues != null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
-                return _ddbClient.DeleteItemAsync(request);
+                return _ddbClient.DeleteItemAsync(request, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -695,7 +709,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="tableName">The table name.</param>
         /// <param name="toDelete">The keys of the entries to delete.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete, CancellationToken cancellationToken)
+        public async Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntries(_logger, tableName);
@@ -703,7 +717,7 @@ namespace Orleans.Transactions.DynamoDB
             if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
 
             if (toDelete.Count == 0)
-                return Task.CompletedTask;
+                return;
 
             try
             {
@@ -719,7 +733,12 @@ namespace Orleans.Transactions.DynamoDB
                     batch.Add(writeRequest);
                 }
                 request.RequestItems.Add(tableName, batch);
-                return _ddbClient.BatchWriteItemAsync(request, cancellationToken);
+                var response = await _ddbClient.BatchWriteItemAsync(request, cancellationToken);
+                var unprocessedCount = response.UnprocessedItems?.Values.Sum(items => items.Count) ?? 0;
+                if (unprocessedCount > 0)
+                {
+                    throw new InvalidOperationException($"Amazon DynamoDB failed to delete {unprocessedCount} item(s) from table {tableName}.");
+                }
             }
             catch (Exception exc)
             {
@@ -736,6 +755,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
         /// <returns>The object translated by the resolver function</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
             => ReadSingleEntryAsync(tableName, keys, resolver, CancellationToken.None);
 
@@ -745,9 +765,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The entry keys.</param>
         /// <param name="resolver">Converts the returned fields to the result.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public async Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken) where TResult : class
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(resolver);
+
             try
             {
                 var request = new GetItemRequest
@@ -788,6 +811,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
             => QueryAsync(tableName, keys, keyConditionExpression, resolver, CancellationToken.None, indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
 
@@ -802,9 +826,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="scanIndexForward">Whether the index is read in ascending order.</param>
         /// <param name="lastEvaluatedKey">The previous page's continuation key.</param>
         /// <param name="consistentRead">Whether reads must be strongly consistent.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(resolver);
+
             try
             {
                 var request = new QueryRequest
@@ -855,6 +882,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
                 string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
                 string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
@@ -870,6 +898,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="indexName">The optional secondary index name.</param>
         /// <param name="scanIndexForward">Whether the index is read in ascending order.</param>
         /// <param name="consistentRead">Whether reads must be strongly consistent.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public async Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
                 string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
                 CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
@@ -904,8 +933,15 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="expression">The filter expression</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
-        public async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
+        public Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class =>
+            ScanAsync(tableName, attributes, expression, resolver, CancellationToken.None);
+
+        internal async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken) where TResult : class
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(resolver);
+
             // From the Amazon documentation:
             // "A single Scan operation will read up to the maximum number of items set
             // (if using the Limit parameter) or a maximum of 1 MB of data and then apply
@@ -934,7 +970,7 @@ namespace Orleans.Transactions.DynamoDB
                         request.ExclusiveStartKey = exclusiveStartKey;
                     }
 
-                    var response = await _ddbClient.ScanAsync(request);
+                    var response = await _ddbClient.ScanAsync(request, cancellationToken);
 
                     if (response.Items != null)
                     {
@@ -955,6 +991,10 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 return resultList;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -1105,6 +1145,8 @@ namespace Orleans.Transactions.DynamoDB
         /// </summary>
         /// <param name="transactItems">Transact write items to be performed</param>
         /// <returns></returns>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped List<TransactWriteItem> signature and passes the AWS SDK request collection unchanged.")]
         public Task WriteTxAsync(List<TransactWriteItem> transactItems)
         {
             try

@@ -29,8 +29,9 @@ namespace Tester.EventSourcingTests
                     .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
                     {
-                        builder.AddFilter(typeof(MemoryGrainStorage).FullName, LogLevel.Debug);
-                        builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
+                        // Capture worker phases, storage-provider entry, and storage-grain receipt for #11398.
+                        builder.AddFilter("Orleans.Runtime.LogConsistency", LogLevel.Debug);
+                        builder.AddFilter(typeof(MemoryGrainStorage).Namespace, LogLevel.Trace);
                     })
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("AzureStore")

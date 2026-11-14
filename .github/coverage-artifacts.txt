@@ -4,7 +4,7 @@ test_output_test-azure-storage_net10.0
 test_output_test-cassandra_4.0_net10.0
 test_output_test-cassandra_4.1_net10.0
 test_output_test-cassandra_5.0_net10.0
-test_output_test-codegenerator_ubuntu-latest_net10.0
+test_output_test-codegenerator_ubuntu-24.04_net10.0
 test_output_test-consul_net10.0
 test_output_test-dynamodb_net10.0
 test_output_test-google_net10.0
@@ -18,6 +18,6 @@ test_output_test-sqlite_net10.0
 test_output_test-sqlserver_net10.0
 test_output_test-sqs_net10.0
 test_output_test-zookeeper_net10.0
-test_output_test_BVT_ubuntu-latest_net10.0
-test_output_test_Functional_ubuntu-latest_net10.0
-test_output_test_SlowBVT_ubuntu-latest_net10.0
+test_output_test_BVT_ubuntu-24.04_net10.0
+test_output_test_Functional_ubuntu-24.04_net10.0
+test_output_test_SlowBVT_ubuntu-24.04_net10.0

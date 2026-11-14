@@ -426,8 +426,10 @@ namespace Orleans.Runtime
         /// <typeparam name="T">The underlying method return type.</typeparam>
         /// <param name="methodDescription">The method description.</param>
         /// <returns>The result of the invocation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="methodDescription"/> is <see langword="null"/>.</exception>
         protected ValueTask<T?> InvokeAsync<T>(IRequest methodDescription)
         {
+            ArgumentNullException.ThrowIfNull(methodDescription);
             return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
         }
 
@@ -436,8 +438,10 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="methodDescription">The method description.</param>
         /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="methodDescription"/> is <see langword="null"/>.</exception>
         protected ValueTask InvokeAsync(IRequest methodDescription)
         {
+            ArgumentNullException.ThrowIfNull(methodDescription);
             return this.Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
         }
 
@@ -445,8 +449,10 @@ namespace Orleans.Runtime
         /// Invokes the provided method.
         /// </summary>
         /// <param name="methodDescription">The method description.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="methodDescription"/> is <see langword="null"/>.</exception>
         protected void Invoke(IRequest methodDescription)
         {
+            ArgumentNullException.ThrowIfNull(methodDescription);
             this.Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
         }
     }
@@ -473,8 +479,10 @@ namespace Orleans.Runtime
         /// Returns a string representation of the request.
         /// </summary>
         /// <returns>A string representation of the request.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
         public static string ToString(IRequest request)
         {
+            ArgumentNullException.ThrowIfNull(request);
             var result = new StringBuilder();
             result.Append(request.GetInterfaceName());
             if (request.GetTarget() is { } target)
@@ -525,8 +533,10 @@ namespace Orleans.Runtime
         /// Returns a string representation of the request.
         /// </summary>
         /// <returns>A string representation of the request.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
         public static string ToMethodCallString(IRequest request)
         {
+            ArgumentNullException.ThrowIfNull(request);
             var result = new StringBuilder();
             result.Append(request.GetInterfaceName());
             result.Append('.');
@@ -622,6 +632,16 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public virtual bool IsCancellable => false;
+
+        /// <summary>
+        /// Gets a value indicating whether any argument of this request may be a <see cref="GrainCancellationToken"/>.
+        /// </summary>
+        /// <remarks>
+        /// When <see langword="false"/>, the runtime does not inspect arguments for <see cref="GrainCancellationToken"/> instances,
+        /// which avoids boxing value-type arguments via <see cref="GetArgument(int)"/>.
+        /// The default is <see langword="true"/> so that requests which do not override this property are always inspected.
+        /// </remarks>
+        public virtual bool MayHaveGrainCancellationToken => true;
     }
 
     /// <summary>

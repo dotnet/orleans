@@ -11,9 +11,15 @@ Cluster membership answers one question for the rest of the runtime: which silo 
 
 ## Identity, status, and views
 
-A silo identity includes its advertised endpoint and a generation value, so a restarted process at the same endpoint is a new identity. Its <xref:Orleans.Runtime.SiloStatus> progresses through `Created`, `Joining`, `Active`, and a terminating status (`ShuttingDown`, `Stopping`, or `Dead`).
+A silo identity includes its advertised endpoint and a generation value, so a restarted process at the same endpoint is a new identity. Its <xref:Orleans.Runtime.SiloStatus> progresses in one direction through `Created`, `Joining`, `Active`, and terminating states (`ShuttingDown`, `Stopping`, or `Dead`).
 
-Each successful versioned membership-table mutation, such as inserting a row or changing a status, advances the table version. Periodic <xref:Orleans.IMembershipTable.UpdateIAmAlive*> writes leave the version unchanged. `MembershipTableManager` publishes immutable snapshots through `ClusterMembershipService`; consumers ignore older versions. Directory ownership, gateway discovery, and failure recovery therefore observe a monotonically ordered sequence of views even if notifications arrive out of order.
+The membership system provides a **canonical membership view**: a versioned view of silo identities and their states. Each successful versioned membership-table mutation advances the version by exactly one. A version uniquely identifies its canonical membership view throughout the cluster, so two hosts observing version N have the same canonical membership view. A host can advance directly from N to N + 2 when its next refresh observes two completed mutations.
+
+`MembershipTableManager` publishes snapshots through `ClusterMembershipService` with monotonically advancing canonical membership views. Directory ownership, gateway discovery, and failure recovery rely on this guarantee.
+
+Per-silo `IAmAliveTime` is tracked independently of the canonical membership view. Periodic <xref:Orleans.IMembershipTable.UpdateIAmAliveAsync*> writes leave the view version unchanged. Snapshot updates retain the maximum observed timestamp for each silo, so local liveness timestamps advance monotonically as table reads and peer snapshots arrive. At the same version, merging retains the accepted versioned fields.
+
+Snapshots can prune previously `Dead` rows at the same version while retaining every non-Dead row. Pruning preserves the versioned fields and maximum `IAmAliveTime` of each retained entry.
 
 ```mermaid
 flowchart LR
@@ -35,19 +41,35 @@ flowchart LR
 
 Resolve <xref:Orleans.Runtime.IClusterMembershipService> from dependency injection when a silo-hosted service or runtime component needs the cluster view. <xref:Orleans.Runtime.IClusterMembershipService.CurrentSnapshot> returns the current local, immutable <xref:Orleans.Runtime.ClusterMembershipSnapshot> without waiting for storage access.
 
-<xref:Orleans.Runtime.IClusterMembershipService.MembershipUpdates> is an asynchronous sequence which first yields the current local snapshot and then yields snapshots with strictly increasing <xref:Orleans.Runtime.ClusterMembershipSnapshot.Version> values. Consumers can retain and process each snapshot as a complete membership view.
+<xref:Orleans.Runtime.IClusterMembershipService.MembershipUpdates> is an asynchronous sequence which first yields the current local snapshot and then yields updated snapshots. <xref:Orleans.Runtime.ClusterMembershipSnapshot.Version> advances with canonical membership changes. Updates at the same version can prune dead rows or advance local knowledge of absent silo identities. Consumers can retain and process each snapshot as a complete membership view.
 
 Compare the snapshot version with the required <xref:Orleans.Runtime.MembershipVersion>. When the local view must reach a minimum version, await <xref:Orleans.Runtime.IClusterMembershipService.Refresh*> with that version; it completes after the local snapshot catches up. The [BasicClustering sample](https://github.com/dotnet/orleans/tree/main/samples/BasicClustering) demonstrates a hosted service which consumes membership updates.
+
+## Classify absent silos
+
+<xref:Orleans.Runtime.ClusterMembershipSnapshot.GetSiloStatus*> returns a present member's recorded status, including long-running members with old generations. For an absent identity, membership uses retained death evidence, successor incarnations, and a generation cutoff fixed in the snapshot. Version-aware lookups can also establish death when a newer view omits a previously recorded owner. Runtime paths which validate previously registered identities against a fresh membership read can establish death before the age cutoff.
+
+<xref:Orleans.Configuration.ClusterMembershipOptions.SiloGenerationRetirementAge?displayProperty=nameWithType> controls age-based classification and defaults to one hour. When publishing a view, each peer derives the cutoff from its local UTC clock and the timestamp-derived positive silo generation. The cutoff advances monotonically, so clock rollback preserves prior retirement knowledge. Each retained snapshot gives fixed status answers. Zero retires absent generations older than publication time; negative values are configuration errors. Setting the option to `null` disables age-based retirement while retaining observed death evidence.
+
+Membership keeps recently removed identities separately from the canonical rows. Once the cutoff covers an identity, it replaces the individual record. With retirement enabled and normal timestamp-derived generations, retained history follows the generation window and recent churn rather than the cluster's lifetime; the configured age is a time-window bound rather than a byte cap. With retirement disabled, observed death records remain for the observer's lifetime.
+
+The cutoff and retained identity records are local observer state. A new observer obtains current rows and computes its own cutoff. A recent absent identity with no prior-registration evidence remains unknown until further validation or the cutoff establishes death.
+
+Choose an age which accommodates host clock skew, process pauses, and membership-storage delays. A registration write stalled beyond that age can commit after another peer has classified its absent identity as dead. The committed row then supplies the identity's actual status.
 
 ## Joining
 
 A starting silo writes its row, becomes `Joining`, and validates two-way connectivity with active members before becoming `Active`. This prevents a partitioned process from silently joining one side of a cluster.
 
-The periodic `IAmAlive` value is not the peer heartbeat. It is a timestamp written to the membership row for diagnostics and startup disaster recovery. A sufficiently stale active row can be ignored during the joining connectivity check, allowing a cluster to recover after all processes were lost without cleanly declaring each other dead.
+Before its first registration, the local lifecycle remains `Created` until a membership write succeeds or recorded death, removal, or successor evidence establishes a terminal outcome. This applies with a zero retirement age as well; snapshot lookups by other observers continue to use their fixed cutoff.
+
+`IAmAliveTime` is a membership-row liveness timestamp used for diagnostics and startup disaster recovery. A joining silo monitors suspected and stale peers and reevaluates monitoring candidates at the <xref:Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout?displayProperty=nameWithType> interval. It compares the latest snapshot's timestamps with current time, so a peer whose timestamp becomes stale during startup enters monitoring even when the membership view remains unchanged.
+
+Those monitors apply the usual failed-probe threshold, connection-liveness checks, and death-vote protocol. Initial connectivity validation retries for up to <xref:Orleans.Configuration.ClusterMembershipOptions.MaxJoinAttemptTime?displayProperty=nameWithType>, completing when each active peer responds or membership records its departure. This allows a replacement silo to recover after an ungraceful process exit and become `Active` through the normal membership protocol.
 
 ## Failure detection and death votes <a name="the-membership-protocol"></a>
 
-Active silos monitor peers selected from the membership view. `ClusterHealthMonitor` sends probes over silo-to-silo messaging, tracks consecutive failures, and can use indirect probes to distinguish a failed target from an unhealthy observer. A failed monitor writes a timestamped vote into the target's membership row.
+Active silos monitor hash-ring-selected peers plus suspected and stale peers. Joining and active silos reevaluate that selection on membership updates and at the `TableRefreshTimeout` interval, preserving existing monitors and their probe counters. `ClusterHealthMonitor` sends probes over silo-to-silo messaging, tracks consecutive failures, and can use indirect probes to distinguish a failed target from an unhealthy observer. A failed monitor writes a timestamped vote into the target's membership row.
 
 Each observer maintains a [Phi Accrual failure detector](https://paperhub.s3.amazonaws.com/f516fdfa940caa08c679d3946b273128.pdf) for each peer. The detector models successful direct-probe round-trip times and estimates the timeout at which the probability of a later response is sufficiently low. The timeout starts at <xref:Orleans.Configuration.ClusterMembershipOptions.ProbeTimeout?displayProperty=nameWithType> and adapts after enough observations. Failures are excluded because they only show that the response exceeded the current timeout, while indirect results are excluded because they measure a different observer's network path.
 
@@ -90,19 +112,22 @@ The defaults are defined by <xref:Orleans.Configuration.ClusterMembershipOptions
 | <xref:Orleans.Configuration.ClusterMembershipOptions.DeathVoteExpirationTimeout?displayProperty=nameWithType> | 2 minutes | Lifetime of a death vote |
 | <xref:Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout?displayProperty=nameWithType> | 1 minute | Fallback membership-table refresh period |
 | <xref:Orleans.Configuration.ClusterMembershipOptions.IAmAliveTablePublishTimeout?displayProperty=nameWithType> | 30 seconds | Membership-row liveness timestamp period |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.SiloGenerationRetirementAge?displayProperty=nameWithType> | 1 hour | Age cutoff for classifying absent positive silo generations as dead |
 
 These values are protocol parameters, not independent timers: indirect probing, local health, scheduling delays, and table contention all affect observed detection time. Following [Lifeguard's local-health awareness principle](https://arxiv.org/abs/1707.00788), the runtime increases probe tolerance when `LocalSiloHealthMonitor` detects thread-pool delay, timer delay, or other local distress, reducing false accusations from an unhealthy observer.
 
 ## Membership-table contract <a name="membership-table"></a>
 
-An <xref:Orleans.IMembershipTable> implementation is more than a list of endpoints. It must support:
+An <xref:Orleans.IMembershipTable> implementation coordinates canonical membership changes through:
 
 - insertion of a new silo row;
 - optimistic, conditional update of a silo row;
 - atomic advancement of the table version with a row mutation;
-- reads which return rows and the corresponding version;
+- atomic full-table snapshots containing rows and their corresponding version;
 - periodic `IAmAlive` updates; and
 - durable availability appropriate for cluster coordination.
+
+<xref:Orleans.IMembershipTable.ReadAllAsync*> obtains a coherent snapshot, and <xref:Orleans.MembershipTableData.TryGet*> selects a silo's entry and row ETag within that view. Conditional mutations return their success status. Snapshot refreshes provide the current table state and ETag for subsequent updates.
 
 Table unavailability favors safety over liveness. Existing silos can continue processing calls, but they cannot durably admit a member or declare a failed member dead. A provider must not synthesize successful updates when its backing store is unavailable.
 
@@ -112,8 +137,8 @@ Official providers adapt transactions, ETags, lightweight transactions, or compa
 
 Membership is deliberately separate from the services which consume it:
 
-- `LocalGrainDirectory` adjusts consistent-hash ownership after view changes.
-- the experimental distributed directory runs an explicit range-transfer protocol.
+- `LegacyGrainDirectory` adjusts consistent-hash ownership after view changes.
+- the distributed directory runs an explicit range-transfer protocol.
 - placement removes unavailable or overloaded candidates.
 - clients refresh the gateway list.
 - persistent-stream queue balancers redistribute queue responsibility.

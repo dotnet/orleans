@@ -14,6 +14,9 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class CachingSiloAddressCodec
     {
+        // Length prefix, hash, IPv6 address with its length prefix, port, and generation.
+        internal const int MaxEncodedSize = 1 + 4 + 1 + 16 + 5 + 4;
+
         internal static ConcurrentLruCache<SiloAddress, (SiloAddress Value, byte[] Encoded)> SharedCache { get; } = new(capacity: 1024);
 
         // Purge entries which have not been accessed in over 2 minutes.
@@ -32,9 +35,7 @@ namespace Orleans.Runtime.Messaging
 
         public SiloAddress? ReadRaw<TInput>(ref Reader<TInput> reader)
         {
-            var currentTimestamp = Environment.TickCount64;
-
-            SiloAddress? result = null;
+            SiloAddress result;
             byte[]? payloadArray = default;
             var length = (int)reader.ReadVarUInt32();
             if (length == 0)
@@ -47,11 +48,11 @@ namespace Orleans.Runtime.Messaging
                 payloadSpan = payloadArray = reader.ReadBytes((uint)length);
             }
 
-            // This payload only contains primitive values, so no serializer session is required.
-            var innerReader = Reader.Create(payloadSpan, null!);
+            var innerReader = Reader.Create(payloadSpan, session: null!);
             var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
+            var currentTimestamp = Environment.TickCount64;
             if (exists && payloadSpan.SequenceEqual(cacheEntry.Encoded))
             {
                 result = cacheEntry.Value;
@@ -132,7 +133,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var innerWriter = Writer.Create(new PooledBuffer(), null!);
+            var innerWriter = Writer.Create(new PooledBuffer(), session: null!);
             innerWriter.WriteInt32(value.GetConsistentHashCode());
             WriteSiloAddressInner(ref innerWriter, value);
             innerWriter.Commit();

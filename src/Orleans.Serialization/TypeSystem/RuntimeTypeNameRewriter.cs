@@ -187,6 +187,11 @@ internal static class RuntimeTypeNameRewriter
         private (TypeSpec Type, string? Assembly) HandleArray(ArrayTypeSpec type, string? assemblyName)
         {
             var element = ApplyInner(type.ElementType, assemblyName);
+            if (element.Type is AssemblyQualifiedTypeSpec qualified)
+            {
+                return (new ArrayTypeSpec(qualified.Type, type.Dimensions), qualified.Assembly);
+            }
+
             if (ReferenceEquals(element.Type, type.ElementType))
             {
                 return (type, element.Assembly);

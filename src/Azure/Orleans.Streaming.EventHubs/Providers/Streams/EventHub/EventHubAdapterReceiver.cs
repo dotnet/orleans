@@ -274,7 +274,9 @@ namespace Orleans.Streaming.EventHubs
         private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(QueueCacheCursorResult<object> result)
             => result.Kind switch
             {
+#pragma warning disable CA2000 // The successful result transfers this cursor to the caller for disposal.
                 QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(this.cache!, result.Cursor!)),
+#pragma warning restore CA2000
                 QueueCacheCursorResultKind.CacheMiss => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(result.CacheMiss!.Value),
                 QueueCacheCursorResultKind.NotSupported => QueueCacheCursorResult<IQueueCacheCursor>.NotSupported,
                 _ => throw new InvalidOperationException("The cursor result is not initialized."),

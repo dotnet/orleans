@@ -1,8 +1,10 @@
 using System.Buffers;
 using System.Text;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Journaling;
+using Orleans.Journaling.Tests;
 using Orleans.Runtime;
 using Orleans.Storage;
 using StackExchange.Redis;
@@ -18,6 +20,210 @@ namespace Tester.Redis.Journaling;
 [TestCategory("BVT")]
 public sealed class RedisJournalStorageTests
 {
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public async Task ObservedAbsenceFencesCompetingCreation(string operation)
+    {
+        TestUtils.CheckForRedis();
+        await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
+        await JournalStorageContractTests.ObservedAbsenceFencesCompetingCreation(
+            () => context.Provider.CreateStorage(new("absence")), operation);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public async Task MetadataPreservesStalePrecondition(string operation)
+    {
+        TestUtils.CheckForRedis();
+        await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
+        await JournalStorageContractTests.MetadataPreservesStalePrecondition(
+            () => context.Provider.CreateStorage(new("stale")), operation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeleteAsync_CompetingCreationAfterObservedAbsenceFencesWrites(bool replace)
+    {
+        var database = Substitute.For<IDatabase>();
+        var callCount = 0;
+        database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>())
+            .Returns(call =>
+            {
+                switch (++callCount)
+                {
+                    case 1:
+                        // Recovery observes absence.
+                        return RedisResult.Create(new RedisValue[] { 0 });
+                    case 2:
+                        // A competing creation wins before the conditional delete script, which requires absence.
+                        Assert.Equal(string.Empty, call.Arg<RedisValue[]>()[0].ToString());
+                        return RedisResult.Create(new RedisValue[] { -1 });
+                    case 3:
+                        Assert.Equal(string.Empty, call.Arg<RedisValue[]>()[0].ToString());
+                        return RedisResult.Create(new RedisValue[] { -1 });
+                    default:
+                        throw new InvalidOperationException("Unexpected storage request.");
+                }
+            });
+        var storage = new RedisJournalStorage(database, "test", "journal", "json", new(), new("journal"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Equal(0, callCount);
+        await storage.ReadAsync(new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => storage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => (replace
+            ? storage.ReplaceAsync(new ReadOnlySequence<byte>([9]), TestContext.Current.CancellationToken)
+            : storage.AppendAsync(new ReadOnlySequence<byte>([9]), TestContext.Current.CancellationToken)).AsTask());
+        Assert.Equal(3, callCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StorageOperations_PreserveRawUtf16IdentityAcrossRedisTransport(bool customMapping)
+    {
+        var id = new JournalId("jobs/\uD800/%uD800/\uDC00/\U0001F600");
+        const string encodedId = "jobs%2F%uD800%2F%25uD800%2F%uDC00%2F%F0%9F%98%80";
+        var options = new RedisJournalStorageOptions();
+        var database = Substitute.For<IDatabase>();
+        var keyName = customMapping ? "mapped/\uD800" : id.Value;
+        var calls = new List<(RedisKey[] Keys, RedisValue[] Values)>();
+        var responses = new Queue<RedisResult>(
+        [
+            MetadataResponse(),
+            MetadataResponse(),
+            RedisResult.Create(new RedisValue[] { 1, 2 }),
+            RedisResult.Create((RedisValue[])[1, new byte[] { 1, 2 }, .. MetadataValues()]),
+            MetadataResponse(),
+            RedisResult.Create(new RedisValue[] { 1, 1 }),
+            RedisResult.Create(new RedisValue[] { 1 }),
+        ]);
+        database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>())
+            .Returns(call =>
+            {
+                calls.Add((call.ArgAt<RedisKey[]>(1), call.ArgAt<RedisValue[]>(2)));
+                return responses.Dequeue();
+            });
+        var storage = new RedisJournalStorage(database, "raw-utf16", keyName, "json", options, id);
+
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("json", (await storage.GetMetadataAsync(TestContext.Current.CancellationToken))!.FormatKey);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
+
+        var reader = new RedisJournalStorage(database, "raw-utf16", keyName, "json", options, id);
+        var consumer = new CapturingJournalStorageConsumer();
+        await reader.ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2], consumer.Bytes);
+        Assert.True(consumer.IsCompleted);
+        Assert.NotNull(await reader.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["owner"] = "test" },
+            cancellationToken: TestContext.Current.CancellationToken));
+        await reader.ReplaceAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
+        await reader.DeleteAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(responses);
+        foreach (var (callIndex, argumentIndex) in new[] { (0, 2), (2, 4), (4, 3), (5, 4), (6, 1) })
+        {
+            Assert.Equal(encodedId, calls[callIndex].Values[argumentIndex].ToString());
+            Assert.Equal(Encoding.UTF8.GetBytes(encodedId), (byte[]?)calls[callIndex].Values[argumentIndex]);
+        }
+
+        Assert.All(calls, call => Assert.Contains(RedisJournalStorage.GetMetadataKey("raw-utf16", keyName), call.Keys));
+
+        static RedisValue[] MetadataValues() =>
+        [
+            RedisJournalStorage.ETagMetadataKey, "etag",
+            RedisJournalStorage.ContentETagMetadataKey, "content-etag",
+            RedisJournalStorage.AppendLengthMetadataKey, "0",
+            RedisJournalStorage.FormatMetadataKey, "json",
+            RedisJournalStorage.JournalIdMetadataKey, Encoding.UTF8.GetBytes(encodedId),
+            RedisJournalStorage.SchemaVersionMetadataKey, RedisJournalStorage.CurrentSchemaVersion,
+        ];
+
+        static RedisResult MetadataResponse() => RedisResult.Create((RedisValue[])[1, .. MetadataValues()]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RawUtf16Identities_RoundTripThroughStorageAndCatalog(bool customMapping)
+    {
+        TestUtils.CheckForRedis();
+        await using var context = await RedisJournalStorageTestContext.CreateAsync(
+            TestContext.Current.CancellationToken,
+            options =>
+            {
+                if (customMapping)
+                {
+                    options.GetKeyName = static id => "mapped/" + id.Value;
+                }
+            });
+        var ids = new JournalId[]
+        {
+            new("jobs/\uD800"), new("jobs/\uD801"), new("jobs/\uDC00"),
+            new("jobs/\uFFFD"), new("jobs/%uD800"), new("jobs/\U0001F600"),
+        };
+        for (var index = 0; index < ids.Length; index++)
+        {
+            var storage = context.Provider.CreateStorage(ids[index]);
+            await storage.ReadForWriteAsync();
+            switch (index % 3)
+            {
+                case 0:
+                    Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+                    await storage.AppendAsync(new ReadOnlySequence<byte>([(byte)index]), TestContext.Current.CancellationToken);
+                    break;
+                case 1:
+                    await storage.AppendAsync(new ReadOnlySequence<byte>([(byte)index]), TestContext.Current.CancellationToken);
+                    break;
+                case 2:
+                    await storage.ReplaceAsync(new ReadOnlySequence<byte>([(byte)index]), TestContext.Current.CancellationToken);
+                    break;
+            }
+        }
+
+        var listed = await ToListAsync(context.Provider.ListAsync(new() { Prefix = new("jobs/") },
+            TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
+        Assert.Equal(ids.OrderBy(id => id.Value, StringComparer.Ordinal), listed.OrderBy(id => id.Value, StringComparer.Ordinal));
+
+        var bounded = await ToListAsync(context.Provider.ListAsync(new()
+        {
+            Prefix = new("jobs/\uD800"),
+            MinId = ids[0],
+            MaxId = ids[0],
+        }, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
+        Assert.Equal([ids[0]], bounded);
+
+        for (var index = 0; index < ids.Length; index++)
+        {
+            var storage = context.Provider.CreateStorage(ids[index]);
+            var consumer = new CapturingJournalStorageConsumer();
+            await storage.ReadAsync(consumer, TestContext.Current.CancellationToken);
+            Assert.Equal([(byte)index], consumer.Bytes);
+            Assert.True(consumer.IsCompleted);
+            var metadata = await storage.UpdateMetadataAsync(
+                new Dictionary<string, string> { ["owner"] = "test" },
+                expectedETag: consumer.Metadata!.ETag,
+                cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Equal("test", metadata!.Properties["owner"]);
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>([42]), TestContext.Current.CancellationToken);
+            var replaced = new CapturingJournalStorageConsumer();
+            await context.Provider.CreateStorage(ids[index]).ReadAsync(replaced, TestContext.Current.CancellationToken);
+            Assert.Equal([42], replaced.Bytes);
+            await storage.DeleteAsync(TestContext.Current.CancellationToken);
+            Assert.Null(await context.Provider.CreateStorage(ids[index]).GetMetadataAsync(TestContext.Current.CancellationToken));
+        }
+
+        Assert.Empty(await ToListAsync(context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -52,14 +258,14 @@ public sealed class RedisJournalStorageTests
         var metadata = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(metadata);
         Assert.Equal("test", metadata.Properties["owner"]);
-        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata.Format);
+        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata.FormatKey);
 
         var consumer = new CapturingJournalStorageConsumer();
         await provider.CreateStorage(JournalId.Create("redis", "append")).ReadAsync(consumer, TestContext.Current.CancellationToken);
 
         Assert.True(consumer.IsCompleted);
         Assert.Equal([1, 2, 3, 4, 5], consumer.Bytes.ToArray());
-        Assert.Equal(metadata.Format, consumer.Metadata?.Format);
+        Assert.Equal(metadata.FormatKey, consumer.Metadata?.FormatKey);
     }
 
     [Fact]
@@ -73,25 +279,25 @@ public sealed class RedisJournalStorageTests
         var child = JournalId.Create("redis", "list", "a", "child");
         var other = JournalId.Create("redis", "other");
 
-        await provider.CreateStorage(idA).ReplaceAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await (await provider.CreateStorage(idA).ReadForWriteAsync()).ReplaceAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         await provider.CreateStorage(idB).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
-        await provider.CreateStorage(child).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await (await provider.CreateStorage(child).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
         await provider.CreateStorage(other).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         var listed = await ToListAsync(
             provider.ListAsync(
-                new ListOptions { Prefix = JournalId.Create("redis", "list") },
+                new JournalCatalogListOptions { Prefix = JournalId.Create("redis", "list") },
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
         Assert.Equal(3, listed.Count);
         Assert.Equal(listed.Count, listed.Distinct().Count());
         Assert.True(new HashSet<JournalId> { idA, child, idB }.SetEquals(listed));
 
-        await provider.CreateStorage(idA).DeleteAsync(TestContext.Current.CancellationToken);
+        await (await provider.CreateStorage(idA).ReadForWriteAsync()).DeleteAsync(TestContext.Current.CancellationToken);
 
         listed = await ToListAsync(
             provider.ListAsync(
-                new ListOptions { Prefix = JournalId.Create("redis", "list") },
+                new JournalCatalogListOptions { Prefix = JournalId.Create("redis", "list") },
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
         Assert.Equal(2, listed.Count);
@@ -151,6 +357,7 @@ public sealed class RedisJournalStorageTests
         var provider = context.Provider;
         var id = JournalId.Create("redis", "stale");
         var first = provider.CreateStorage(id);
+        await first.ReadForWriteAsync();
         var second = provider.CreateStorage(id);
 
         await first.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
@@ -163,18 +370,19 @@ public sealed class RedisJournalStorageTests
     }
 
     [Fact]
-    public async Task ColdAppendToExistingJournal_AppendsCurrentVersion()
+    public async Task ColdAppendToExistingJournal_RequiresReadAndPreservesContent()
     {
         TestUtils.CheckForRedis();
         await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
         var id = JournalId.Create("redis", "cold-append");
-        await context.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await (await context.Provider.CreateStorage(id).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
 
-        await context.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => context.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
 
         var consumer = new CapturingJournalStorageConsumer();
         await context.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
-        Assert.Equal([1, 2], consumer.Bytes);
+        Assert.Equal([1], consumer.Bytes);
     }
 
     [Fact]
@@ -184,8 +392,9 @@ public sealed class RedisJournalStorageTests
         await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
         var id = JournalId.Create("redis", "stale-after-delete");
         var stale = context.Provider.CreateStorage(id);
+        await stale.ReadForWriteAsync();
         await stale.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
-        await context.Provider.CreateStorage(id).DeleteAsync(TestContext.Current.CancellationToken);
+        await (await context.Provider.CreateStorage(id).ReadForWriteAsync()).DeleteAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => stale.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
@@ -200,6 +409,7 @@ public sealed class RedisJournalStorageTests
             TestContext.Current.CancellationToken,
             options => options.ReadChunkSize = 2);
         var storage = context.Provider.CreateStorage(JournalId.Create("redis", "segmented-read"));
+        await storage.ReadForWriteAsync();
         await storage.ReplaceAsync(
             new ReadOnlySequence<byte>(Enumerable.Range(0, 10).Select(static value => (byte)value).ToArray()),
             TestContext.Current.CancellationToken);
@@ -223,7 +433,7 @@ public sealed class RedisJournalStorageTests
             TestContext.Current.CancellationToken,
             options => options.ReadChunkSize = 2);
         var id = JournalId.Create("redis", "cancelled-read");
-        await context.Provider.CreateStorage(id).ReplaceAsync(
+        await (await context.Provider.CreateStorage(id).ReadForWriteAsync()).ReplaceAsync(
             new ReadOnlySequence<byte>(Enumerable.Range(0, 10).Select(static value => (byte)value).ToArray()),
             TestContext.Current.CancellationToken);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -242,6 +452,7 @@ public sealed class RedisJournalStorageTests
         await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
         var id = JournalId.Create("redis", "metadata-content-etag");
         var writer = context.Provider.CreateStorage(id);
+        await writer.ReadForWriteAsync();
         var metadataWriter = context.Provider.CreateStorage(id);
         await writer.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var metadata = await metadataWriter.GetMetadataAsync(TestContext.Current.CancellationToken);
@@ -268,6 +479,7 @@ public sealed class RedisJournalStorageTests
             options => options.ReadChunkSize = 8);
         var id = JournalId.Create("redis", "atomic-read");
         var writer = context.Provider.CreateStorage(id);
+        await writer.ReadForWriteAsync();
         var first = Enumerable.Repeat((byte)0x11, 512).ToArray();
         var second = Enumerable.Repeat((byte)0x22, 512).ToArray();
         await writer.ReplaceAsync(new ReadOnlySequence<byte>(first), cancellationToken);
@@ -303,19 +515,21 @@ public sealed class RedisJournalStorageTests
         for (var i = 0; i < 64; i++)
         {
             var id = JournalId.Create("redis", "delete-create", i.ToString());
-            var deleting = context.Provider.CreateStorage(id);
-            var creating = context.Provider.CreateStorage(id);
-            var deleteTask = deleting.DeleteAsync(TestContext.Current.CancellationToken).AsTask();
-            var appendTask = TryAppendAsync(creating, [1, 2, 3], TestContext.Current.CancellationToken);
+            var deleting = await context.Provider.CreateStorage(id).ReadForWriteAsync();
+            var creating = await context.Provider.CreateStorage(id).ReadForWriteAsync();
+            var deleteTask = Record.ExceptionAsync(() => deleting.DeleteAsync(TestContext.Current.CancellationToken).AsTask()).AsTask();
+            var appendTask = creating.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), TestContext.Current.CancellationToken).AsTask();
             await Task.WhenAll(deleteTask, appendTask);
+            if (await deleteTask is { } exception)
+            {
+                Assert.IsType<InconsistentStateException>(exception);
+            }
 
             var metadata = await context.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken);
-            if (metadata is not null)
-            {
-                var consumer = new CapturingJournalStorageConsumer();
-                await context.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
-                Assert.Equal([1, 2, 3], consumer.Bytes);
-            }
+            Assert.NotNull(metadata);
+            var consumer = new CapturingJournalStorageConsumer();
+            await context.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+            Assert.Equal([1, 2, 3], consumer.Bytes);
         }
     }
 
@@ -361,6 +575,7 @@ public sealed class RedisJournalStorageTests
             TestContext.Current.CancellationToken,
             options => options.CompactionThresholdBytes = 3);
         var storage = context.Provider.CreateStorage(JournalId.Create("redis", "compaction"));
+        await storage.ReadForWriteAsync();
 
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([1, 2, 3, 4]), TestContext.Current.CancellationToken);
         Assert.False(storage.IsCompactionRequested);
@@ -379,6 +594,7 @@ public sealed class RedisJournalStorageTests
         await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
         var id = JournalId.Create("redis", "invalid-append-length", invalidAppendLength);
         var storage = context.Provider.CreateStorage(id);
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var metadata = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         var metadataKey = context.GetMetadataKey(id);
@@ -407,7 +623,7 @@ public sealed class RedisJournalStorageTests
         TestUtils.CheckForRedis();
         await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
         var id = JournalId.Create("redis", "schema-version");
-        await context.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await (await context.Provider.CreateStorage(id).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
 
         var schemaVersion = await context.Database.HashGetAsync(
             context.GetMetadataKey(id),
@@ -425,6 +641,7 @@ public sealed class RedisJournalStorageTests
         await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
         var id = JournalId.Create("redis", "unsupported-schema", schemaVersion ?? "missing");
         var storage = context.Provider.CreateStorage(id);
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var metadata = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         var metadataKey = context.GetMetadataKey(id);
@@ -477,7 +694,7 @@ public sealed class RedisJournalStorageTests
 
         var metadata = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata!.Format);
+        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata!.FormatKey);
         Assert.Equal("caller", metadata.Properties["format"]);
     }
 
@@ -500,22 +717,6 @@ public sealed class RedisJournalStorageTests
                 cancellationToken: TestContext.Current.CancellationToken).AsTask());
     }
 
-    private static async Task<bool> TryAppendAsync(
-        IJournalStorage storage,
-        byte[] value,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await storage.AppendAsync(new ReadOnlySequence<byte>(value), cancellationToken);
-            return true;
-        }
-        catch (InconsistentStateException)
-        {
-            return false;
-        }
-    }
-
     private static ReadOnlySequence<byte> CreateSequence(byte[] first, byte[] second)
     {
         var firstSegment = new ByteSequenceSegment(first);
@@ -523,14 +724,14 @@ public sealed class RedisJournalStorageTests
         return new(firstSegment, 0, lastSegment, lastSegment.Memory.Length);
     }
 
-    private static async Task<List<T>> ToListAsync<T>(
-        IAsyncEnumerable<T> source,
+    private static async Task<List<JournalId>> ToListAsync(
+        IAsyncEnumerable<JournalCatalogEntry> source,
         CancellationToken cancellationToken)
     {
-        var result = new List<T>();
+        var result = new List<JournalId>();
         await foreach (var item in source.WithCancellation(cancellationToken))
         {
-            result.Add(item);
+            result.Add(item.Id);
         }
 
         return result;

@@ -12,6 +12,8 @@ namespace Orleans.Journaling
     {
         public static Hosting.ISiloBuilder AddS3JournalStorage(this Hosting.ISiloBuilder builder, System.Action<S3JournalStorageOptions>? configure) { throw null; }
 
+        public static Hosting.ISiloBuilder AddS3JournalStorage(this Hosting.ISiloBuilder builder, string name, System.Action<S3JournalStorageOptions>? configure) { throw null; }
+
         public static Hosting.ISiloBuilder AddS3JournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
@@ -30,6 +32,8 @@ namespace Orleans.Journaling
 
         public System.Func<JournalId, string> GetObjectKey { get { throw null; } set { } }
 
+        public System.Func<JournalId, string>? GetObjectKeyPrefix { get { throw null; } set { } }
+
         public int MaxMetadataOnlyConflictRetries { get { throw null; } set { } }
 
         public System.TimeSpan MetadataOnlyConflictInitialBackoff { get { throw null; } set { } }
@@ -43,6 +47,8 @@ namespace Orleans.Journaling
         public System.Func<string, JournalId?> TryParseJournalId { get { throw null; } set { } }
 
         public bool UseConditionalDelete { get { throw null; } set { } }
+
+        public bool UseOrderedListing { get { throw null; } set { } }
 
         public bool UseS3ExpressAppend { get { throw null; } set { } }
 

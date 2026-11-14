@@ -77,10 +77,12 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
 
         collector.Clear();
 
-        c1.ReceiveMessage(CreateLateDeliveryMessage(grainId));
+        var lateDelivery = new DoWorkRequest();
+        c1.ReceiveMessage(CreateLateDeliveryMessage(grainId, lateDelivery));
 
         var forwarded = await WaitForMessageForwardedAsync(collector, c1);
         var workerCreated = await WaitForWorkerCreatedAsync(collector, forwarded.ReplacementContext);
+        await AssertCompletedSuccessfullyAsync(lateDelivery);
 
         Assert.NotSame(c1, forwarded.ReplacementContext);
         Assert.Same(forwarded.ReplacementContext, workerCreated.Context);
@@ -116,11 +118,13 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
         collector.Clear();
 
         var freshCallTask = grain.DoWork();
-        c1.ReceiveMessage(CreateLateDeliveryMessage(grainId));
+        var lateDelivery = new DoWorkRequest();
+        c1.ReceiveMessage(CreateLateDeliveryMessage(grainId, lateDelivery));
         await freshCallTask;
 
         var forwarded = await WaitForMessageForwardedAsync(collector, c1);
         _ = await WaitForWorkerCreatedAsync(collector, forwarded.ReplacementContext);
+        await AssertCompletedSuccessfullyAsync(lateDelivery);
 
         var workerCreatedEvents = GetWorkerCreatedEvents(collector);
         var replacementCreations = Assert.Single(workerCreatedEvents);
@@ -133,13 +137,14 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
             $"Observed up to {tracker.MaxObserved} concurrent activations after a late delivery and a fresh call on a [StatelessWorker(maxLocalWorkers:1)] grain; expected at most 1.");
     }
 
-    private Message CreateLateDeliveryMessage(GrainId grainId)
+    private Message CreateLateDeliveryMessage(GrainId grainId, DoWorkRequest request)
     {
         var services = PrimarySilo.SiloHost.Services;
         var messageFactory = services.GetRequiredService<MessageFactory>();
         var localSiloDetails = services.GetRequiredService<ILocalSiloDetails>();
 
-        var message = messageFactory.CreateMessage(new DoWorkRequest(), InvokeMethodOptions.OneWay);
+        // Local-only messages carry an ILocalRequest, which receives the outcome of the delivery.
+        var message = messageFactory.CreateMessage(request, InvokeMethodOptions.OneWay);
         message.SetInfiniteTimeToLive();
         message.IsLocalOnly = true;
         message.SendingGrain = grainId;
@@ -147,6 +152,12 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
         message.SendingSilo = localSiloDetails.SiloAddress;
         message.TargetSilo = localSiloDetails.SiloAddress;
         return message;
+    }
+
+    private static async Task AssertCompletedSuccessfullyAsync(DoWorkRequest request)
+    {
+        var response = await request.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Null(response.Exception);
     }
 
     private static IReadOnlyList<StatelessWorkerEvents.WorkerCreated> GetWorkerCreatedEvents(DiagnosticEventCollector collector)
@@ -210,10 +221,15 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
         return Assert.IsType<StatelessWorkerEvents.WorkerCreated>(evt.Payload);
     }
 
-    private sealed class DoWorkRequest : IInvokable
+    private sealed class DoWorkRequest : ILocalRequest
     {
         private static readonly MethodInfo Method = typeof(IStatelessWorkerSingleActivationGrain).GetMethod(nameof(IStatelessWorkerSingleActivationGrain.DoWork))!;
+        private readonly TaskCompletionSource<Response> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private IStatelessWorkerSingleActivationGrain? _target;
+
+        public Task<Response> Completion => _completion.Task;
+
+        public void Complete(Response response) => _completion.TrySetResult(response);
 
         public object? GetTarget() => _target;
 

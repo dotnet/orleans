@@ -1,29 +1,147 @@
 ---
 title: Configure Orleans Journaling
 description: Select an experimental Orleans Journaling storage provider and journal format.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: how-to
 ---
 
 # Configure Orleans Journaling
 
-Configure one journal storage provider on every silo that can activate a <xref:Orleans.Journaling.DurableGrain>. Provider registration also adds the core Journaling services, durable-state keyed services, JSON format, and legacy Orleans binary reader.
+Configure the journal storage providers selected by grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager> on every silo that hosts those grain types. Named providers give grain types and standalone journal consumers independent storage namespaces. Grain types without an explicit selection use `Default`. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
 
 The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
 
+## Configure grain-scoped composition
+
+The standard <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registration supplies one scoped `IDurableStateManager` per activation, using the existing activation service scope. The manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Inject that manager into an ordinary <xref:Orleans.Grain>, an application-owned grain base, or an activation-scoped feature. Declare states through its `GetOrAdd` helpers or keyed injection during construction or synchronous activation setup. Recovery at <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> then completes before <xref:Orleans.Grain.OnActivateAsync*> and requests.
+
+Storage registration makes these services available across the silo. Per-grain journal reads and writes are triggered by activations which resolve the manager directly or through a durable-state dependency. Unrelated grain activations retain their existing persistence behavior.
+
+<xref:Orleans.Journaling.DurableGrain> provides optional protected helpers for the same scoped manager. The default manager implements both `IDurableStateManager` and the independent <xref:Orleans.Journaling.IJournaledStateManager> contract. Custom grain manager replacements provide both contracts and their registrations as appropriate, and establish lifecycle enrollment in their constructor or registration factory before resolution returns. Reusable features compose their own lifecycle work through a [shared activation setup action](../grain-lifecycle.md#shared-activation-setup).
+
+<xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> returns the journal-owner contract for explicitly supplied state machine components. The caller constructs and registers components, initializes the journal, and disposes the owner. Component dependencies and their lifetimes remain caller-owned. Standalone journal owners use no manager-owned DI scope.
+
+See [Use durable state](durable-state.md) for source-backed constructor injection and feature setup examples, and [Activation and recovery](runtime-behavior.md#activation-and-recovery) for lifecycle ordering.
+
 ## Choose a storage provider
 
-| Provider | Package | Storage model | Compaction trigger |
-| --- | --- | --- | --- |
-| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget |
-| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes |
-| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes |
+| Provider | Package | Storage model | Compaction trigger | Largest append |
+| --- | --- | --- | --- | --- |
+| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget | 100 MiB |
+| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes | 2 MiB |
+| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes | Whole journal within the server's string limit (512 MB by default) |
+| Amazon S3 | `Microsoft.Orleans.Journaling.S3` | WAL object plus immutable checkpoint objects | Append part budget | 5 GB |
 
-Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
+Every provider writes each append and replacement all-or-nothing and fails a write which exceeds its limits as a whole; see [Journal storage contract](runtime-behavior.md#journal-storage-contract). Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
+
+## Select named providers
+
+The Blob, Table, Redis, S3, and volatile registration APIs accept a provider name.
+Each named registration binds its options, storage, catalog, and state-manager
+factory to one physical journal namespace. The unnamed overloads configure the
+`Default` binding. Registrations under other names leave that default unchanged.
+
+For a named backend registration, supply both the provider name and the options
+delegate. Pass `configure: null` when options are configured separately.
+
+The `Default` storage binding retains the unnamed backend-options configuration
+pipeline, including option delegates registered before or after convenience
+methods and each `ConfigureAll` delegate applied once. Non-default storage names
+use their corresponding named backend options.
+The storage binding name and the backend options name are therefore distinct
+for the default binding.
+
+An unkeyed singleton <xref:Orleans.Journaling.IJournalStorageProvider> customization supplies
+storage for both grain activations and the `Default` keyed factory. The default
+catalog and lifecycle bindings use that provider too, so replacement providers
+implement the catalog and lifecycle contracts declared by the registered provider type.
+
+A provider name identifies storage, rather than a journal format or an individual
+durable state. Register each selected physical namespace once and keep its
+account, container, table, bucket, key prefix, and naming functions stable while
+it contains work.
+
+Configure each journal storage binding under `Orleans:Journaling:{name}`.
+`ProviderType` selects its storage provider, and `ServiceKey` selects its Azure
+or Redis client from dependency injection. Orleans passes each entry's name and
+configuration section to the registered provider builder. Use `Default` for grain
+types with the default selection, and additional names for selected storage bindings.
+
+For example, these entries configure the default journal and an archive with
+separate registered Redis clients and key prefixes:
+
+```json
+{
+  "Orleans": {
+    "Journaling": {
+      "Default": {
+        "ProviderType": "Redis",
+        "ServiceKey": "primary-redis",
+        "KeyPrefix": "primary-journal"
+      },
+      "archive": {
+        "ProviderType": "Redis",
+        "ServiceKey": "archive-redis",
+        "KeyPrefix": "archive-journal"
+      }
+    }
+  }
+}
+```
+
+The equivalent environment-variable key for the archive client is
+`Orleans__Journaling__archive__ServiceKey`.
+
+### Select storage per grain type
+
+Apply <xref:Orleans.Journaling.JournalStorageProviderAttribute> to a grain class to
+select its registered, ordinal, case-sensitive provider name. Orleans publishes
+the selection in grain-type metadata and resolves it when creating the activation's
+shared state manager. An inherited attribute supplies the base class's selection;
+an attribute on a derived grain class supplies that type's selection.
+
+Register the same names and physical namespaces on every silo hosting the grain
+types. For example, two named Azure Blob providers can use separate containers
+alongside the default container:
+
+:::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="configure_grain_providers":::
+
+Both <xref:Orleans.Journaling.DurableGrain> helpers and constructor injection use
+the selected provider:
+
+:::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="select_grain_providers":::
+
+All injected durable values, collections, and journaling-backed
+<xref:Orleans.Runtime.IPersistentState`1> share that activation's manager and write
+boundary. The provider stays fixed for the activation's lifetime. Invalid or
+unregistered selections fail with a configuration error identifying the grain type
+and provider before journal data is accessed.
+
+Recovery reads the selected physical namespace using the grain's existing journal
+identity. Changing a grain type's selection directs new activations to the new
+namespace. For grain types with existing journals, plan a deliberate data migration
+or cutover: stop writes to the old namespace, transfer and verify journals with
+their metadata, and deploy the new selection consistently across silos. Include
+the provider selection and namespace in the rollback plan.
+
+For Durable Jobs, <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
+selects the journaled implementation.
+<xref:Orleans.Hosting.DurableJobsOptions.ActiveProviderName> selects the provider
+for new shards and defaults to `Default`.
+<xref:Orleans.Hosting.DurableJobsOptions.DrainingProviderNames> selects additional
+providers containing existing shards and is empty by default. All selected
+bindings require storage, catalog, and factory services and are validated at
+startup. Bindings remain fixed for that process's lifetime.
+
+See [Migrate Durable Jobs storage](durable-jobs-migration.md) for named selection,
+deployment staging, and full-namespace retirement checks. The runnable sample
+linked from that guide exercises the new APIs against packages built from this
+repository. The journaling snippet projects reference the current repository
+sources so their configuration examples use the APIs in the current checkout.
 
 ## Configure the JSON format
 
-JSON Lines is the default write format. Register source-generated metadata for every application type used as a durable key, value, collection item, persistent state, or durable task result:
+JSON Lines is the default write format. <xref:Orleans.Journaling.Json.JsonJournalHostingExtensions.UseJsonJournalFormat*> registers source-generated metadata for application types used as durable keys, values, collection items, persistent state, or durable task results:
 
 :::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="configure_json_format":::
 
@@ -33,7 +151,7 @@ Serializer naming policies affect application payload values. Journal command na
 
 ## Migrate a journal format
 
-Providers persist a format key with journal metadata. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata.
+Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
 
 Use this deployment sequence:
 
@@ -59,6 +177,27 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 
 ## Development storage
 
-<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services and resolves an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can register <xref:Orleans.Journaling.VolatileJournalStorageProvider> directly; its contents live in process memory.
+<xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registers the core services, formats, durable-state factories, and lifecycle integration. Register storage through a provider-specific method or the generic <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournalStorage*> method. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.JournalingHostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
+
+<xref:Orleans.Journaling.VolatileJournalStorageOptions> controls the retained append
+history. The defaults request a snapshot after **100 successful appends or 1 MiB
+(1,048,576 bytes)** of appended data, whichever limit is reached first:
+
+:::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="volatile_journal_thresholds":::
+
+The state manager observes that request before its next write. That write replaces
+the history with a snapshot of current state; successful replacement resets both
+counters. Snapshot bytes are excluded from the appended-byte count. Deletion and
+recreation begin with empty history. Each limit must be positive; a single append
+can exceed the byte threshold.
+
+Use the overload accepting a provider name and options delegate to configure
+independent named thresholds. Providers capture the configured limits when
+constructed. Counters belong to each journal and are shared by
+handles for the same journal within one provider. Larger limits amortize
+full-state snapshot copies over more updates; smaller limits reduce retained
+append history and replay work. Size both limits alongside the current snapshot.
+Retained memory includes the latest snapshot, appended encoded bytes up to and
+including the crossing append, and the storage provider's bookkeeping.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

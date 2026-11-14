@@ -8,10 +8,10 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <EnableSingleFileAnalyzer Condition="'$(TargetFramework)' == 'net10.0'">true</EnableSingleFileAnalyzer>
+    <EnableSingleFileAnalyzer Condition="'$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0'">true</EnableSingleFileAnalyzer>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0'">
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <WarningsAsErrors>$(WarningsAsErrors);IL2067;IL2070;IL2075;IL2091</WarningsAsErrors>
     <!-- Keep the remaining trim and AOT backlog visible in the compatibility audit while enforcing this bounded rollout. -->
@@ -34,6 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Orleans.Serialization.Abstractions\IdentityNameValidator.cs" Link="IdentityNameValidator.cs" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
   </ItemGroup>
 
@@ -41,6 +42,7 @@
     <InternalsVisibleTo Include="Orleans.Core" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.Serialization.UnitTests" />
+    <InternalsVisibleTo Include="Orleans.NativeAotSmoke" />
   </ItemGroup>
 
   <ItemGroup>

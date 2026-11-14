@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -6,6 +7,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.TestingHost.Logging;
 using TestExtensions;
 using Xunit;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
@@ -127,6 +129,147 @@ namespace NonSilo.Tests.Membership
             _timerCalls.Writer.TryComplete();
             cancellationToken.ThrowIfCancellationRequested();
         }
+
+        [Fact]
+        public async Task DisposalBeforeStartReleasesCancellationAndTimer()
+        {
+            var source = GetStoppingSource();
+            var handle = source.Token.WaitHandle;
+
+            _monitor.Dispose();
+            await _monitor.DisposeAsync();
+            _monitor.Dispose();
+
+            Assert.True(_monitor.IsCanceled);
+            Assert.Equal(1, Assert.Single(_timers).DisposedCounter);
+            Assert.Throws<ObjectDisposedException>(() => handle.WaitOne(0));
+            Assert.Throws<InvalidOperationException>(() => _monitor.Start());
+        }
+
+        [Fact]
+        public async Task CanceledStopWaitRetainsSourceUntilWorkerCompletes()
+        {
+            var source = GetStoppingSource();
+            var handle = source.Token.WaitHandle;
+            _monitor.Start();
+            var tick = await _timerCalls.Reader.ReadAsync(TestContext.Current.CancellationToken);
+            using var canceledWait = new CancellationTokenSource();
+            canceledWait.Cancel();
+            try
+            {
+                await _monitor.StopAsync(canceledWait.Token);
+                var first = _monitor.DisposeAsync().AsTask();
+                var second = _monitor.DisposeAsync().AsTask();
+
+                Assert.True(handle.WaitOne(0));
+                Assert.False(first.IsCompleted);
+                Assert.False(second.IsCompleted);
+                Assert.Equal(1, Assert.Single(_timers).DisposedCounter);
+                tick.Completion.SetResult(false);
+                await Task.WhenAll(first, second).WaitAsync(TestContext.Current.CancellationToken);
+
+                Assert.Throws<ObjectDisposedException>(() => handle.WaitOne(0));
+                await _monitor.DisposeAsync();
+            }
+            finally
+            {
+                tick.Completion.TrySetResult(false);
+                await _monitor.DisposeAsync();
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task CancellationFailureStillDrainsWorkerAndReleasesResources(bool callbackThrows)
+        {
+            var source = GetStoppingSource();
+            var token = source.Token;
+            var handle = token.WaitHandle;
+            _monitor.Start();
+            var tick = await _timerCalls.Reader.ReadAsync(TestContext.Current.CancellationToken);
+            var expected = new InvalidOperationException("Cancellation callback failed.");
+            var callbackThread = 0;
+            using var registration = token.Register(() =>
+            {
+                callbackThread = Environment.CurrentManagedThreadId;
+                if (callbackThrows)
+                {
+                    throw expected;
+                }
+            });
+            try
+            {
+                var callerThread = Environment.CurrentManagedThreadId;
+                var first = _monitor.DisposeAsync().AsTask();
+                var second = _monitor.DisposeAsync().AsTask();
+
+                Assert.Equal(callerThread, callbackThread);
+                Assert.True(handle.WaitOne(0));
+                Assert.False(first.IsCompleted);
+                Assert.False(second.IsCompleted);
+                Assert.Equal(1, Assert.Single(_timers).DisposedCounter);
+                tick.Completion.SetResult(false);
+                if (callbackThrows)
+                {
+                    var exception = await Assert.ThrowsAsync<AggregateException>(() => first);
+                    Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+                }
+                else
+                {
+                    await first;
+                }
+
+                await second;
+                Assert.Throws<ObjectDisposedException>(() => handle.WaitOne(0));
+                await _monitor.DisposeAsync();
+            }
+            finally
+            {
+                tick.Completion.TrySetResult(false);
+                await _monitor.DisposeAsync();
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task WorkerCompletionOwnsCancellationRelease(bool timerFails)
+        {
+            var source = GetStoppingSource();
+            var handle = source.Token.WaitHandle;
+            _monitor.Start();
+            var tick = await _timerCalls.Reader.ReadAsync(TestContext.Current.CancellationToken);
+            var running = Assert.IsAssignableFrom<Task>(
+                typeof(SiloHealthMonitor).GetField("_runTask", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_monitor));
+            var expected = new InvalidOperationException("Timer failed.");
+            try
+            {
+                if (timerFails)
+                {
+                    tick.Completion.SetException(expected);
+                    var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => running);
+                    Assert.Same(expected, exception);
+                }
+                else
+                {
+                    tick.Completion.SetResult(false);
+                    await running;
+                }
+
+                Assert.True(_monitor.IsCanceled);
+                Assert.Equal(1, Assert.Single(_timers).DisposedCounter);
+                Assert.Throws<ObjectDisposedException>(() => handle.WaitOne(0));
+            }
+            finally
+            {
+                tick.Completion.TrySetResult(false);
+                await _monitor.DisposeAsync();
+            }
+        }
+
+        private CancellationTokenSource GetStoppingSource() => Assert.IsType<CancellationTokenSource>(
+            typeof(SiloHealthMonitor).GetField("_stoppingCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_monitor));
 
         [Fact]
         public async Task SiloHealthMonitor_SuccessfulProbe()
@@ -314,6 +457,208 @@ namespace NonSilo.Tests.Membership
             finally
             {
                 await monitor.StopAsync(cancellationToken);
+            }
+        }
+
+        [Fact]
+        public async Task SiloHealthMonitor_StopDuringStallDetection_DoesNotLogError()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var timeProvider = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
+                new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+            var options = new ClusterMembershipOptions
+            {
+                ProbeTimeout = TimeSpan.FromSeconds(5),
+                MaxProbeTimeout = TimeSpan.FromSeconds(45),
+                EnableIndirectProbes = false,
+            };
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            var prober = Substitute.For<IRemoteSiloProber>();
+            var probeEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(call =>
+            {
+                probeEntered.TrySetResult(call.ArgAt<CancellationToken>(2));
+                return pendingProbe.Task;
+            });
+            var localHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
+            localHealthMonitor
+                .GetLocalHealthStatus(default, default)
+                .ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
+            localHealthMonitor.GetTimestamp().Returns(123, 456);
+            var stallQueryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            localHealthMonitor
+                .GetStallDurationAsync(default, default, cancellationToken)
+                .ReturnsForAnyArgs(call =>
+                {
+                    stallQueryStarted.TrySetResult();
+                    return new ValueTask<TimeSpan>(WaitForCancellation(call.ArgAt<CancellationToken>(2)));
+                });
+            var timer = new DilationProbeTimer();
+            var logProvider = new InMemoryLoggerProvider();
+            using var loggerFactory = new LoggerFactory([new XunitLoggerProvider(_output), logProvider]);
+            var monitor = new SiloHealthMonitor(
+                _targetSilo,
+                (_, _) => Task.CompletedTask,
+                optionsMonitor,
+                loggerFactory,
+                prober,
+                new DelegateAsyncTimerFactory((_, _) => timer),
+                localHealthMonitor,
+                _membershipService,
+                _localSiloDetails,
+                timeProvider);
+
+            try
+            {
+                monitor.Start();
+                var firstTick = await timer.Ticks.ReadAsync(cancellationToken);
+                firstTick.Completion.SetResult(true);
+                var probeCancellationToken = await probeEntered.Task.WaitAsync(cancellationToken);
+
+                timeProvider.Advance(options.ProbeTimeout);
+
+                Assert.True(probeCancellationToken.IsCancellationRequested);
+                await stallQueryStarted.Task.WaitAsync(cancellationToken);
+                await monitor.StopAsync(CancellationToken.None);
+
+                Assert.DoesNotContain(logProvider.Buffer.AllEntries, static entry => entry.LogLevel == LogLevel.Error);
+            }
+            finally
+            {
+                await monitor.StopAsync(CancellationToken.None);
+            }
+
+            static async Task<TimeSpan> WaitForCancellation(CancellationToken cancellationToken)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return TimeSpan.Zero;
+            }
+        }
+
+        [Fact]
+        public async Task SiloHealthMonitor_UnexpectedRunFailure_LogsError()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var prober = Substitute.For<IRemoteSiloProber>();
+            prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(Task.CompletedTask);
+            var timer = new DilationProbeTimer();
+            var logProvider = new InMemoryLoggerProvider();
+            using var loggerFactory = new LoggerFactory([new XunitLoggerProvider(_output), logProvider]);
+            var monitor = new SiloHealthMonitor(
+                _targetSilo,
+                (_, _) => throw new InvalidOperationException("Unexpected monitor failure"),
+                _optionsMonitor,
+                loggerFactory,
+                prober,
+                new DelegateAsyncTimerFactory((_, _) => timer),
+                _localSiloHealthMonitor,
+                _membershipService,
+                _localSiloDetails,
+                TimeProvider.System);
+
+            try
+            {
+                monitor.Start();
+                var firstTick = await timer.Ticks.ReadAsync(cancellationToken);
+                firstTick.Completion.SetResult(true);
+                var secondTick = await timer.Ticks.ReadAsync(cancellationToken);
+                secondTick.Completion.SetResult(false);
+                await monitor.StopAsync(CancellationToken.None);
+
+                var error = Assert.Single(logProvider.Buffer.GetEntries(LogLevel.Error));
+                Assert.IsType<InvalidOperationException>(error.Exception);
+                Assert.Equal("Unexpected monitor failure", error.Exception.Message);
+            }
+            finally
+            {
+                await monitor.StopAsync(CancellationToken.None);
+            }
+        }
+
+        [Fact]
+        public async Task SiloHealthMonitor_UnexpectedFailureAfterStop_LogsError()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var timeProvider = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
+                new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+            var options = new ClusterMembershipOptions
+            {
+                ProbeTimeout = TimeSpan.FromSeconds(5),
+                MaxProbeTimeout = TimeSpan.FromSeconds(45),
+                EnableIndirectProbes = false,
+            };
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            var prober = Substitute.For<IRemoteSiloProber>();
+            var probeEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(call =>
+            {
+                probeEntered.TrySetResult(call.ArgAt<CancellationToken>(2));
+                return pendingProbe.Task;
+            });
+            var localHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
+            localHealthMonitor
+                .GetLocalHealthStatus(default, default)
+                .ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
+            localHealthMonitor.GetTimestamp().Returns(123, 456);
+            var stallQueryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var stallResult = new TaskCompletionSource<TimeSpan>(TaskCreationOptions.RunContinuationsAsynchronously);
+            localHealthMonitor
+                .GetStallDurationAsync(default, default, cancellationToken)
+                .ReturnsForAnyArgs(_ =>
+                {
+                    stallQueryStarted.TrySetResult();
+                    return new ValueTask<TimeSpan>(stallResult.Task);
+                });
+            var timer = new DilationProbeTimer();
+            var logProvider = new InMemoryLoggerProvider();
+            using var loggerFactory = new LoggerFactory([new XunitLoggerProvider(_output), logProvider]);
+            var monitor = new SiloHealthMonitor(
+                _targetSilo,
+                (_, _) => Task.CompletedTask,
+                optionsMonitor,
+                loggerFactory,
+                prober,
+                new DelegateAsyncTimerFactory((_, _) => timer),
+                localHealthMonitor,
+                _membershipService,
+                _localSiloDetails,
+                timeProvider);
+
+            try
+            {
+                monitor.Start();
+                var firstTick = await timer.Ticks.ReadAsync(cancellationToken);
+                firstTick.Completion.SetResult(true);
+                var probeCancellationToken = await probeEntered.Task.WaitAsync(cancellationToken);
+
+                timeProvider.Advance(options.ProbeTimeout);
+
+                Assert.True(probeCancellationToken.IsCancellationRequested);
+                await stallQueryStarted.Task.WaitAsync(cancellationToken);
+                var stoppingSource = Assert.IsType<CancellationTokenSource>(
+                    typeof(SiloHealthMonitor).GetField("_stoppingCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(monitor));
+                var handle = stoppingSource.Token.WaitHandle;
+                monitor.Dispose();
+                var disposal = monitor.DisposeAsync().AsTask();
+                Assert.True(handle.WaitOne(0));
+                Assert.False(disposal.IsCompleted);
+                stallResult.SetException(new InvalidOperationException("Unexpected stall detector failure"));
+                await disposal;
+                await monitor.StopAsync(CancellationToken.None);
+                Assert.Throws<ObjectDisposedException>(() => handle.WaitOne(0));
+
+                var error = Assert.Single(logProvider.Buffer.GetEntries(LogLevel.Error));
+                Assert.IsType<InvalidOperationException>(error.Exception);
+                Assert.Equal("Unexpected stall detector failure", error.Exception.Message);
+            }
+            finally
+            {
+                stallResult.TrySetResult(TimeSpan.Zero);
+                await monitor.StopAsync(CancellationToken.None);
             }
         }
 

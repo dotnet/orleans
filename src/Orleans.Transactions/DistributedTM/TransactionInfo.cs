@@ -45,8 +45,10 @@ namespace Orleans.Transactions
         /// <remarks>
         /// Participant access counts, pending-call state, and joined branches remain local to each instance.
         /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
         public TransactionInfo(TransactionInfo other) : this()
         {
+            ArgumentNullException.ThrowIfNull(other);
             this.TransactionId = other.TransactionId;
             this.TryToCommit = other.TryToCommit;
             this.IsReadOnly = other.IsReadOnly;
@@ -136,8 +138,10 @@ namespace Orleans.Transactions
         /// Queues a completed transaction branch for reconciliation with this instance.
         /// </summary>
         /// <param name="x">The completed transaction branch to join.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="x"/> is <see langword="null"/>.</exception>
         public void Join(TransactionInfo x)
         {
+            ArgumentNullException.ThrowIfNull(x);
             joined.Enqueue(x);
         }
 
@@ -149,10 +153,14 @@ namespace Orleans.Transactions
         /// The recorded abort exception, an orphan-call exception for outstanding calls, or <see langword="null"/>
         /// when the transaction has no mandatory abort condition.
         /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="serializer"/> is <see langword="null"/> when a recorded exception requires deserialization.
+        /// </exception>
         public OrleansTransactionAbortedException? MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
         {
             if (OriginalException != null)
             {
+                ArgumentNullException.ThrowIfNull(serializer);
                 return serializer.Deserialize(OriginalException);
             }
             else if (PendingCalls != 0)
@@ -170,10 +178,14 @@ namespace Orleans.Transactions
         /// </summary>
         /// <param name="e">The exception raised during transaction execution.</param>
         /// <param name="sm">The serializer used to store the exception for transaction propagation.</param>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="sm"/> is <see langword="null"/> when recording the first exception.
+        /// </exception>
         public void RecordException(Exception e, Serializer<OrleansTransactionAbortedException> sm)
         {
             if (OriginalException == null)
             {
+                ArgumentNullException.ThrowIfNull(sm);
                 var exception = (e as OrleansTransactionAbortedException)
                     ?? new OrleansTransactionAbortedException(TransactionId.ToString(), e);
 

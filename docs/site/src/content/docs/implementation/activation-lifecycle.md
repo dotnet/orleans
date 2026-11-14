@@ -55,6 +55,20 @@ A deactivation reason distinguishes normal collection, application-requested dea
 
 Migration moves an activation while preserving its grain identity. `ActivationMigrationManager` starts migration by creating a `MigrationContext`, asking registered migration participants to dehydrate state, and deactivating with the `Migrating` reason. The target creates the activation, rehydrates participants, runs activation, and waits until the activation reaches a stable state.
 
+The migration package also carries the requests which are queued for the source activation. The catalog delivers them through the activation's ordinary request admission, with per-request overload checks and FIFO queueing. A new activation receives them before rehydration and directory registration. An existing activation receives them before the catalog disposes the unused migration context. Requests already queued at the destination retain their place. Once the target accepts the migration, the source retargets their callers' pending calls to the target on a best-effort basis, so the calls survive the source silo's departure. The package serializes its request list using the same message framing as silo connections, preserving received requests' serialized bodies. The target decodes each body when it invokes the request and drops requests whose remaining lifetime has elapsed before admission. A source sends queued requests only to silos whose manifest lists version 1 or later of `IActivationMigrationManagerSystemTarget`. The source activation remains in the catalog until the migration completes, so requests which reach the source silo for the grain reach it. A caller which cancels its call before the call is retargeted signals the cancellation to the target as well, once the call is retargeted. When the migration fails or its outcome is unknown, the source rejects the requests which it carried, so their callers can retry them. It forwards the requests which arrived meanwhile.
+
+The serializer claims a migration's context and request bodies under the migration's completion lock and releases them when serialization finishes, including on failure. Completion releases a payload which serialization has not claimed; a later writer then discards the completed migration. Once serialization owns the payload, completion proceeds independently while the serializer keeps its buffers valid. The source retains routing headers for failure reporting. Transport retries reuse the serialized RPC body. On the destination, embedded messages share the receive buffer and retain their own body slices until invocation. The RPC decoder requires a context object and non-null entries in a carried request list. Malformed packages fail before admission, and GC reclaims abandoned partial decode graphs once they become unreachable. Migration context keeps its existing wire format.
+
+The migration pump bounds the acceptance invocation by <xref:Orleans.Configuration.SiloMessagingOptions.SystemResponseTimeout> using the messaging clock. This budget covers asynchronous outgoing filters as well as the destination's response. On timeout, the source completes the migration as failed and can finish deactivation. A filter which resumes afterward follows the same payload-ownership rules as any delayed writer.
+
+Requests enter the migration in one handoff after dehydration, and the package retains that fixed request set. Later arrivals remain in the source activation's queue. Once the source leaves the catalog, it completes the original handoff's disposition before handling its remaining queue through ordinary forwarding or rejection.
+
+Each embedded message preserves the request's remaining time-to-live at serialization. Local expiry tracking resumes when the destination decodes its headers, and expired requests are dropped individually. Time spent in transport, including retries, makes expiry accounting best effort. The caller's response timeout continues independently; a delayed migration can deliver a request after its caller has timed out.
+
+The catalog transfers requests through ordinary activation admission and releases requests and contexts which remain unadmitted when validation or creation fails. Creating an activation commits it to scheduling rehydration and calling `Activate`, including when subsequent admission work fails. During rehydration, the new activation reads its previous registration and adds cache updates to its queued messages. Responses carry these updates; one-way callers' routes converge on their next send through normal forwarding and cache repair. An existing activation receives requests through ordinary admission and uses normal cache repair. Each activation owns every request submitted to it and handles activation failure through its normal rejection and teardown paths. Canceling an unsent source migration releases its dehydration context while retaining its requests for ordinary forwarding.
+
+Before batching, the source retains local request bodies as owned serialized bytes and bounds each request's current headers, including cache updates from earlier migrations. Arbitrary request-context values use the configured maximum header size as a conservative bound, so sizing leaves those values untouched. Requests which do not fit with their migration state are forwarded individually using the retained body bytes.
+
 ```mermaid
 sequenceDiagram
     participant Source as Source activation
@@ -64,12 +78,14 @@ sequenceDiagram
 
     Manager->>Source: Begin migration
     Source->>Source: OnDehydrate(MigrationContext)
-    Source->>Directory: Remove or transfer registration
     Manager->>Target: AcceptMigratingGrains
-    Target->>Target: Create and OnRehydrate
-    Target->>Directory: Register target activation
+    Target->>Target: Create, admit requests, and OnRehydrate
+    Target->>Directory: Replace the source's registration
     Target->>Target: OnActivateAsync
-    Target-->>Manager: Stable activation
+    Target-->>Manager: Stable activation, requests accepted
+    Manager->>Manager: Retarget callers' pending calls (best-effort)
+    Manager->>Source: Migration complete
+    Source->>Source: Leave the catalog and forward later requests
 ```
 
 Migration state is not the same as persisted grain state. <xref:Orleans.Runtime.IGrainMigrationParticipant> is intended for runtime or application components whose in-memory state must accompany a live move. Participants write versionable data to the migration context and must tolerate rehydration on another silo.

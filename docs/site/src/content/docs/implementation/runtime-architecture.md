@@ -31,7 +31,7 @@ A silo is a [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensio
 
 - `MessageCenter` for network connections, routing, forwarding, gateways, and dispatch.
 - `MembershipTableManager`, `MembershipAgent`, `ClusterHealthMonitor`, and `ClusterMembershipService` for membership.
-- `LocalGrainDirectory`, `GrainLocator`, and `CachedGrainLocator` for activation location.
+- `DistributedGrainDirectory`, `GrainLocator`, and `CachedGrainLocator` for activation location.
 - `PlacementService` and keyed placement directors for new activation selection.
 - `ActivationDirectory`, `Catalog`, `ActivationData`, and `ActivationCollector` for local activation ownership.
 - `InsideRuntimeClient` for invoking local targets and producing responses.

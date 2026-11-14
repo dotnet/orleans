@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Orleans.Journaling;
 
 namespace Orleans.DurableJobs;
@@ -7,6 +8,7 @@ internal readonly record struct JobShardId
 {
     private const string RootSegment = "jobs";
     private const string ShardsSegment = "shards";
+    private const string StartTimeFormat = "yyyyMMdd'T'HHmmssfffffff'Z'";
 
     public JobShardId(string value)
     {
@@ -18,7 +20,14 @@ internal readonly record struct JobShardId
 
     public static JournalId StoragePrefix => JournalId.Create(RootSegment, ShardsSegment);
 
-    public static JobShardId New() => new(Guid.NewGuid().ToString("N"));
+    public static JobShardId New(DateTimeOffset startTime)
+        => new($"{FormatStartTime(startTime)}-{Guid.NewGuid():N}");
+
+    public static JournalId GetMaxJournalId(DateTimeOffset startTime)
+        => JournalId.Create(RootSegment, ShardsSegment, $"{FormatStartTime(startTime)}~");
+
+    private static string FormatStartTime(DateTimeOffset startTime)
+        => startTime.UtcDateTime.ToString(StartTimeFormat, CultureInfo.InvariantCulture);
 
     public static JobShardId Parse(string value) => new(value);
 

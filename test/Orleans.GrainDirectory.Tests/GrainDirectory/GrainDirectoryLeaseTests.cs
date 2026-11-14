@@ -427,9 +427,7 @@ public class GrainDirectoryLeaseTests
     {
         var timeProvider = new FakeTimeProvider(InitialTime);
         var builder = new InProcessTestClusterBuilder(siloCount);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Services.AddSingleton<MembershipTableManager>();
@@ -864,8 +862,11 @@ internal sealed class LeaseTestMembershipManager(MembershipTableManager inner) :
     public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).ProcessGossipSnapshot(snapshot, cancellationToken);
 
-    public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) =>
-        ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken);
+    public Task Refresh(
+        MembershipVersion? targetVersion,
+        CancellationToken cancellationToken,
+        bool requireFresh = false) =>
+        ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken, requireFresh);
 
     public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).TryKillSilo(silo, cancellationToken);

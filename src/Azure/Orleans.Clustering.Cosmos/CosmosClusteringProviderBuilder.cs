@@ -26,18 +26,12 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.ContainerName = containerName;
                 }
-                if (bool.TryParse(configurationSection[nameof(options.IsResourceCreationEnabled)], out var irce))
+                options.IsResourceCreationEnabled = configurationSection.GetValue(nameof(options.IsResourceCreationEnabled), options.IsResourceCreationEnabled);
+                if (configurationSection.GetValue<int?>(nameof(options.DatabaseThroughput)) is { } databaseThroughput)
                 {
-                    options.IsResourceCreationEnabled = irce;
+                    options.DatabaseThroughput = databaseThroughput;
                 }
-                if (int.TryParse(configurationSection[nameof(options.DatabaseThroughput)], out var dt))
-                {
-                    options.DatabaseThroughput = dt;
-                }
-                if (bool.TryParse(configurationSection[nameof(options.CleanResourcesOnInitialization)], out var croi))
-                {
-                    options.CleanResourcesOnInitialization = croi;
-                }
+                options.CleanResourcesOnInitialization = configurationSection.GetValue(nameof(options.CleanResourcesOnInitialization), options.CleanResourcesOnInitialization);
 
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))
@@ -76,18 +70,12 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.ContainerName = containerName;
                 }
-                if (bool.TryParse(configurationSection[nameof(options.IsResourceCreationEnabled)], out var irce))
+                options.IsResourceCreationEnabled = configurationSection.GetValue(nameof(options.IsResourceCreationEnabled), options.IsResourceCreationEnabled);
+                if (configurationSection.GetValue<int?>(nameof(options.DatabaseThroughput)) is { } databaseThroughput)
                 {
-                    options.IsResourceCreationEnabled = irce;
+                    options.DatabaseThroughput = databaseThroughput;
                 }
-                if (int.TryParse(configurationSection[nameof(options.DatabaseThroughput)], out var dt))
-                {
-                    options.DatabaseThroughput = dt;
-                }
-                if (bool.TryParse(configurationSection[nameof(options.CleanResourcesOnInitialization)], out var croi))
-                {
-                    options.CleanResourcesOnInitialization = croi;
-                }
+                options.CleanResourcesOnInitialization = configurationSection.GetValue(nameof(options.CleanResourcesOnInitialization), options.CleanResourcesOnInitialization);
 
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))

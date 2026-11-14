@@ -15,11 +15,7 @@ namespace Orleans.Runtime.Utilities
 
     internal sealed class AsyncEnumerable<T> : IAsyncEnumerable<T> where T : notnull
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _updateLock = new();
-#else
-        private readonly object _updateLock = new();
-#endif
         private readonly Func<T, T, bool> _updateValidator;
         private readonly Action<T> _onPublished;
         private Element _current;

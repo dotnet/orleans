@@ -11,13 +11,20 @@
 <body class="layout-fixed sidebar-expand-lg sidebar-mini" id="body">
     <div id="error-message-content" class="error-container"></div>
     <div class="app-wrapper">
+        <header class="app-header d-lg-none">
+            <button type="button" id="sidebar-toggle" class="btn btn-link" aria-label="Toggle navigation" aria-controls="dashboard-sidebar" aria-expanded="false">
+                <i class="fa fa-bars" aria-hidden="true"></i>
+            </button>
+            <span>Orleans Dashboard</span>
+        </header>
+        <button id="sidebar-overlay" type="button" class="sidebar-overlay border-0 p-0" aria-label="Close navigation" hidden></button>
         <!-- Main Sidebar Container -->
-        <aside class="app-sidebar elevation-4">
+        <aside class="app-sidebar elevation-4" id="dashboard-sidebar">
             <div id="brand-header"></div>
 
             <!-- Sidebar -->
             <div class="sidebar">
-                <nav>
+                <nav aria-label="Dashboard navigation">
                     <div id="menu"></div>
                 </nav>
             </div>
