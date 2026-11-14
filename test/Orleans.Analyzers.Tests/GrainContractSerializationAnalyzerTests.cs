@@ -130,6 +130,22 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
     }
 
     [Fact]
+    public async Task ExactClosedBaseCodec_BlocksOpenDerivedTypeCodec()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(CodecSource + """
+            public class Base<T> { }
+            public class Derived : Base<int> { }
+            [RegisterSerializer] public class ExactCodec : Codec<Base<int>> { }
+            [RegisterSerializer] public class OpenCodec<T> : Codec<Base<T>>, Orleans.Serialization.Codecs.IDerivedTypeCodec { }
+            public interface IContract : IGrain { Task Send(Derived request); }
+            """);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Contains("'Derived'", diagnostic.GetMessage());
+        Assert.Contains("no statically declared serializer", diagnostic.GetMessage());
+    }
+
+    [Fact]
     public Task GenericFieldCodec_WithParameterTarget_IsRecognized() => AssertNoDiagnostics(CodecSource + """
         public class Request { }
         [RegisterSerializer] public class GenericCodec<T> : Codec<T> { }
@@ -479,6 +495,90 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         """);
 
     [Fact]
+    public async Task BuiltInCodecForConstructedGenericBase_ChecksOnlyTheBaseArgument()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync("""
+            public class Missing { }
+            public class Unrelated { }
+            public class DerivedCollection<T> : System.Collections.ObjectModel.ReadOnlyCollection<Missing>
+            {
+                public DerivedCollection() : base(System.Array.Empty<Missing>()) { }
+            }
+            public interface IContract : IGrain { Task Send(DerivedCollection<Unrelated> request); }
+            """);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Contains("'Missing'", diagnostic.GetMessage());
+        Assert.DoesNotContain("'Unrelated'", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public Task ComparerCodec_DoesNotRequireItsGenericArgumentSerializer() => AssertNoDiagnostics("""
+        public class Unannotated { }
+        public interface IContract : IGrain
+        {
+            Task Send(System.Collections.Generic.Comparer<Unannotated> request);
+        }
+        """);
+
+    [Fact]
+    public async Task UnionAndClosedHierarchyCases_ReportMissingCaseSerializers()
+    {
+        var unionCaseTypesAvailable = typeof(ITypeSymbol).GetProperty("UnionCaseTypes") is not null;
+        var diagnostics = await AnalyzePreviewSourceAsync(TaggedTypeFeaturePolyfills + """
+            public class MissingUnionCase { }
+            [GenerateSerializer] public union RequestUnion(MissingUnionCase, int);
+
+            [GenerateSerializer] public closed record RequestHierarchy;
+            [Case(0)] public sealed record MissingHierarchyCase : RequestHierarchy;
+
+            public interface IContract : IGrain
+            {
+                Task Send(RequestUnion unionRequest, RequestHierarchy hierarchyRequest);
+            }
+            """);
+
+        Assert.Equal(2, diagnostics.Length);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'MissingHierarchyCase'", StringComparison.Ordinal));
+        if (unionCaseTypesAvailable)
+        {
+            Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'MissingUnionCase'", StringComparison.Ordinal));
+        }
+        else
+        {
+            var unionDiagnostic = Assert.Single(diagnostics,
+                diagnostic => diagnostic.GetMessage().Contains("'RequestUnion'", StringComparison.Ordinal));
+            Assert.Contains("cannot be verified", unionDiagnostic.GetMessage());
+        }
+    }
+
+    [Fact]
+    public async Task MetadataUnionWithoutCaseInformation_ReportsUnverifiableSupport()
+    {
+        var unionCaseTypesAvailable = typeof(ITypeSymbol).GetProperty("UnionCaseTypes") is not null;
+        var reference = await CompilePreviewReference(TaggedTypeFeaturePolyfills + """
+            [Orleans.GenerateSerializer] public union ExternalUnion(int, string);
+            """);
+        var diagnostics = await AnalyzeWithReference("""
+            public interface IContract : Orleans.IGrain
+            {
+                System.Threading.Tasks.Task Send(ExternalUnion request);
+            }
+            """, reference);
+
+        if (unionCaseTypesAvailable)
+        {
+            Assert.Empty(diagnostics);
+        }
+        else
+        {
+            var diagnostic = Assert.Single(diagnostics);
+            Assert.Contains("'ExternalUnion'", diagnostic.GetMessage());
+            Assert.Contains("cannot be verified", diagnostic.GetMessage());
+        }
+    }
+
+    [Fact]
     public async Task RepeatedGenericConstructions_CheckTheirActualMemberCodecs()
     {
         var (diagnostics, _) = await GetDiagnosticsAsync(CodecSource + """
@@ -655,6 +755,32 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
     }
 
     [Fact]
+    public Task ClassConstrainedTypeParameterCodec_SupportsArrayWithoutCheckingElement() => AssertNoDiagnostics(CodecSource + """
+        public class MissingElement { }
+        [RegisterSerializer] public class ClassCodec<T> : Codec<T> where T : class { }
+        public interface IContract : IGrain { Task Send(MissingElement[] request); }
+        """);
+
+    [Fact]
+    public async Task ClassConstrainedTypeParameterConverterForArray_ReportsMissingSurrogate()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync("""
+            public class MissingElement { }
+            public struct MissingSurrogate { }
+            [RegisterConverter] public class ArrayConverter<T> : IConverter<T, MissingSurrogate> where T : class
+            {
+                public T ConvertFromSurrogate(in MissingSurrogate value) => default;
+                public MissingSurrogate ConvertToSurrogate(in T value) => default;
+            }
+            public interface IContract : IGrain { Task Send(MissingElement[] request); }
+            """);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Contains("'MissingSurrogate'", diagnostic.GetMessage());
+        Assert.DoesNotContain("'MissingElement'", diagnostic.GetMessage());
+    }
+
+    [Fact]
     public Task RegisteredSurrogateConverter_IsAccepted() => AssertNoDiagnostics("""
         public class Request { }
         [GenerateSerializer] public struct Surrogate { [Id(0)] public int Value; }
@@ -726,6 +852,43 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
             public MissingSurrogate ConvertToSurrogate(in Request value) => default;
         }
         public interface IContract : IGrain { Task Send(Request request); }
+        """);
+
+    [Fact]
+    public Task EnumField_UsesRuntimeScalarBeforeConverterAndAcceptsExplicitRegistrations() => AssertNoDiagnostics(CodecSource + """
+        public enum ConvertedEnum { Value }
+        public enum CodecEnum { Value }
+        public enum ValueSerializerEnum { Value }
+        public struct MissingSurrogate { }
+
+        [GenerateSerializer] public class EnumFields
+        {
+            [Id(0)] public ConvertedEnum Converted { get; set; }
+            [Id(1)] public CodecEnum ExplicitCodec { get; set; }
+            [Id(2)] public ValueSerializerEnum ExplicitValueSerializer { get; set; }
+        }
+
+        [RegisterConverter] public class EnumConverter : IConverter<ConvertedEnum, MissingSurrogate>
+        {
+            public ConvertedEnum ConvertFromSurrogate(in MissingSurrogate value) => default;
+            public MissingSurrogate ConvertToSurrogate(in ConvertedEnum value) => default;
+        }
+
+        [RegisterSerializer] public class CodecEnumCodec : Codec<CodecEnum> { }
+
+        [RegisterSerializer] public class ValueSerializerEnumSerializer :
+            Orleans.Serialization.Serializers.IValueSerializer<ValueSerializerEnum>
+        {
+            public void Serialize<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer,
+                scoped ref ValueSerializerEnum value) where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+            public void Deserialize<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader,
+                scoped ref ValueSerializerEnum value) { }
+        }
+
+        public interface IContract : IGrain
+        {
+            Task Send(EnumFields fields);
+        }
         """);
 
     [Fact]
@@ -1046,6 +1209,32 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
+    private static async Task<PortableExecutableReference> CompilePreviewReference(string source)
+    {
+        var project = CreateAnalyzerTestProject(source).WithParseOptions(new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = (await project.GetCompilationAsync(TestContext.Current.CancellationToken))!.WithAssemblyName("ExternalModels");
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+        return MetadataReference.CreateFromImage(stream.ToArray());
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzePreviewSourceAsync(string source)
+    {
+        var fullSource = "using System;\nusing System.Threading.Tasks;\nusing Orleans;\n" + source;
+        var project = CreateAnalyzerTestProject(fullSource).WithParseOptions(new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = (await project.GetCompilationAsync(TestContext.Current.CancellationToken))!;
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        compilation = compilation.WithOptions(compilation.Options.WithSpecificDiagnosticOptions(
+            new Dictionary<string, ReportDiagnostic>
+            {
+                [GrainContractSerializationAnalyzer.ContractRuleId] = ReportDiagnostic.Warn,
+                [GrainContractSerializationAnalyzer.StateRuleId] = ReportDiagnostic.Warn,
+            }));
+        return await RunAnalyzerAsync(compilation, new GrainContractSerializationAnalyzer(), TestContext.Current.CancellationToken);
+    }
+
     [Fact]
     public async Task PartialContract_IsAnalyzedOnce()
     {
@@ -1246,6 +1435,23 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
             public void WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer,
                 uint fieldIdDelta, System.Type expectedType, T value) where TBufferWriter : System.Buffers.IBufferWriter<byte>
                 => throw new System.NotImplementedException();
+        }
+
+        """;
+
+    private const string TaggedTypeFeaturePolyfills = """
+        namespace System.Runtime.CompilerServices
+        {
+            [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
+            internal sealed class IsClosedTypeAttribute : System.Attribute
+            {
+                public System.Type[]? DerivedTypes { get; set; }
+            }
+
+            [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct, Inherited = false)]
+            internal sealed class UnionAttribute : System.Attribute { }
+
+            internal interface IUnion { object? Value { get; } }
         }
 
         """;

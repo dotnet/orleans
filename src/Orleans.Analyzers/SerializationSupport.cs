@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -81,7 +82,10 @@ internal sealed class SerializationSupport
 
                         var registration = new Registration(target,
                             registrationKind == RegistrationKind.Converter ? implemented.TypeArguments[1] : null,
-                            assembly.Name == "Orleans.Serialization", type, registrationKind,
+                            assembly.Name == "Orleans.Serialization"
+                                ? GetInspectedTypeParameters(type, fieldCodec, baseCodec, valueSerializer)
+                                : ImmutableArray<ITypeParameterSymbol>.Empty,
+                            type, registrationKind,
                             supportsDerivedTypes && registrationKind == RegistrationKind.FieldCodec);
                         if (target is IArrayTypeSymbol)
                         {
@@ -109,7 +113,7 @@ internal sealed class SerializationSupport
         return result;
     }
 
-    public bool TryGetSupport(ITypeSymbol type, Requirement requirement, out bool inspectArguments,
+    public bool TryGetSupport(ITypeSymbol type, Requirement requirement, out ImmutableArray<ITypeSymbol> inspectArguments,
         out ITypeSymbol? surrogate, out bool ambiguous)
     {
         var candidates = new List<SupportCandidate>();
@@ -138,6 +142,11 @@ internal sealed class SerializationSupport
             {
                 AddCandidate(registration, array, false);
             }
+
+            foreach (var registration in _parameterRegistrations)
+            {
+                AddCandidate(registration, array, false);
+            }
         }
 
         if (candidates.Count > 0)
@@ -151,12 +160,12 @@ internal sealed class SerializationSupport
                 && candidates.Any(candidate => candidate.Priority == best && candidate.TargetSpecificity == bestSpecificity
                     && candidate.Registration.Kind == RegistrationKind.Converter
                     && !SymbolEqualityComparer.Default.Equals(candidate.Surrogate, selected.Surrogate));
-            inspectArguments = selected.Registration.InspectArguments;
+            inspectArguments = selected.InspectedArguments;
             surrogate = ambiguous ? null : selected.Surrogate;
             return true;
         }
 
-        inspectArguments = false;
+        inspectArguments = ImmutableArray<ITypeSymbol>.Empty;
         surrogate = null;
         ambiguous = false;
         return false;
@@ -164,34 +173,135 @@ internal sealed class SerializationSupport
         bool AddMatches(INamedTypeSymbol candidateType, bool derivedType)
         {
             if (!_registrations.TryGetValue(candidateType.OriginalDefinition, out var registrations)) return false;
-            var found = false;
+
+            var matches = new List<SupportCandidate>();
             foreach (var registration in registrations)
             {
-                var supportsDerivedTypes = registration.Kind == RegistrationKind.FieldCodec && registration.SupportsDerivedTypes;
-                found |= AddCandidate(registration, candidateType, derivedType, !derivedType || supportsDerivedTypes);
+                if (TryCreateCandidate(registration, candidateType, false, out var candidate))
+                {
+                    matches.Add(candidate);
+                }
             }
 
-            return found;
-        }
-
-        bool AddCandidate(Registration registration, ITypeSymbol candidateType, bool derivedType, bool includeCandidate = true)
-        {
-            if (!Supports(registration.Kind, requirement, type.IsValueType)) return false;
-            var arguments = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
-            if (!Matches(registration.Target, candidateType, arguments)) return false;
-            // Do not infer support from a constrained open registration for an ineligible construction.
-            if (GetTypeParameters(registration.Implementation).Any(parameter =>
-                !arguments.TryGetValue(parameter, out var argument) || !SatisfiesConstraints(parameter, argument))) return false;
-            if (includeCandidate)
+            if (matches.Count == 0) return false;
+            if (!derivedType)
             {
-                var targetSpecificity = SymbolEqualityComparer.Default.Equals(registration.Target, candidateType) ? 0
-                    : registration.Target is ITypeParameterSymbol ? 2
-                    : 1;
-                candidates.Add(new(registration, Priority(registration.Kind, requirement, derivedType),
-                    targetSpecificity, Substitute(registration.Surrogate, arguments)));
+                candidates.AddRange(matches);
+                return true;
+            }
+
+            // The runtime selects a codec for the nearest constructed base before checking whether it supports derived values.
+            // An exact registration without IDerivedTypeCodec therefore blocks a less-specific open registration.
+            var bestPriority = matches.Min(static candidate => candidate.Priority);
+            var bestSpecificity = matches.Where(candidate => candidate.Priority == bestPriority)
+                .Min(static candidate => candidate.TargetSpecificity);
+            var selected = matches.First(candidate => candidate.Priority == bestPriority
+                && candidate.TargetSpecificity == bestSpecificity);
+            if (selected.Registration.SupportsDerivedTypes)
+            {
+                candidates.Add(selected with { Priority = Priority(selected.Registration.Kind, requirement, true) });
             }
 
             return true;
+        }
+
+        void AddCandidate(Registration registration, ITypeSymbol candidateType, bool derivedType)
+        {
+            if (TryCreateCandidate(registration, candidateType, derivedType, out var candidate))
+            {
+                candidates.Add(candidate);
+            }
+        }
+
+        bool TryCreateCandidate(Registration registration, ITypeSymbol candidateType, bool derivedType, out SupportCandidate candidate)
+        {
+            if (!Supports(registration.Kind, requirement, type.IsValueType)
+                || requirement == Requirement.Field && type.TypeKind == TypeKind.Enum && registration.Kind == RegistrationKind.Converter)
+            {
+                candidate = null!;
+                return false;
+            }
+
+            var arguments = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+            if (!Matches(registration.Target, candidateType, arguments))
+            {
+                candidate = null!;
+                return false;
+            }
+
+            // Do not infer support from a constrained open registration for an ineligible construction.
+            if (GetTypeParameters(registration.Implementation).Any(parameter =>
+                !arguments.TryGetValue(parameter, out var argument) || !SatisfiesConstraints(parameter, argument)))
+            {
+                candidate = null!;
+                return false;
+            }
+
+            var targetSpecificity = SymbolEqualityComparer.Default.Equals(registration.Target, candidateType) ? 0
+                : registration.Target is ITypeParameterSymbol ? 2
+                : 1;
+            var inspectedArguments = registration.InspectedTypeParameters
+                .Where(arguments.ContainsKey)
+                .Select(parameter => arguments[parameter])
+                .ToImmutableArray();
+            candidate = new(registration, Priority(registration.Kind, requirement, derivedType),
+                targetSpecificity, Substitute(registration.Surrogate, arguments), inspectedArguments);
+            return true;
+        }
+    }
+
+    private static ImmutableArray<ITypeParameterSymbol> GetInspectedTypeParameters(INamedTypeSymbol implementation,
+        INamedTypeSymbol? fieldCodec, INamedTypeSymbol? baseCodec, INamedTypeSymbol? valueSerializer)
+    {
+        // Inspect only arguments used by injected serializer services; comparer codecs, for example, carry T without serializing it.
+        var result = ImmutableArray.CreateBuilder<ITypeParameterSymbol>();
+        var seen = new HashSet<ITypeParameterSymbol>(SymbolEqualityComparer.Default);
+        var implementationParameters = new HashSet<ITypeParameterSymbol>(GetTypeParameters(implementation), SymbolEqualityComparer.Default);
+        foreach (var constructor in implementation.InstanceConstructors)
+        {
+            foreach (var parameter in constructor.Parameters)
+            {
+                AddDependencies(parameter.Type, false);
+            }
+        }
+
+        return result.ToImmutable();
+
+        void AddDependencies(ITypeSymbol type, bool isDependency)
+        {
+            if (type is ITypeParameterSymbol parameter)
+            {
+                if (isDependency && implementationParameters.Contains(parameter) && seen.Add(parameter))
+                {
+                    result.Add(parameter);
+                }
+
+                return;
+            }
+
+            if (type is IArrayTypeSymbol array)
+            {
+                AddDependencies(array.ElementType, isDependency);
+                return;
+            }
+
+            if (type is not INamedTypeSymbol named)
+            {
+                return;
+            }
+
+            var isCodecDependency = fieldCodec is not null && SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, fieldCodec)
+                || baseCodec is not null && SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, baseCodec)
+                || valueSerializer is not null && SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, valueSerializer);
+            foreach (var argument in named.TypeArguments)
+            {
+                AddDependencies(argument, isDependency || isCodecDependency);
+            }
+
+            if (named.ContainingType is { } containing)
+            {
+                AddDependencies(containing, isDependency || isCodecDependency);
+            }
         }
     }
 
@@ -291,8 +401,9 @@ internal sealed class SerializationSupport
         Converter
     }
 
-    private sealed record Registration(ITypeSymbol Target, ITypeSymbol? Surrogate, bool InspectArguments,
+    private sealed record Registration(ITypeSymbol Target, ITypeSymbol? Surrogate, ImmutableArray<ITypeParameterSymbol> InspectedTypeParameters,
         INamedTypeSymbol Implementation, RegistrationKind Kind, bool SupportsDerivedTypes);
 
-    private sealed record SupportCandidate(Registration Registration, int Priority, int TargetSpecificity, ITypeSymbol? Surrogate);
+    private sealed record SupportCandidate(Registration Registration, int Priority, int TargetSpecificity, ITypeSymbol? Surrogate,
+        ImmutableArray<ITypeSymbol> InspectedArguments);
 }

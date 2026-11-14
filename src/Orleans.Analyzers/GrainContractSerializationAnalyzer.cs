@@ -1,6 +1,8 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -218,7 +220,7 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
 
             var attribute = named is not null ? symbols.GetAttribute(named, symbols.GenerateSerializer) : null;
             if (attribute is null && serializers.TryGetSupport(type, item.Requirement,
-                out var inspectArguments, out var surrogate, out var ambiguous))
+                out var inspectedArguments, out var surrogate, out var ambiguous))
             {
                 if (ambiguous)
                 {
@@ -232,16 +234,9 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
                         new(type, item.ConverterPath)));
                 }
 
-                if (inspectArguments)
+                foreach (var argument in inspectedArguments)
                 {
-                    if (named is not null)
-                    {
-                        PushArguments(named, item.Depth + 1);
-                    }
-                    else if (type is IArrayTypeSymbol elementArray)
-                    {
-                        pending.Push(new(elementArray.ElementType, item.Depth + 1, SerializationSupport.Requirement.Field, null));
-                    }
+                    pending.Push(new(argument, item.Depth + 1, SerializationSupport.Requirement.Field, null));
                 }
 
                 continue;
@@ -258,6 +253,26 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
                 && (namedType.TypeKind == TypeKind.Enum || symbols.IsLeaf(namedType)))
             {
                 continue;
+            }
+
+            if (attribute is not null && item.Requirement == SerializationSupport.Requirement.Field)
+            {
+                var taggedCases = symbols.GetTaggedCases(namedType, out var caseTypes);
+                if (taggedCases == SerializationSymbols.TaggedCaseStatus.Incomplete)
+                {
+                    Report(namedType, "tagged serializer case types are unavailable to static analysis; verify serialization support");
+                    continue;
+                }
+
+                if (taggedCases == SerializationSymbols.TaggedCaseStatus.Cases)
+                {
+                    foreach (var caseType in caseTypes)
+                    {
+                        pending.Push(new(caseType, item.Depth + 1, SerializationSupport.Requirement.Field, null));
+                    }
+
+                    continue;
+                }
             }
 
             if (attribute is null && item.Requirement == SerializationSupport.Requirement.Field
@@ -299,22 +314,6 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
             type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
             owner.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat), reason));
 
-        void PushArguments(INamedTypeSymbol type, int depth)
-        {
-            foreach (var argument in type.TypeArguments)
-            {
-                pending.Push(new(argument, depth, SerializationSupport.Requirement.Field, null));
-            }
-
-            for (var declaringType = type.ContainingType; declaringType is not null; declaringType = declaringType.ContainingType)
-            {
-                foreach (var argument in declaringType.TypeArguments)
-                {
-                    pending.Push(new(argument, depth, SerializationSupport.Requirement.Field, null));
-                }
-            }
-        }
-
         static bool Contains(ConverterPath? path, ITypeSymbol type)
         {
             for (; path is not null; path = path.Parent)
@@ -342,11 +341,16 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
         private readonly INamedTypeSymbol? _compilerGenerated;
         private readonly INamedTypeSymbol? _constructor;
         private readonly INamedTypeSymbol? _activatorConstructor;
+        private readonly INamedTypeSymbol? _case;
         private readonly IAssemblySymbol _assembly;
         private readonly bool _implicitProperties;
         private readonly bool _metadataImportAll;
         private readonly HashSet<INamedTypeSymbol> _leaves = new(SymbolEqualityComparer.Default);
         private readonly HashSet<INamedTypeSymbol> _returnWrappers = new(SymbolEqualityComparer.Default);
+        private readonly ConcurrentDictionary<INamedTypeSymbol, ImmutableArray<INamedTypeSymbol>> _closedSubtypes = new(SymbolEqualityComparer.Default);
+        private static readonly PropertyInfo? IsClosedAccessor = typeof(ITypeSymbol).GetProperty("IsClosed");
+        private static readonly PropertyInfo? IsUnionAccessor = typeof(ITypeSymbol).GetProperty("IsUnion");
+        private static readonly PropertyInfo? UnionCaseTypesAccessor = typeof(ITypeSymbol).GetProperty("UnionCaseTypes");
 
         public SerializationSymbols(Compilation compilation, INamedTypeSymbol grain, INamedTypeSymbol generateSerializer, bool implicitProperties)
         {
@@ -365,6 +369,7 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
             _compilerGenerated = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.CompilerGeneratedAttribute");
             _constructor = compilation.GetTypeByMetadataName("Orleans.OrleansConstructorAttribute");
             _activatorConstructor = compilation.GetTypeByMetadataName("Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute");
+            _case = compilation.GetTypeByMetadataName("Orleans.CaseAttribute");
             StatefulGrain = compilation.GetTypeByMetadataName("Orleans.Grain`1");
             PersistentState = compilation.GetTypeByMetadataName("Orleans.Runtime.IPersistentState`1");
             foreach (var name in new[] { "System.Threading.CancellationToken", "Orleans.GrainCancellationToken" })
@@ -391,6 +396,139 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
             || type.TypeKind == TypeKind.Class && type.IsAbstract;
         public bool IsSerializerTransparent(INamedTypeSymbol type) => GetAttribute(type, _serializerTransparent) is not null;
         public bool CanInspectMembers(INamedTypeSymbol type) => !type.DeclaringSyntaxReferences.IsEmpty || _metadataImportAll;
+
+        public enum TaggedCaseStatus
+        {
+            None,
+            Cases,
+            Incomplete
+        }
+
+        public TaggedCaseStatus GetTaggedCases(INamedTypeSymbol type, out ImmutableArray<ITypeSymbol> cases)
+        {
+            cases = [];
+            if (IsUnion(type))
+            {
+                if (UnionCaseTypesAccessor?.GetValue(type) is not ImmutableArray<ITypeSymbol> unionCases || unionCases.IsDefaultOrEmpty)
+                {
+                    return TaggedCaseStatus.Incomplete;
+                }
+
+                var result = ImmutableArray.CreateBuilder<ITypeSymbol>(unionCases.Length);
+                foreach (var unionCase in unionCases)
+                {
+                    result.Add(unionCase is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+                        ? nullable.TypeArguments[0]
+                        : unionCase);
+                }
+
+                cases = result.ToImmutable();
+                return TaggedCaseStatus.Cases;
+            }
+
+            if (!IsClosed(type))
+            {
+                return TaggedCaseStatus.None;
+            }
+
+            var definition = type.OriginalDefinition;
+            var subtypes = _closedSubtypes.GetOrAdd(definition, _ => [.. GetDeclaredTypes(type.ContainingAssembly)
+                .Where(candidate => candidate.BaseType is { } baseType
+                    && SymbolEqualityComparer.Default.Equals(baseType.OriginalDefinition, definition))]);
+            if (subtypes.Length == 0)
+            {
+                return TaggedCaseStatus.None;
+            }
+
+            var hasCase = subtypes.Any(subtype => GetAttribute(subtype, _case) is not null);
+            if (!hasCase)
+            {
+                return TaggedCaseStatus.None;
+            }
+
+            if (subtypes.Any(subtype => GetAttribute(subtype, _case) is null))
+            {
+                return TaggedCaseStatus.Incomplete;
+            }
+
+            var closedCases = ImmutableArray.CreateBuilder<ITypeSymbol>(subtypes.Length);
+            foreach (var subtype in subtypes)
+            {
+                if (GetClosedCaseType(subtype, type) is not { } closedCase)
+                {
+                    return TaggedCaseStatus.Incomplete;
+                }
+
+                closedCases.Add(closedCase);
+            }
+
+            cases = closedCases.ToImmutable();
+            return TaggedCaseStatus.Cases;
+        }
+
+        private static bool IsUnion(INamedTypeSymbol type) =>
+            IsUnionAccessor is { } accessor
+                ? accessor.GetValue(type) is true
+                : HasAttribute(type, "System.Runtime.CompilerServices.UnionAttribute");
+
+        private static bool IsClosed(INamedTypeSymbol type) =>
+            IsClosedAccessor?.GetValue(type) is true || HasAttribute(type, "System.Runtime.CompilerServices.IsClosedTypeAttribute");
+
+        private static bool HasAttribute(ISymbol symbol, string metadataName) => symbol.GetAttributes()
+            .Any(attribute => attribute.AttributeClass?.ToDisplayString() == metadataName);
+
+        private static IEnumerable<INamedTypeSymbol> GetDeclaredTypes(IAssemblySymbol assembly)
+        {
+            var pending = new Stack<INamespaceOrTypeSymbol>();
+            pending.Push(assembly.GlobalNamespace);
+            while (pending.Count > 0)
+            {
+                var current = pending.Pop();
+                foreach (var member in current.GetMembers().OfType<INamespaceOrTypeSymbol>())
+                {
+                    pending.Push(member);
+                }
+
+                if (current is INamedTypeSymbol type)
+                {
+                    yield return type;
+                }
+            }
+        }
+
+        private static INamedTypeSymbol? GetClosedCaseType(INamedTypeSymbol subtype, INamedTypeSymbol closedType)
+        {
+            if (!closedType.IsGenericType && !subtype.IsGenericType)
+            {
+                return subtype;
+            }
+
+            if (closedType.ContainingType is { IsGenericType: true }
+                || subtype.ContainingType is { IsGenericType: true }
+                || subtype.BaseType is not { } baseType
+                || baseType.TypeArguments.Length != subtype.TypeParameters.Length
+                || baseType.TypeArguments.Length != closedType.TypeArguments.Length)
+            {
+                return null;
+            }
+
+            var subtypeArguments = new ITypeSymbol[subtype.TypeParameters.Length];
+            for (var index = 0; index < baseType.TypeArguments.Length; index++)
+            {
+                if (baseType.TypeArguments[index] is not ITypeParameterSymbol parameter
+                    || !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, subtype)
+                    || subtypeArguments[parameter.Ordinal] is not null)
+                {
+                    return null;
+                }
+
+                subtypeArguments[parameter.Ordinal] = closedType.TypeArguments[index];
+            }
+
+            return subtype.TypeParameters.Length == 0 || subtypeArguments.All(static argument => argument is not null)
+                ? subtype.Construct(subtypeArguments)
+                : null;
+        }
 
         private static bool Implements(INamedTypeSymbol type, INamedTypeSymbol? contract) => contract is not null
             && (SymbolEqualityComparer.Default.Equals(type, contract)
