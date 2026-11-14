@@ -102,41 +102,28 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task WriteStateAsync_RetryWithMatchingTokenAndHash_WhenIdempotentWritesOptionIsEnabled()
+    public async Task WriteStateAsync_RejectsSameProviderStaleWriter_WhenIdempotentWritesOptionIsEnabled()
     {
         var serializer = CreateSetupSerializer();
         var storage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
-        var grainState = new GrainState<TestState> { State = new TestState { Value = 42 } };
-        var blob = _container.GetBlobClient(GetBlobName());
+        var currentState = new GrainState<TestState> { State = new TestState { Value = 42 } };
 
-        await storage.WriteStateAsync(GrainType, _grainId, grainState);
+        await storage.WriteStateAsync(GrainType, _grainId, currentState);
 
-        var initialETag = Assert.IsType<string>(grainState.ETag);
-        var contents = serializer.Serialize(grainState.State);
-        var expectedHash = ComputeHashBase64(contents);
-        var properties = await blob.GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var staleState = new GrainState<TestState>
+        {
+            ETag = Assert.IsType<string>(currentState.ETag),
+            RecordExists = true,
+            State = new TestState { Value = 42 },
+        };
 
-        Assert.True(properties.Value.Metadata.TryGetValue("OrleansUpdateToken", out var updateToken));
-        Assert.True(properties.Value.Metadata.TryGetValue("ContentSha256", out var storedHash));
-        Assert.Equal(expectedHash, storedHash);
+        await storage.WriteStateAsync(GrainType, _grainId, currentState);
+        var currentETag = currentState.ETag;
 
-        var remoteWrite = await blob.UploadAsync(
-            contents,
-            new BlobUploadOptions
-            {
-                Conditions = new BlobRequestConditions { IfMatch = new ETag(initialETag) },
-                Metadata = new Dictionary<string, string>
-                {
-                    ["OrleansUpdateToken"] = updateToken,
-                    ["ContentSha256"] = expectedHash,
-                },
-            },
-            TestContext.Current.CancellationToken);
-
-        await storage.WriteStateAsync(GrainType, _grainId, grainState);
-
-        Assert.Equal(remoteWrite.Value.ETag.ToString(), grainState.ETag);
-        Assert.True(grainState.RecordExists);
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, _grainId, staleState));
+        Assert.Equal(currentETag, staleState.ETag);
+        Assert.True(staleState.RecordExists);
     }
 
     [Fact, TestCategory("Functional")]
@@ -243,6 +230,9 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         var initialETag = Assert.IsType<string>(grainState.ETag);
         var originalContents = serializer.Serialize(grainState.State);
         var originalHash = ComputeHashBase64(originalContents);
+        var properties = await blob.GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.False(properties.Value.Metadata.ContainsKey("OrleansUpdateToken"));
+        Assert.False(properties.Value.Metadata.ContainsKey("ContentSha256"));
 
         await blob.UploadAsync(
             originalContents,

@@ -31,7 +31,6 @@ namespace Orleans.Storage
         private readonly IActivatorProvider _activatorProvider;
         private readonly AzureBlobStorageOptions options;
         private readonly IGrainStorageSerializer grainStorageSerializer;
-        private readonly string _storageInstanceId = Guid.NewGuid().ToString();
 
         /// <summary> Default constructor </summary>
         /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
@@ -136,16 +135,17 @@ namespace Orleans.Storage
                 LogTraceWriting(grainType, grainId, grainState.ETag, blobName, container.Name);
 
                 var blob = container.GetBlobClient(blobName);
+                var updateToken = options.EnableIdempotentWrites ? Guid.NewGuid().ToString("N") : null;
 
                 if (this.grainStorageSerializer is IGrainStorageStreamingSerializer serializer)
                 {
-                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, "application/octet-stream", blob, cancellationToken);
+                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, updateToken, "application/octet-stream", blob, cancellationToken);
                 }
                 else
                 {
                     var contents = ConvertToStorageFormat(grainState.State);
                     var localHashBase64 = options.EnableIdempotentWrites ? ComputeHashBase64(contents) : null;
-                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, localHashBase64, "application/octet-stream", blob, cancellationToken);
+                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, localHashBase64, updateToken, "application/octet-stream", blob, cancellationToken);
                 }
 
                 LogTraceDataWritten(grainType, grainId, grainState.ETag, blobName, container.Name);
@@ -205,10 +205,11 @@ namespace Orleans.Storage
                 else
                 {
                     var emptyHashBase64 = options.EnableIdempotentWrites ? ComputeHashBase64(BinaryData.Empty) : null;
+                    var updateToken = options.EnableIdempotentWrites ? Guid.NewGuid().ToString("N") : null;
                     var uploadOptions = new BlobUploadOptions
                     {
                         Conditions = conditions,
-                        Metadata = CreateWriteMetadata(emptyHashBase64),
+                        Metadata = CreateWriteMetadata(updateToken, emptyHashBase64),
                     };
 
                     try
@@ -220,9 +221,9 @@ namespace Orleans.Storage
                     catch (RequestFailedException ex) when (IsWriteConflict(ex))
                     {
                         var attemptedETag = grainState.ETag;
-                        if (!ex.IsPreconditionFailed()
+                        if (!CanVerifyIdempotentRetry(ex, conditions.IfNoneMatch == ETag.All)
                             || !options.EnableIdempotentWrites
-                            || !await TryHandleIdempotentRetryAsync(blob, grainState, emptyHashBase64, cancellationToken).ConfigureAwait(false))
+                            || !await TryHandleIdempotentRetryAsync(blob, grainState, updateToken, emptyHashBase64, ex, cancellationToken).ConfigureAwait(false))
                         {
                             throw CreateInconsistentStateException(blob, grainState.ETag, ex);
                         }
@@ -252,8 +253,9 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string? localHashBase64, string mimeType, BlobClient blob, CancellationToken cancellationToken)
+        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string? localHashBase64, string? updateToken, string mimeType, BlobClient blob, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             try
@@ -266,7 +268,7 @@ namespace Orleans.Storage
                 {
                     HttpHeaders = new BlobHttpHeaders { ContentType = mimeType },
                     Conditions = conditions,
-                    Metadata = CreateWriteMetadata(localHashBase64),
+                    Metadata = CreateWriteMetadata(updateToken, localHashBase64),
                 };
 
                 try
@@ -278,9 +280,9 @@ namespace Orleans.Storage
                 catch (RequestFailedException ex) when (IsWriteConflict(ex))
                 {
                     var attemptedETag = grainState.ETag;
-                    if (ex.IsPreconditionFailed()
+                    if (CanVerifyIdempotentRetry(ex, conditions.IfNoneMatch == ETag.All)
                         && this.options.EnableIdempotentWrites
-                        && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken).ConfigureAwait(false))
+                        && await TryHandleIdempotentRetryAsync(blob, grainState, updateToken, localHashBase64, ex, cancellationToken).ConfigureAwait(false))
                     {
                         LogWarningIdempotentRetryResolved(
                             "write",
@@ -303,12 +305,13 @@ namespace Orleans.Storage
                 // if the container does not exist, create it, and make another attempt
                 LogTraceContainerNotFound(grainType, grainId, grainState.ETag, blob.Name, container.Name);
                 await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, localHashBase64, mimeType, blob, cancellationToken).ConfigureAwait(false);
+                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, localHashBase64, updateToken, mimeType, blob, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async Task WriteStateBufferedStreamAndCreateContainerIfNotExists<T>(IGrainStorageStreamingSerializer serializer, string grainType, GrainId grainId, IGrainState<T> grainState, string mimeType, BlobClient blob, CancellationToken cancellationToken)
+        private async Task WriteStateBufferedStreamAndCreateContainerIfNotExists<T>(IGrainStorageStreamingSerializer serializer, string grainType, GrainId grainId, IGrainState<T> grainState, string? updateToken, string mimeType, BlobClient blob, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             try
@@ -316,7 +319,6 @@ namespace Orleans.Storage
                 var conditions = string.IsNullOrEmpty(grainState.ETag)
                     ? new BlobRequestConditions { IfNoneMatch = ETag.All }
                     : new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) };
-
                 var bufferStream = PooledBufferStream.Rent();
                 try
                 {
@@ -324,15 +326,14 @@ namespace Orleans.Storage
                     string? localHashBase64 = null;
                     if (options.EnableIdempotentWrites)
                     {
-                        bufferStream.Position = 0;
-                        localHashBase64 = Convert.ToBase64String(SHA256.HashData(bufferStream));
+                        localHashBase64 = ComputeHashBase64(bufferStream);
                     }
 
                     var uploadOptions = new BlobUploadOptions
                     {
                         HttpHeaders = new BlobHttpHeaders { ContentType = mimeType },
                         Conditions = conditions,
-                        Metadata = CreateWriteMetadata(localHashBase64),
+                        Metadata = CreateWriteMetadata(updateToken, localHashBase64),
                     };
 
                     try
@@ -345,9 +346,9 @@ namespace Orleans.Storage
                     catch (RequestFailedException ex) when (IsWriteConflict(ex))
                     {
                         var attemptedETag = grainState.ETag;
-                        if (ex.IsPreconditionFailed()
+                        if (CanVerifyIdempotentRetry(ex, conditions.IfNoneMatch == ETag.All)
                             && this.options.EnableIdempotentWrites
-                            && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken).ConfigureAwait(false))
+                            && await TryHandleIdempotentRetryAsync(blob, grainState, updateToken, localHashBase64, ex, cancellationToken).ConfigureAwait(false))
                         {
                             LogWarningIdempotentRetryResolved(
                                 "write",
@@ -375,7 +376,7 @@ namespace Orleans.Storage
                 // if the container does not exist, create it, and make another attempt
                 LogTraceContainerNotFound(grainType, grainId, grainState.ETag, blob.Name, container.Name);
                 await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-                await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, mimeType, blob, cancellationToken).ConfigureAwait(false);
+                await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, updateToken, mimeType, blob, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -442,55 +443,77 @@ namespace Orleans.Storage
         private static bool IsWriteConflict(RequestFailedException exception)
             => exception.IsPreconditionFailed() || exception.IsConflict() || exception.IsNotFound() && !exception.IsContainerNotFound();
 
-        private static InconsistentStateException CreateInconsistentStateException(BlobClient blob, string? currentETag, RequestFailedException exception)
+        private static bool CanVerifyIdempotentRetry(RequestFailedException exception, bool isCreate)
+            => exception.IsPreconditionFailed() || isCreate && exception.Status == 409 && exception.ErrorCode == "BlobAlreadyExists";
+
+        private static InconsistentStateException CreateInconsistentStateException(BlobClient blob, string? currentETag, Exception exception)
             => new($"Blob storage condition not Satisfied. BlobName: {blob.Name}, Container: {blob.BlobContainerName}, CurrentETag: {currentETag}", "Unknown", currentETag, exception);
 
-        private async Task<bool> TryHandleIdempotentRetryAsync<T>(BlobClient blob, IGrainState<T> grainState, string? localHashBase64, CancellationToken cancellationToken)
+        private async Task<bool> TryHandleIdempotentRetryAsync<T>(BlobClient blob, IGrainState<T> grainState, string? updateToken, string? localHashBase64, RequestFailedException writeConflict, CancellationToken cancellationToken)
         {
             try
             {
                 var properties = await blob.GetPropertiesAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                // Check if the stored OrleansUpdateToken matches this provider's instance ID
-                if (properties.Value.Metadata.TryGetValue(UpdateTokenMetadataKey, out var storedToken) &&
-                    storedToken == _storageInstanceId &&
-                    localHashBase64 is not null &&
-                    properties.Value.Metadata.TryGetValue(ContentHashMetadataKey, out var storedHash) &&
-                    storedHash == localHashBase64)
+                if (updateToken is not null
+                    && properties.Value.Metadata.TryGetValue(UpdateTokenMetadataKey, out var storedToken)
+                    && storedToken == updateToken
+                    && localHashBase64 is not null
+                    && properties.Value.Metadata.TryGetValue(ContentHashMetadataKey, out var storedHash)
+                    && storedHash == localHashBase64)
                 {
-                    // This is an idempotent retry - the write already succeeded with this instance's token.
-                    // The 412 occurred because the response was lost during network transmission.
-                    // Update the ETag to the current server state.
                     grainState.ETag = properties.Value.ETag.ToString();
                     grainState.RecordExists = true;
                     return true;
                 }
 
-                // Token mismatch - this is a real conflict, not an idempotent retry
                 return false;
             }
             catch (RequestFailedException ex) when (ex.IsNotFound())
             {
-                // Blob doesn't exist - this is a real precondition failure
                 return false;
+            }
+            catch (RequestFailedException verificationException)
+            {
+                var details = new AggregateException("The Azure Blob write conflict could not be verified.", writeConflict, verificationException);
+                throw CreateInconsistentStateException(blob, grainState.ETag, details);
             }
         }
 
-        private Dictionary<string, string>? CreateWriteMetadata(string? localHashBase64)
+        private Dictionary<string, string>? CreateWriteMetadata(string? updateToken, string? localHashBase64)
         {
-            if (!options.EnableIdempotentWrites || localHashBase64 is null)
+            if (!options.EnableIdempotentWrites || updateToken is null || localHashBase64 is null)
             {
                 return null;
             }
 
             return new Dictionary<string, string>
             {
-                [UpdateTokenMetadataKey] = _storageInstanceId,
+                [UpdateTokenMetadataKey] = updateToken,
                 [ContentHashMetadataKey] = localHashBase64,
             };
         }
 
-        private static string ComputeHashBase64(BinaryData contents) => Convert.ToBase64String(SHA256.HashData(contents.ToArray()));
+        private static string ComputeHashBase64(BinaryData contents) => Convert.ToBase64String(SHA256.HashData(contents.ToMemory().Span));
+
+        private static string ComputeHashBase64(PooledBufferStream contents)
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            var sequence = contents.RentReadOnlySequence();
+            try
+            {
+                foreach (var segment in sequence)
+                {
+                    hash.AppendData(segment.Span);
+                }
+            }
+            finally
+            {
+                contents.ReturnReadOnlySequence(sequence);
+            }
+
+            return Convert.ToBase64String(hash.GetHashAndReset());
+        }
 
         /// <inheritdoc/>
         public void Participate(ISiloLifecycle lifecycle)
