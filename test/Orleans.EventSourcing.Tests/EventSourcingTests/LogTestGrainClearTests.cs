@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Hosting;
 using Orleans.Storage;
+using Orleans.TestingHost;
+using TestGrains;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Assert = Xunit.Assert;
@@ -27,6 +30,7 @@ namespace Tester.EventSourcingTests
         [InlineData("TestGrains.LogTestGrainDefaultStorage", 721001L)]
         [InlineData("TestGrains.LogTestGrainSharedLogStorage", 721002L)]
         [InlineData("TestGrains.LogTestGrainCustomStoragePrimaryCluster", 721003L)]
+        [InlineData("TestGrains.LogTestGrainSeparateCustomStorage", 721004L)]
         public async Task ClearLog_ResetDropsTentativeAndAllowsFurtherWrites(string grainClass, long grainId)
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(grainId, grainClass);
@@ -67,6 +71,61 @@ namespace Tester.EventSourcingTests
             await grain.SetAGlobal(7);
             Assert.Equal(7, await grain.GetAGlobal());
             Assert.Equal(1, await grain.GetConfirmedVersion());
+        }
+
+        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        public async Task FactoryBackedCustomStorage_RetrievesConfirmedEvents()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(
+                721005L,
+                "TestGrains.LogTestGrainSeparateCustomStorage");
+
+            await grain.Clear();
+            await grain.SetAGlobal(10);
+            await grain.IncrementAGlobal();
+
+            var events = await grain.GetEventLog();
+
+            Assert.Equal(2, events.Count);
+            Assert.Equal(10, Assert.IsType<UpdateA>(events[0]).Val);
+            Assert.IsType<IncrementA>(events[1]);
+
+            await grain.Clear();
+
+            Assert.Empty(await grain.GetEventLog());
+        }
+
+        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        public async Task DefaultFactoryBackedCustomStorage_ActivatesGrainWithoutProviderAttribute()
+        {
+            var builder = new TestClusterBuilder(1);
+            builder.AddSiloBuilderConfigurator<DefaultCustomStorageConfigurator>();
+            await using var cluster = builder.Build();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
+            var grain = cluster.GrainFactory.GetGrain<ILogTestGrain>(
+                721006L, "TestGrains.LogTestGrainDefaultStorage");
+
+            await grain.SetAGlobal(20);
+            await grain.IncrementAGlobal();
+
+            Assert.Equal(21, await grain.GetAGlobal());
+            Assert.Equal(2, await grain.GetConfirmedVersion());
+            var events = await grain.GetEventLog();
+            Assert.Equal(20, Assert.IsType<UpdateA>(events[0]).Val);
+            Assert.IsType<IncrementA>(events[1]);
+            Assert.Equal(2, events.Count);
+
+            await grain.Clear();
+
+            Assert.Equal(0, await grain.GetConfirmedVersion());
+            Assert.Equal(0, await grain.GetAGlobal());
+            Assert.Empty(await grain.GetEventLog());
+        }
+
+        private sealed class DefaultCustomStorageConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder siloBuilder) =>
+                siloBuilder.AddCustomStorageBasedLogConsistencyProviderAsDefault<SeparateCustomStorageFactory>();
         }
 
         private static async Task<List<Exception>> RunConcurrentOperationsAroundClear(ILogTestGrain grain)
