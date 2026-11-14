@@ -94,6 +94,7 @@ namespace Orleans.AzureUtils
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">Name of the queue to be connected to.</param>
         /// <param name="options">Queue connection options.</param>
+        /// <exception cref="ArgumentException">The sanitized <paramref name="queueName"/> violates Azure Queue naming rules.</exception>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, AzureQueueOptions options)
         {
             ArgumentNullException.ThrowIfNull(queueName);
@@ -434,7 +435,9 @@ namespace Orleans.AzureUtils
         {
             var tmp = queueName;
             //Azure queue naming rules : https://learn.microsoft.com/rest/api/storageservices/Naming-Queues-and-Metadata?redirectedfrom=MSDN
+#pragma warning disable CA1308 // Azure Queue names use lowercase letters.
             tmp = tmp.ToLowerInvariant();
+#pragma warning restore CA1308
             tmp = tmp
                 .Replace('/', '-') // Forward slash
                 .Replace('\\', '-') // Backslash
@@ -454,37 +457,31 @@ namespace Orleans.AzureUtils
             if (!(queueName.Length >= 3 && queueName.Length <= 63))
             {
                 // A queue name must be from 3 through 63 characters long.
-                throw new ArgumentException(string.Format("A queue name must be from 3 through 63 characters long, while your queueName length is {0}, queueName is {1}.", queueName.Length, queueName), queueName);
+                throw new ArgumentException(string.Format("A queue name must be from 3 through 63 characters long, while your queueName length is {0}, queueName is {1}.", queueName.Length, queueName), nameof(queueName));
             }
 
-            if (!char.IsLetterOrDigit(queueName.First()))
+            if (!char.IsAsciiLetterOrDigit(queueName.First()))
             {
                 // A queue name must start with a letter or number
-                throw new ArgumentException(string.Format("A queue name must start with a letter or number, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("A queue name must start with a letter or number, while your queueName is {0}.", queueName), nameof(queueName));
             }
 
-            if (!char.IsLetterOrDigit(queueName.Last()))
+            if (!char.IsAsciiLetterOrDigit(queueName.Last()))
             {
                 // The first and last letters in the queue name must be alphanumeric. The dash (-) character cannot be the first or last character.
-                throw new ArgumentException(string.Format("The last letter in the queue name must be alphanumeric, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("The last letter in the queue name must be alphanumeric, while your queueName is {0}.", queueName), nameof(queueName));
             }
 
-            if (!queueName.All(c => char.IsLetterOrDigit(c) || c.Equals('-')))
+            if (!queueName.All(c => char.IsAsciiLetterOrDigit(c) || c.Equals('-')))
             {
                 // A queue name can only contain letters, numbers, and the dash (-) character.
-                throw new ArgumentException(string.Format("A queue name can only contain letters, numbers, and the dash (-) character, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("A queue name can only contain ASCII letters, numbers, and the dash (-) character, while your queueName is {0}.", queueName), nameof(queueName));
             }
 
             if (queueName.Contains("--", StringComparison.Ordinal))
             {
                 // Consecutive dash characters are not permitted in the queue name.
-                throw new ArgumentException(string.Format("Consecutive dash characters are not permitted in the queue name, while your queueName is {0}.", queueName), queueName);
-            }
-
-            if (queueName.Where(char.IsLetter).Any(c => !char.IsLower(c)))
-            {
-                // All letters in a queue name must be lowercase.
-                throw new ArgumentException(string.Format("All letters in a queue name must be lowercase, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("Consecutive dash characters are not permitted in the queue name, while your queueName is {0}.", queueName), nameof(queueName));
             }
         }
 
