@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
@@ -15,9 +16,11 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Placement;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Utilities;
@@ -41,6 +44,67 @@ namespace UnitTests.Runtime
         private static readonly GrainType TestGrainType = GrainType.Create("test");
         private static readonly GrainInterfaceType TestInterfaceType = GrainInterfaceType.Create("test.interface");
         private static int _siloGeneration;
+
+        [Theory]
+        [InlineData(0, 0)]
+        [InlineData(1, 1)]
+        public async Task RerouteMessage_UsesPlacementCacheWithExpectedHintStatusLookups(int generation, int expectedStatusLookups)
+        {
+            var grainId = GrainId.Create(TestGrainType, "legacy-client");
+            var localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
+            var fixture = new PlacementServiceFixture(localGrainDirectory: localGrainDirectory);
+            using var services = fixture.ServiceProvider;
+            using var metrics = new ServiceCollection().AddMetrics().BuildServiceProvider();
+            var instruments = new OrleansInstruments(metrics.GetRequiredService<IMeterFactory>());
+            var messaging = new MessagingInstruments(instruments);
+            var processing = new MessagingProcessingInstruments(instruments);
+            var cachedAddress = new GrainAddress { GrainId = grainId, SiloAddress = fixture.Target.LocalSilo };
+            localGrainDirectory.TryLocalLookup(grainId, out Arg.Any<GrainAddress?>()).Returns(call =>
+            {
+                call[1] = cachedAddress;
+                return true;
+            });
+            var siloDetails = Substitute.For<ILocalSiloDetails>();
+            siloDetails.SiloAddress.Returns(fixture.Target.LocalSilo);
+            await using var messageCenter = new MessageCenter(
+                siloDetails: siloDetails,
+                messageFactory: null!,
+                catalog: null!,
+                gatewayFactory: _ => throw new InvalidOperationException("This fixture uses placement without a gateway."),
+                logger: NullLogger<MessageCenter>.Instance,
+                siloStatusOracle: fixture.SiloStatusOracle,
+                senderManager: null!,
+                messagingTrace: new RuntimeMessagingTrace(NullLoggerFactory.Instance, messaging, processing),
+                messagingInstruments: messaging,
+                messagingProcessingInstruments: processing,
+                messagingOptions: Options.Create(new SiloMessagingOptions()),
+                placementService: fixture.Target,
+                grainLocator: CreateGrainLocator(services, fixture.ClusterManifestProvider, localGrainDirectory),
+                messageStatisticsSink: new NoOpMessageStatisticsSink());
+            var target = SiloAddress.New(IPAddress.Loopback, 11112, generation);
+            using var message = new Message
+            {
+                Direction = Message.Directions.Request,
+                TargetGrain = grainId,
+                TargetSilo = target,
+                // Observe re-addressing, then expire at SendMessage before transport delivery.
+                TimeToLive = TimeSpan.FromMilliseconds(-1),
+            };
+
+            try
+            {
+                messageCenter.RerouteMessage(message);
+
+                Assert.Equal(cachedAddress.SiloAddress, message.TargetSilo);
+                Assert.Null(message.CacheInvalidationHeader);
+                fixture.SiloStatusOracle.Received(expectedStatusLookups).GetApproximateSiloStatus(target);
+                localGrainDirectory.Received(1).TryLocalLookup(grainId, out Arg.Any<GrainAddress?>());
+            }
+            finally
+            {
+                await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
+            }
+        }
 
         [Fact]
         public async Task LifecycleStop_CompletesWorkerTasks()
