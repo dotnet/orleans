@@ -130,10 +130,11 @@ internal sealed class SmokePlacementFilterDirector : IPlacementFilterDirector
 
     public ActivationMarker Marker { get; }
 
-    public IEnumerable<SiloAddress> Filter(
+    public Task<IReadOnlyList<SiloAddress>> FilterAsync(
         PlacementFilterStrategy filterStrategy,
         PlacementTarget target,
-        IEnumerable<SiloAddress> silos) => silos;
+        IReadOnlyList<SiloAddress> silos,
+        CancellationToken cancellationToken = default) => Task.FromResult(silos);
 }
 
 internal sealed class SmokePlacementStrategy : PlacementStrategy
