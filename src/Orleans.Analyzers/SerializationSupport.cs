@@ -13,8 +13,16 @@ internal sealed class SerializationSupport
 {
     private readonly Compilation _compilation;
     private readonly Dictionary<INamedTypeSymbol, List<Registration>> _registrations = new(SymbolEqualityComparer.Default);
+    private readonly List<Registration> _arrayRegistrations = [];
 
     private SerializationSupport(Compilation compilation) => _compilation = compilation;
+
+    internal enum Requirement
+    {
+        Field,
+        Base,
+        Value
+    }
 
     public static SerializationSupport Create(Compilation compilation, IAssemblySymbol annotations, CancellationToken cancellationToken)
     {
@@ -25,6 +33,7 @@ internal sealed class SerializationSupport
         var baseCodec = compilation.GetTypeByMetadataName("Orleans.Serialization.Serializers.IBaseCodec`1");
         var valueSerializer = compilation.GetTypeByMetadataName("Orleans.Serialization.Serializers.IValueSerializer`1");
         var converter = compilation.GetTypeByMetadataName("Orleans.IConverter`2");
+        var derivedTypeCodec = compilation.GetTypeByMetadataName("Orleans.Serialization.Codecs.IDerivedTypeCodec");
         foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols.Prepend(compilation.Assembly))
         {
             // Assemblies without a reference to the annotations cannot declare a registration.
@@ -46,22 +55,40 @@ internal sealed class SerializationSupport
                 var serializer = HasAttribute(type, registerSerializer);
                 var surrogateConverter = HasAttribute(type, registerConverter);
                 if (!serializer && !surrogateConverter) continue;
+                var supportsDerivedTypes = derivedTypeCodec is not null && type.AllInterfaces.Any(candidate =>
+                    SymbolEqualityComparer.Default.Equals(candidate, derivedTypeCodec));
                 foreach (var implemented in type.AllInterfaces)
                 {
-                    // CodecProvider wraps base codecs and value serializers in field codecs.
-                    var isCodec = serializer && (SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, fieldCodec)
-                        || SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, baseCodec)
-                        || SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, valueSerializer));
-                    var isConverter = surrogateConverter && SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, converter);
-                    if ((isCodec || isConverter) && implemented.TypeArguments[0] is INamedTypeSymbol target)
+                    var kind = serializer && SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, fieldCodec)
+                        ? RegistrationKind.FieldCodec
+                        : serializer && SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, baseCodec)
+                            ? RegistrationKind.BaseCodec
+                            : serializer && SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, valueSerializer)
+                                ? RegistrationKind.ValueSerializer
+                                : surrogateConverter && SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, converter)
+                                    ? RegistrationKind.Converter
+                                    : (RegistrationKind?)null;
+                    if (kind is { } registrationKind && implemented.TypeArguments[0] is { } target
+                        && target is INamedTypeSymbol or IArrayTypeSymbol)
                     {
-                        if (!result._registrations.TryGetValue(target.OriginalDefinition, out var registrations))
+                        var registration = new Registration(target,
+                            registrationKind == RegistrationKind.Converter ? implemented.TypeArguments[1] : null,
+                            assembly.Name == "Orleans.Serialization", type, registrationKind,
+                            supportsDerivedTypes && registrationKind == RegistrationKind.FieldCodec);
+                        if (target is IArrayTypeSymbol)
                         {
-                            result._registrations.Add(target.OriginalDefinition, registrations = []);
+                            result._arrayRegistrations.Add(registration);
                         }
+                        else
+                        {
+                            var namedTarget = (INamedTypeSymbol)target;
+                            if (!result._registrations.TryGetValue(namedTarget.OriginalDefinition, out var registrations))
+                            {
+                                result._registrations.Add(namedTarget.OriginalDefinition, registrations = []);
+                            }
 
-                        registrations.Add(new(target, isConverter ? implemented.TypeArguments[1] : null,
-                            assembly.Name == "Orleans.Serialization", type));
+                            registrations.Add(registration);
+                        }
                     }
                 }
             }
@@ -70,27 +97,98 @@ internal sealed class SerializationSupport
         return result;
     }
 
-    public bool TryGetSupport(INamedTypeSymbol type, out bool inspectArguments, out ITypeSymbol? surrogate)
+    public bool TryGetSupport(ITypeSymbol type, Requirement requirement, out bool inspectArguments,
+        out ITypeSymbol? surrogate, out bool ambiguous)
     {
-        if (_registrations.TryGetValue(type.OriginalDefinition, out var registrations))
+        var candidates = new List<SupportCandidate>();
+        if (type is INamedTypeSymbol named)
         {
-            foreach (var registration in registrations)
+            AddMatches(named, false);
+            if (requirement == Requirement.Field && named.IsReferenceType)
             {
-                var arguments = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
-                if (!Matches(registration.Target, type, arguments)) continue;
-                // Do not infer support from a constrained open registration for an ineligible construction.
-                if (GetTypeParameters(registration.Implementation).Any(parameter =>
-                    !arguments.TryGetValue(parameter, out var argument) || !SatisfiesConstraints(parameter, argument))) continue;
-                inspectArguments = registration.InspectArguments;
-                surrogate = Substitute(registration.Surrogate, arguments);
-                return true;
+                for (var baseType = named.BaseType; baseType is not null; baseType = baseType.BaseType)
+                {
+                    AddMatches(baseType, true);
+                }
             }
+        }
+        else if (type is IArrayTypeSymbol array)
+        {
+            foreach (var registration in _arrayRegistrations)
+            {
+                AddCandidate(registration, array, false);
+            }
+        }
+
+        if (candidates.Count > 0)
+        {
+            var best = candidates.Min(static candidate => candidate.Priority);
+            var bestIsExact = candidates.Any(candidate => candidate.Priority == best && candidate.IsExact);
+            var selected = candidates.First(candidate => candidate.Priority == best && candidate.IsExact == bestIsExact);
+            ambiguous = selected.Registration.Kind == RegistrationKind.Converter
+                && candidates.Any(candidate => candidate.Priority == best && candidate.IsExact == bestIsExact
+                    && candidate.Registration.Kind == RegistrationKind.Converter
+                    && !SymbolEqualityComparer.Default.Equals(candidate.Surrogate, selected.Surrogate));
+            inspectArguments = selected.Registration.InspectArguments;
+            surrogate = ambiguous ? null : selected.Surrogate;
+            return true;
         }
 
         inspectArguments = false;
         surrogate = null;
+        ambiguous = false;
         return false;
+
+        void AddMatches(INamedTypeSymbol candidateType, bool derivedType)
+        {
+            if (!_registrations.TryGetValue(candidateType.OriginalDefinition, out var registrations)) return;
+            foreach (var registration in registrations)
+            {
+                if (derivedType && (registration.Kind != RegistrationKind.FieldCodec || !registration.SupportsDerivedTypes))
+                {
+                    continue;
+                }
+
+                AddCandidate(registration, candidateType, derivedType);
+            }
+        }
+
+        void AddCandidate(Registration registration, ITypeSymbol candidateType, bool derivedType)
+        {
+            if (!Supports(registration.Kind, requirement, type.IsValueType)) return;
+            var arguments = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+            if (!Matches(registration.Target, candidateType, arguments)) return;
+            // Do not infer support from a constrained open registration for an ineligible construction.
+            if (GetTypeParameters(registration.Implementation).Any(parameter =>
+                !arguments.TryGetValue(parameter, out var argument) || !SatisfiesConstraints(parameter, argument))) return;
+            candidates.Add(new(registration, Priority(registration.Kind, requirement, derivedType),
+                SymbolEqualityComparer.Default.Equals(registration.Target, candidateType),
+                Substitute(registration.Surrogate, arguments)));
+        }
     }
+
+    private static bool Supports(RegistrationKind kind, Requirement requirement, bool isValueType) => requirement switch
+    {
+        Requirement.Field => true,
+        Requirement.Base => kind == RegistrationKind.BaseCodec || kind == RegistrationKind.Converter && !isValueType,
+        Requirement.Value => kind == RegistrationKind.ValueSerializer || kind == RegistrationKind.Converter && isValueType,
+        _ => false
+    };
+
+    private static int Priority(RegistrationKind kind, Requirement requirement, bool derivedType) =>
+        (requirement, derivedType, kind) switch
+        {
+            (_, true, _) => 4,
+            (Requirement.Field, false, RegistrationKind.FieldCodec) => 0,
+            (Requirement.Field, false, RegistrationKind.BaseCodec) => 1,
+            (Requirement.Field, false, RegistrationKind.ValueSerializer) => 2,
+            (Requirement.Field, false, RegistrationKind.Converter) => 3,
+            (Requirement.Base, false, RegistrationKind.BaseCodec) => 0,
+            (Requirement.Base, false, RegistrationKind.Converter) => 1,
+            (Requirement.Value, false, RegistrationKind.ValueSerializer) => 0,
+            (Requirement.Value, false, RegistrationKind.Converter) => 1,
+            _ => int.MaxValue
+        };
 
     private static bool HasAttribute(INamedTypeSymbol type, INamedTypeSymbol? attribute) => attribute is not null
         && type.GetAttributes().Any(candidate => SymbolEqualityComparer.Default.Equals(candidate.AttributeClass, attribute));
@@ -157,5 +255,16 @@ internal sealed class SerializationSupport
         return type;
     }
 
-    private sealed record Registration(INamedTypeSymbol Target, ITypeSymbol? Surrogate, bool InspectArguments, INamedTypeSymbol Implementation);
+    private enum RegistrationKind
+    {
+        FieldCodec,
+        BaseCodec,
+        ValueSerializer,
+        Converter
+    }
+
+    private sealed record Registration(ITypeSymbol Target, ITypeSymbol? Surrogate, bool InspectArguments,
+        INamedTypeSymbol Implementation, RegistrationKind Kind, bool SupportsDerivedTypes);
+
+    private sealed record SupportCandidate(Registration Registration, int Priority, bool IsExact, ITypeSymbol? Surrogate);
 }

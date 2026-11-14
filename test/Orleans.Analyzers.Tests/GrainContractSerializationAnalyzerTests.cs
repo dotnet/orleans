@@ -74,6 +74,21 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         """);
 
     [Fact]
+    public Task RegisteredArrayCodec_DoesNotRequireAnElementCodec() => AssertNoDiagnostics(CodecSource + """
+        public class Missing { }
+        [RegisterSerializer] public class ArrayCodec : Codec<Missing[]> { }
+        public interface IContract : IGrain { Task Send(Missing[] request); }
+        """);
+
+    [Fact]
+    public Task DerivedTypeCodec_SupportsDerivedContractTypes() => AssertNoDiagnostics(CodecSource + """
+        public class Base { }
+        public class Derived : Base { }
+        [RegisterSerializer] public class BaseCodec : Codec<Base>, Orleans.Serialization.Codecs.IDerivedTypeCodec { }
+        public interface IContract : IGrain { Task Send(Derived request); }
+        """);
+
+    [Fact]
     public async Task SerializedMembers_ExposeNestedMissingType()
     {
         var (diagnostics, _) = await GetDiagnosticsAsync("""
@@ -100,7 +115,7 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
             public class Missing { }
             public interface IContract : IGrain { Task Send({{parameterType}} request); }
             """);
-        Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'Missing'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -110,7 +125,7 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
             public struct Missing { }
             public interface IContract : IGrain { Task Send(Missing? request); }
             """);
-        Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'Missing'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -192,7 +207,38 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
             [GenerateSerializer] public class Request { {{member}} }
             public interface IContract : IGrain { Task Send(Request request); }
             """);
-        Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'Missing'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ReferencedPrivateSerializationMember_ReportsIncompleteSchema()
+    {
+        var reference = await CompileReference("""
+            using Orleans;
+            public class Missing { }
+            [GenerateSerializer] public class Request { [Id(0)] private Missing _value; }
+            """);
+        var diagnostics = await AnalyzeWithReference("""
+            public interface IContract : Orleans.IGrain { System.Threading.Tasks.Task Send(Request request); }
+            """, reference);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.GetMessage().Contains("non-public members are unavailable", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ReferencedPrivateSerializationMember_IsCheckedWhenMetadataMembersAreImported()
+    {
+        var reference = await CompileReference("""
+            using Orleans;
+            public class Missing { }
+            [GenerateSerializer] public class Request { [Id(0)] private Missing _value; }
+            """);
+        var diagnostics = await AnalyzeWithReference("""
+            public interface IContract : Orleans.IGrain { System.Threading.Tasks.Task Send(Request request); }
+            """, reference, MetadataImportOptions.All);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'Missing'", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.GetMessage().Contains("non-public members are unavailable", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -224,6 +270,32 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         var (diagnostics, _) = await GetDiagnosticsAsync("""
             public class MissingBase { }
             [GenerateSerializer] public class Request : MissingBase { }
+            public interface IContract : IGrain { Task Send(Request request); }
+            """);
+        Assert.Contains("'MissingBase'", Assert.Single(diagnostics).GetMessage());
+    }
+
+    [Fact]
+    public Task AbstractContractType_UsesRuntimeSubtypeCodec() => AssertNoDiagnostics("""
+        public abstract class Request { }
+        public interface IContract : IGrain { Task Send(Request request); }
+        """);
+
+    [Fact]
+    public Task SerializerTransparentBase_IsSkippedInTheSerializedHierarchy() => AssertNoDiagnostics("""
+        [GenerateSerializer] public class SerializedBase { [Id(0)] public int Value; }
+        [SerializerTransparent] public abstract class TransparentBase : SerializedBase { }
+        [GenerateSerializer] public class Request : TransparentBase { }
+        public interface IContract : IGrain { Task Send(Request request); }
+        """);
+
+    [Fact]
+    public async Task FieldCodec_DoesNotSatisfyBaseCodecDependency()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(CodecSource + """
+            public class MissingBase { }
+            [GenerateSerializer] public class Request : MissingBase { }
+            [RegisterSerializer] public class FieldCodec : Codec<MissingBase> { }
             public interface IContract : IGrain { Task Send(Request request); }
             """);
         Assert.Contains("'MissingBase'", Assert.Single(diagnostics).GetMessage());
@@ -262,6 +334,21 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.Contains("static traversal limit", diagnostic.GetMessage());
         Assert.DoesNotContain("no statically declared serializer", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ConverterCycle_ReportsUnverifiableSerializationSupport()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync("""
+            public struct Box { }
+            [RegisterConverter] public class Converter : IConverter<Box, Box>
+            {
+                public Box ConvertFromSurrogate(in Box value) => value;
+                public Box ConvertToSurrogate(in Box value) => value;
+            }
+            public interface IContract : IGrain { Task Send(Box request); }
+            """);
+        Assert.Contains("converter dependencies form a cycle", Assert.Single(diagnostics).GetMessage());
     }
 
     [Fact]
@@ -500,6 +587,74 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
     }
 
     [Fact]
+    public async Task FieldCodec_DoesNotSatisfyConverterSurrogateValueSerializerDependency()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(CodecSource + """
+            public class Request { }
+            public struct MissingSurrogate { }
+            [RegisterSerializer] public class FieldCodec : Codec<MissingSurrogate> { }
+            [RegisterConverter] public class Converter : IConverter<Request, MissingSurrogate>
+            {
+                public Request ConvertFromSurrogate(in MissingSurrogate value) => new Request();
+                public MissingSurrogate ConvertToSurrogate(in Request value) => default;
+            }
+            public interface IContract : IGrain { Task Send(Request request); }
+            """);
+        Assert.Contains("'MissingSurrogate'", Assert.Single(diagnostics).GetMessage());
+    }
+
+    [Fact]
+    public async Task FieldCodec_DoesNotSatisfyPrimitiveConverterSurrogateValueSerializerDependency()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(CodecSource + """
+            public class Request { }
+            [RegisterSerializer] public class IntFieldCodec : Codec<int> { }
+            [RegisterConverter] public class Converter : IConverter<Request, int>
+            {
+                public Request ConvertFromSurrogate(in int value) => new Request();
+                public int ConvertToSurrogate(in Request value) => 0;
+            }
+            public interface IContract : IGrain { Task Send(Request request); }
+            """);
+        Assert.Contains("no statically declared serializer", Assert.Single(diagnostics).GetMessage());
+    }
+
+    [Fact]
+    public Task FieldCodec_TakesPrecedenceOverUnusedConverter() => AssertNoDiagnostics(CodecSource + """
+        public class Request { }
+        public struct MissingSurrogate { }
+        [RegisterSerializer] public class RequestCodec : Codec<Request> { }
+        [RegisterConverter] public class Converter : IConverter<Request, MissingSurrogate>
+        {
+            public Request ConvertFromSurrogate(in MissingSurrogate value) => new Request();
+            public MissingSurrogate ConvertToSurrogate(in Request value) => default;
+        }
+        public interface IContract : IGrain { Task Send(Request request); }
+        """);
+
+    [Fact]
+    public async Task ClosedConverter_TakesPrecedenceOverOpenConverter()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync("""
+            public class Request<T> { }
+            [GenerateSerializer] public struct ValidSurrogate<T> { [Id(0)] public int Value; }
+            public struct MissingSurrogate { }
+            [RegisterConverter] public class OpenConverter<T> : IConverter<Request<T>, ValidSurrogate<T>>
+            {
+                public Request<T> ConvertFromSurrogate(in ValidSurrogate<T> value) => new Request<T>();
+                public ValidSurrogate<T> ConvertToSurrogate(in Request<T> value) => default;
+            }
+            [RegisterConverter] public class ClosedConverter : IConverter<Request<int>, MissingSurrogate>
+            {
+                public Request<int> ConvertFromSurrogate(in MissingSurrogate value) => new Request<int>();
+                public MissingSurrogate ConvertToSurrogate(in Request<int> value) => default;
+            }
+            public interface IContract : IGrain { Task Send(Request<int> request); }
+            """);
+        Assert.Contains("'MissingSurrogate'", Assert.Single(diagnostics).GetMessage());
+    }
+
+    [Fact]
     public async Task GrainOfState_IsCheckedWithoutAnnotatingTheGrain()
     {
         var (diagnostics, _) = await GetDiagnosticsAsync("""
@@ -586,12 +741,13 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
             public class ExternalCustom { }
             [RegisterSerializer] public class ExternalCodec : Codec<ExternalCustom> { }
             """);
-        Assert.Empty(await AnalyzeWithReference("""
+        var diagnostics = await AnalyzeWithReference("""
             public interface IContract : Orleans.IGrain
             {
                 System.Threading.Tasks.Task Send(ExternalGenerated generated, ExternalCustom custom);
             }
-            """, reference));
+            """, reference);
+        Assert.Contains("non-public members are unavailable", Assert.Single(diagnostics).GetMessage());
     }
 
     [Fact]
@@ -631,7 +787,7 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         var diagnostics = await AnalyzeWithReference("""
             public interface IContract : Orleans.IGrain { System.Threading.Tasks.Task Send(Request request); }
             """, reference);
-        Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'Missing'", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -653,7 +809,7 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         var diagnostics = referenced
             ? await AnalyzeWithReference(contract, await CompileReference(model))
             : (await GetDiagnosticsFullSourceAsync(model + contract)).ToImmutableArray();
-        Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'Missing'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -758,7 +914,7 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         var diagnostics = await AnalyzeWithReference("""
             public interface IContract : Orleans.IGrain { System.Threading.Tasks.Task Send(Request request); }
             """, reference);
-        Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("'Missing'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -913,9 +1069,12 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> AnalyzeWithReference(string source, MetadataReference reference)
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeWithReference(string source, MetadataReference reference,
+        MetadataImportOptions metadataImportOptions = MetadataImportOptions.Public)
     {
         var compilation = (await CreateAnalyzerTestProject(source).AddMetadataReference(reference).GetCompilationAsync(TestContext.Current.CancellationToken))!;
+        compilation = compilation.WithOptions(((CSharpCompilationOptions)compilation.Options)
+            .WithMetadataImportOptions(metadataImportOptions));
         Assert.Empty(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         var options = compilation.Options.WithSpecificDiagnosticOptions(new Dictionary<string, ReportDiagnostic>
         {
@@ -974,6 +1133,7 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         CancellationToken cancellationToken)
     {
         compilation = compilation.WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            .WithMetadataImportOptions(((CSharpCompilationOptions)compilation.Options).MetadataImportOptions)
             .WithSpecificDiagnosticOptions(compilation.Options.SpecificDiagnosticOptions));
         var failures = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
         var options = new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), (exception, _, _) => failures.Enqueue(exception), true, false);

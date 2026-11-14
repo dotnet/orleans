@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
@@ -178,78 +179,119 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeGraph(SymbolAnalysisContext context, ITypeSymbol root, Location location, ISymbol owner,
         DiagnosticDescriptor rule, SerializationSymbols symbols, SerializationSupport serializers)
     {
-        var pending = new Stack<(ITypeSymbol Type, int Depth)>();
-        var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-        pending.Push((root, 0));
+        var pending = new Stack<PendingType>();
+        var visited = new Dictionary<ITypeSymbol, int>(SymbolEqualityComparer.Default);
+        pending.Push(new(root, 0, SerializationSupport.Requirement.Field, null));
         while (pending.Count > 0)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var (type, depth) = pending.Pop();
-            if (!visited.Add(type))
+            var item = pending.Pop();
+            var type = item.Type;
+            if (Contains(item.ConverterPath, type))
+            {
+                Report(type, "registered converter dependencies form a cycle; verify serialization support");
+                continue;
+            }
+
+            var requirementMask = 1 << (int)item.Requirement;
+            if (visited.TryGetValue(type, out var visitedRequirements) && (visitedRequirements & requirementMask) != 0)
             {
                 continue;
             }
 
-            if (type is not IArrayTypeSymbol && (type is not INamedTypeSymbol candidate
-                || candidate.TypeKind == TypeKind.Error || candidate.TypeKind == TypeKind.Enum || symbols.IsLeaf(candidate)))
-            {
-                continue;
-            }
+            visited[type] = visitedRequirements | requirementMask;
 
             // Check actual constructions, not just generic definitions: different arguments can select different codecs.
             // A bounded traversal also covers expanding converter chains without inventing serialization requirements
             // for unused generic arguments. Report the analysis limit instead of claiming a codec is missing.
-            if (depth >= MaxGraphDepth || visited.Count >= MaxGraphTypes)
+            if (item.Depth >= MaxGraphDepth || visited.Count >= MaxGraphTypes)
             {
                 Report(root, "the serialized type graph exceeds the static traversal limit; verify serialization and suppress this warning if appropriate");
                 break;
             }
 
-            if (type is IArrayTypeSymbol array)
+            var named = type as INamedTypeSymbol;
+            if (type is not IArrayTypeSymbol && (named is null || named.TypeKind == TypeKind.Error))
             {
-                pending.Push((array.ElementType, depth + 1));
                 continue;
             }
 
-            var named = (INamedTypeSymbol)type;
-            // Generated codecs also carry RegisterSerializer. An annotated model must still have its data graph checked.
-            var attribute = symbols.GetAttribute(named, symbols.GenerateSerializer);
-            if (attribute is null && serializers.TryGetSupport(named, out var inspectArguments, out var surrogate))
+            var attribute = named is not null ? symbols.GetAttribute(named, symbols.GenerateSerializer) : null;
+            if (attribute is null && serializers.TryGetSupport(type, item.Requirement,
+                out var inspectArguments, out var surrogate, out var ambiguous))
             {
+                if (ambiguous)
+                {
+                    Report(type, "equally prioritized converter registrations use different surrogates; verify serializer registration order");
+                    continue;
+                }
+
                 if (surrogate is not null)
                 {
-                    pending.Push((surrogate, depth + 1));
+                    pending.Push(new(surrogate, item.Depth + 1, SerializationSupport.Requirement.Value,
+                        new(type, item.ConverterPath)));
                 }
 
                 if (inspectArguments)
                 {
-                    PushArguments(named, depth + 1);
+                    if (named is not null)
+                    {
+                        PushArguments(named, item.Depth + 1);
+                    }
+                    else if (type is IArrayTypeSymbol elementArray)
+                    {
+                        pending.Push(new(elementArray.ElementType, item.Depth + 1, SerializationSupport.Requirement.Field, null));
+                    }
                 }
 
                 continue;
             }
 
-            if (named.TypeKind == TypeKind.Interface)
+            if (type is IArrayTypeSymbol array)
             {
-                // Concrete runtime implementations are unknown. Their generic data arguments are still checked.
-                PushArguments(named, depth + 1);
+                pending.Push(new(array.ElementType, item.Depth + 1, SerializationSupport.Requirement.Field, null));
+                continue;
+            }
+
+            var namedType = (INamedTypeSymbol)type;
+            if (item.Requirement == SerializationSupport.Requirement.Field
+                && (namedType.TypeKind == TypeKind.Enum || symbols.IsLeaf(namedType)))
+            {
+                continue;
+            }
+
+            if (item.Requirement == SerializationSupport.Requirement.Field && symbols.IsAbstractReference(namedType))
+            {
+                // Abstract references use runtime subtype codecs. Their declared generic arguments remain relevant.
+                PushArguments(namedType, item.Depth + 1);
                 continue;
             }
 
             if (attribute is null)
             {
-                Report(named, "no statically declared serializer was found; add [GenerateSerializer] or register a serializer");
+                Report(namedType, "no statically declared serializer was found; add [GenerateSerializer] or register a serializer");
                 continue;
             }
 
-            if (named.BaseType is { SpecialType: not SpecialType.System_Object and not SpecialType.System_ValueType } baseType)
+            if (!symbols.CanInspectMembers(namedType))
             {
-                pending.Push((baseType, depth + 1));
+                Report(namedType, "its serialized schema is in metadata whose non-public members are unavailable; verify the producer's schema");
             }
 
-            foreach (var memberType in symbols.GetSerializedMembers(named, attribute))
+            var baseType = namedType.BaseType;
+            while (baseType is not null && symbols.IsSerializerTransparent(baseType))
             {
-                pending.Push((memberType, depth + 1));
+                baseType = baseType.BaseType;
+            }
+
+            if (baseType is { SpecialType: not SpecialType.System_Object and not SpecialType.System_ValueType })
+            {
+                pending.Push(new(baseType, item.Depth + 1, SerializationSupport.Requirement.Base, null));
+            }
+
+            foreach (var memberType in symbols.GetSerializedMembers(namedType, attribute))
+            {
+                pending.Push(new(memberType, item.Depth + 1, SerializationSupport.Requirement.Field, null));
             }
         }
 
@@ -261,18 +303,32 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
         {
             foreach (var argument in type.TypeArguments)
             {
-                pending.Push((argument, depth));
+                pending.Push(new(argument, depth, SerializationSupport.Requirement.Field, null));
             }
 
             for (var declaringType = type.ContainingType; declaringType is not null; declaringType = declaringType.ContainingType)
             {
                 foreach (var argument in declaringType.TypeArguments)
                 {
-                    pending.Push((argument, depth));
+                    pending.Push(new(argument, depth, SerializationSupport.Requirement.Field, null));
                 }
             }
         }
+
+        static bool Contains(ConverterPath? path, ITypeSymbol type)
+        {
+            for (; path is not null; path = path.Parent)
+            {
+                if (SymbolEqualityComparer.Default.Equals(path.Type, type)) return true;
+            }
+
+            return false;
+        }
     }
+
+    private sealed record PendingType(ITypeSymbol Type, int Depth, SerializationSupport.Requirement Requirement, ConverterPath? ConverterPath);
+
+    private sealed record ConverterPath(ITypeSymbol Type, ConverterPath? Parent);
 
     private sealed class SerializationSymbols
     {
@@ -282,11 +338,13 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
         private readonly INamedTypeSymbol? _grainBase;
         private readonly INamedTypeSymbol? _id;
         private readonly INamedTypeSymbol? _nonSerialized;
+        private readonly INamedTypeSymbol? _serializerTransparent;
         private readonly INamedTypeSymbol? _compilerGenerated;
         private readonly INamedTypeSymbol? _constructor;
         private readonly INamedTypeSymbol? _activatorConstructor;
         private readonly IAssemblySymbol _assembly;
         private readonly bool _implicitProperties;
+        private readonly bool _metadataImportAll;
         private readonly HashSet<INamedTypeSymbol> _leaves = new(SymbolEqualityComparer.Default);
         private readonly HashSet<INamedTypeSymbol> _returnWrappers = new(SymbolEqualityComparer.Default);
 
@@ -295,12 +353,15 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
             _grain = grain;
             _assembly = compilation.Assembly;
             _implicitProperties = implicitProperties;
+            _metadataImportAll = compilation.Options is CSharpCompilationOptions options
+                && options.MetadataImportOptions == MetadataImportOptions.All;
             GenerateSerializer = generateSerializer;
             _observer = compilation.GetTypeByMetadataName("Orleans.IGrainObserver");
             _addressable = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
             _grainBase = compilation.GetTypeByMetadataName(Constants.IGrainBaseFullyQualifiedName);
             _id = compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
             _nonSerialized = compilation.GetTypeByMetadataName(Constants.NonSerializedAttributeFullyQualifiedName);
+            _serializerTransparent = compilation.GetTypeByMetadataName("Orleans.SerializerTransparentAttribute");
             _compilerGenerated = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.CompilerGeneratedAttribute");
             _constructor = compilation.GetTypeByMetadataName("Orleans.OrleansConstructorAttribute");
             _activatorConstructor = compilation.GetTypeByMetadataName("Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute");
@@ -326,6 +387,10 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
         public bool IsReturnWrapper(ITypeSymbol type) => type is INamedTypeSymbol named && _returnWrappers.Contains(named.OriginalDefinition);
         public bool IsLeaf(INamedTypeSymbol type) => !type.IsGenericType && type.SpecialType != SpecialType.None
             || _leaves.Contains(type) || Implements(type, _addressable);
+        public bool IsAbstractReference(INamedTypeSymbol type) => type.TypeKind == TypeKind.Interface
+            || type.TypeKind == TypeKind.Class && type.IsAbstract;
+        public bool IsSerializerTransparent(INamedTypeSymbol type) => GetAttribute(type, _serializerTransparent) is not null;
+        public bool CanInspectMembers(INamedTypeSymbol type) => !type.DeclaringSyntaxReferences.IsEmpty || _metadataImportAll;
 
         private static bool Implements(INamedTypeSymbol type, INamedTypeSymbol? contract) => contract is not null
             && (SymbolEqualityComparer.Default.Equals(type, contract)

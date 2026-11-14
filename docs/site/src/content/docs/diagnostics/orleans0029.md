@@ -53,6 +53,6 @@ Finite recursive graphs are checked once per constructed type. The traversal is 
 
 Runtime-registered generalized serializers, arbitrary dependency-injection factories, assembly-level implicit field-ID settings in referenced projects, and custom serializer registrations with arbitrary generic constraints cannot always be established statically. Keep the rule disabled or suppress a specific diagnostic when independently verified runtime configuration supplies that support. Use a serialization round-trip test to verify those paths.
 
-For referenced models using type-level implicit field IDs, read-only auto-properties are conservatively included when private backing fields are hidden from compiler metadata. A field-level exclusion in the producer can therefore require a consumer-side suppression after checking the producer's schema.
+When the compilation imports only public metadata, the analyzer reports an incomplete schema for referenced generated models because private serialized fields cannot be recovered. Verify those models against the producer's schema. For type-level implicit field IDs, read-only auto-properties are also included when backing fields are hidden; a field-level exclusion in the producer can therefore require a consumer-side suppression after checking the schema.
 
 Use [ORLEANS0030](orleans0030.md) separately for grain state used by Orleans-serialized storage or live activation migration. Migration also requires Orleans serialization when storage uses JSON.
