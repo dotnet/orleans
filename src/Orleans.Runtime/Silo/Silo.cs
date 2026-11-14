@@ -41,6 +41,9 @@ namespace Orleans.Runtime
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
             Justification = "Has no timer or linked tokens to release, and a start may still observe it while the silo is disposed.")]
         private readonly CancellationTokenSource stopRequested = new();
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
+            Justification = "Has no timer or linked tokens to release, and a stop may still observe it while the silo is disposed.")]
+        private readonly CancellationTokenSource stopEscalation = new();
         private Task? startTask;
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
@@ -181,9 +184,10 @@ namespace Orleans.Runtime
 
                 // Stop the stages which had already started (for example, the silo listener and the membership row),
                 // unless StopAsync was called during the start: it waits for the start to end and then stops the silo.
+                // The stop is graceful, but a later StopAsync or DisposeAsync whose token is cancelled hurries it through stopEscalation.
                 if (TryBeginStop(gracefully: true))
                 {
-                    await StopCoreAsync(gracefully: true, CancellationToken.None);
+                    await StopCoreAsync(gracefully: true, stopEscalation.Token);
                 }
 
                 throw;
@@ -233,7 +237,7 @@ namespace Orleans.Runtime
 
             // Load and init grain services before silo becomes active.
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
-                () => CreateGrainServices(), stopWatch);
+                () => CreateGrainServices(ct), stopWatch);
 
             try
             {
@@ -267,20 +271,20 @@ namespace Orleans.Runtime
         {
             foreach (var grainService in grainServices)
             {
-                await StartGrainService(grainService);
+                await StartGrainService(grainService, ct);
             }
         }
 
-        private async Task CreateGrainServices()
+        private async Task CreateGrainServices(CancellationToken cancellationToken)
         {
             var grainServices = this.Services.GetServices<IGrainService>();
             foreach (var grainService in grainServices)
             {
-                await RegisterGrainService(grainService);
+                await RegisterGrainService(grainService, cancellationToken);
             }
         }
 
-        private async Task RegisterGrainService(IGrainService service)
+        private async Task RegisterGrainService(IGrainService service, CancellationToken cancellationToken)
         {
             var grainService = (GrainService)service;
             var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
@@ -289,7 +293,7 @@ namespace Orleans.Runtime
 
             try
             {
-                await grainService.QueueTask(() => grainService.Init(Services)).WaitAsync(this.initTimeout);
+                await grainService.QueueTask(() => grainService.Init(Services)).WaitAsync(this.initTimeout, cancellationToken);
             }
             catch (TimeoutException exception)
             {
@@ -300,13 +304,13 @@ namespace Orleans.Runtime
             LogInfoGrainServiceRegistered(logger, service.GetType().FullName!);
         }
 
-        private async Task StartGrainService(IGrainService service)
+        private async Task StartGrainService(IGrainService service, CancellationToken cancellationToken)
         {
             var grainService = (GrainService)service;
 
             try
             {
-                await grainService.QueueTask(grainService.Start).WaitAsync(this.initTimeout);
+                await grainService.QueueTask(grainService.Start).WaitAsync(this.initTimeout, cancellationToken);
             }
             catch (TimeoutException exception)
             {
@@ -345,6 +349,9 @@ namespace Orleans.Runtime
             if (!TryBeginStop(gracefully))
             {
                 LogDebugSiloStopInProgress(logger);
+
+                // A caller whose token is cancelled hurries the stop in progress, for example the rollback of a failed start.
+                using var escalation = cancellationToken.UnsafeRegister(static state => ((CancellationTokenSource)state!).Cancel(), stopEscalation);
                 await this.SiloTerminated.WaitAsync(cancellationToken).ConfigureAwait(false);
                 return;
             }
@@ -359,11 +366,13 @@ namespace Orleans.Runtime
             {
                 // Stopping the stages while they are still starting would race with their start, so cancel the start
                 // and wait for it to end first. It does not roll back by itself, since this stop has begun.
+                // The silo's own start waits observe the cancellation; other lifecycle participants are expected to.
                 stopRequested.Cancel();
                 await pendingStart.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
 
-            await StopCoreAsync(gracefully, cancellationToken).ConfigureAwait(false);
+            using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopEscalation.Token);
+            await StopCoreAsync(gracefully, stopCancellation.Token).ConfigureAwait(false);
         }
 
         /// <summary>
