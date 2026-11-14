@@ -24,7 +24,6 @@ namespace Orleans.EventSourcing.Common
         /// <param name="listener">the listener for connection issues</param>
         /// <param name="services">for reporting exceptions in listener</param>
         /// <exception cref="ArgumentNullException">A required argument is <see langword="null"/>.</exception>
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "User notification failures are reported through CaughtUserCodeException so connection issue bookkeeping completes.")]
         public void Record(ConnectionIssue newIssue, IConnectionIssueListener listener, ILogConsistencyProtocolServices services)
         {
             ArgumentNullException.ThrowIfNull(newIssue);
@@ -63,7 +62,6 @@ namespace Orleans.EventSourcing.Common
         /// <param name="listener">the listener for connection issues</param>
         /// <param name="services">for reporting exceptions in listener</param>
         /// <exception cref="ArgumentNullException">A required argument is <see langword="null"/>.</exception>
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "User notification failures are reported through CaughtUserCodeException so connection issue bookkeeping completes.")]
         public void Resolve(IConnectionIssueListener listener, ILogConsistencyProtocolServices services)
         {
             ArgumentNullException.ThrowIfNull(listener);
