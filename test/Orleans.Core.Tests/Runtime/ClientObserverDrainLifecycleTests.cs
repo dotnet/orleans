@@ -47,7 +47,7 @@ public class ClientObserverDrainLifecycleTests
         };
         var callback = new CallbackData(
             new SharedCallbackData(
-                message => callbacks.TryRemove(message.Id, out _),
+                callback => callbacks.TryRemove(callback.Message.Id, out _),
                 NullLogger<CallbackData>.Instance,
                 fixture.TimeProvider,
                 TimeSpan.FromMinutes(1),
@@ -92,6 +92,99 @@ public class ClientObserverDrainLifecycleTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReceiveResponse_TerminalRaceDisposesBufferedResponse(bool canceled)
+    {
+        var fixture = new ExternalClientFixture();
+        var unregisterEntered = DrainTestHelpers.CreateSignal();
+        using var releaseUnregister = new ManualResetEventSlim();
+        using var cancellation = new CancellationTokenSource();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var callbacks = ReadCallbacks(fixture.Runtime);
+        var completion = new CallbackCompletionSource();
+        using var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(2502),
+            SendingGrain = fixture.ObserverId.GrainId
+        };
+        var callback = new CallbackData(
+            new SharedCallbackData(
+                callback =>
+                {
+                    unregisterEntered.TrySetResult();
+                    releaseUnregister.Wait(cancellationToken);
+                    callbacks.TryRemove(callback.Message.Id, out _);
+                },
+                NullLogger<CallbackData>.Instance,
+                fixture.TimeProvider,
+                TimeSpan.FromMinutes(1),
+                cancelOnTimeout: false,
+                waitForCancellationAcknowledgement: false,
+                cancellationManager: null,
+                new ApplicationRequestInstruments(fixture.Instruments)),
+            completion,
+            request);
+        try
+        {
+            using var body = Response.FromResult(731);
+            using var response = new BufferedResponse(fixture.Services, new Message
+            {
+                Direction = Message.Directions.Response,
+                Result = Message.ResponseTypes.Success,
+                Id = request.Id,
+                TargetGrain = request.SendingGrain,
+                BodyObject = body
+            });
+            Assert.True(callbacks.TryAdd(request.Id, callback));
+            Assert.Same(response.Request, response.Message._bodyObject);
+            Assert.True(response.Request.Body.Length > 0);
+            if (canceled)
+            {
+                callback.SubscribeForCancellation(cancellation.Token);
+            }
+
+            var terminal = Task.Run(() =>
+            {
+                if (canceled)
+                {
+                    cancellation.Cancel();
+                }
+                else
+                {
+                    callback.OnTimeout();
+                }
+            }, cancellationToken);
+            try
+            {
+                await fixture.WaitAsync(unregisterEntered.Task, "2502: terminal completion claimed callback before unregistering");
+                Assert.True(callback.IsCompleted);
+                Assert.True(callbacks.ContainsKey(request.Id));
+
+                fixture.Runtime.ReceiveResponse(response.Message);
+
+                Assert.False(callbacks.ContainsKey(request.Id));
+                Assert.Null(response.Message._bodyObject);
+                Assert.Equal(0, response.Request.Body.Length);
+            }
+            finally
+            {
+                releaseUnregister.Set();
+                await terminal;
+            }
+
+            Assert.IsType(canceled ? typeof(OperationCanceledException) : typeof(TimeoutException), completion.Exception);
+            Assert.Equal(1, completion.CompletionCount);
+            Assert.Empty(callbacks);
+        }
+        finally
+        {
+            await fixture.CleanupAsync();
+        }
+    }
+
     [Fact]
     public async Task ClusterClientStop_AllowsUpperStageCleanupThenDrainsBeforeConnectionClose()
     {
@@ -109,7 +202,7 @@ public class ClientObserverDrainLifecycleTests
         };
         var callback = new CallbackData(
             new SharedCallbackData(
-                message => callbacks.TryRemove(message.Id, out _),
+                callback => callbacks.TryRemove(callback.Message.Id, out _),
                 NullLogger<CallbackData>.Instance, fixture.TimeProvider, TimeSpan.FromMinutes(1),
                 cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null,
                 new ApplicationRequestInstruments(fixture.Instruments)),
@@ -297,9 +390,9 @@ public class ClientObserverDrainLifecycleTests
                 ClientGrainId.Create("remote-client"), IdSpan.Create("outbound-observer")).GrainId
         };
         var shared = new SharedCallbackData(
-            message =>
+            callback =>
             {
-                unregistered.Enqueue((message, callbacks.TryRemove(message.Id, out _)));
+                unregistered.Enqueue((callback.Message, callbacks.TryRemove(callback.Message.Id, out _)));
                 events.Enqueue("callback-unregistered");
             },
             NullLogger<CallbackData>.Instance,
