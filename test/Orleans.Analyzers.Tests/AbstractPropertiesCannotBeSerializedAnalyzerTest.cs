@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -70,4 +71,42 @@ public abstract class D {
     [GenericAttribute<bool>] [Id(0)] public abstract int F { get; set; }
 }
 """);
+
+    [Fact]
+    public async Task PartialSerializableType_ShouldReportOnlyAbstractAndStaticIdAttributeSpans()
+    {
+        const string abstractId = "Id(0)";
+        const string staticId = "Id(1)";
+        var source = $$"""
+            using Orleans;
+            using Serializer = Orleans.GenerateSerializerAttribute;
+
+            [Serializer] public abstract partial class D { }
+
+            public abstract partial class D
+            {
+                [{{abstractId}}] public abstract int Abstract { get; set; }
+                [{{staticId}}] public static int Static { get; set; }
+                [Id(2)] public int Concrete { get; set; }
+            }
+
+            public abstract class NotSerializable
+            {
+                [Id(3)] public abstract int Value { get; set; }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        Assert.Collection(diagnostics,
+            diagnostic => AssertInvalidMember(diagnostic, abstractId),
+            diagnostic => AssertInvalidMember(diagnostic, staticId));
+
+        void AssertInvalidMember(Diagnostic diagnostic, string attribute)
+        {
+            Assert.Equal(AbstractPropertiesCannotBeSerializedAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.Equal(new TextSpan(source.IndexOf(attribute, StringComparison.Ordinal), attribute.Length), diagnostic.Location.SourceSpan);
+        }
+    }
 }

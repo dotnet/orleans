@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Configuration
 {
@@ -22,11 +23,15 @@ namespace Orleans.Configuration
         /// <summary>
         /// Specifies which Amazon SQS system attributes are retrieved with each message.
         /// </summary>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped List<string> option property type for source and binary compatibility.")]
         public List<string> ReceiveMessageSystemAttributes { get; set; } = [];
 
         /// <summary>
         /// Specifies which application-defined message attributes are retrieved with each message.
         /// </summary>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped List<string> option property type for source and binary compatibility.")]
         public List<string> ReceiveMessageAttributes { get; set; } = [];
 
         /// <summary>

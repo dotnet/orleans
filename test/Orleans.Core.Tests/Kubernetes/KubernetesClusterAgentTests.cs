@@ -141,6 +141,77 @@ public class KubernetesClusterAgentTests
         Assert.Equal(0, fixture.Accessor.PauseMonitoringSemaphore.CurrentCount);
     }
 
+    [Fact]
+    public async Task StartupPublishesMonitoringTaskBeforeReturning()
+    {
+        await using var fixture = new Fixture(startDirectMonitor: false);
+        var startupContext = new AsyncLocal<object> { Value = new object() };
+        object? monitorContext = startupContext.Value;
+        fixture.MonitoringStarted = () => monitorContext = startupContext.Value;
+
+        await fixture.Accessor.Start(TestContext.Current.CancellationToken);
+
+        var monitoring = Assert.IsAssignableFrom<Task>(fixture.Accessor.MonitoringTask);
+        await fixture.Publish((LocalSilo, SiloStatus.Active));
+        Assert.Null(monitorContext);
+        Assert.False(monitoring.IsCompleted);
+        await fixture.Agent.OnStop(TestContext.Current.CancellationToken);
+        Assert.True(monitoring.IsCompletedSuccessfully);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ShutdownCancelsInlineThenObservesMonitoringDrain(bool deadlineExpired)
+    {
+        await using var fixture = new Fixture(startDirectMonitor: false);
+        await fixture.Accessor.Start(TestContext.Current.CancellationToken);
+        await fixture.Publish((LocalSilo, SiloStatus.Active));
+        var drain = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.MembershipDrain = drain.Task;
+        var callbackCount = 0;
+        var callbackThread = 0;
+        var monitoringDuringCancellation = false;
+        fixture.CancellationCallback = () =>
+        {
+            callbackCount++;
+            callbackThread = Environment.CurrentManagedThreadId;
+            monitoringDuringCancellation = fixture.Accessor.IsMonitoringEnabled;
+        };
+        try
+        {
+            var callingThread = Environment.CurrentManagedThreadId;
+            var stop = fixture.Agent.OnStop(deadlineExpired
+                ? new CancellationToken(canceled: true)
+                : TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, callbackCount);
+            Assert.Equal(callingThread, callbackThread);
+            Assert.True(monitoringDuringCancellation);
+            Assert.False(fixture.Accessor.IsMonitoringEnabled);
+            await fixture.DrainStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.False(fixture.Accessor.MonitoringTask.IsCompleted);
+            if (deadlineExpired)
+            {
+                await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            }
+            else
+            {
+                Assert.False(stop.IsCompleted);
+            }
+
+            drain.SetResult();
+            await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await fixture.Agent.OnStop(TestContext.Current.CancellationToken);
+            Assert.True(fixture.Accessor.MonitoringTask.IsCompletedSuccessfully);
+            Assert.Equal(1, callbackCount);
+        }
+        finally
+        {
+            drain.TrySetResult();
+        }
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly Channel<(ClusterMembershipSnapshot Snapshot, TaskCompletionSource Processed)> _updates =
@@ -153,8 +224,12 @@ public class KubernetesClusterAgentTests
         public KubernetesClusterAgent Agent { get; }
         public KubernetesClusterAgent.TestAccessor Accessor { get; }
         public List<string> DeletedPods => _handler.DeletedPods;
+        public Action? MonitoringStarted { get; set; }
+        public Action? CancellationCallback { get; set; }
+        public Task? MembershipDrain { get; set; }
+        public TaskCompletionSource DrainStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Fixture(SiloAddress? localSilo = null, int maxAgents = 2, bool deleteDefunctPods = false)
+        public Fixture(SiloAddress? localSilo = null, int maxAgents = 2, bool deleteDefunctPods = false, bool startDirectMonitor = true)
         {
             _membership.CurrentSnapshot.Returns(Snapshot());
             _membership.MembershipUpdates.Returns(GetMembershipUpdates());
@@ -177,7 +252,7 @@ public class KubernetesClusterAgentTests
                 localDetails,
                 [_handler]);
             Accessor = new KubernetesClusterAgent.TestAccessor(Agent);
-            _monitor = Accessor.MonitorOrleansClustering();
+            _monitor = startDirectMonitor ? Accessor.MonitorOrleansClustering() : Task.CompletedTask;
         }
 
         public async Task Publish(params (SiloAddress Silo, SiloStatus Status)[] members)
@@ -198,10 +273,23 @@ public class KubernetesClusterAgentTests
         private async IAsyncEnumerable<ClusterMembershipSnapshot> GetMembershipUpdates(
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            await foreach (var (snapshot, processed) in _updates.Reader.ReadAllAsync(cancellationToken))
+            MonitoringStarted?.Invoke();
+            using var registration = cancellationToken.Register(() => CancellationCallback?.Invoke());
+            try
             {
-                yield return snapshot;
-                processed.SetResult();
+                await foreach (var (snapshot, processed) in _updates.Reader.ReadAllAsync(cancellationToken))
+                {
+                    yield return snapshot;
+                    processed.SetResult();
+                }
+            }
+            finally
+            {
+                DrainStarted.TrySetResult();
+                if (MembershipDrain is { } drain)
+                {
+                    await drain;
+                }
             }
         }
 
@@ -219,6 +307,19 @@ public class KubernetesClusterAgentTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.Method == HttpMethod.Get)
+            {
+                var content = request.RequestUri!.AbsolutePath.EndsWith("/pods", StringComparison.Ordinal)
+                    ? """{"items":[]}"""
+                    : """{"metadata":{"name":"local","labels":{}}}""";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { RequestMessage = request, Content = new StringContent(content) });
+            }
+
+            if (request.Method == HttpMethod.Patch)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { RequestMessage = request, Content = new StringContent("{}") });
+            }
+
             Assert.Equal(HttpMethod.Delete, request.Method);
             DeletedPods.Add(request.RequestUri!.AbsolutePath);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });

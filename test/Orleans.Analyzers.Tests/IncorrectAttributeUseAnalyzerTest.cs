@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -164,6 +165,35 @@ public class IncorrectAttributeUseAnalyzerTest : DiagnosticAnalyzerTestBase<Inco
     }
 
     #endregion
+
+    [Fact]
+    public async Task AliasedAttributesOnPartialGrain_ShouldReportExactAttributeLocations()
+    {
+        const string alias = "StableName(\"grain\")";
+        const string serializer = "Serializer";
+        var source = $$"""
+            using StableName = Orleans.AliasAttribute;
+            using Serializer = Orleans.GenerateSerializerAttribute;
+
+            public partial class C : Orleans.Grain { }
+
+            [{{alias}}, {{serializer}}]
+            public partial class C { }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        Assert.Collection(diagnostics,
+            diagnostic => AssertAttributeDiagnostic(diagnostic, source.IndexOf(alias, StringComparison.Ordinal), alias.Length),
+            diagnostic => AssertAttributeDiagnostic(diagnostic, source.IndexOf(", " + serializer + "]", StringComparison.Ordinal) + 2, serializer.Length));
+
+        static void AssertAttributeDiagnostic(Diagnostic diagnostic, int start, int length)
+        {
+            Assert.Equal(IncorrectAttributeUseAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.Equal(new TextSpan(start, length), diagnostic.Location.SourceSpan);
+        }
+    }
 
     public static IEnumerable<object[]> Attributes =>
         new List<object[]>

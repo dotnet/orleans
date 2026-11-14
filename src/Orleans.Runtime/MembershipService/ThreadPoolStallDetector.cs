@@ -26,11 +26,7 @@ internal sealed partial class ThreadPoolStallDetector : IDisposable
     private readonly ITimer _timer;
     private readonly List<StallInterval> _stalls = [];
     private readonly SortedDictionary<long, int> _pendingQueries = [];
-#if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
     private TaskCompletionSource? _nextSample;
     private long _lastSampleTimestamp;
     private long _nextExpectedTimestamp;

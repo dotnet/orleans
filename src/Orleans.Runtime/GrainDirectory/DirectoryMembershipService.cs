@@ -22,6 +22,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly int _partitionsPerSilo;
     private readonly Func<SiloAddress, int, ImmutableArray<uint>> _getRingBoundaries;
     private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
+    private Task? _disposeTask;
 
     public DirectoryMembershipSnapshot CurrentView
     {
@@ -145,10 +146,48 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        _shutdownCts.Cancel();
-        await _runTask.SuppressThrowing();
+        TaskCompletionSource completion;
+        lock (_shutdownCts)
+        {
+            if (_disposeTask is { } task)
+            {
+                return new(task);
+            }
+
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Publish completion before cancellation callbacks can reenter disposal.
+            _disposeTask = completion.Task;
+        }
+
+        _ = DisposeCoreAsync(completion);
+        return new(completion.Task);
+    }
+
+    private async Task DisposeCoreAsync(TaskCompletionSource completion)
+    {
+        try
+        {
+            try
+            {
+#pragma warning disable CA1849 // Notify on the caller's scheduler before asynchronously draining the subscription.
+                _shutdownCts.Cancel();
+#pragma warning restore CA1849
+            }
+            finally
+            {
+                // The membership processor owns its subscription until it has completed.
+                await _runTask.SuppressThrowing();
+                _shutdownCts.Dispose();
+            }
+
+            completion.SetResult();
+        }
+        catch (AggregateException exception)
+        {
+            completion.SetException(exception);
+        }
     }
 
     [LoggerMessage(

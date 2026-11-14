@@ -1,4 +1,7 @@
-// Import styles
+// Third-party styles are imported from JavaScript so the build's license notices include them.
+import 'bootstrap/dist/css/bootstrap.css';
+import '@fortawesome/fontawesome-free/css/all.css';
+import 'admin-lte/dist/css/adminlte.css';
 import './styles.css';
 
 // Register Chart.js components

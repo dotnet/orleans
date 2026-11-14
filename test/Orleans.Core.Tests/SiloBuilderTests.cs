@@ -5,9 +5,11 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
+using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Hosting;
 using Orleans.Statistics;
 using UnitTests.Grains;
 using Xunit;
@@ -105,6 +107,109 @@ namespace NonSilo.Tests
     [TestArea("Runtime")]
     public class SiloBuilderTests
     {
+        [Fact]
+        public void ConfigureServicesRejectsNullBuilderBeforeCallingDelegate()
+        {
+            var invoked = false;
+
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => ((ISiloBuilder)null!).ConfigureServices(_ => invoked = true));
+
+            Assert.Equal("builder", exception.ParamName);
+            Assert.False(invoked);
+        }
+
+        [Fact]
+        public void ConfigureServicesAppliesRegistrationsToBuilderCollection()
+        {
+            var marker = new object();
+            using var host = new HostBuilder().UseOrleans(builder =>
+            {
+                builder.UseLocalhostClustering();
+
+                var result = builder.ConfigureServices(services => services.AddSingleton(marker));
+
+                Assert.Same(builder, result);
+            }).Build();
+
+            Assert.Same(marker, host.Services.GetRequiredService<object>());
+        }
+
+        [Fact]
+        public void ActivityPropagationRejectsNullSiloBuilder()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => CoreHostingExtensions.AddActivityPropagation(null!));
+
+            Assert.Equal("builder", exception.ParamName);
+        }
+
+        [Fact]
+        public void LegacyGrainDirectoryRejectsNullSiloBuilder()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => CoreHostingExtensions.UseLegacyGrainDirectory(null!));
+
+            Assert.Equal("siloBuilder", exception.ParamName);
+        }
+
+        [Fact]
+        public void DistributedGrainDirectoryRejectsNullSiloBuilder()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => CoreHostingExtensions.AddDistributedGrainDirectory(null!));
+
+            Assert.Equal("siloBuilder", exception.ParamName);
+        }
+
+        [Fact]
+        public void ActivityPropagationPreservesBuilderAndRegistersCallFilters()
+        {
+            using var host = new HostBuilder().UseOrleans(builder =>
+            {
+                builder.UseLocalhostClustering();
+
+                Assert.Same(builder, builder.AddActivityPropagation());
+            }).Build();
+
+            Assert.Same(
+                System.Diagnostics.DistributedContextPropagator.Current,
+                host.Services.GetRequiredService<System.Diagnostics.DistributedContextPropagator>());
+            Assert.Single(host.Services.GetServices<IIncomingGrainCallFilter>(),
+                filter => filter is ActivityPropagationIncomingGrainCallFilter);
+            Assert.Single(host.Services.GetServices<IOutgoingGrainCallFilter>(),
+                filter => filter is ActivityPropagationOutgoingGrainCallFilter);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void GrainDirectorySelectionPreservesBuilderAndDefaultRegistration(bool useLegacy)
+        {
+            using var host = new HostBuilder().UseOrleans(builder =>
+            {
+                builder.UseLocalhostClustering();
+
+                var result = useLegacy ? builder.UseLegacyGrainDirectory() : builder.AddDistributedGrainDirectory();
+
+                Assert.Same(builder, result);
+                var registrations = builder.Services
+                    .Where(descriptor => !descriptor.IsKeyedService)
+                    .Select(descriptor => descriptor.ImplementationInstance)
+                    .OfType<NamedService<IGrainDirectory>>()
+                    .Where(registration => registration.Name == GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
+                if (useLegacy)
+                {
+                    Assert.Empty(registrations);
+                }
+                else
+                {
+                    Assert.Equal(typeof(Orleans.Runtime.GrainDirectory.DistributedGrainDirectory),
+                        Assert.Single(registrations).ImplementationType);
+                }
+            }).Build();
+        }
+
         /// <summary>
         /// Tests basic silo builder configuration, verifying that a silo can be successfully built
         /// with localhost clustering and required configuration options.

@@ -13,11 +13,7 @@ namespace Orleans.Runtime.MembershipService;
 /// </summary>
 internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
 {
-#if NET9_0_OR_GREATER
     private readonly Lock _listenersLock = new();
-#else
-    private readonly object _listenersLock = new();
-#endif
     private readonly CancellationTokenSource _cancellation = new();
     private readonly IMembershipManager _membershipService;
     private readonly ILogger<SiloStatusListenerManager> _logger;

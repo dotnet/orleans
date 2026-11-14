@@ -16,8 +16,13 @@ namespace Orleans.Serialization
         private const int MaxAddressSize = 65; // Maximum bytes or chars stackallocated, taken from IPAddressParser.MaxIPv6StringLength
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void Write(Utf8JsonWriter writer, IPAddress value, JsonSerializerOptions options)
-            => WriteCore(writer, value, options, false);
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            WriteCore(writer, value, options, false);
+        }
 
         private void WriteCore(Utf8JsonWriter writer, IPAddress value, JsonSerializerOptions options, bool writeAsPropertyName)
         {
@@ -78,7 +83,12 @@ namespace Orleans.Serialization
             => Parse(ref reader);
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] IPAddress value, JsonSerializerOptions options)
-            => WriteCore(writer, value, options, true);
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            WriteCore(writer, value, options, true);
+        }
     }
 }

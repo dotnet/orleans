@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -157,5 +158,42 @@ public class IdClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<IdClashAt
                     """;
 
         return VerifyHasNoDiagnostic(code);
+    }
+
+    [Fact]
+    public async Task PartialType_WithAliasedAttributes_ShouldReportExactDuplicateIdLocations()
+    {
+        const string firstId = "FieldId(7)";
+        const string secondId = "global::Orleans.Id(7)";
+        var source = $$"""
+            using Serializer = Orleans.GenerateSerializerAttribute;
+            using FieldId = Orleans.IdAttribute;
+
+            [Serializer]
+            public partial class C
+            {
+                [{{firstId}}] public int First;
+                [FieldId(8)] public int Unique;
+            }
+
+            public partial class C
+            {
+                [{{secondId}}] public int Second;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        Assert.Collection(diagnostics,
+            diagnostic => AssertDuplicateId(diagnostic, firstId),
+            diagnostic => AssertDuplicateId(diagnostic, secondId));
+
+        void AssertDuplicateId(Diagnostic diagnostic, string attribute)
+        {
+            Assert.Equal(IdClashAttributeAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.Equal(new TextSpan(source.IndexOf(attribute, StringComparison.Ordinal), attribute.Length), diagnostic.Location.SourceSpan);
+            Assert.Equal("7", diagnostic.Properties["IdValue"]);
+        }
     }
 }

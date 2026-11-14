@@ -1,0 +1,9 @@
+{
+  "solution": {
+    "path": "../../Orleans.slnx",
+    "projects": [
+      "test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj",
+      "test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj"
+    ]
+  }
+}

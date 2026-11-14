@@ -10,11 +10,7 @@ namespace Orleans.Transactions
     /// </summary>
     public class CausalClock
     {
-#if NET9_0_OR_GREATER
         private readonly Lock lockable = new();
-#else
-        private readonly object lockable = new();
-#endif
         private readonly IClock clock;
         private long previous;
 

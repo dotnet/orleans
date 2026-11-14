@@ -20,11 +20,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed partial class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
-#if NET9_0_OR_GREATER
         private readonly Lock lockObj = new();
-#else
-        private readonly object lockObj = new();
-#endif
         private readonly Channel<Message> incomingMessages;
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;

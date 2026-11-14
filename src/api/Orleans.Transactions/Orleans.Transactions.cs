@@ -557,6 +557,8 @@ namespace Orleans.Transactions
 
         public void Participate(Runtime.IGrainLifecycle lifecycle) { }
 
+        public System.Threading.Tasks.Task<TResult> PerformRead<TResult>(System.Func<TState, TResult> operation, Abstractions.ReadIsolation isolation) { throw null; }
+
         public System.Threading.Tasks.Task<TResult> PerformRead<TResult>(System.Func<TState, TResult> operation) { throw null; }
 
         public System.Threading.Tasks.Task<TResult> PerformUpdate<TResult>(System.Func<TState, TResult> updateAction) { throw null; }
@@ -853,6 +855,7 @@ namespace Orleans.Transactions.Abstractions
     public partial interface ITransactionalState<TState>
         where TState : class, new()
     {
+        System.Threading.Tasks.Task<TResult> PerformRead<TResult>(System.Func<TState, TResult> readFunction, ReadIsolation isolation);
         System.Threading.Tasks.Task<TResult> PerformRead<TResult>(System.Func<TState, TResult> readFunction);
         System.Threading.Tasks.Task<TResult> PerformUpdate<TResult>(System.Func<TState, TResult> updateFunction);
     }
@@ -948,6 +951,12 @@ namespace Orleans.Transactions.Abstractions
 
         [Id(3)]
         public ParticipantId TransactionManager { get { throw null; } set { } }
+    }
+
+    public enum ReadIsolation
+    {
+        Serializable = 0,
+        ReadCommitted = 1
     }
 
     [System.AttributeUsage(System.AttributeTargets.Parameter)]

@@ -30,6 +30,7 @@ namespace Orleans.Runtime.Membership
         /// <param name="options">The relational clustering options.</param>
         /// <param name="gatewayOptions">The gateway discovery options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
+        /// <exception cref="ArgumentNullException">A required options accessor is <see langword="null"/>.</exception>
         public AdoNetGatewayListProvider(
             ILogger<AdoNetGatewayListProvider> logger,
             IServiceProvider serviceProvider,
@@ -37,6 +38,10 @@ namespace Orleans.Runtime.Membership
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(gatewayOptions);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+
             this._logger = logger;
             this._serviceProvider = serviceProvider;
             this._options = options.Value;

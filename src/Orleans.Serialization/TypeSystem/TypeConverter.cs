@@ -717,7 +717,7 @@ public class TypeConverter
             return true;
         }
 
-        var simpleNameEnd = assemblyName.IndexOf(',');
+        var simpleNameEnd = assemblyName.IndexOf(',', StringComparison.Ordinal);
         return simpleNameEnd > 0 && _allowedAssembliesConfiguration.Contains(assemblyName[..simpleNameEnd].Trim());
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Model;
 
@@ -8,6 +9,8 @@ internal static class ReferenceAssemblyDataProvider
     internal static ReferenceAssemblyDataResult CreateReferenceAssemblyDataResult(
         Compilation compilation,
         SourceGeneratorOptions options,
+        ImmutableArray<SerializableTypeModel> sourceSerializableTypes,
+        ImmutableArray<ProxyInterfaceModel> sourceProxyInterfaces,
         CancellationToken cancellationToken)
     {
         try
@@ -16,9 +19,12 @@ internal static class ReferenceAssemblyDataProvider
                 compilation,
                 SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options),
                 cancellationToken,
-                out var diagnostics);
+                out var diagnostics,
+                out var implementationDiagnostics,
+                sourceSerializableTypes,
+                sourceProxyInterfaces);
 
-            return ReferenceAssemblyDataResult.FromModelAndDiagnostics(model, diagnostics);
+            return ReferenceAssemblyDataResult.FromModelAndDiagnostics(model, diagnostics, implementationDiagnostics);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

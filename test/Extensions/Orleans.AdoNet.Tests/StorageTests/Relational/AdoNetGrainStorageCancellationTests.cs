@@ -22,6 +22,56 @@ public sealed class AdoNetGrainStorageCancellationTests
     private static readonly GrainId TestGrainId = GrainId.Create("cancellation-grain", "key");
 
     [Theory]
+    [InlineData("Read", false)]
+    [InlineData("Write", false)]
+    [InlineData("Clear", false)]
+    [InlineData("Delete", false)]
+    [InlineData("Read", true)]
+    [InlineData("Write", true)]
+    [InlineData("Clear", true)]
+    [InlineData("Delete", true)]
+    public async Task MissingStateFailsBeforeHashingOrStorage(string operation, bool legacyOverload)
+    {
+        var relationalStorage = new ScriptedRelationalStorage();
+        var fixture = new StorageFixture(relationalStorage, operation == "Delete");
+        var hasher = Substitute.For<IStorageHasherPicker>();
+        fixture.Storage.HashPicker = hasher;
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() => legacyOverload
+            ? InvokeLegacyAsync(fixture.Storage, operation, null!)
+            : InvokeAsync(fixture.Storage, operation, null!, CancellationToken.None));
+
+        Assert.Equal("grainState", exception.ParamName);
+        Assert.Empty(relationalStorage.Calls);
+        Assert.Empty(hasher.ReceivedCalls());
+        Assert.Empty(fixture.Serializer.ReceivedCalls());
+        Assert.Empty(fixture.ActivatorProvider.ReceivedCalls());
+        Assert.Empty(fixture.Logger.Entries);
+    }
+
+    [Theory]
+    [InlineData("Read")]
+    [InlineData("Write")]
+    [InlineData("Clear")]
+    [InlineData("Delete")]
+    public async Task PreCanceledOperationsPreserveCancellationPrecedenceForMissingState(string operation)
+    {
+        var relationalStorage = new ScriptedRelationalStorage();
+        var fixture = new StorageFixture(relationalStorage, operation == "Delete");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => InvokeAsync(fixture.Storage, operation, null!, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Empty(relationalStorage.Calls);
+        Assert.Empty(fixture.Serializer.ReceivedCalls());
+        Assert.Empty(fixture.ActivatorProvider.ReceivedCalls());
+        Assert.Empty(fixture.Logger.Entries);
+    }
+
+    [Theory]
     [InlineData("Read")]
     [InlineData("Write")]
     [InlineData("Clear")]

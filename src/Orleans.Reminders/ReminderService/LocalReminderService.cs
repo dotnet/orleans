@@ -545,12 +545,12 @@ namespace Orleans.Runtime.ReminderService
                     {
                         continue;
                     }
-
-                    // The generation-change task can only complete after the generation advances, so the
-                    // observed reconciliation is complete and its outcome can be read without blocking.
-                    observedTask.GetAwaiter().GetResult();
-                    return;
                 }
+
+                // The generation-change task can only complete after the generation advances, so the
+                // observed reconciliation is complete and its outcome can be read without blocking.
+                await observedTask;
+                return;
             }
         }
 
@@ -1097,11 +1097,7 @@ namespace Orleans.Runtime.ReminderService
         {
             private readonly LocalReminderService _shared;
             private readonly CancellationTokenSource _stopCancellation = new();
-#if NET10_0_OR_GREATER
             private readonly System.Threading.Lock _lock = new();
-#else
-            private readonly object _lock = new();
-#endif
             private readonly ReminderIdentity _identity;
             private ReminderEntry? _entry;
             private DateTime? _lastFiredTickTime;

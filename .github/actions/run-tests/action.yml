@@ -5,10 +5,6 @@ inputs:
   artifact-name:
     description: Test output artifact name.
     required: true
-  build-external-assets:
-    description: Build external assets required by the selected tests.
-    required: false
-    default: 'false'
   filter-query:
     description: Optional Microsoft Testing Platform query filter.
     required: false
@@ -24,6 +20,10 @@ inputs:
     description: Retry the test partition once after a failure.
     required: false
     default: 'false'
+  solution:
+    description: Solution or solution filter containing the test partition roots and their dependencies.
+    required: false
+    default: Orleans.slnx
 
 runs:
   using: composite
@@ -40,11 +40,11 @@ runs:
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
       result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
+      solution: ${{ inputs.solution }}
       coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
     env:
       # The nested composite action supplies its own inputs context when continue-on-error is evaluated.
       ORLEANS_TEST_RETRY: ${{ inputs.retry }}
-      BuildExternalAssets: ${{ inputs['build-external-assets'] }}
   - name: Retry tests
     id: retry
     if: inputs.retry == 'true' && steps.test.outcome == 'failure'
@@ -54,9 +54,8 @@ runs:
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
       result-id: ${{ format('{0}-attempt2', inputs.artifact-name) }}
+      solution: ${{ inputs.solution }}
       coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
-    env:
-      BuildExternalAssets: ${{ inputs['build-external-assets'] }}
   - name: Archive test results
     if: always()
     uses: ./.github/actions/archive-test-results

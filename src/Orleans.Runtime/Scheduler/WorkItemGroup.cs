@@ -23,11 +23,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         Running = 2
     }
 
-#if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
-#else
-    private readonly object _lockObj = new();
-#endif
     private readonly Queue<Task> _workItems = new();
     private readonly SchedulingOptions _schedulingOptions;
     private readonly SchedulerInstruments _schedulerInstruments;

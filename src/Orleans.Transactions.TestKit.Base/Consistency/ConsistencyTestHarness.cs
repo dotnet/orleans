@@ -1,6 +1,7 @@
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -159,6 +160,8 @@ namespace Orleans.Transactions.TestKit.Consistency
         /// <param name="grainFactory">The grain factory used to create consistency test grain references.</param>
         /// <param name="output">The callback used to write test diagnostics.</param>
         /// <returns>A task which represents the transaction sequence.</returns>
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "A seeded PRNG selects test-grain targets for consistency workloads.")]
         public async Task RunRandomTransactionSequence(int partition, int count, IGrainFactory grainFactory, Action<string> output)
         {
             ArgumentNullException.ThrowIfNull(grainFactory);
@@ -375,7 +378,7 @@ namespace Orleans.Transactions.TestKit.Consistency
         {
             foreach (var transaction in indoubt)
             {
-                if (transaction.Value.Contains("failure during transaction commit"))
+                if (transaction.Value.Contains("failure during transaction commit", StringComparison.Ordinal))
                 {
                     true.Should().BeFalse($"exception during commit {transaction.Key} {transaction.Value}");
                 }

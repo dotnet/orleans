@@ -21,7 +21,17 @@ namespace Orleans.Analyzers
         }
 
         public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeSymbol)
-            => symbol.HasAttribute(attributeSymbol, out _);
+        {
+            foreach (var attribute in symbol.GetAttributes())
+            {
+                if (attributeSymbol.Equals(attribute.AttributeClass, SymbolEqualityComparer.Default))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         public static bool DerivesFrom(this ITypeSymbol symbol, ITypeSymbol? candidateBaseType)
         {

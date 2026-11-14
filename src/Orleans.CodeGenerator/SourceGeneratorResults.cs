@@ -58,17 +58,27 @@ internal readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, D
 // The declaration completes the authored partial type; the implementation provides its runtime registrations.
 internal readonly record struct SerializerContextOutput(SourceOutputResult Declaration, SourceOutputResult Implementation);
 
-internal readonly struct ReferenceAssemblyDataResult(ReferenceAssemblyModel model, ImmutableArray<Diagnostic> diagnostics) : IEquatable<ReferenceAssemblyDataResult>
+internal readonly struct ReferenceAssemblyDataResult(
+    ReferenceAssemblyModel model,
+    ImmutableArray<Diagnostic> diagnostics,
+    ImmutableArray<Diagnostic> implementationDiagnostics) : IEquatable<ReferenceAssemblyDataResult>
 {
     public ReferenceAssemblyModel Model { get; } = model;
     public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics.IsDefault ? [] : diagnostics;
 
-    public static ReferenceAssemblyDataResult FromModelAndDiagnostics(ReferenceAssemblyModel model, ImmutableArray<Diagnostic> diagnostics)
-        => new(model, diagnostics);
+    // Diagnostics about generated metadata are reported only when implementation outputs are emitted.
+    public ImmutableArray<Diagnostic> ImplementationDiagnostics { get; } = implementationDiagnostics.IsDefault ? [] : implementationDiagnostics;
+
+    public static ReferenceAssemblyDataResult FromModelAndDiagnostics(
+        ReferenceAssemblyModel model,
+        ImmutableArray<Diagnostic> diagnostics,
+        ImmutableArray<Diagnostic> implementationDiagnostics = default)
+        => new(model, diagnostics, implementationDiagnostics);
 
     public bool Equals(ReferenceAssemblyDataResult other)
         => EqualityComparer<ReferenceAssemblyModel>.Default.Equals(Model, other.Model)
-            && SourceGeneratorDiagnosticComparer.AreSequencesEqual(Diagnostics, other.Diagnostics);
+            && SourceGeneratorDiagnosticComparer.AreSequencesEqual(Diagnostics, other.Diagnostics)
+            && SourceGeneratorDiagnosticComparer.AreSequencesEqual(ImplementationDiagnostics, other.ImplementationDiagnostics);
 
     public override bool Equals(object? obj) => obj is ReferenceAssemblyDataResult other && Equals(other);
 
@@ -78,6 +88,7 @@ internal readonly struct ReferenceAssemblyDataResult(ReferenceAssemblyModel mode
         {
             var hash = Model?.GetHashCode() ?? 0;
             hash = hash * 31 + SourceGeneratorDiagnosticComparer.GetSequenceHashCode(Diagnostics);
+            hash = hash * 31 + SourceGeneratorDiagnosticComparer.GetSequenceHashCode(ImplementationDiagnostics);
             return hash;
         }
     }
@@ -88,21 +99,24 @@ internal readonly struct SerializableTypeResult(
     Diagnostic? diagnostic,
     TypeMetadataIdentity metadataIdentity,
     SourceLocationModel sourceLocation,
-    string typeSyntax) : IEquatable<SerializableTypeResult>
+    string typeSyntax,
+    EnumSerializerOutputPlan? enumSerializerPlan = null) : IEquatable<SerializableTypeResult>
 {
     public SerializableTypeModel? Model { get; } = model;
     public Diagnostic? Diagnostic { get; } = diagnostic;
     public TypeMetadataIdentity MetadataIdentity { get; } = metadataIdentity;
     public SourceLocationModel SourceLocation { get; } = sourceLocation;
     public string TypeSyntax { get; } = typeSyntax;
+    public EnumSerializerOutputPlan? EnumSerializerPlan { get; } = enumSerializerPlan;
 
-    public static SerializableTypeResult FromModel(SerializableTypeModel model)
+    public static SerializableTypeResult FromModel(SerializableTypeModel model, EnumSerializerOutputPlan? enumSerializerPlan = null)
         => new(
             model,
             diagnostic: null,
             model?.MetadataIdentity ?? TypeMetadataIdentity.Empty,
             model?.SourceLocation ?? default,
-            model?.TypeSyntax.SyntaxString ?? string.Empty);
+            model?.TypeSyntax.SyntaxString ?? string.Empty,
+            enumSerializerPlan);
 
     public static SerializableTypeResult FromDiagnostic(
         Diagnostic diagnostic,
@@ -116,7 +130,8 @@ internal readonly struct SerializableTypeResult(
             && SourceGeneratorDiagnosticComparer.AreEqual(Diagnostic, other.Diagnostic)
             && MetadataIdentity.Equals(other.MetadataIdentity)
             && SourceLocation.Equals(other.SourceLocation)
-            && string.Equals(TypeSyntax, other.TypeSyntax, StringComparison.Ordinal);
+            && string.Equals(TypeSyntax, other.TypeSyntax, StringComparison.Ordinal)
+            && EqualityComparer<EnumSerializerOutputPlan?>.Default.Equals(EnumSerializerPlan, other.EnumSerializerPlan);
 
     public override bool Equals(object? obj) => obj is SerializableTypeResult other && Equals(other);
 
@@ -129,6 +144,7 @@ internal readonly struct SerializableTypeResult(
             hash = hash * 31 + MetadataIdentity.GetHashCode();
             hash = hash * 31 + SourceLocation.GetHashCode();
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(TypeSyntax ?? string.Empty);
+            hash = hash * 31 + (EnumSerializerPlan?.GetHashCode() ?? 0);
             return hash;
         }
     }
@@ -152,10 +168,11 @@ internal readonly struct ProxyOutputPreparationResult(
     public static ProxyOutputPreparationResult FromDiagnostic(Diagnostic diagnostic)
         => new([], [], [diagnostic]);
 
+    // Diagnostics retain the current compilation's source trees even when their messages and spans match.
     public bool Equals(ProxyOutputPreparationResult other)
         => StructuralEquality.SequenceEqual(ProxyOutputModels, other.ProxyOutputModels)
             && StructuralEquality.SequenceEqual(SourceOutputs, other.SourceOutputs)
-            && SourceGeneratorDiagnosticComparer.AreSequencesEqual(Diagnostics, other.Diagnostics);
+            && StructuralEquality.SequenceEqual(Diagnostics, other.Diagnostics);
 
     public override bool Equals(object? obj) => obj is ProxyOutputPreparationResult other && Equals(other);
 
@@ -165,7 +182,7 @@ internal readonly struct ProxyOutputPreparationResult(
         {
             var hash = StructuralEquality.GetSequenceHashCode(ProxyOutputModels);
             hash = hash * 31 + StructuralEquality.GetSequenceHashCode(SourceOutputs);
-            hash = hash * 31 + SourceGeneratorDiagnosticComparer.GetSequenceHashCode(Diagnostics);
+            hash = hash * 31 + StructuralEquality.GetSequenceHashCode(Diagnostics);
             return hash;
         }
     }
@@ -227,9 +244,12 @@ internal static class SourceGeneratorDiagnosticComparer
             return false;
         }
 
-        return string.Equals(left.Id, right.Id, StringComparison.Ordinal)
+        // A source location retains its syntax tree, so diagnostics from different trees cannot be reused after an edit.
+        return left.Location.Equals(right.Location)
+            && string.Equals(left.Id, right.Id, StringComparison.Ordinal)
             && left.Severity == right.Severity
             && left.WarningLevel == right.WarningLevel
+            && left.AdditionalLocations.SequenceEqual(right.AdditionalLocations)
             && string.Equals(left.ToString(), right.ToString(), StringComparison.Ordinal);
     }
 
@@ -245,6 +265,11 @@ internal static class SourceGeneratorDiagnosticComparer
             var hash = StringComparer.Ordinal.GetHashCode(diagnostic.Id ?? string.Empty);
             hash = hash * 31 + (int)diagnostic.Severity;
             hash = hash * 31 + diagnostic.WarningLevel;
+            hash = hash * 31 + diagnostic.Location.GetHashCode();
+            foreach (var location in diagnostic.AdditionalLocations)
+            {
+                hash = hash * 31 + location.GetHashCode();
+            }
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(diagnostic.ToString() ?? string.Empty);
             return hash;
         }

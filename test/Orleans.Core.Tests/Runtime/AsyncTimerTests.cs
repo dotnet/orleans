@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime;
@@ -7,6 +8,57 @@ namespace NonSilo.Tests.Runtime;
 
 public class AsyncTimerTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task Dispose_CancelsPendingTickAndKeepsFutureTicksStopped()
+    {
+        var timeProvider = new FakeTimeProvider();
+        using var timer = new AsyncTimer(Timeout.InfiniteTimeSpan, "test", NullLogger.Instance, timeProvider);
+        var source = Assert.IsType<CancellationTokenSource>(
+            typeof(AsyncTimer).GetField("cancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(timer));
+        var waitHandle = source.Token.WaitHandle;
+        var pending = timer.NextTick();
+        Assert.False(pending.IsCompleted);
+
+        timer.Dispose();
+
+        Assert.False(await pending);
+        Assert.Throws<ObjectDisposedException>(() => source.Token);
+        Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        Assert.False(await timer.NextTick());
+        Assert.False(await timer.NextTick(TimeSpan.Zero));
+        timer.Dispose();
+        Assert.False(await timer.NextTick(TimeSpan.FromDays(1)));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(1000)]
+    [InlineData(-1)]
+    public async Task NextTick_DisposalAfterAdmissionCancelsDelay(int milliseconds)
+    {
+        AsyncTimer? timer = null;
+        var timeProvider = new DisposingTimeProvider(() =>
+        {
+            Assert.NotNull(timer);
+            timer.Dispose();
+        });
+        using (timer = new AsyncTimer(TimeSpan.FromMilliseconds(milliseconds), "test", NullLogger.Instance, timeProvider))
+        {
+            var source = Assert.IsType<CancellationTokenSource>(
+                typeof(AsyncTimer).GetField("cancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(timer));
+            var waitHandle = source.Token.WaitHandle;
+
+            Assert.False(await timer.NextTick());
+
+            Assert.Throws<ObjectDisposedException>(() => source.Token);
+            Assert.True(waitHandle.SafeWaitHandle.IsClosed);
+            Assert.False(await timer.NextTick());
+        }
+    }
+
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Theory, TestCategory("BVT")]
@@ -119,5 +171,14 @@ public class AsyncTimerTests
         Assert.False(task.IsCompleted);
         timer.Dispose();
         Assert.False(await task);
+    }
+
+    private sealed class DisposingTimeProvider(Action dispose) : FakeTimeProvider
+    {
+        public override DateTimeOffset GetUtcNow()
+        {
+            dispose();
+            return base.GetUtcNow();
+        }
     }
 }

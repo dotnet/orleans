@@ -23,6 +23,10 @@ namespace Orleans.Tests.SqlUtils
     /// <summary>
     /// A common interface for all relational databases.
     /// </summary>
+    /// <remarks>
+    /// Queries are trusted SQL statements supplied by provider configuration. Supply record and request values
+    /// through command parameters using <c>parameterProvider</c>.
+    /// </remarks>
 #if TESTER_SQLUTILS
     public interface IRelationalStorage
 #else

@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Orleans.CodeGenerator.SerializerGenerator;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -190,31 +191,10 @@ internal static class FSharpUtilities
 
             public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
 
-            /// <summary>
-            /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
-            /// </summary>
-            /// <param name="instance">The instance of the containing type.</param>
-            /// <returns>Syntax for retrieving the value of this field.</returns>
-            public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(_field.Name);
+            public MemberAccessPlan GetGetter() => MemberAccessPlan.ForMember(_field.Name);
 
-            /// <summary>
-            /// Returns syntax for setting the value of this field.
-            /// </summary>
-            /// <param name="instance">The instance of the containing type.</param>
-            /// <param name="value">Syntax for the new value.</param>
-            /// <returns>Syntax for setting the value of this field.</returns>
-            public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value)
-            {
-                var instanceArg = Argument(instance);
-                if (ContainingType != null && ContainingType.IsValueType)
-                {
-                    instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
-                }
-
-                return
-                    InvocationExpression(IdentifierName(SetterFieldName))
-                        .AddArgumentListArguments(instanceArg, Argument(value));
-            }
+            public MemberAccessPlan GetSetter()
+                => new(MemberAccessKind.Invoke, SetterFieldName, RefInstance: ContainingType != null && ContainingType.IsValueType);
 
             public FieldAccessorDescription? GetGetterFieldDescription() => null;
 
@@ -294,31 +274,10 @@ internal static class FSharpUtilities
 
             public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
 
-            /// <summary>
-            /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
-            /// </summary>
-            /// <param name="instance">The instance of the containing type.</param>
-            /// <returns>Syntax for retrieving the value of this field.</returns>
-            public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(Property.Name);
+            public MemberAccessPlan GetGetter() => MemberAccessPlan.ForMember(Property.Name);
 
-            /// <summary>
-            /// Returns syntax for setting the value of this field.
-            /// </summary>
-            /// <param name="instance">The instance of the containing type.</param>
-            /// <param name="value">Syntax for the new value.</param>
-            /// <returns>Syntax for setting the value of this field.</returns>
-            public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value)
-            {
-                var instanceArg = Argument(instance);
-                if (ContainingType != null && ContainingType.IsValueType)
-                {
-                    instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
-                }
-
-                return
-                    InvocationExpression(IdentifierName(SetterFieldName))
-                        .AddArgumentListArguments(instanceArg, Argument(value));
-            }
+            public MemberAccessPlan GetSetter()
+                => new(MemberAccessKind.Invoke, SetterFieldName, RefInstance: ContainingType != null && ContainingType.IsValueType);
 
             public FieldAccessorDescription? GetGetterFieldDescription() => null;
 

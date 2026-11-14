@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -109,4 +110,116 @@ public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTes
                 [Custom.Id(0)] public int F;
             }
             """);
+
+    [Theory]
+    [InlineData("class", "GenerateSerializer", "GenerateFieldIds.PublicProperties")]
+    [InlineData("struct", "GenerateSerializer", "FieldIds.PublicProperties")]
+    [InlineData("record", "Serializer", "GenerateFieldIds.PublicProperties")]
+    [InlineData("record struct", "global::Orleans.GenerateSerializer", "global::Orleans.GenerateFieldIds.PublicProperties")]
+    public async Task PublicProperties_WithExistingMemberAttributes_ShouldNotTriggerDiagnostic(string declarationKind, string attributeName, string fieldIdOption)
+    {
+        var source = $$"""
+            using Orleans;
+            using Serializer = Orleans.GenerateSerializerAttribute;
+            using FieldIds = Orleans.GenerateFieldIds;
+
+            [{{attributeName}}(GenerateFieldIds = {{fieldIdOption}})]
+            public {{declarationKind}} D
+            {
+                [Id(9)] public int Tagged { get; set; }
+                [System.NonSerialized] public int Ignored;
+                public int Untagged { get; set; }
+                public int UntaggedField;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData("GenerateSerializer", "")]
+    [InlineData("Serializer", "(GenerateFieldIds = GenerateFieldIds.None)")]
+    [InlineData("global::Orleans.GenerateSerializer", "")]
+    [InlineData("GenerateSerializer", "(GenerateFieldIds = PublicProperties)")]
+    [InlineData("GenerateSerializer", "(GenerateFieldIds = Options.Automatic)")]
+    public async Task FieldIdOptionSyntax_ShouldPreserveDiagnosticAttributeLocation(string attributeName, string arguments)
+    {
+        // Preserve the existing syntax-only interpretation of imported enum members and constants.
+        var attribute = attributeName + arguments;
+        var source = $$"""
+            using Orleans;
+            using Serializer = Orleans.GenerateSerializerAttribute;
+            using static Orleans.GenerateFieldIds;
+
+            public static class Options
+            {
+                public const GenerateFieldIds Automatic = GenerateFieldIds.PublicProperties;
+            }
+
+            [{{attribute}}]
+            public class D
+            {
+                [Id(0)] public int Tagged { get; set; }
+                public int Untagged { get; set; }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GenerateSerializationAttributesAnalyzer.RuleId, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(new TextSpan(source.IndexOf("[" + attribute + "]", StringComparison.Ordinal) + 1, attribute.Length), diagnostic.Location.SourceSpan);
+    }
+
+    [Fact]
+    public async Task PartialTypes_ShouldAnalyzeOnlyMembersInAttributedDeclaration()
+    {
+        const string reportedAttribute = "GenerateSerializer(GenerateFieldIds = GenerateFieldIds.None)";
+        var source = $$"""
+            using Orleans;
+
+            [GenerateSerializer]
+            public partial class AnnotatedHere
+            {
+                [Id(0)] public int Tagged;
+            }
+
+            public partial class AnnotatedHere
+            {
+                public int Untagged;
+            }
+
+            [{{reportedAttribute}}]
+            public partial class UnannotatedHere
+            {
+                public int Untagged;
+            }
+
+            public partial class UnannotatedHere
+            {
+                [Id(0)] public int Tagged;
+            }
+
+            [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties)]
+            public partial class Automatic
+            {
+                public int Untagged { get; set; }
+            }
+
+            public partial class Automatic
+            {
+                public int Other { get; set; }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GenerateSerializationAttributesAnalyzer.RuleId, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(new TextSpan(source.IndexOf(reportedAttribute, StringComparison.Ordinal), reportedAttribute.Length), diagnostic.Location.SourceSpan);
+    }
 }

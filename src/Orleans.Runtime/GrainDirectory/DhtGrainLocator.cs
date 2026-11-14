@@ -16,11 +16,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly ILocalGrainDirectory _localGrainDirectory;
         private readonly IGrainContext _grainContext;
-#if NET9_0_OR_GREATER
         private readonly Lock _initLock = new();
-#else
-        private readonly object _initLock = new();
-#endif
         private BatchedDeregistrationWorker _forceWorker = null!;
         private BatchedDeregistrationWorker _neaWorker = null!;
 

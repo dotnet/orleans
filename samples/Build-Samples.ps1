@@ -2,7 +2,6 @@
 param(
     [string] $Configuration = 'Release',
     [switch] $NoIncremental,
-    [switch] $SkipExternalAssets,
     [switch] $DisableSharedCompilation
 )
 
@@ -13,7 +12,6 @@ $sampleSolution = Join-Path $PSScriptRoot 'Samples.slnx'
 $packageSource = Join-Path $repositoryRoot "Artifacts/Samples/$Configuration/packages"
 $sampleBinlog = Join-Path $repositoryRoot "Artifacts/Samples/$Configuration/samples.binlog"
 $packageVersion = "10.0.0-dev.$([System.DateTime]::UtcNow.Ticks)"
-$buildExternalAssets = (-not $SkipExternalAssets).ToString().ToLowerInvariant()
 
 if (Test-Path -LiteralPath $packageSource) {
     Remove-Item -LiteralPath $packageSource -Recurse -Force
@@ -23,7 +21,6 @@ if (Test-Path -LiteralPath $packageSource) {
     --configuration $Configuration `
     --output $packageSource `
     -p:Version=$packageVersion `
-    -p:BuildExternalAssets=$buildExternalAssets `
     --nologo
 if ($LASTEXITCODE -ne 0) {
     throw "Orleans package build failed with exit code $LASTEXITCODE."

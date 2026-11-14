@@ -25,4 +25,3 @@
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
   </ItemGroup>
 </Project>
-

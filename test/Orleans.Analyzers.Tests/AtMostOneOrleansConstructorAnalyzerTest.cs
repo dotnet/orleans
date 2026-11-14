@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -107,6 +108,32 @@ public class AtMostOneOrleansConstructorAnalyzerTest : DiagnosticAnalyzerTestBas
         Assert.Empty(diagnostics);
     }
 
+    [Fact]
+    public async Task PartialType_WithAliasedSerializer_ShouldReportTypeLocation()
+    {
+        const string source = """
+            using Serializer = Orleans.GenerateSerializerAttribute;
+
+            public partial class C
+            {
+                [Serializer] public C() { }
+            }
+
+            [Serializer]
+            public partial class C
+            {
+                [Serializer] public C(int value) { }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AtMostOneOrleansConstructorAnalyzer.RuleId, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(new TextSpan(source.IndexOf("class C", StringComparison.Ordinal) + "class ".Length, 1), diagnostic.Location.SourceSpan);
+    }
+
     private static async Task<Diagnostic[]> GetDiagnosticsAsync(string source)
     {
         const string attributeDefinition = """
@@ -122,6 +149,8 @@ public class AtMostOneOrleansConstructorAnalyzerTest : DiagnosticAnalyzerTestBas
             "TestProject",
             [CSharpSyntaxTree.ParseText(attributeDefinition), CSharpSyntaxTree.ParseText(source)],
             GetMetadataReferences());
+
+        Assert.Empty(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
         var analyzer = new AtMostOneOrleansConstructorAnalyzer();
         var diagnostics = await compilation

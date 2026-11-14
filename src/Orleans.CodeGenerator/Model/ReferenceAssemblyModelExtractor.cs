@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
@@ -12,20 +13,52 @@ internal static class ReferenceAssemblyModelExtractor
     /// Extracts reference-assembly metadata from the compilation using the provided code generation options.
     /// This isolates reference-assembly scanning into a cacheable pipeline step so that
     /// downstream work can be skipped when references don't change.
+    /// Type syntax is formatted on demand and shared by each type's metadata registrations.
     /// </summary>
     internal static ReferenceAssemblyModel ExtractReferenceAssemblyData(
         Compilation compilation,
         CodeGeneratorOptions options,
         CancellationToken cancellationToken)
-        => ExtractReferenceAssemblyData(compilation, options, cancellationToken, out _);
+        => ExtractReferenceAssemblyData(compilation, options, cancellationToken, out _, out _);
 
+    /// <summary>
+    /// Reuses successful, deduplicated source discoveries from this compilation for current-assembly
+    /// serializer and proxy metadata. Uncovered types and selected external assemblies use symbol-based discovery.
+    /// </summary>
     internal static ReferenceAssemblyModel ExtractReferenceAssemblyData(
         Compilation compilation,
         CodeGeneratorOptions options,
         CancellationToken cancellationToken,
-        out ImmutableArray<Diagnostic> diagnostics)
+        out ImmutableArray<Diagnostic> diagnostics,
+        out ImmutableArray<Diagnostic> implementationDiagnostics,
+        ImmutableArray<SerializableTypeModel> sourceSerializableTypes = default,
+        ImmutableArray<ProxyInterfaceModel> sourceProxyInterfaces = default)
     {
         var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
+        var sourceSerializers = new Dictionary<INamedTypeSymbol, SerializableTypeModel>(SymbolEqualityComparer.Default);
+        var sourceProxies = new Dictionary<INamedTypeSymbol, ProxyInterfaceModel>(SymbolEqualityComparer.Default);
+
+        if (!sourceSerializableTypes.IsDefaultOrEmpty)
+        {
+            foreach (var model in sourceSerializableTypes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var symbol = compilation.Assembly.GetTypeByMetadataName(model.MetadataIdentity.MetadataName);
+                Debug.Assert(symbol is not null);
+                sourceSerializers.Add(symbol!, model);
+            }
+        }
+
+        if (!sourceProxyInterfaces.IsDefaultOrEmpty)
+        {
+            foreach (var model in sourceProxyInterfaces)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var symbol = compilation.Assembly.GetTypeByMetadataName(model.MetadataIdentity.MetadataName);
+                Debug.Assert(symbol is not null);
+                sourceProxies.Add(symbol!, model);
+            }
+        }
 
         var applicationParts = new List<string>();
         var applicationPartSet = new HashSet<string>(StringComparer.Ordinal);
@@ -48,6 +81,7 @@ internal static class ReferenceAssemblyModelExtractor
         var hasUnrepresentableProviderRegistration = false;
         var interfaceImplementations = new HashSet<InterfaceImplementationModel>();
         var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        var implementationDiagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
         CollectAssemblyAttributes(compilation.Assembly, includeApplicationParts: false);
 
@@ -74,7 +108,10 @@ internal static class ReferenceAssemblyModelExtractor
 
                 try
                 {
-                    if (SerializableTypeModelExtractor.TryExtractSerializableTypeModel(symbol, compilation, libraryTypes, options, reportSerializableTypeDiagnostics) is { } serializableTypeModel)
+                    var serializableTypeModel = !reportSerializableTypeDiagnostics && sourceSerializers.TryGetValue(symbol, out var sourceSerializer)
+                        ? sourceSerializer
+                        : SerializableTypeModelExtractor.TryExtractSerializableTypeModel(symbol, compilation, libraryTypes, options, reportSerializableTypeDiagnostics);
+                    if (serializableTypeModel is not null)
                     {
                         referencedSerializableTypes.Add(serializableTypeModel);
                     }
@@ -84,28 +121,45 @@ internal static class ReferenceAssemblyModelExtractor
                     diagnosticBuilder.Add(exception.Diagnostic);
                 }
 
-                if (ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(symbol, compilation, cancellationToken) is { } proxyInterfaceModel)
+                var proxyInterfaceModel = !reportSerializableTypeDiagnostics && sourceProxies.TryGetValue(symbol, out var sourceProxy)
+                    ? sourceProxy
+                    : ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(symbol, compilation, cancellationToken);
+                if (proxyInterfaceModel is not null)
                 {
                     referencedProxyInterfaces.Add(proxyInterfaceModel);
                 }
 
-                var typeRef = new TypeRef(symbol.ToOpenTypeSyntax().ToString());
+                string? typeSyntax = null;
+                TypeRef GetTypeRef() => new(typeSyntax ??= symbol.ToOpenTypeSyntax().ToString());
+
                 if (GeneratedCodeUtilities.GetId(libraryTypes, symbol) is uint wellKnownTypeId)
                 {
-                    wellKnownTypeIds.Add(new WellKnownTypeIdModel(typeRef, wellKnownTypeId));
+                    wellKnownTypeIds.Add(new WellKnownTypeIdModel(GetTypeRef(), wellKnownTypeId));
                 }
 
                 if (symbol.GetAttribute(libraryTypes.AliasAttribute) is { ConstructorArguments.Length: > 0 } aliasAttr
                     && aliasAttr.ConstructorArguments[0].Value is string alias)
                 {
-                    typeAliases.Add(new TypeAliasModel(typeRef, alias));
+                    typeAliases.Add(new TypeAliasModel(GetTypeRef(), alias));
                 }
 
                 foreach (var compoundAlias in symbol.GetAttributes().Where(attribute =>
                     SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.CompoundTypeAliasAttribute)))
                 {
-                    if (TryExtractCompoundTypeAlias(compoundAlias, out var components))
-                        compoundTypeAliases.Add(new CompoundTypeAliasModel(components, typeRef));
+                    if (!TryExtractCompoundTypeAlias(compoundAlias, out var components))
+                    {
+                        continue;
+                    }
+
+                    // The metadata provider is emitted outside the aliased type, so every type it names must be accessible from generated code.
+                    // The diagnostic concerns generated metadata, so it is reported only when implementation outputs are emitted.
+                    if (FindInaccessibleCompoundAliasType(symbol, compoundAlias) is { } inaccessibleType)
+                    {
+                        implementationDiagnosticBuilder.Add(InaccessibleCompoundTypeAliasDiagnostic.CreateDiagnostic(symbol, compoundAlias, inaccessibleType, compilation));
+                        continue;
+                    }
+
+                    compoundTypeAliases.Add(new CompoundTypeAliasModel(components, GetTypeRef()));
                 }
 
                 if ((symbol.TypeKind == TypeKind.Class || symbol.TypeKind == TypeKind.Struct)
@@ -136,7 +190,7 @@ internal static class ReferenceAssemblyModelExtractor
                     {
                         if (iface.GetAttribute(libraryTypes.GenerateMethodSerializersAttribute, inherited: true) is not null)
                         {
-                            interfaceImplementations.Add(new InterfaceImplementationModel(typeRef, SymbolSourceLocationExtractor.GetSourceLocation(symbol)));
+                            interfaceImplementations.Add(new InterfaceImplementationModel(GetTypeRef(), SymbolSourceLocationExtractor.GetSourceLocation(symbol)));
                             break;
                         }
                     }
@@ -185,6 +239,7 @@ internal static class ReferenceAssemblyModelExtractor
             .ToImmutableArray();
 
         diagnostics = diagnosticBuilder.ToImmutable();
+        implementationDiagnostics = implementationDiagnosticBuilder.ToImmutable();
 
         return new ReferenceAssemblyModel(
             AssemblyName: compilation.AssemblyName ?? string.Empty,
@@ -245,7 +300,7 @@ internal static class ReferenceAssemblyModelExtractor
                     || arguments[2].Value is not string target
                     || arguments[3].Value is not INamedTypeSymbol type
                     || !compilation.IsSymbolAccessibleWithin(type, compilation.Assembly)
-                    || !CanReferenceProviderType(type))
+                    || !CanReferenceType(type))
                 {
                     hasUnrepresentableProviderRegistration = true;
                     continue;
@@ -261,15 +316,15 @@ internal static class ReferenceAssemblyModelExtractor
             }
         }
 
-        bool CanReferenceProviderType(ITypeSymbol type)
+        bool CanReferenceType(ITypeSymbol type)
         {
             return type switch
             {
                 INamedTypeSymbol namedType => CanReferenceNamedType(namedType)
-                    && (namedType.ContainingType is null || CanReferenceProviderType(namedType.ContainingType))
-                    && namedType.TypeArguments.All(CanReferenceProviderType),
-                IArrayTypeSymbol arrayType => CanReferenceProviderType(arrayType.ElementType),
-                IPointerTypeSymbol pointerType => CanReferenceProviderType(pointerType.PointedAtType),
+                    && (namedType.ContainingType is null || CanReferenceType(namedType.ContainingType))
+                    && (namedType.IsUnboundGenericType || namedType.TypeArguments.All(CanReferenceType)),
+                IArrayTypeSymbol arrayType => CanReferenceType(arrayType.ElementType),
+                IPointerTypeSymbol pointerType => CanReferenceType(pointerType.PointedAtType),
                 _ => true,
             };
         }
@@ -282,9 +337,30 @@ internal static class ReferenceAssemblyModelExtractor
             }
 
             var originalDefinition = type.OriginalDefinition;
-            var metadataName = TypeMetadataIdentity.Create(originalDefinition).MetadataName;
+            var metadataName = TypeMetadataIdentity.GetMetadataName(originalDefinition);
             return compilation.GetTypeByMetadataName(metadataName) is { } resolvedType
                 && SymbolEqualityComparer.Default.Equals(resolvedType, originalDefinition);
+        }
+
+        ITypeSymbol? FindInaccessibleCompoundAliasType(INamedTypeSymbol target, AttributeData attribute)
+        {
+            // Assembly accessibility includes file-local types, whose names cannot be used in the generated file.
+            if (!compilation.IsSymbolAccessibleWithin(target, compilation.Assembly) || !CanReferenceType(target))
+            {
+                return target;
+            }
+
+            // TryExtractCompoundTypeAlias has already validated the shape of the arguments.
+            foreach (var argument in attribute.ConstructorArguments[0].Values)
+            {
+                if (argument.Value is ITypeSymbol type
+                    && (!compilation.IsSymbolAccessibleWithin(type, compilation.Assembly) || !CanReferenceType(type)))
+                {
+                    return type;
+                }
+            }
+
+            return null;
         }
     }
 

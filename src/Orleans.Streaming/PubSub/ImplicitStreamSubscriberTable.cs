@@ -15,11 +15,7 @@ namespace Orleans.Streams
 {
     internal class ImplicitStreamSubscriberTable
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
-#else
-        private readonly object _lockObj = new();
-#endif
         private readonly GrainBindingsResolver _bindings;
         private readonly IStreamNamespacePredicateProvider[] _providers;
         private readonly IServiceProvider _serviceProvider;

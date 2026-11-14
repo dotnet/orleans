@@ -23,11 +23,7 @@ namespace Orleans.Messaging
     /// </summary>
     internal partial class GatewayManager : IDisposable
     {
-#if NET9_0_OR_GREATER
         private readonly Lock lockable = new();
-#else
-        private readonly object lockable = new();
-#endif
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
         private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
         private readonly IGatewayListProvider gatewayListProvider;
@@ -244,7 +240,6 @@ namespace Orleans.Messaging
             });
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         internal async Task PeriodicallyRefreshGatewaySnapshot()
         {
             await Task.Yield();

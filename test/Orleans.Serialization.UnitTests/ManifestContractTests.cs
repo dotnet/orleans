@@ -1123,12 +1123,8 @@ public class ManifestContractTests
     [InlineData(typeof(ReferenceConstrainedCopier<>), typeof(int), false)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PublicConstructorTarget), true)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PrivateConstructorTarget), false)]
-    // MakeGenericType permits an abstract new()-constrained argument on .NET 8 and rejects it on .NET 10.
-#if NET10_0_OR_GREATER
+    // MakeGenericType rejects an abstract new()-constrained argument.
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), false)]
-#else
-    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), true)]
-#endif
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(int), true)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(string), true)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(int), true)]

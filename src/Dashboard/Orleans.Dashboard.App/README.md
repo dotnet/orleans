@@ -1,25 +1,17 @@
 # Orleans Dashboard App
 
-This directory contains the frontend web application for the Orleans Dashboard, built with React and Vite.
+This directory contains the frontend web application for the Orleans Dashboard, built with React and Vite. The production build is committed under `dist/`, and building the Orleans.Dashboard C# project embeds every file in `dist/` as a resource. .NET builds do not require Node.js or npm.
 
 ## Structure
 
 ```
 Orleans.Dashboard.App/
 ├── src/              # React application source code
-│   ├── components/   # Reusable React components
-│   ├── grains/       # Grain-specific views
-│   ├── logstream/    # Log streaming components
-│   ├── overview/     # Dashboard overview components
-│   ├── reminders/    # Reminders view components
-│   ├── silos/        # Silo management components
-│   ├── lib/          # Utility libraries
-│   └── index.jsx     # Application entry point
-├── public/           # Static assets (copied to build output)
-│   ├── favicon.ico
-│   ├── OrleansLogo.png
-│   └── *.css, *.js   # Third-party CSS/JS libraries
+├── public/           # Static assets copied to the build output
+├── scripts/          # npm installation helper and its tests
+├── dist/             # Committed production build, embedded by Orleans.Dashboard
 ├── screenshots/      # Dashboard screenshots for documentation
+├── tests/            # Playwright navigation tests
 ├── index.html        # HTML template
 ├── package.json      # npm dependencies and scripts
 ├── vite.config.ts    # Vite build configuration
@@ -28,75 +20,37 @@ Orleans.Dashboard.App/
 
 ## Development
 
-### Prerequisites
+Use the Node.js version in `.node-version` with the npm version in `package.json`. From this directory:
 
-- Node.js (v24 or later)
-- npm
-
-### Setup
-
-```bash
-cd src/Dashboard/Orleans.Dashboard.App
-npm install
-```
-
-### Development Server
-
-Run the Vite development server for hot module replacement:
-
-```bash
+```shell
+npm run restore
 npm run dev
 ```
 
-This will start the development server at `http://localhost:5173` (or another port if 5173 is in use).
+`npm run restore` runs `npm ci` and restarts the clean installation, up to three attempts, when npm reports a connection reset while downloading a package. Other failures are reported immediately.
 
-### Building
+The development server provides hot module replacement at `http://localhost:5173`.
 
-To build the production bundle:
+## Updating the committed build
 
-```bash
+After changing the frontend or its dependencies, rebuild and commit `dist/` with the source change:
+
+```shell
+npm run restore
 npm run build
 ```
 
-This builds the application to `../Orleans.Dashboard/wwwroot/` which is then embedded as resources in the Orleans.Dashboard C# project.
+The build writes the bundle, source map, fonts, images, and `THIRD-PARTY-NOTICES.md`, which Vite generates from the licenses of the bundled dependencies. The NuGet package also includes the notices as a standalone file.
 
-### Navigation Tests
+The `Dashboard` workflow runs when a pull request or push changes this directory. It runs the same commands and fails if the output differs from the committed `dist/`, and runs the navigation tests. Frontend sources use LF line endings on every platform, so builds on Windows, Linux, and macOS produce identical files.
+
+## Navigation tests
 
 The browser tests exercise the production bundle's counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
 
-```bash
+```shell
 npx playwright install chromium
 npm run test:ui
 ```
 
-### Preview Production Build
-
-To preview the production build locally:
-
-```bash
-npm run preview
-```
-
-## Integration with Orleans.Dashboard
-
-The frontend application is automatically built when you build the Orleans.Dashboard C# project. The build process is managed by `Orleans.Dashboard.Frontend.targets` which:
-
-1. Installs npm packages if `node_modules` doesn't exist
-2. Runs `npm run build` to compile the frontend
-3. Embeds the built assets as resources in the Orleans.Dashboard assembly
-
-The build uses incremental compilation, so the frontend is only rebuilt when source files change.
-
-## Migration from Browserify
-
-This project was migrated from Browserify to Vite for improved:
-- Build performance
-- Development experience with HMR
-- Modern JavaScript/TypeScript support
-- Better tree-shaking and optimization
-
-The migration updated:
-- React from v15 to v18
-- Chart.js from v2 to v4
-- Build tooling from Browserify/Babel to Vite
-- Module system from CommonJS to ESM
+`npm run preview` serves the production build locally.

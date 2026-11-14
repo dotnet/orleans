@@ -342,19 +342,10 @@ internal static class ProcessPingBenchmark
         request.CertificateExtensions.Add(subjectAlternativeName.Build());
         using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         var pfx = certificate.Export(X509ContentType.Pkcs12, "benchmark-only");
-#if NET9_0_OR_GREATER
         return X509CertificateLoader.LoadPkcs12(
             pfx,
             "benchmark-only",
             X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
-#else
-#pragma warning disable SYSLIB0057
-        return new X509Certificate2(
-            pfx,
-            "benchmark-only",
-            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
-#pragma warning restore SYSLIB0057
-#endif
     }
 
     private static long Percentile(long[] values, int count, double percentile)

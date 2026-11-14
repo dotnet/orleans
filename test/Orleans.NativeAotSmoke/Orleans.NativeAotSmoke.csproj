@@ -30,13 +30,11 @@
     <Compile Include="NativeAotEnvironment.cs" />
     <Compile Include="Factories.Contracts.cs" Condition="'$(NativeAotSmokeScenario)' == 'Contexts'" />
     <Compile Include="Factories.Review.cs" Condition="'$(NativeAotSmokeScenario)' == 'Contexts'" />
-    <Compile Include="..\Orleans.DependencyInjection.TrimmedSmoke\Program.cs"
-             Link="DependencyInjection.cs"
+    <Compile Include="DependencyInjection.cs"
              Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection'" />
     <Compile Include="$(NativeAotSmokeScenario)*.cs"
              Condition="'$(NativeAotSmokeScenario)' != 'DependencyInjection'" />
-    <Compile Include="..\Orleans.Core.Tests\GrainReferences\ReferenceConstructionFixture.cs"
-             Link="ReferenceConstructionFixture.cs"
+    <Compile Include="ReferenceConstructionFixture.cs"
              Condition="'$(NativeAotSmokeScenario)' == 'GrainReferences'" />
   </ItemGroup>
 

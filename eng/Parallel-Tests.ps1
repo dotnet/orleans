@@ -2,7 +2,7 @@ param(
     [string[]] $directories,
     [string] $testFilter = $null)
 
-. .\common.ps1
+. (Join-Path $PSScriptRoot 'common.ps1')
 
 Install-Dotnet
 

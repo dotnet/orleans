@@ -147,13 +147,8 @@ namespace UnitTests.General
 
             var activity = new Activity("SomeName")
             {
-#if NET10_0_OR_GREATER
-                // In .NET 10+, the W3C propagator enforces strict W3C trace state format (key=value)
+                // The W3C propagator requires key=value trace state.
                 TraceStateString = "vendor=value"
-#else
-                // Pre-.NET 10 legacy propagator accepts any string format
-                TraceStateString = "traceState"
-#endif
             };
             activity.AddBaggage("foo", "bar");
             activity.Start();
@@ -186,12 +181,8 @@ namespace UnitTests.General
 
         /// <summary>
         /// Tests activity propagation with Hierarchical format (legacy .NET format).
-        /// Verifies that:
-        /// - The grain's activity ID is a child of the parent activity (starts with parent ID)
-        /// - Baggage items are correctly propagated
-        /// Note: Hierarchical format doesn't support trace state like W3C format does.
-        /// In .NET 10+, the default W3C propagator doesn't support Hierarchical format,
-        /// so the test expectations are adjusted accordingly.
+        /// The default W3C propagator cannot inject Hierarchical activities, so the grain
+        /// starts a new root activity instead of a child of the caller's activity.
         /// </summary>
         [Fact]
         [TestCategory("BVT")]
@@ -221,17 +212,6 @@ namespace UnitTests.General
 
                 Assert.NotNull(result);
                 Assert.NotNull(result.Id);
-#if NET10_0_OR_GREATER
-                // In .NET 10+, the default W3C propagator doesn't support Hierarchical format.
-                // It cannot inject Hierarchical activities, so the grain creates a new root activity.
-                // Neither ID hierarchy nor baggage is propagated with Hierarchical format.
-#else
-                // Pre-.NET 10: Legacy propagator supports Hierarchical format
-                Assert.StartsWith(activity.Id, result.Id);
-                Assert.Equal(
-                    activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)),
-                    result.Baggage);
-#endif
             }
         }
     }
