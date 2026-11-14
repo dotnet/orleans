@@ -77,17 +77,17 @@ for both `AddEventHubStreams` and `AddPersistentStreams` registrations. A shutdo
 accepted publications continue draining and cleanup failures are logged. The values above should be tuned for the workload;
 increasing the wait time or buffer size can improve throughput at the cost of latency and memory.
 
-Orleans closes its producer and the connection created from a connection string, credentials, or connection factory.
-A connection factory supplies a new provider-owned connection on each invocation. When configured with an existing
-`EventHubConnection` instance, the caller owns that connection and closes it after its providers have stopped.
+Orleans closes its producer and connections created from a connection string or credentials. The caller owns
+connections supplied through a connection factory or an existing `EventHubConnection` instance and closes them
+after their providers have stopped.
 
 The default factory defers activation until `CreateAdapter`, after the stream provider
 has acquired the factory, so initialization failures use the same asynchronous cleanup path as shutdown. The factory
 owns connections it creates even if producer construction fails.
 
-Each partition's adapter receiver also owns its factory-created connection. It closes that connection after closing
+Each partition's adapter receiver also owns its internally created connection. It closes that connection after closing
 the partition receiver on shutdown or partition handoff, including when initialization or checkpoint flushing fails.
-Connections supplied through the connection-instance overload remain caller-owned on both producer and receiver paths.
+Connections supplied through the factory and connection-instance overloads remain caller-owned on both producer and receiver paths.
 Receiver and connection cleanup failures are logged individually, even after the shutdown wait times out, and combined
 when both fail before shutdown completes.
 

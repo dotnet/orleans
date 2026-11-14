@@ -22,6 +22,23 @@ public sealed class EventHubReceiverConnectionTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(30);
 
+    [Fact]
+    public async Task Shutdown_PreservesConnectionSuppliedByFactory()
+    {
+        await using var connection = new TrackingConnection();
+        var settings = CreateSettings(connection, false, () => connection);
+        settings.Hub.ConfigureEventHubConnection(
+            "Endpoint=sb://localhost;SharedAccessKeyName=test;SharedAccessKey=dGVzdA==", "events", "$Default");
+        settings.Hub.ConfigureEventHubConnection(_ => connection, "events", "$Default");
+        var receiver = CreateReceiver(settings);
+        await receiver.Initialize(TestTimeout);
+
+        await receiver.Shutdown(TestTimeout);
+
+        Assert.False(connection.IsClosed);
+        Assert.Equal(0, connection.CloseCount);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -373,6 +390,9 @@ public sealed class EventHubReceiverConnectionTests
         if (ownsConnection)
         {
             hub.ConfigureEventHubConnection(_ => createConnection(), "events", "$Default");
+            // Substitute tracked connections for those created by the provider.
+            typeof(EventHubOptions).GetProperty("OwnsConnection", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(hub, true);
         }
         else
         {

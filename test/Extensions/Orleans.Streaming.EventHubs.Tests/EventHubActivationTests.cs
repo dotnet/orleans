@@ -86,6 +86,47 @@ public sealed class EventHubActivationTests
         await Assert.ThrowsAsync<ObjectDisposedException>(() => factory.CreateAdapter());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Shutdown_PreservesConnectionsSuppliedByFactory(bool buffered)
+    {
+        await using var connection = new TrackingConnection();
+        using var host = CreateHost(connection, false, buffered, false, null, suppliedFactory: true);
+        var factory = Assert.IsType<EventHubAdapterFactory>(
+            host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(ProviderName));
+        factory.Init();
+
+        await factory.ShutdownAsync(CancellationToken.None);
+
+        Assert.False(connection.IsClosed);
+        Assert.Equal(0, connection.CloseCount);
+    }
+
+    [Fact]
+    public async Task InitializationFailure_PreservesCleanupFailure()
+    {
+        await using var connection = new TrackingConnection();
+        using var host = CreateHost(connection, false, false, true, null, failConstruction: true);
+        var provider = Assert.IsType<PersistentStreamProvider>(
+            host.Services.GetRequiredKeyedService<IStreamProvider>(ProviderName));
+        var cleanupFailure = new InvalidOperationException("connection cleanup failed");
+        connection.CloseFailure = cleanupFailure;
+        try
+        {
+            var failure = await Assert.ThrowsAsync<AggregateException>(
+                () => Initialize(provider, TestContext.Current.CancellationToken)
+                    .WaitAsync(Timeout, TestContext.Current.CancellationToken));
+
+            Assert.Equal("ConnectionOptions", Assert.IsType<ArgumentNullException>(failure.InnerExceptions[0]).ParamName);
+            Assert.Same(cleanupFailure, failure.InnerExceptions[1]);
+        }
+        finally
+        {
+            connection.CloseFailure = null;
+        }
+    }
+
     [Fact]
     public async Task InitializationFailure_CancellationBoundsTheCleanupWait()
     {
@@ -197,7 +238,7 @@ public sealed class EventHubActivationTests
 
     private static IHost CreateHost(
         TrackingConnection connection, bool genericRegistration, bool buffered, bool ownsConnection,
-        Exception? lateFailure, bool failConstruction = false)
+        Exception? lateFailure, bool failConstruction = false, bool suppliedFactory = false)
         => new HostBuilder()
             .ConfigureLogging(logging => logging.AddProvider(new InitializationLogger(lateFailure)))
             .UseOrleansClient(client =>
@@ -217,6 +258,13 @@ public sealed class EventHubActivationTests
                 client.Services.AddOptions<EventHubOptions>(ProviderName).Configure(options =>
                 {
                     if (ownsConnection)
+                    {
+                        options.ConfigureEventHubConnection(_ => connection, "events", "$Default");
+                        // Substitute a tracked connection for one created by the provider.
+                        typeof(EventHubOptions).GetProperty("OwnsConnection", BindingFlags.Instance | BindingFlags.NonPublic)!
+                            .SetValue(options, true);
+                    }
+                    else if (suppliedFactory)
                     {
                         options.ConfigureEventHubConnection(_ => connection, "events", "$Default");
                     }

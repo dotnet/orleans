@@ -231,9 +231,11 @@ public sealed class EventHubShutdownTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HostShutdown_WaitsForDetachedReceiverDrainAndClosesAfterDrainFailure(bool genericRegistration)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task HostShutdown_WaitsForDetachedReceiverDrainAndPreservesFailures(bool genericRegistration, bool failShutdown)
     {
         var silos = new ConcurrentDictionary<string, TrackingFactory>();
         var clients = new ConcurrentDictionary<string, TrackingFactory>();
@@ -248,9 +250,17 @@ public sealed class EventHubShutdownTests
         var provider = host.Services.GetRequiredKeyedService<IStreamProvider>("owned");
         typeof(PersistentStreamProvider).GetField("pullingAgentManager", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(provider, manager);
+        var shutdownFailure = new InvalidOperationException("adapter shutdown failed");
         foreach (var factory in silos.Values.Concat(clients.Values))
         {
-            factory.Client.CloseRelease.SetResult();
+            if (failShutdown && ReferenceEquals(factory, silos["owned"]))
+            {
+                factory.Client.CloseRelease.SetException(shutdownFailure);
+            }
+            else
+            {
+                factory.Client.CloseRelease.SetResult();
+            }
         }
 
         using var cancellation = new CancellationTokenSource();
@@ -269,7 +279,19 @@ public sealed class EventHubShutdownTests
         var failure = new InvalidOperationException("receiver drain failed");
         manager.Drain.SetException(failure);
         await silos["owned"].ShutdownCalled.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken);
-        await silos["owned"].Inner.ShutdownAsync(CancellationToken.None).WaitAsync(Timeout, TestContext.Current.CancellationToken);
+        var shutdown = (Task)typeof(PersistentStreamProvider)
+            .GetField("adapterShutdownTask", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(provider)!;
+        var actual = await Record.ExceptionAsync(() => shutdown.WaitAsync(Timeout, TestContext.Current.CancellationToken));
+        if (failShutdown)
+        {
+            Assert.Equal(new[] { failure, shutdownFailure }, Assert.IsType<AggregateException>(actual).InnerExceptions);
+            Assert.Contains(logs.Errors, exception => ReferenceEquals(exception, shutdownFailure));
+        }
+        else
+        {
+            Assert.Same(failure, actual);
+        }
+
         Assert.True(silos["owned"].Connection.IsClosed);
         Assert.Contains(logs.Errors, exception => ReferenceEquals(exception, failure));
     }
@@ -341,6 +363,9 @@ public sealed class EventHubShutdownTests
             if (name == "owned")
             {
                 options.ConfigureEventHubConnection(_ => connection, "events", "$Default");
+                // Substitute a tracked connection for one created by the provider.
+                typeof(EventHubOptions).GetProperty("OwnsConnection", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(options, true);
             }
             else
             {

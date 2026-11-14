@@ -177,8 +177,8 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided delegate.
         /// </summary>
-        /// <remarks>Orleans owns each connection returned by the delegate. Use the connection-instance overload for a caller-owned shared connection.</remarks>
-        /// <param name="createConnection">The delegate which creates a new, provider-owned Event Hub connection for each invocation.</param>
+        /// <remarks>The caller owns the connections returned by the delegate and closes them after all providers using them have stopped.</remarks>
+        /// <param name="createConnection">The delegate used to create Event Hub connections.</param>
         /// <param name="eventHubName">The Event Hub name.</param>
         /// <param name="consumerGroup">The consumer group name.</param>
         public void ConfigureEventHubConnection(CreateConnectionDelegate createConnection, string eventHubName, string consumerGroup)
@@ -186,7 +186,7 @@ namespace Orleans.Configuration
             EventHubName = eventHubName;
             ConsumerGroup = consumerGroup;
             ValidateValues(eventHubName, consumerGroup);
-            OwnsConnection = true;
+            OwnsConnection = false;
             CreateConnection = createConnection ?? throw new ArgumentNullException(nameof(createConnection));
         }
 

@@ -138,7 +138,15 @@ namespace Orleans.Providers.Streams.Common
             catch (Exception exception)
             {
                 LogErrorInitializingAdapter(exception, Name);
-                await ShutdownAdapter(token);
+                try
+                {
+                    await ShutdownAdapter(token);
+                }
+                catch (Exception cleanupException)
+                {
+                    throw new AggregateException(exception, cleanupException);
+                }
+
                 throw;
             }
         }
@@ -217,9 +225,15 @@ namespace Orleans.Providers.Streams.Common
 
         private async Task ShutdownAdapterCore()
         {
+            Exception? stopException = null;
             try
             {
                 await GetPullingAgentStopTask();
+            }
+            catch (Exception exception)
+            {
+                stopException = exception;
+                throw;
             }
             finally
             {
@@ -233,6 +247,11 @@ namespace Orleans.Providers.Streams.Common
                     catch (Exception exception)
                     {
                         LogErrorShuttingDownAdapter(exception, Name);
+                        if (stopException is not null)
+                        {
+                            throw new AggregateException(stopException, exception);
+                        }
+
                         throw;
                     }
                 }
