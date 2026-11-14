@@ -6,7 +6,7 @@ CREATE TABLE OrleansTransactionKeyTable  (
   Metadata LONGBLOB NULL,
   Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (StateId)
-);
+) ENGINE=InnoDB;
 
 -- Orleans Transaction State Table for mysql
 CREATE TABLE OrleansTransactionStateTable  (
@@ -20,4 +20,4 @@ CREATE TABLE OrleansTransactionStateTable  (
   Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (StateId, SequenceId),
   INDEX IX_State_Seq(StateId, SequenceId) USING BTREE
-);
+) ENGINE=InnoDB;

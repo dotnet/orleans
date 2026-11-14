@@ -74,7 +74,7 @@ internal static class AdoNetTransactionServicecollectionExtensions
         services.AddTransient<IConfigurationValidator>(sp => new TransactionalStateStorageOptionsValidator(
             sp.GetRequiredService<IOptionsMonitor<TransactionalStateStorageOptions>>().Get(name),
             name));
-        services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetRequiredKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+        services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)!);
         services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => TransactionalStateStorageFactory.Create(sp, (string)key!));
         services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(name));
 

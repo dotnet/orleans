@@ -66,14 +66,15 @@ public class TransactionalStateStorageFactory : ITransactionalStateStorageFactor
 
     private string MakePartitionKey(IGrainContext context, string stateName)
     {
-        string grainKey = context.GrainReference.GrainId.ToString();
-        var key = CreateStateId(grainKey, clusterOptions.ServiceId, stateName);
+        var key = CreateStateId(context.GrainReference.GrainId, clusterOptions.ServiceId, stateName);
         return ValidateStateId(key);
     }
 
-    internal static string CreateStateId(string grainKey, string serviceId, string stateName)
+    internal static string CreateStateId(GrainId grainId, string serviceId, string stateName)
     {
-        var value = $"{grainKey.Length}:{grainKey}{serviceId.Length}:{serviceId}{stateName.Length}:{stateName}";
+        var grainType = grainId.Type.ToString();
+        var grainKey = grainId.Key.ToString();
+        var value = $"{grainType.Length}:{grainType}{grainKey.Length}:{grainKey}{serviceId.Length}:{serviceId}{stateName.Length}:{stateName}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     }
 

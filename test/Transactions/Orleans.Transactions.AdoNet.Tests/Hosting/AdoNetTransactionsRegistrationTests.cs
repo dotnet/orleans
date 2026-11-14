@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AdoNet.Storage;
 using Orleans.Transactions.AdoNet.TransactionalState;
 using Xunit;
@@ -89,6 +90,17 @@ public sealed class AdoNetTransactionsRegistrationTests
 
         Assert.Equal(TransactionalStateStorageOptions.DEFAULT_ADONET_INVARIANT, options.Invariant);
         Assert.Equal(8, options.ExecuteSqlDictionary.Count);
+    }
+
+    [Fact]
+    public void AddAdoNetTransactionalStateStorage_NamedProviderLeavesDefaultFactoryOptional()
+    {
+        var builder = new TestSiloBuilder();
+        builder.AddAdoNetTransactionalStateStorage("transactions");
+
+        using var services = builder.Services.BuildServiceProvider();
+
+        Assert.Null(services.GetService<ITransactionalStateStorageFactory>());
     }
 
     [Fact]

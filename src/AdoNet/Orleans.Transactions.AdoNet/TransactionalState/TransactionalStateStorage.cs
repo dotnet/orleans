@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Orleans.Hosting;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AdoNet.Entity;
 using Orleans.Transactions.AdoNet.Storage;
@@ -45,6 +46,13 @@ public partial class TransactionalStateStorage<TState> : ITransactionalStateStor
         this.logger = logger;
         this.jsonSettings = jsonSettings;
         this.jsonSettings.DefaultValueHandling = DefaultValueHandling.Include;
+        lock (options.ExecuteSqlDictionary)
+        {
+            if (options.ExecuteSqlDictionary.Count == 0)
+            {
+                options.InitExecuteSqlDic();
+            }
+        }
         this.storage = RelationalStorage.CreateInstance(this.options.Invariant, this.options.ConnectionString);
     }
 

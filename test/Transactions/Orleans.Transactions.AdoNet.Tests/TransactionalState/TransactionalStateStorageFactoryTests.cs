@@ -3,6 +3,7 @@
 
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Orleans.Runtime;
 using Orleans.Transactions.AdoNet.Tests.Fakes;
 using Orleans.Transactions.AdoNet.TransactionalState;
 using Xunit;
@@ -50,8 +51,18 @@ public sealed class TransactionalStateStorageFactoryTests
     [Fact]
     public void CreateStateId_ComponentBoundariesDoNotCollide()
     {
-        var first = TransactionalStateStorageFactory.CreateStateId("grain", "A", "B_C");
-        var second = TransactionalStateStorageFactory.CreateStateId("grain", "A_B", "C");
+        var grainId = GrainId.Create("grain", "key");
+        var first = TransactionalStateStorageFactory.CreateStateId(grainId, "A", "B_C");
+        var second = TransactionalStateStorageFactory.CreateStateId(grainId, "A_B", "C");
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
+    public void CreateStateId_GrainTypeAndKeyBoundariesDoNotCollide()
+    {
+        var first = TransactionalStateStorageFactory.CreateStateId(GrainId.Create("a/b", "c"), "service", "state");
+        var second = TransactionalStateStorageFactory.CreateStateId(GrainId.Create("a", "b/c"), "service", "state");
 
         Assert.NotEqual(first, second);
     }
@@ -59,8 +70,9 @@ public sealed class TransactionalStateStorageFactoryTests
     [Fact]
     public void CreateStateId_IsStableAndFixedLength()
     {
-        var first = TransactionalStateStorageFactory.CreateStateId("grain", "service", "state");
-        var second = TransactionalStateStorageFactory.CreateStateId("grain", "service", "state");
+        var grainId = GrainId.Create("grain", "key");
+        var first = TransactionalStateStorageFactory.CreateStateId(grainId, "service", "state");
+        var second = TransactionalStateStorageFactory.CreateStateId(grainId, "service", "state");
 
         Assert.Equal(first, second);
         Assert.Equal(64, first.Length);

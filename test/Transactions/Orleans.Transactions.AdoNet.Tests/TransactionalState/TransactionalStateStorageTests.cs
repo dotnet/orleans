@@ -5,7 +5,9 @@ using System.Data;
 using System.Reflection;
 using System.Text;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
+using Orleans.Hosting;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AdoNet.Entity;
 using Orleans.Transactions.AdoNet.Tests.Fakes;
@@ -37,6 +39,23 @@ public sealed class TransactionalStateStorageTests
     }
 
     private static readonly JsonSerializerSettings s_jsonSettings = new();
+
+    [Fact]
+    public void Constructor_InitializesSqlQueriesForDirectConstruction()
+    {
+        var options = new TransactionalStateStorageOptions
+        {
+            ConnectionString = "Server=localhost;Database=orleans"
+        };
+
+        _ = new TransactionalStateStorage<SimpleState>(
+            "state-id",
+            new JsonSerializerSettings(),
+            options,
+            NullLogger<TransactionalStateStorage<SimpleState>>.Instance);
+
+        Assert.Equal(8, options.ExecuteSqlDictionary.Count);
+    }
 
     /// <summary>
     /// Serialise <paramref name="obj"/> to UTF-8 bytes using plain Newtonsoft.Json.
