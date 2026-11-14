@@ -336,6 +336,37 @@ public class InvokableObjectManagerTests
     }
 
     [Fact]
+    public async Task StopAsync_PreservesCancellationWhileTargetIsInitializing()
+    {
+        await using var fixture = new ManagerFixture();
+        var request = new DeferredCancellationTestInvokable();
+        var message = fixture.Request(11, request);
+        var control = new CancellationControlInvokable(message.SendingGrain, message.Id);
+        control.Release.TrySetResult();
+        var cancellation = fixture.Request(91, control, alwaysInterleave: true);
+
+        try
+        {
+            fixture.Manager.Dispatch(message);
+            await fixture.WaitAsync(request.TargetEntered.Task, "11: target initialization entered");
+            fixture.Manager.Dispatch(cancellation);
+            await fixture.WaitAsync(control.CancellationSent.Task, "91: cancellation retained during initialization");
+
+            var stop = fixture.StopAsync();
+            fixture.AssertPending(stop, "11: target initialization held");
+            request.ReleaseTarget();
+
+            await fixture.WaitAsync(stop, "retained cancellation and shutdown drain");
+            fixture.AssertException<TaskCanceledException>(message);
+            fixture.AssertCompletedControl(cancellation, control);
+        }
+        finally
+        {
+            request.ReleaseTarget();
+        }
+    }
+
+    [Fact]
     public async Task CancelRequestAsync_ReleasesQueuedAdmissionExactlyOnce()
     {
         await using var fixture = new ManagerFixture(registerObserver: false);

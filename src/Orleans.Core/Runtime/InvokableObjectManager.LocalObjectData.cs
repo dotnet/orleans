@@ -615,9 +615,6 @@ internal partial class InvokableObjectManager
                     return new ValueTask(existingDisposeTask);
                 }
 
-                _pendingCancellations.Clear();
-                _pendingCancellationOrder.Clear();
-
                 extension = _asyncEnumerableExtension;
                 Volatile.Write(ref _asyncEnumerableExtension, null);
 

@@ -192,6 +192,82 @@ public class AsyncEnumerableGrainObserverExtensionTests
     }
 
     [Fact]
+    public async Task CleanupLoop_ReusesTimerAcrossConsecutiveEnumerations()
+    {
+        var timeProvider = new TrackingTimeProvider();
+        await using var extension = CreateExtension(timeProvider);
+        var firstId = Guid.NewGuid();
+
+        await extension.StartEnumeration(firstId, CreateRequest(1, 2), CancellationToken.None);
+        await extension.DisposeAsync(firstId, CancellationToken.None);
+        await extension.StartEnumeration(Guid.NewGuid(), CreateRequest(3, 4), CancellationToken.None);
+
+        Assert.Equal(1, timeProvider.PeriodicTimerCount);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_AfterIdleCleanupLoopStops_Completes()
+    {
+        var timeProvider = new TrackingTimeProvider();
+        var extension = CreateExtension(timeProvider);
+        var requestId = Guid.NewGuid();
+
+        await extension.StartEnumeration(requestId, CreateRequest(1, 2), CancellationToken.None);
+        await extension.DisposeAsync(requestId, CancellationToken.None);
+        timeProvider.Clock.Advance(TimeSpan.FromSeconds(30));
+        await timeProvider.TimerDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        await extension.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    private static AsyncEnumerableGrainObserverExtension CreateExtension(TimeProvider timeProvider) =>
+        new(
+            Substitute.For<IGrainContext>(),
+            timeProvider,
+            Options.Create(new SiloMessagingOptions { ResponseTimeout = TimeSpan.FromSeconds(30) }),
+            NullLogger<AsyncEnumerableGrainObserverExtension>.Instance);
+
+    private sealed class TrackingTimeProvider : TimeProvider
+    {
+        private int _periodicTimerCount;
+        public FakeTimeProvider Clock { get; } = new();
+        public TaskCompletionSource TimerDisposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int PeriodicTimerCount => Volatile.Read(ref _periodicTimerCount);
+        public override DateTimeOffset GetUtcNow() => Clock.GetUtcNow();
+        public override long GetTimestamp() => Clock.GetTimestamp();
+        public override long TimestampFrequency => Clock.TimestampFrequency;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = Clock.CreateTimer(callback, state, dueTime, period);
+            if (period != Timeout.InfiniteTimeSpan)
+            {
+                Interlocked.Increment(ref _periodicTimerCount);
+                return new TrackingTimer(timer, TimerDisposed);
+            }
+
+            return timer;
+        }
+
+        private sealed class TrackingTimer(ITimer inner, TaskCompletionSource disposed) : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => inner.Change(dueTime, period);
+
+            public void Dispose()
+            {
+                inner.Dispose();
+                disposed.TrySetResult();
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                await inner.DisposeAsync();
+                disposed.TrySetResult();
+            }
+        }
+    }
+
+    [Fact]
     public async Task MoveNext_ClientTokenCanceledWhileParked_ReturnsCanceled()
     {
         await using var extension = CreateExtension();

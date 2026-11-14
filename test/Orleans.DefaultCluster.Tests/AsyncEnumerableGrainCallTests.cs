@@ -219,6 +219,10 @@ public sealed class AsyncEnumerableExtensionListener : IObserver<KeyValuePair<st
 /// Orleans uses a grain extension mechanism to manage the lifecycle of async enumerators
 /// across the distributed system.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestCategory("BVT")]
+[TestCategory("Observable")]
 [Collection(AsyncEnumerableGrainCallTestCollection.Name)]
 public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
 {
