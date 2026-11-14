@@ -126,8 +126,10 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ns">The namespace.</param>
         /// <param name="key">The key.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
         public static StreamId Create(string? ns, string key)
         {
+            ArgumentNullException.ThrowIfNull(key);
             if (ns is null)
                 return new StreamId(Encoding.UTF8.GetBytes(key), 0);
 
@@ -143,7 +145,12 @@ namespace Orleans.Runtime
         /// Initializes a new instance of the <see cref="StreamId"/> struct.
         /// </summary>
         /// <param name="streamIdentity">The stream identity.</param>
-        public static StreamId Create(IStreamIdentity streamIdentity) => Create(streamIdentity.Namespace, streamIdentity.Guid);
+        /// <exception cref="ArgumentNullException"><paramref name="streamIdentity"/> is <see langword="null"/>.</exception>
+        public static StreamId Create(IStreamIdentity streamIdentity)
+        {
+            ArgumentNullException.ThrowIfNull(streamIdentity);
+            return Create(streamIdentity.Namespace, streamIdentity.Guid);
+        }
 
         /// <inheritdoc/>
         public int CompareTo(StreamId other) => fullKey.AsSpan().SequenceCompareTo(other.fullKey);
@@ -171,8 +178,10 @@ namespace Orleans.Runtime
         public static bool operator !=(StreamId s1, StreamId s2) => !s2.Equals(s1);
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="info"/> is <see langword="null"/>.</exception>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            ArgumentNullException.ThrowIfNull(info);
             info.AddValue("fk", fullKey);
             info.AddValue("ki", this.keyIndex);
             info.AddValue("fh", this.hash);
@@ -307,8 +316,10 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> is <see langword="null"/>.</exception>
         public override void Write(Utf8JsonWriter writer, StreamId value, JsonSerializerOptions options)
         {
+            ArgumentNullException.ThrowIfNull(writer);
             if (value == default || value.Key.IsEmpty)
             {
                 throw new JsonException($"Could not serialize {nameof(StreamId)}.");
@@ -336,8 +347,12 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> is <see langword="null"/>.</exception>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] StreamId value, JsonSerializerOptions options)
-            => writer.WritePropertyName(FormatPropertyName(value));
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            writer.WritePropertyName(FormatPropertyName(value));
+        }
 
         internal static string FormatPropertyName(StreamId value)
         {

@@ -40,7 +40,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="dimensions">The cache metric dimensions.</param>
         /// <param name="instruments">The Orleans runtime instruments.</param>
         public DefaultCacheMonitor(CacheMonitorDimensions dimensions, OrleansInstruments instruments)
-            : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
+            : this(CreateDimensions(dimensions), GetMeter(instruments))
         {
         }
 
@@ -50,8 +50,20 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="dimensions">The dimensions attached to metrics reported by this monitor.</param>
         /// <param name="instruments">The Orleans runtime instruments.</param>
         protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
-            : this(dimensions, instruments.Meter)
+            : this(dimensions, GetMeter(instruments))
         {
+        }
+
+        private static KeyValuePair<string, object>[] CreateDimensions(CacheMonitorDimensions dimensions)
+        {
+            if (dimensions is null) throw new ArgumentNullException(nameof(dimensions));
+            return [new("QueueId", dimensions.QueueId)];
+        }
+
+        private static Meter GetMeter(OrleansInstruments instruments)
+        {
+            if (instruments is null) throw new ArgumentNullException(nameof(instruments));
+            return instruments.Meter;
         }
 
         private DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)

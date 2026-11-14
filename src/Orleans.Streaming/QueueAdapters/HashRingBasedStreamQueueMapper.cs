@@ -17,7 +17,10 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="options">The options.</param>
         /// <param name="queueNamePrefix">The queue name prefix.</param>
-        public HashRingBasedStreamQueueMapper(HashRingStreamQueueMapperOptions options, string queueNamePrefix) : this(options.TotalQueueCount, queueNamePrefix) { }
+        public HashRingBasedStreamQueueMapper(HashRingStreamQueueMapperOptions options, string queueNamePrefix)
+            : this((options ?? throw new ArgumentNullException(nameof(options))).TotalQueueCount, queueNamePrefix)
+        {
+        }
 
         internal HashRingBasedStreamQueueMapper(int numQueues, string queueNamePrefix)
         {
@@ -43,6 +46,7 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public IEnumerable<QueueId> GetQueuesForRange(IRingRange range)
         {
+            ArgumentNullException.ThrowIfNull(range);
             var ls = new List<QueueId>();
             foreach (QueueId queueId in hashRing.GetAllRingMembers())
             {
@@ -78,7 +82,7 @@ namespace Orleans.Streams
         /// <param name="partitionIds">List of partitions</param>
         /// <param name="queueNamePrefix">Prefix for QueueIds.  Must be unique per stream provider</param>
         public HashRingBasedPartitionedStreamQueueMapper(IReadOnlyList<string> partitionIds, string queueNamePrefix)
-            : base(partitionIds.Count, queueNamePrefix)
+            : base((partitionIds ?? throw new ArgumentNullException(nameof(partitionIds))).Count, queueNamePrefix)
         {
             var queues = (QueueId[])GetAllQueues();
             _partitions = new(queues.Length);

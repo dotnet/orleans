@@ -13,6 +13,23 @@ public class EventHubDataAdapterTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [TestArea("Streaming")]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public void EventDataExtensionsRejectNullInputs()
+    {
+        var eventData = new EventData();
+        var serializer = CreateSerializer();
+        var emptyBytes = new ArraySegment<byte>([]);
+
+        Assert.Throws<ArgumentNullException>("eventData", () => EventDataExtensions.SetStreamNamespaceProperty(null!, null));
+        Assert.Throws<ArgumentNullException>("eventData", () => EventDataExtensions.GetStreamNamespaceProperty(null!));
+        Assert.Throws<ArgumentNullException>("eventData", () => EventDataExtensions.SerializeProperties(null!, serializer));
+        Assert.Throws<ArgumentNullException>("serializer", () => eventData.SerializeProperties(null!));
+        Assert.Throws<ArgumentNullException>("serializer", () => emptyBytes.DeserializeProperties(null!));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
     [InlineData(false)]
     [InlineData(true)]
