@@ -208,7 +208,7 @@ public partial class TransactionalStateStorage<TState> : ITransactionalStateStor
         {
             await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Add, keyEntity)).ConfigureAwait(false);
 
-            LogTraceInsertWithCount(stateId,keyEntity.CommittedSequenceId, metadata.CommitRecords.Count);
+            LogTraceInsertWithCount(stateId, keyEntity.CommittedSequenceId, metadata.CommitRecords.Count);
         }
         else
         {
@@ -277,6 +277,11 @@ public partial class TransactionalStateStorage<TState> : ITransactionalStateStor
         }
 
         await batchOperation.Flush().ConfigureAwait(false);
+
+        foreach (var state in stateEntityList)
+        {
+            state.Value.StateData = null;
+        }
 
         LogDebugStoredETag(stateId, keyEntity.CommittedSequenceId, keyEntity.ETag);
 

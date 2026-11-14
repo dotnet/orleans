@@ -37,7 +37,7 @@ internal class StateEntity : IEntity
             SequenceId = pendingState.SequenceId,
             TransactionId = pendingState.TransactionId,
             TransactionTimestampTicks = pendingState.TimeStamp.ToUniversalTime().Ticks,
-            TransactionManager = JsonUtils.SerializeWithNewtonsoftJson(pendingState.TransactionManager,jsonSettings),
+            TransactionManager = JsonUtils.SerializeWithNewtonsoftJson(pendingState.TransactionManager, jsonSettings),
             StateData = JsonUtils.SerializeWithNewtonsoftJson(pendingState.State, jsonSettings),
         };
 

@@ -111,7 +111,7 @@ public sealed class TransactionalStateStorageTests
     private static TransactionalStateMetaData EmptyMeta() => new()
     {
         CommitRecords = new Dictionary<Guid, CommitRecord>(),
-        TimeStamp     = DateTime.UtcNow
+        TimeStamp = DateTime.UtcNow
     };
 
     private static IReadOnlyList<KeyValuePair<long, StateEntity>> GetTrackedStates(
@@ -199,17 +199,17 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-1",
+            StateId = "test-state-id",
+            ETag = "etag-1",
             CommittedSequenceId = 1,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateEntity = new StateEntity
         {
-            StateId    = "test-state-id",
+            StateId = "test-state-id",
             SequenceId = 1,
-            ETag       = "etag-1",
-            StateData   = Serialize(new SimpleState { Name = "Alice", Value = 42 }),
+            ETag = "etag-1",
+            StateData = Serialize(new SimpleState { Name = "Alice", Value = 42 }),
             TransactionManager = null!,
         };
         SetupFakeRows(fake, opts, keyEntity, new[] { stateEntity });
@@ -227,17 +227,17 @@ public sealed class TransactionalStateStorageTests
         var expected = new SimpleState { Name = "Alice", Value = 42 };
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-1",
+            StateId = "test-state-id",
+            ETag = "etag-1",
             CommittedSequenceId = 1,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateEntity = new StateEntity
         {
-            StateId    = "test-state-id",
+            StateId = "test-state-id",
             SequenceId = 1,
-            ETag       = "etag-1",
-            StateData   = Serialize(expected),
+            ETag = "etag-1",
+            StateData = Serialize(expected),
             TransactionManager = null!,
         };
         SetupFakeRows(fake, opts, keyEntity, new[] { stateEntity });
@@ -255,10 +255,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-1",
+            StateId = "test-state-id",
+            ETag = "etag-1",
             CommittedSequenceId = 0,  // No committed state yet, but key row exists
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         SetupFakeRows(fake, opts, keyEntity, stateEntities: null);
 
@@ -277,10 +277,10 @@ public sealed class TransactionalStateStorageTests
         // Key says committed = 5, but no state row with SequenceId=5.
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-1",
+            StateId = "test-state-id",
+            ETag = "etag-1",
             CommittedSequenceId = 5,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         SetupFakeRows(fake, opts, keyEntity, stateEntities: null); // no state rows
 
@@ -298,10 +298,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-1",
+            StateId = "test-state-id",
+            ETag = "etag-1",
             CommittedSequenceId = 1,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var secondTimestamp = new DateTimeOffset(2025, 1, 2, 3, 4, 5, TimeSpan.Zero);
         var thirdTimestamp = secondTimestamp.AddMinutes(1);
@@ -352,10 +352,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-1",
+            StateId = "test-state-id",
+            ETag = "etag-1",
             CommittedSequenceId = 1,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateRows = new[]
         {
@@ -397,7 +397,9 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId = "test-state-id", ETag = "correct-etag", CommittedSequenceId = 0,
+            StateId = "test-state-id",
+            ETag = "correct-etag",
+            CommittedSequenceId = 0,
             Metadata = Serialize(EmptyMeta()),
         };
         SetupFakeRows(fake, opts, keyEntity);
@@ -492,10 +494,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",
+            StateId = "test-state-id",
+            ETag = "etag-k",
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateRows = new[]
         {
@@ -527,10 +529,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",
+            StateId = "test-state-id",
+            ETag = "etag-k",
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateRows = new[]
         {
@@ -555,7 +557,9 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId = "test-state-id", ETag = "etag-k", CommittedSequenceId = 0,
+            StateId = "test-state-id",
+            ETag = "etag-k",
+            CommittedSequenceId = 0,
             Metadata = Serialize(EmptyMeta())
         };
         var stateRows = new[]
@@ -594,11 +598,17 @@ public sealed class TransactionalStateStorageTests
 
         var addStateSql = opts.ExecuteSqlDictionary[Constants.AddStateSql];
         var ops = fake.TransactionCallLog.SelectMany(call => call).ToList();
-        Assert.Contains(ops, t => t.Item1 == addStateSql);
+        Assert.Contains(ops, operation => operation.Item1 == addStateSql);
+        var writtenState = Assert.Single(
+            fake.TransactionStateDataLog.SelectMany(call => call),
+            operation => operation.Sql == addStateSql);
+        Assert.Equal(
+            Serialize(statesToPrepare[0].State),
+            writtenState.StateData);
         var tracked = Assert.Single(GetTrackedStates(sut));
         Assert.Equal(1L, tracked.Key);
         Assert.Equal("tx-1", tracked.Value.TransactionId);
-        Assert.Equal("X", JsonUtils.DeserializeWithNewtonsoftJson<SimpleState>(Assert.IsType<byte[]>(tracked.Value.StateData), s_jsonSettings).Name);
+        Assert.Null(tracked.Value.StateData);
     }
 
     [Fact]
@@ -647,10 +657,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",
+            StateId = "test-state-id",
+            ETag = "etag-k",
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         // SequenceId=1 already exists with ETag="e1"
         var stateRows = new[]
@@ -673,10 +683,16 @@ public sealed class TransactionalStateStorageTests
         var ops = fake.TransactionCallLog.SelectMany(call => call).ToList();
         Assert.Equal("etag-k", Assert.Single(fake.TransactionETagCallLog));
         Assert.Equal(opts.ExecuteSqlDictionary[Constants.UpdateKeySql], ops[0].Item1);
-        Assert.Contains(ops, t => t.Item1 == updateStateSql);
+        Assert.Contains(ops, operation => operation.Item1 == updateStateSql);
+        var writtenState = Assert.Single(
+            fake.TransactionStateDataLog.SelectMany(call => call),
+            operation => operation.Sql == updateStateSql);
+        Assert.Equal(
+            Serialize(statesToPrepare[0].State),
+            writtenState.StateData);
         var tracked = Assert.Single(GetTrackedStates(sut));
         Assert.Equal("tx-1", tracked.Value.TransactionId);
-        Assert.Equal("Updated", JsonUtils.DeserializeWithNewtonsoftJson<SimpleState>(Assert.IsType<byte[]>(tracked.Value.StateData), s_jsonSettings).Name);
+        Assert.Null(tracked.Value.StateData);
     }
 
     [Fact]
@@ -685,10 +701,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",
+            StateId = "test-state-id",
+            ETag = "etag-k",
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateRows = new[]
         {
@@ -723,10 +739,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",
+            StateId = "test-state-id",
+            ETag = "etag-k",
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         SetupFakeRows(fake, opts, keyEntity);
         await sut.Load();
@@ -749,10 +765,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",
+            StateId = "test-state-id",
+            ETag = "etag-k",
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateRows = new[]
         {
@@ -785,18 +801,18 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",  // non-empty → Load doesn't treat as fresh
+            StateId = "test-state-id",
+            ETag = "etag-k",  // non-empty → Load doesn't treat as fresh
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         // State entity SequenceId=1 has an empty ETag — guard should fire during Delete.
         var stateRow = new StateEntity
         {
-            StateId    = "test-state-id",
+            StateId = "test-state-id",
             SequenceId = 1,
-            ETag       = "",              // <-- empty ETag triggers the guard
-            StateData   = Serialize(new SimpleState()),
+            ETag = "",              // <-- empty ETag triggers the guard
+            StateData = Serialize(new SimpleState()),
             TransactionManager = null!,
         };
         SetupFakeRows(fake, opts, keyEntity, new[] { stateRow });
@@ -815,13 +831,18 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId = "test-state-id", ETag = "etag-k", CommittedSequenceId = 0,
+            StateId = "test-state-id",
+            ETag = "etag-k",
+            CommittedSequenceId = 0,
             Metadata = Serialize(EmptyMeta())
         };
         var stateEntity = new StateEntity
         {
-            StateId = "different-state-id", SequenceId = 1, ETag = "e1",
-            StateData = Serialize(new SimpleState()), TransactionManager = null!
+            StateId = "different-state-id",
+            SequenceId = 1,
+            ETag = "e1",
+            StateData = Serialize(new SimpleState()),
+            TransactionManager = null!
         };
         SetupFakeRows(fake, opts, keyEntity, new[] { stateEntity });
         await sut.Load();
@@ -845,10 +866,10 @@ public sealed class TransactionalStateStorageTests
         var (sut, fake, opts) = StorageTestHarness.Create<SimpleState>();
         var keyEntity = new KeyEntity
         {
-            StateId             = "test-state-id",
-            ETag                = "etag-k",
+            StateId = "test-state-id",
+            ETag = "etag-k",
             CommittedSequenceId = 0,
-            Metadata            = Serialize(EmptyMeta()),
+            Metadata = Serialize(EmptyMeta()),
         };
         var stateRows = new[]
         {
@@ -869,7 +890,7 @@ public sealed class TransactionalStateStorageTests
         };
         var firstETag = await sut.Store("etag-k", EmptyMeta(), pending3, null, null);
 
-        var addStateSql    = opts.ExecuteSqlDictionary[Constants.AddStateSql];
+        var addStateSql = opts.ExecuteSqlDictionary[Constants.AddStateSql];
         var updateStateSql = opts.ExecuteSqlDictionary[Constants.UpdateStateSql];
         var ops1 = fake.TransactionCallLog.SelectMany(c => c).ToList();
         Assert.Contains(ops1, t => t.Item1 == addStateSql);

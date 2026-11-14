@@ -107,7 +107,7 @@ internal static class ExecuteSqlExtensions
         {
             nameof(KeyEntity.StateId)
         }, null, options.SqlParameterDot);
-        options.ExecuteSqlDictionary.Add(Constants.QueryKeySql,queryKeySql);
+        options.ExecuteSqlDictionary.Add(Constants.QueryKeySql, queryKeySql);
 
         var addKeySql = ActionToSql.InsertSql(options.KeyEntityTableName, new List<string>() {
             nameof(KeyEntity.StateId),nameof(KeyEntity.CommittedSequenceId),

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace Orleans.Transactions.AdoNet.Utils;
+
 internal static class ActionToSql
 {
     public static string InsertSql(string tableName, IReadOnlyList<string> columns, string parameterPrefix) =>

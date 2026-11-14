@@ -88,19 +88,29 @@ public sealed class SqlServerTransactionalStateStorageTests
         var (seed, _) = database.CreateStorage(stateId);
         var initial = await seed.Load();
         var initialETag = await seed.Store(initial.ETag, new(), null, null, null);
+        var pendingETag = await seed.Store(initialETag, new(), [CreatePendingState(1)], null, null);
 
         var (firstWriter, _) = database.CreateStorage(stateId);
         var (secondWriter, _) = database.CreateStorage(stateId);
         var firstSnapshot = await firstWriter.Load();
         var secondSnapshot = await secondWriter.Load();
+        Assert.Equal(1, Assert.Single(firstSnapshot.PendingStates).State.Value);
 
-        var winningETag = await firstWriter.Store(firstSnapshot.ETag, new(), null, null, null);
+        var winningETag = await firstWriter.Store(
+            firstSnapshot.ETag,
+            new(),
+            [CreatePendingState(2)],
+            commitUpTo: 1,
+            abortAfter: null);
         var conflict = await Assert.ThrowsAsync<InconsistentStateException>(
             () => secondWriter.Store(secondSnapshot.ETag, new(), null, null, null));
 
-        Assert.Equal(initialETag, conflict.CurrentEtag);
+        Assert.Equal(pendingETag, conflict.CurrentEtag);
         var (reader, _) = database.CreateStorage(stateId);
-        Assert.Equal(winningETag, (await reader.Load()).ETag);
+        var persisted = await reader.Load();
+        Assert.Equal(winningETag, persisted.ETag);
+        Assert.Equal(1, persisted.CommittedSequenceId);
+        Assert.Equal(2, persisted.CommittedState.Value);
     }
 
     [Fact]

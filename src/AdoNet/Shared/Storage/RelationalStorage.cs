@@ -233,7 +233,11 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(secondSelector);
 
             using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-            using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+            using var transaction = await BeginTransactionAsync(
+                connection,
+                IsolationLevel.Serializable,
+                _isSynchronousAdoNetImplementation,
+                cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
             try
             {
                 var first = await ReadInTransactionAsync(
@@ -259,6 +263,23 @@ namespace Orleans.Tests.SqlUtils
                 await RollbackPreservingOriginalExceptionAsync(transaction, exception, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 throw;
             }
+        }
+
+        internal static async Task<DbTransaction> BeginTransactionAsync(
+            DbConnection connection,
+            IsolationLevel isolationLevel,
+            bool isSynchronousAdoNetImplementation,
+            CancellationToken cancellationToken)
+        {
+            if (isSynchronousAdoNetImplementation)
+            {
+                return await Task.Run(
+                    () => connection.BeginTransaction(isolationLevel),
+                    cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+            }
+
+            return await connection.BeginTransactionAsync(isolationLevel, cancellationToken)
+                .ConfigureAwait(continueOnCapturedContext: false);
         }
 
         private async Task<IReadOnlyList<TResult>> ReadInTransactionAsync<TResult>(
@@ -472,7 +493,11 @@ namespace Orleans.Tests.SqlUtils
             CancellationToken cancellationToken)
         {
             using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            using var transaction = await BeginTransactionAsync(
+                connection,
+                IsolationLevel.ReadCommitted,
+                _isSynchronousAdoNetImplementation,
+                cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
             try
             {
                 var affectedRows = 0;

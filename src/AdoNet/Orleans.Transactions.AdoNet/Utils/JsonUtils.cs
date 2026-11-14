@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 namespace Orleans.Transactions.AdoNet.Utils;
+
 internal static class JsonUtils
 {
     public static byte[] SerializeWithNewtonsoftJson(object? value, JsonSerializerSettings jsonSettings)

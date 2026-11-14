@@ -60,13 +60,13 @@ internal static class StorageTestHarness
     /// </summary>
     internal static TransactionalStateStorageOptions BuildOptions(
         string? stateTable = null,
-        string? keyTable   = null,
-        string? sqlDot     = null)
+        string? keyTable = null,
+        string? sqlDot = null)
     {
         var opts = new TransactionalStateStorageOptions();
         if (stateTable is not null) opts.StateEntityTableName = stateTable;
-        if (keyTable   is not null) opts.KeyEntityTableName   = keyTable;
-        if (sqlDot     is not null) opts.SqlParameterDot      = sqlDot;
+        if (keyTable is not null) opts.KeyEntityTableName = keyTable;
+        if (sqlDot is not null) opts.SqlParameterDot = sqlDot;
         opts.InitExecuteSqlDic();
         return opts;
     }

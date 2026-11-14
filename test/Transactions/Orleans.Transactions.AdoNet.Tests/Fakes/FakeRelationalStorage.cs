@@ -3,6 +3,8 @@
 
 using System.Data;
 using System.Data.Common;
+using Microsoft.Data.SqlClient;
+using Orleans.Transactions.AdoNet.Entity;
 using Orleans.Transactions.AdoNet.Storage;
 
 namespace Orleans.Transactions.AdoNet.Tests.Fakes;
@@ -20,6 +22,7 @@ internal sealed class FakeRelationalStorage : IRelationalStorage
 
     // All ExecuteTransactionAsync argument lists, in call order (outer = calls, inner = operations per call).
     public List<List<Tuple<string, Action<DbCommand>>>> TransactionCallLog { get; } = new();
+    public List<List<(string Sql, byte[]? StateData)>> TransactionStateDataLog { get; } = new();
     public List<string?> TransactionETagCallLog { get; } = new();
     public Exception? TransactionException { get; set; }
 
@@ -66,6 +69,18 @@ internal sealed class FakeRelationalStorage : IRelationalStorage
         CancellationToken cancellationToken = default)
     {
         TransactionCallLog.Add(new List<Tuple<string, Action<DbCommand>>>(operations));
+        var stateDataOperations = new List<(string Sql, byte[]? StateData)>(operations.Count);
+        foreach (var operation in operations)
+        {
+            using var command = new SqlCommand();
+            operation.Item2(command);
+            var stateDataParameter = command.Parameters
+                .Cast<SqlParameter>()
+                .FirstOrDefault(parameter => parameter.ParameterName.TrimStart('@', ':') == nameof(StateEntity.StateData));
+            stateDataOperations.Add((operation.Item1, stateDataParameter?.Value as byte[]));
+        }
+
+        TransactionStateDataLog.Add(stateDataOperations);
         TransactionETagCallLog.Add(currentETag);
         if (TransactionException is { } exception)
         {

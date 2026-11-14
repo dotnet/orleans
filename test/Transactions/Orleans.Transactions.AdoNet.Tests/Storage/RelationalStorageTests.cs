@@ -3,7 +3,10 @@
 
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Storage;
 using Orleans.Transactions.AdoNet.Storage;
 using Xunit;
@@ -42,6 +45,48 @@ public sealed class RelationalStorageTests
         Assert.Equal("expected-etag", exception.CurrentEtag);
         Assert.Null(exception.InnerException);
         Assert.Contains("operation 0", exception.Message);
+    }
+
+    [Fact]
+    public async Task BeginTransactionAsync_UsesAsyncProvider()
+    {
+        var connection = new TrackingDbConnection();
+        var transaction = await RelationalStorage.BeginTransactionAsync(
+            connection,
+            IsolationLevel.Serializable,
+            isSynchronousAdoNetImplementation: false,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(connection.AsyncBeginTransactionCalled);
+        Assert.Equal(0, connection.SyncBeginTransactionThreadId);
+        Assert.Same(connection.CreatedTransaction, transaction);
+    }
+
+    [Fact]
+    public async Task BeginTransactionAsync_OffloadsSynchronousProvider()
+    {
+        var connection = new TrackingDbConnection();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var callerThreadId = 0;
+        var transactionTask = Task.Factory.StartNew(
+            () =>
+            {
+                callerThreadId = Environment.CurrentManagedThreadId;
+                return RelationalStorage.BeginTransactionAsync(
+                    connection,
+                    IsolationLevel.ReadCommitted,
+                    isSynchronousAdoNetImplementation: true,
+                    cancellationToken);
+            },
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default).Unwrap();
+
+        var transaction = await transactionTask;
+
+        Assert.False(connection.AsyncBeginTransactionCalled);
+        Assert.NotEqual(callerThreadId, connection.SyncBeginTransactionThreadId);
+        Assert.Same(connection.CreatedTransaction, transaction);
     }
 
     [Theory]
@@ -118,6 +163,54 @@ public sealed class RelationalStorageTests
     private sealed class SqlStateDbException(string sqlState) : DbException("Provider failure")
     {
         public override string? SqlState { get; } = sqlState;
+    }
+
+    private sealed class TrackingDbConnection : DbConnection
+    {
+        public int SyncBeginTransactionThreadId { get; private set; }
+        public bool AsyncBeginTransactionCalled { get; private set; }
+        public DbTransaction? CreatedTransaction { get; private set; }
+
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => string.Empty;
+        public override string DataSource => string.Empty;
+        public override string ServerVersion => string.Empty;
+        public override ConnectionState State => ConnectionState.Open;
+
+        public override void ChangeDatabase(string databaseName) => throw new NotSupportedException();
+        public override void Close() { }
+        public override void Open() => throw new NotSupportedException();
+
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
+        {
+            SyncBeginTransactionThreadId = Environment.CurrentManagedThreadId;
+            var transaction = new TrackingDbTransaction(this, isolationLevel);
+            CreatedTransaction = transaction;
+            return transaction;
+        }
+
+        protected override ValueTask<DbTransaction> BeginDbTransactionAsync(
+            IsolationLevel isolationLevel,
+            CancellationToken cancellationToken)
+        {
+            AsyncBeginTransactionCalled = true;
+            var transaction = new TrackingDbTransaction(this, isolationLevel);
+            CreatedTransaction = transaction;
+            return ValueTask.FromResult<DbTransaction>(transaction);
+        }
+
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+
+    private sealed class TrackingDbTransaction(DbConnection connection, IsolationLevel isolationLevel) : DbTransaction
+    {
+        public override IsolationLevel IsolationLevel => isolationLevel;
+
+        protected override DbConnection DbConnection => connection;
+
+        public override void Commit() => throw new NotSupportedException();
+        public override void Rollback() => throw new NotSupportedException();
     }
 
     private sealed class FailingRollbackTransaction(Exception exception) : DbTransaction
