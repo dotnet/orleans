@@ -147,15 +147,34 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         Assert.NotNull(await remindersTable.ReadRow(grainId, secondName));
     }
 
-    [Fact]
-    public async Task RemindersTable_DurableRangePagingIsBounded()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RemindersTable_DurableRangePagingIsBounded(bool wraps)
     {
         const int ReminderCount = 7;
         const int PageSize = 2;
         var expected = new List<string>(ReminderCount);
+        var grainIds = new SortedDictionary<uint, GrainId>();
+        while (grainIds.Count < ReminderCount + 1)
+        {
+            var id = MakeTestGrainReference();
+            grainIds.TryAdd(id.GetUniformHashCode(), id);
+        }
+
+        var orderedIds = grainIds.Values.ToArray();
+        var lowerBoundary = orderedIds[0].GetUniformHashCode();
+        var upperBoundary = orderedIds[^1].GetUniformHashCode();
+        var excluded = CreateReminder(orderedIds[0], "at-lower-boundary");
+        await remindersTable.UpsertRow(excluded);
+        if (wraps)
+        {
+            expected.Add($"{excluded.GrainId}|{excluded.ReminderName}");
+        }
+
         for (var index = 0; index < ReminderCount; index++)
         {
-            var reminder = CreateReminder(MakeTestGrainReference(), $"paged-{index}");
+            var reminder = CreateReminder(orderedIds[index + 1], $"paged-{index}");
             await remindersTable.UpsertRow(reminder);
             expected.Add($"{reminder.GrainId}|{reminder.ReminderName}");
         }
@@ -165,7 +184,8 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         string? continuationToken = null;
         do
         {
-            var page = await remindersTable.ReadRows(0, 0, PageSize, continuationToken);
+            var page = await remindersTable.ReadRows(
+                wraps ? 0 : lowerBoundary, wraps ? 0 : upperBoundary, PageSize, continuationToken);
             Assert.InRange(page.Reminders.Count, 0, PageSize);
             actual.AddRange(page.Reminders.Select(reminder => $"{reminder.GrainId}|{reminder.ReminderName}"));
             if (page.ContinuationToken is { } nextToken)

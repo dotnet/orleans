@@ -27,6 +27,7 @@ For installation guidance, see [`dotnet package add`](https://learn.microsoft.co
 | --- | --- |
 | [Microsoft.Orleans.Hosting.Kubernetes](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.Kubernetes) | Kubernetes hosting integration. |
 | [Microsoft.Orleans.Dashboard](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard) | Built-in Orleans Dashboard server and UI. |
+| [Microsoft.Orleans.Dashboard.AdvancedReminders](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard.AdvancedReminders) | Optional prerelease integration for inspecting advanced reminders in the Dashboard. |
 | [Microsoft.Orleans.Dashboard.Abstractions](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard.Abstractions) | Dashboard contracts for components which don't host the UI. |
 
 `Microsoft.Orleans.Runtime`, `Microsoft.Orleans.Core`, and the abstractions packages are lower-level dependencies of the metapackages. Reference them directly only when building a library with a narrower dependency requirement.

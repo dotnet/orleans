@@ -262,7 +262,7 @@ internal sealed partial class AdvancedReminderService
             && ((entry.Period == TimeSpan.Zero && string.IsNullOrWhiteSpace(entry.CronExpression))
                 || lastFireUtc >= (entry.NextDueUtc ?? entry.StartAt));
 
-    private static bool MatchesScheduledOccurrence(ReminderEntry entry, string? expectedScheduleId)
+    internal static bool MatchesScheduledOccurrence(ReminderEntry entry, string? expectedScheduleId)
         => string.IsNullOrEmpty(expectedScheduleId)
             || string.Equals(entry.ScheduleId, expectedScheduleId, StringComparison.Ordinal)
             || (string.IsNullOrEmpty(entry.ScheduleId) && string.Equals(entry.ETag, expectedScheduleId, StringComparison.Ordinal));

@@ -1301,6 +1301,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     {
         public string arg0;
         public global::Orleans.AdvancedReminders.Runtime.TickStatus arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1334,6 +1336,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     {
         public global::Orleans.Runtime.GrainId arg0;
         public string arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1367,6 +1371,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     {
         public int arg0;
         public string arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1402,6 +1408,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
         public System.DateTime arg1;
         public int arg2;
         public string arg3;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1436,6 +1444,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
         public System.TimeSpan arg0;
         public int arg1;
         public string arg2;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1470,6 +1480,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
         public global::Orleans.Runtime.GrainId arg0;
         public string arg1;
         public global::Orleans.AdvancedReminders.Runtime.MissedReminderAction arg2;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1502,6 +1514,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     public sealed partial class Invokable_IReminderManagementGrain_GrainReference_7B5551DA : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.IEnumerable<global::Orleans.AdvancedReminders.ReminderEntry>>
     {
         public global::Orleans.Runtime.GrainId arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1536,6 +1550,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
         public global::Orleans.AdvancedReminders.ReminderQueryFilter arg0;
         public int arg1;
         public string arg2;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1569,6 +1585,8 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     {
         public global::Orleans.Runtime.GrainId arg0;
         public string arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1679,6 +1697,8 @@ namespace OrleansCodeGen.Orleans.DurableJobs
         public global::Orleans.DurableJobs.IJobRunContext arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 

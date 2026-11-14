@@ -4,6 +4,7 @@ internal sealed class AdvancedReminderDispatcherGrain(
     AdvancedReminderService reminderService) : Grain, IAdvancedReminderDispatcherGrain
 {
     private readonly AdvancedReminderService _reminderService = reminderService;
+    private readonly Dictionary<Guid, DeliveryObservation> _deliveryObservations = new();
     private ActiveDelivery? _activeDelivery;
 
     public Task<IGrainReminder> RegisterOrUpdateAsync(ReminderEntry entry)
@@ -41,7 +42,7 @@ internal sealed class AdvancedReminderDispatcherGrain(
             {
                 var preparation = await owner.PrepareDeliveryAsync(
                     grainId, reminderName, expectedScheduleId, durableJobDequeueCount, deliveryToken, cancellationToken);
-                releaseAdmission = preparation.Outcome == AdvancedReminderDeliveryOutcome.Ready;
+                releaseAdmission = preparation.Outcome != AdvancedReminderDeliveryOutcome.Skipped;
                 cancellationToken.ThrowIfCancellationRequested();
                 if (preparation.Outcome == AdvancedReminderDeliveryOutcome.Skipped)
                 {
@@ -50,7 +51,7 @@ internal sealed class AdvancedReminderDispatcherGrain(
 
                 if (preparation.Outcome == AdvancedReminderDeliveryOutcome.Wait)
                 {
-                    await owner.ObserveDeliveryAsync(preparation.DeliveryToken, cancellationToken);
+                    await owner.ObserveDeliveryAsync(deliveryToken, cancellationToken);
                     continue;
                 }
 
@@ -63,8 +64,8 @@ internal sealed class AdvancedReminderDispatcherGrain(
             {
                 if (releaseAdmission)
                 {
-                    // Normal completion releases only this attempt, including
-                    // admission whose reply failed and caller cancellation.
+                    // The owner releases only this caller's admission or observation,
+                    // including when the preparation reply is lost or cancelled.
                     await owner.CompleteDeliveryAsync(
                         deliveryToken, deliveryException, deliveryCancelled, CancellationToken.None);
                 }
@@ -90,10 +91,15 @@ internal sealed class AdvancedReminderDispatcherGrain(
 
         if (_activeDelivery is { } active)
         {
+            var entry = active.Preparation.Entry!;
+            var sameOccurrence = string.Equals(entry.ReminderName, reminderName, StringComparison.Ordinal)
+                && AdvancedReminderService.MatchesScheduledOccurrence(entry, expectedScheduleId);
+            // Capture the task during admission. The active delivery may complete
+            // before the waiting caller receives this response.
+            _deliveryObservations.Add(deliveryToken, new(active.Completion.Task, sameOccurrence));
             return new AdvancedReminderDeliveryPreparation
             {
-                Outcome = AdvancedReminderDeliveryOutcome.Wait,
-                DeliveryToken = active.Preparation.DeliveryToken
+                Outcome = AdvancedReminderDeliveryOutcome.Wait
             };
         }
 
@@ -109,10 +115,15 @@ internal sealed class AdvancedReminderDispatcherGrain(
         return preparation;
     }
 
-    public Task ObserveDeliveryAsync(Guid deliveryToken, CancellationToken cancellationToken)
-        => _activeDelivery is { } active && active.Preparation.DeliveryToken == deliveryToken
-            ? active.Completion.Task.WaitAsync(cancellationToken)
-            : Task.CompletedTask;
+    public async Task ObserveDeliveryAsync(Guid deliveryToken, CancellationToken cancellationToken)
+    {
+        var observation = _deliveryObservations[deliveryToken];
+        var failure = await observation.Completion.WaitAsync(cancellationToken);
+        if (observation.SameOccurrence && failure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+        }
+    }
 
     public async Task CompleteDeliveryAsync(
         Guid deliveryToken,
@@ -120,11 +131,13 @@ internal sealed class AdvancedReminderDispatcherGrain(
         bool deliveryCancelled,
         CancellationToken cancellationToken)
     {
+        _deliveryObservations.Remove(deliveryToken);
         if (_activeDelivery is not { } active || active.Preparation.DeliveryToken != deliveryToken)
         {
             return;
         }
 
+        Exception? failure = null;
         try
         {
             if (!deliveryCancelled)
@@ -134,10 +147,15 @@ internal sealed class AdvancedReminderDispatcherGrain(
                     deliveryException, active.DurableJobDequeueCount, cancellationToken);
             }
         }
+        catch (Exception exception)
+        {
+            failure = exception;
+            throw;
+        }
         finally
         {
             _activeDelivery = null;
-            active.Completion.TrySetResult();
+            active.Completion.TrySetResult(failure);
         }
     }
 
@@ -171,6 +189,8 @@ internal sealed class AdvancedReminderDispatcherGrain(
     {
         public AdvancedReminderDeliveryPreparation Preparation { get; } = preparation;
         public int DurableJobDequeueCount { get; } = durableJobDequeueCount;
-        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<Exception?> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+
+    private readonly record struct DeliveryObservation(Task<Exception?> Completion, bool SameOccurrence);
 }

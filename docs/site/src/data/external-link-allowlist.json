@@ -11,6 +11,7 @@
     "https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html": "AWS serves this public SDK credential-resolution page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/sdkfornet/v4/apidocs/items/Util/TLoggingConfig.html": "AWS serves this public .NET SDK logging configuration reference to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/streams/latest/dev/introduction.html": "AWS serves this public Kinesis overview to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
+    "https://www.nuget.org/packages/Microsoft.Orleans.Dashboard.AdvancedReminders": "The optional Dashboard integration is awaiting its first NuGet publication.",
     "https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders": "The new Advanced Reminders package is documented but not yet published; remove this entry after publication.",
     "https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders.AdoNet": "The new ADO.NET Advanced Reminders package is documented but not yet published; remove this entry after publication.",
     "https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders.AzureStorage": "The new Azure Storage Advanced Reminders package is documented but not yet published; remove this entry after publication.",

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Runtime;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -97,6 +98,90 @@ public sealed partial class AdvancedReminderFeatureTests
     }
 
     [Fact]
+    public async Task ConcurrentDeliveryOfDifferentReminders_DoesNotShareCallbackFailure()
+    {
+        await VerifyConcurrentFailedDelivery(duplicate: false, delayDuplicateObservation: false);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentDeliveryOfSameOccurrence_SharesCallbackFailure(bool delayDuplicateObservation)
+    {
+        await VerifyConcurrentFailedDelivery(duplicate: true, delayDuplicateObservation);
+    }
+
+    private static async Task VerifyConcurrentFailedDelivery(bool duplicate, bool delayDuplicateObservation)
+    {
+        const string failedName = "failing";
+        const string otherName = "other";
+        var barrier = new AdvancedReminderDeliveryBarrier
+        {
+            HoldCallback = true,
+            FailingReminderName = failedName,
+            PausePreparationResponse = delayDuplicateObservation,
+            PausedPreparationResponseNumber = 2
+        };
+        await using var cluster = await CreateClusterAsync(
+            retryPolicy: ReminderRetryPolicy.Limited(3), deliveryBarrier: barrier);
+        var grain = cluster.Client.GetGrain<IAdvancedReminderConcurrentFeatureGrain>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        var services = cluster.GetSiloServiceProvider();
+        var table = services.GetRequiredService<Orleans.AdvancedReminders.IReminderTable>();
+        var service = services.GetRequiredService<AdvancedReminderService>();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        async Task<ReminderEntry> MakeDue(string name)
+        {
+            await grain.Register(name, DateTimeOffset.UtcNow.AddDays(30));
+            var entry = Assert.IsType<ReminderEntry>(await table.ReadRow(grainId, name));
+            entry.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
+            entry.ETag = await table.UpsertRow(entry);
+            return entry;
+        }
+
+        var original = await MakeDue(failedName);
+        var concurrent = duplicate ? original : await MakeDue(otherName);
+        barrier.Target = grainId;
+        var first = service.ProcessDueReminderAsync(grainId, failedName, original.ScheduleId, cancellationToken, 1);
+        try
+        {
+            await AwaitPhase(barrier.CallbackStarted.Task, "first callback has entered");
+            var second = service.ProcessDueReminderAsync(grainId, concurrent.ReminderName, concurrent.ScheduleId, cancellationToken, 1);
+            await AwaitPhase(
+                delayDuplicateObservation ? barrier.PreparationReady.Task : barrier.DuplicateWaiting.Task,
+                "second delivery is waiting on the first admission");
+            barrier.ReleaseCallback.TrySetResult();
+            var firstFailure = await Assert.ThrowsAsync<ReminderDeliveryException>(
+                () => AwaitPhase(first, "first delivery signals a retry"));
+            barrier.ReleasePreparationResponse.TrySetResult();
+
+            if (duplicate)
+            {
+                var duplicateFailure = await Assert.ThrowsAsync<ReminderDeliveryException>(
+                    () => AwaitPhase(second, "duplicate observes the same retry"));
+                Assert.Equal(firstFailure.Message, duplicateFailure.Message);
+                Assert.Equal(1, await grain.GetTickCount());
+            }
+            else
+            {
+                await AwaitPhase(second, "the unrelated reminder delivers after the failed callback");
+                Assert.Equal(2, await grain.GetTickCount());
+                Assert.Null(await table.ReadRow(grainId, otherName));
+            }
+        }
+        finally
+        {
+            barrier.ReleaseCallback.TrySetResult();
+            barrier.ReleasePreparationResponse.TrySetResult();
+        }
+
+        var retained = Assert.IsType<ReminderEntry>(await table.ReadRow(grainId, failedName));
+        Assert.Equal(original.ScheduleId, retained.ScheduleId);
+        Assert.Null(retained.LastFireUtc);
+    }
+
+    [Fact]
     public async Task CancelledDelivery_ReleasesAdmission_WithoutAdvancingOccurrence()
     {
         var barrier = new AdvancedReminderDeliveryBarrier { HoldCallback = true };
@@ -154,9 +239,11 @@ public sealed class AdvancedReminderDeliveryBarrier : IOutgoingGrainCallFilter, 
 {
     public GrainId Target { get; set; }
     public bool HoldCallback { get; init; }
+    public string? FailingReminderName { get; init; }
     public bool FailPreparationResponse { get; init; }
     public int FailedPreparationResponseNumber { get; init; } = 1;
     public bool PausePreparationResponse { get; init; }
+    public int PausedPreparationResponseNumber { get; init; } = 1;
     public TaskCompletionSource PreparationReady { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource ReleasePreparationResponse { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _preparationResponses;
@@ -182,14 +269,15 @@ public sealed class AdvancedReminderDeliveryBarrier : IOutgoingGrainCallFilter, 
         if (context.InterfaceMethod.DeclaringType?.FullName == "Orleans.AdvancedReminders.Runtime.ReminderService.IAdvancedReminderDispatcherGrain"
             && context.MethodName == "PrepareDeliveryAsync")
         {
-            if (PausePreparationResponse)
+            var preparationResponse = Interlocked.Increment(ref _preparationResponses);
+            if (PausePreparationResponse && preparationResponse == PausedPreparationResponseNumber)
             {
                 PreparationReady.TrySetResult();
                 await ReleasePreparationResponse.Task;
             }
 
             if (FailPreparationResponse
-                && Interlocked.Increment(ref _preparationResponses) == FailedPreparationResponseNumber)
+                && preparationResponse == FailedPreparationResponseNumber)
             {
                 // The owner has admitted delivery, but the caller cannot observe its reply.
                 throw new InvalidOperationException("Intentional loss of the prepared delivery response.");
@@ -256,6 +344,11 @@ public sealed class AdvancedReminderConcurrentFeatureGrain(AdvancedReminderDeliv
         if (barrier.HoldCallback)
         {
             await barrier.ReleaseCallback.Task;
+        }
+
+        if (reminderName == barrier.FailingReminderName)
+        {
+            throw new InvalidOperationException("Intentional reminder callback failure.");
         }
     }
 }

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Dashboard.AdvancedReminders</PackageId>
+    <Title>Microsoft Orleans Dashboard Advanced Reminders</Title>
+    <Description>Optional Advanced Reminders integration for the Orleans Dashboard.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- This is a new package with no released compatibility baseline. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute"/>
+    <InternalsVisibleTo Include="Orleans.Dashboard.UnitTests" />
+    <ProjectReference Include="..\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+    <ProjectReference Include="..\..\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
+  </ItemGroup>
+</Project>

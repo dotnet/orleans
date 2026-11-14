@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.AdvancedReminders;
+using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Implementation.Grains;
+using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using Xunit;
 using AdvancedReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using AdvancedReminderTable = Orleans.AdvancedReminders.IReminderTable;
@@ -162,80 +167,12 @@ public sealed class DashboardRemindersGrainTests
     }
 
     [Fact]
-    public async Task GetAdvancedReminders_FallbackMatchesManagementBucketOrder()
-    {
-        var grainIdsByBucket = new Dictionary<int, GrainId>();
-        for (var i = 0; i < 10_000 && grainIdsByBucket.Count < 3; i++)
-        {
-            var grainId = GrainId.Create("advanced-grain", $"bucketed-{i}");
-            grainIdsByBucket.TryAdd((int)(grainId.GetUniformHashCode() >> 24), grainId);
-        }
-
-        Assert.Equal(3, grainIdsByBucket.Count);
-        var due = new DateTime(2026, 7, 22, 10, 0, 0, DateTimeKind.Utc);
-        var reminders = grainIdsByBucket
-            .OrderBy(static pair => pair.Key)
-            .Select((pair, index) => new AdvancedReminderEntry
-            {
-                GrainId = pair.Value,
-                ReminderName = $"advanced-reminder-{index}",
-                StartAt = due,
-                NextDueUtc = due.AddMinutes(-index),
-            })
-            .ToArray();
-        var serviceProvider = new ReminderServiceProvider(
-            new ClassicReminderTableStub(),
-            new AdvancedReminderTableStub(reminders));
-        var grain = new DashboardRemindersGrain(serviceProvider);
-
-        var response = (await grain.GetAdvancedReminders(1, reminders.Length, TestContext.Current.CancellationToken)).Value;
-
-        Assert.Equal(
-            reminders.Select(static reminder => reminder.ReminderName),
-            response.Reminders.Select(static reminder => reminder.Name));
-    }
-
-    [Fact]
-    public async Task GetAdvancedReminders_FallbackPreservesIdentityOrderWhenDueTimeChanges()
-    {
-        var grainId = GrainId.Create("advanced-grain", "same-bucket");
-        var due = new DateTime(2026, 7, 22, 10, 0, 0, DateTimeKind.Utc);
-        var firstReminder = new AdvancedReminderEntry
-        {
-            GrainId = grainId,
-            ReminderName = "a",
-            StartAt = due,
-            NextDueUtc = due,
-        };
-        var secondReminder = new AdvancedReminderEntry
-        {
-            GrainId = grainId,
-            ReminderName = "b",
-            StartAt = due,
-            NextDueUtc = due.AddMinutes(1),
-        };
-        var serviceProvider = new ReminderServiceProvider(
-            new ClassicReminderTableStub(),
-            new AdvancedReminderTableStub(secondReminder, firstReminder));
-        var grain = new DashboardRemindersGrain(serviceProvider);
-
-        var first = (await grain.GetAdvancedReminders(1, 1, TestContext.Current.CancellationToken)).Value;
-        Assert.Equal("a", Assert.Single(first.Reminders).Name);
-
-        firstReminder.NextDueUtc = due.AddDays(1);
-        var second = (await grain.GetAdvancedReminders(2, 1, TestContext.Current.CancellationToken)).Value;
-
-        Assert.Equal("b", Assert.Single(second.Reminders).Name);
-        Assert.False(second.HasMore);
-    }
-
-    [Fact]
     public async Task GetAdvancedReminders_UsesStoreCountWithoutReadingReminderRows()
     {
         var advancedReminderTable = new AdvancedReminderTableStub { StoredCount = 34_900 };
         var serviceProvider = new ReminderServiceProvider(new ClassicReminderTableStub(), advancedReminderTable);
         var management = new PagedAdvancedReminderManagementGrain();
-        var grain = new DashboardRemindersGrain(serviceProvider, management);
+        var grain = new DashboardRemindersGrain(serviceProvider with { Management = management });
 
         var first = (await grain.GetAdvancedReminders(1, 1, TestContext.Current.CancellationToken)).Value;
         var second = (await grain.GetAdvancedReminders(2, 1, TestContext.Current.CancellationToken)).Value;
@@ -260,8 +197,7 @@ public sealed class DashboardRemindersGrainTests
         var clock = new CountTimeProvider();
         var table = new AdvancedReminderTableStub { StoredCount = storedCount };
         var grain = new DashboardRemindersGrain(
-            new ReminderServiceProvider(new ClassicReminderTableStub(), table, clock),
-            new PagedAdvancedReminderManagementGrain());
+            new ReminderServiceProvider(new ClassicReminderTableStub(), table, clock));
 
         var first = (await grain.GetAdvancedReminders(1, 1, TestContext.Current.CancellationToken)).Value;
         Assert.Equal(storedCount, first.Count);
@@ -283,7 +219,7 @@ public sealed class DashboardRemindersGrainTests
         var table = new AdvancedReminderTableStub();
         var management = new PagedAdvancedReminderManagementGrain();
         var grain = new DashboardRemindersGrain(
-            new ReminderServiceProvider(new ClassicReminderTableStub(), table), management);
+            new ReminderServiceProvider(new ClassicReminderTableStub(), table) { Management = management });
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             grain.GetAdvancedReminders(1, 50, new CancellationToken(canceled: true)));
@@ -298,7 +234,7 @@ public sealed class DashboardRemindersGrainTests
         var advancedReminderTable = new AdvancedReminderTableStub();
         var serviceProvider = new ReminderServiceProvider(new ClassicReminderTableStub(), advancedReminderTable);
         var management = new PagedAdvancedReminderManagementGrain();
-        var grain = new DashboardRemindersGrain(serviceProvider, management);
+        var grain = new DashboardRemindersGrain(serviceProvider with { Management = management });
 
         var response = (await grain.GetAdvancedReminders(int.MaxValue, 1, TestContext.Current.CancellationToken)).Value;
 
@@ -314,8 +250,8 @@ public sealed class DashboardRemindersGrainTests
         var serviceProvider = new ReminderServiceProvider(
             new ClassicReminderTableStub(),
             new AdvancedReminderTableStub());
-        var management = new PagedAdvancedReminderManagementGrain();
-        var grain = new DashboardRemindersGrain(serviceProvider, management);
+        var management = new PagedAdvancedReminderManagementGrain { MaxPageSize = 1 };
+        var grain = new DashboardRemindersGrain(serviceProvider with { Management = management });
 
         for (var pageSize = 1; pageSize <= 65; pageSize++)
         {
@@ -343,17 +279,59 @@ public sealed class DashboardRemindersGrainTests
         Assert.Equal(0u, classicReminderTable.EndHash);
     }
 
-    private sealed class ReminderServiceProvider(
-        ClassicReminderTable classicReminderTable,
-        AdvancedReminderTable advancedReminderTable,
-        TimeProvider? timeProvider = null) : IServiceProvider
+    [Fact]
+    public async Task AddAdvancedReminderDashboard_ExposesRegistrationsThroughDashboardGrain()
     {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.ConfigureSilo((_, silo) =>
+        {
+            silo.AddDashboard();
+            silo.UseInMemoryAdvancedReminderService();
+            silo.AddAdvancedReminderDashboard();
+        });
+        await using var cluster = builder.Build();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await cluster.DeployAsync(cancellationToken);
+        var table = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderTable>();
+        var due = DateTime.UtcNow.AddDays(1);
+        await table.UpsertRow(new AdvancedReminderEntry
+        {
+            GrainId = GrainId.Create("dashboard-test", "key"),
+            ReminderName = "dashboard-integration",
+            StartAt = due,
+            NextDueUtc = due,
+        });
+
+        var grain = cluster.Client.GetGrain<IDashboardRemindersGrain>(0);
+        var page = (await grain.GetAdvancedReminders(1, 50, cancellationToken)).Value;
+        Assert.Equal(1, page.Count);
+        Assert.Equal("dashboard-integration", Assert.Single(page.Reminders).Name);
+    }
+
+    [Fact]
+    public async Task GetAdvancedReminders_WithoutIntegration_ReturnsEmptyPage()
+    {
+        var grain = new DashboardRemindersGrain(new ReminderServiceProvider(new ClassicReminderTableStub()));
+        var response = (await grain.GetAdvancedReminders(1, 50, TestContext.Current.CancellationToken)).Value;
+
+        Assert.Empty(response.Reminders);
+        Assert.Equal(0, response.Count);
+        Assert.False(response.HasMore);
+    }
+
+    private sealed record ReminderServiceProvider(
+        ClassicReminderTable ClassicTable,
+        AdvancedReminderTableStub? AdvancedTable = null,
+        TimeProvider? Clock = null) : IServiceProvider
+    {
+        public IReminderManagementGrain? Management { get; init; }
+
         public object? GetService(Type serviceType)
-            => serviceType == typeof(ClassicReminderTable)
-                ? classicReminderTable
-                : serviceType == typeof(AdvancedReminderTable)
-                    ? advancedReminderTable
-                    : serviceType == typeof(TimeProvider) ? timeProvider : null;
+            => serviceType == typeof(ClassicReminderTable) ? ClassicTable
+                : serviceType == typeof(TimeProvider) ? Clock
+                : serviceType == typeof(IAdvancedReminderDashboardSource) && AdvancedTable is { } table
+                    ? new AdvancedReminderDashboardSource(table, Management ?? new PagedAdvancedReminderManagementGrain(table.Rows))
+                    : null;
     }
 
     private sealed class ClassicReminderTableStub(params ClassicReminderEntry[] reminders) : ClassicReminderTable
@@ -399,34 +377,18 @@ public sealed class DashboardRemindersGrainTests
 
         public int RangeReadCount { get; private set; }
 
-        public uint BeginHash { get; private set; }
-
-        public uint EndHash { get; private set; }
+        public AdvancedReminderEntry[] Rows { get; } = reminders;
 
         public Task<AdvancedReminderTableData> ReadRows(uint begin, uint end)
         {
             RangeReadCount++;
-            BeginHash = begin;
-            EndHash = end;
-            return Task.FromResult(new AdvancedReminderTableData(reminders));
+            throw new NotSupportedException();
         }
 
         public Task<AdvancedReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
         {
             RangeReadCount++;
-            BeginHash = begin;
-            EndHash = end;
-            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
-            var page = reminders.Skip(offset).Take(maxRows + 1).ToList();
-            var hasMore = page.Count > maxRows;
-            if (hasMore)
-            {
-                page.RemoveAt(maxRows);
-            }
-
-            return Task.FromResult(new AdvancedReminderTableData(
-                page,
-                hasMore ? (offset + page.Count).ToString(CultureInfo.InvariantCulture) : null));
+            throw new NotSupportedException();
         }
 
         public Task<AdvancedReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();
@@ -448,26 +410,27 @@ public sealed class DashboardRemindersGrainTests
         public void Advance(TimeSpan elapsed) => _timestamp += elapsed.Ticks;
     }
 
-    private sealed class PagedAdvancedReminderManagementGrain : IReminderManagementGrain
+    private sealed class PagedAdvancedReminderManagementGrain(AdvancedReminderEntry[]? rows = null) : IReminderManagementGrain
     {
+        private readonly AdvancedReminderEntry[] _rows = rows ??
+        [
+            new AdvancedReminderEntry { GrainId = GrainId.Create("advanced-grain", "1"), ReminderName = "advanced-reminder-1" },
+            new AdvancedReminderEntry { GrainId = GrainId.Create("advanced-grain", "2"), ReminderName = "advanced-reminder-2" },
+        ];
+
         public int ListCallCount { get; private set; }
+        public int MaxPageSize { get; init; } = int.MaxValue;
 
         public Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string? continuationToken = null)
         {
             ListCallCount++;
-            var isFirstPage = continuationToken is null;
+            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var page = _rows.Skip(offset).Take(Math.Min(pageSize, MaxPageSize)).ToArray();
+            var nextOffset = offset + page.Length;
             return Task.FromResult(new ReminderManagementPage
             {
-                Reminders =
-                [
-                    new AdvancedReminderEntry
-                    {
-                        GrainId = GrainId.Create("advanced-grain", isFirstPage ? "1" : "2"),
-                        ReminderName = isFirstPage ? "advanced-reminder-1" : "advanced-reminder-2",
-                        StartAt = new DateTime(2026, 7, 22, isFirstPage ? 10 : 11, 0, 0, DateTimeKind.Utc),
-                    },
-                ],
-                ContinuationToken = isFirstPage ? "next" : null,
+                Reminders = [.. page],
+                ContinuationToken = nextOffset < _rows.Length ? nextOffset.ToString(CultureInfo.InvariantCulture) : null,
             });
         }
 
