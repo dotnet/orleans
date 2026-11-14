@@ -20,5 +20,3 @@ CREATE TABLE OrleansTransactionStateTable (
   Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(),
   PRIMARY KEY (StateId, SequenceId)
 );
-
-CREATE INDEX IX_State_Seq ON OrleansTransactionStateTable (StateId, SequenceId);

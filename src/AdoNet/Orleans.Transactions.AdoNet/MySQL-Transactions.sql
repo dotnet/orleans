@@ -18,6 +18,5 @@ CREATE TABLE OrleansTransactionStateTable  (
   TransactionManager LONGBLOB NOT NULL,
   StateData LONGBLOB NULL,
   Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (StateId, SequenceId),
-  INDEX IX_State_Seq(StateId, SequenceId) USING BTREE
+  PRIMARY KEY (StateId, SequenceId)
 ) ENGINE=InnoDB;
