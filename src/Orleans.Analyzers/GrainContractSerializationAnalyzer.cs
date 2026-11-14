@@ -260,10 +260,10 @@ public sealed class GrainContractSerializationAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            if (item.Requirement == SerializationSupport.Requirement.Field && symbols.IsAbstractReference(namedType))
+            if (attribute is null && item.Requirement == SerializationSupport.Requirement.Field
+                && symbols.IsAbstractReference(namedType))
             {
-                // Abstract references use runtime subtype codecs. Their declared generic arguments remain relevant.
-                PushArguments(namedType, item.Depth + 1);
+                // Abstract references use runtime subtype codecs; without a schema, their type arguments are opaque.
                 continue;
             }
 

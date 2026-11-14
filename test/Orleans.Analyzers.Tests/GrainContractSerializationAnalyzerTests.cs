@@ -81,11 +81,89 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         """);
 
     [Fact]
+    public Task ArrayConverter_TakesPrecedenceOverIntrinsicArrayCodec() => AssertNoDiagnostics("""
+        public class Missing { }
+        [GenerateSerializer] public struct Surrogate { }
+        [RegisterConverter] public class Converter : IConverter<Missing[], Surrogate>
+        {
+            public Missing[] ConvertFromSurrogate(in Surrogate value) => [];
+            public Surrogate ConvertToSurrogate(in Missing[] value) => default;
+        }
+        public interface IContract : IGrain { Task Send(Missing[] request); }
+        """);
+
+    [Fact]
+    public async Task ArrayConverter_RequiresItsSurrogateSerializer()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync("""
+            public struct MissingSurrogate { }
+            [RegisterConverter] public class Converter : IConverter<int[], MissingSurrogate>
+            {
+                public int[] ConvertFromSurrogate(in MissingSurrogate value) => [];
+                public MissingSurrogate ConvertToSurrogate(in int[] value) => new();
+            }
+            public interface IContract : IGrain { Task Send(int[] request); }
+            """);
+        Assert.Contains("'MissingSurrogate'", Assert.Single(diagnostics).GetMessage());
+    }
+
+    [Fact]
     public Task DerivedTypeCodec_SupportsDerivedContractTypes() => AssertNoDiagnostics(CodecSource + """
         public class Base { }
         public class Derived : Base { }
         [RegisterSerializer] public class BaseCodec : Codec<Base>, Orleans.Serialization.Codecs.IDerivedTypeCodec { }
         public interface IContract : IGrain { Task Send(Derived request); }
+        """);
+
+    [Fact]
+    public async Task NearestNonDerivedCodec_BlocksFartherDerivedTypeCodec()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(CodecSource + """
+            public class Base { }
+            public class Middle : Base { }
+            public class Derived : Middle { }
+            [RegisterSerializer] public class BaseCodec : Codec<Base>, Orleans.Serialization.Codecs.IDerivedTypeCodec { }
+            [RegisterSerializer] public class MiddleCodec : Codec<Middle> { }
+            public interface IContract : IGrain { Task Send(Derived request); }
+            """);
+        Assert.Contains("'Derived'", Assert.Single(diagnostics).GetMessage());
+    }
+
+    [Fact]
+    public Task GenericFieldCodec_WithParameterTarget_IsRecognized() => AssertNoDiagnostics(CodecSource + """
+        public class Request { }
+        [RegisterSerializer] public class GenericCodec<T> : Codec<T> { }
+        public interface IContract : IGrain { Task Send(Request request); }
+        """);
+
+    [Fact]
+    public Task GenericConverter_WithParameterTarget_IsRecognized() => AssertNoDiagnostics("""
+        public class Request { }
+        [GenerateSerializer] public struct Surrogate { }
+        [RegisterConverter] public class GenericConverter<T> : IConverter<T, Surrogate>
+        {
+            public T ConvertFromSurrogate(in Surrogate value) => default;
+            public Surrogate ConvertToSurrogate(in T value) => default;
+        }
+        public interface IContract : IGrain { Task Send(Request request); }
+        """);
+
+    [Fact]
+    public Task NamedGenericConverter_TakesPrecedenceOverParameterTargetConverter() => AssertNoDiagnostics("""
+        public class Request<T> { }
+        public struct MissingSurrogate { }
+        [GenerateSerializer] public struct ValidSurrogate<T> { [Id(0)] public int Value; }
+        [RegisterConverter] public class ParameterConverter<T> : IConverter<T, MissingSurrogate>
+        {
+            public T ConvertFromSurrogate(in MissingSurrogate value) => default;
+            public MissingSurrogate ConvertToSurrogate(in T value) => default;
+        }
+        [RegisterConverter] public class RequestConverter<T> : IConverter<Request<T>, ValidSurrogate<T>>
+        {
+            public Request<T> ConvertFromSurrogate(in ValidSurrogate<T> value) => new();
+            public ValidSurrogate<T> ConvertToSurrogate(in Request<T> value) => default;
+        }
+        public interface IContract : IGrain { Task Send(Request<int> request); }
         """);
 
     [Fact]
@@ -280,6 +358,24 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         public abstract class Request { }
         public interface IContract : IGrain { Task Send(Request request); }
         """);
+
+    [Fact]
+    public Task AbstractInterfaceArguments_AreOpaque() => AssertNoDiagnostics("""
+        public class Local { }
+        public interface IMarker<T> { }
+        public interface IContract : IGrain { Task Send(IMarker<Local> request); }
+        """);
+
+    [Fact]
+    public async Task AnnotatedAbstractModel_MembersAreChecked()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync("""
+            public class Missing { }
+            [GenerateSerializer] public abstract class Request { [Id(0)] public Missing Value; }
+            public interface IContract : IGrain { Task Send(Request request); }
+            """);
+        Assert.Contains("'Missing'", Assert.Single(diagnostics).GetMessage());
+    }
 
     [Fact]
     public Task SerializerTransparentBase_IsSkippedInTheSerializedHierarchy() => AssertNoDiagnostics("""
