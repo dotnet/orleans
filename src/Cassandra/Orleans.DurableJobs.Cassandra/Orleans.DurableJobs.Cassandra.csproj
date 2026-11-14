@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>Microsoft.Orleans.DurableJobs.Cassandra</PackageId>
+    <Title>Microsoft Orleans Cassandra Durable Jobs Provider</Title>
+    <Description>Microsoft Orleans durable jobs provider backed by Cassandra journal storage</Description>
+    <PackageTags>$(PackageTags) Cassandra</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.DurableJobs.Cassandra</AssemblyName>
+    <RootNamespace>Orleans.DurableJobs.Cassandra</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <!-- This new package has no published baseline. Enable validation after its first release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Cassandra\Orleans.Journaling.Cassandra\Orleans.Journaling.Cassandra.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

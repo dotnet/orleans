@@ -104,6 +104,8 @@
   </Folder>
   <Folder Name="/src/Extensions/Cassandra/">
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
+    <Project Path="src/Cassandra/Orleans.DurableJobs.Cassandra/Orleans.DurableJobs.Cassandra.csproj" />
+    <Project Path="src/Cassandra/Orleans.Journaling.Cassandra/Orleans.Journaling.Cassandra.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Google/">
     <Project Path="src/Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
@@ -181,6 +183,7 @@
     <Project Path="test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.EventHubs.Tests/Orleans.Streaming.EventHubs.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Journaling.Cassandra.Tests/Orleans.Journaling.Cassandra.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Firestore.Tests/Orleans.Clustering.Firestore.Tests.csproj" />
