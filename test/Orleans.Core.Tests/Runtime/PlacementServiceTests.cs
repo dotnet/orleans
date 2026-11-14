@@ -423,7 +423,7 @@ namespace UnitTests.Runtime
                     await Task.Yield();
                     throw exception;
                 }
-                : (_, _, _) => throw exception;
+            : (_, _, _) => throw exception;
 
             var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 fixture.Target.GetCompatibleSilosAsync(CreatePlacementTarget(), TestContext.Current.CancellationToken));
