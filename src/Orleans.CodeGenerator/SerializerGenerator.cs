@@ -164,11 +164,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
     public static string GetSimpleClassName(string name) => $"Codec_{name}";
 
-    public static string GetGeneratedNamespaceName(ITypeSymbol type) => type.GetNamespaceAndNesting() switch
-    {
-        { Length: > 0 } ns => $"{GeneratedCodeUtilities.CodeGeneratorName}.{ns}",
-        _ => GeneratedCodeUtilities.CodeGeneratorName
-    };
+    public static string GetGeneratedNamespaceName(ITypeSymbol type) => GeneratedCodeUtilities.GetGeneratedNamespaceName(type);
 
     internal static string GetServiceExpression(string serviceType, string codecProvider)
         => $"OrleansGeneratedCodeHelper.GetService<{serviceType}>(this, {codecProvider})";

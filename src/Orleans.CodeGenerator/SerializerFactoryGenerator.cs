@@ -470,7 +470,7 @@ internal static class SerializerFactoryGenerator
 
         INamedTypeSymbol? ResolveImplementation(string name)
         {
-            var metadataName = $"{SerializerGenerator.GetGeneratedNamespaceName(named)}.{name}"
+            var metadataName = $"{GeneratedCodeUtilities.GetMetadataNamespaceName(SerializerGenerator.GetGeneratedNamespaceName(named))}.{name}"
                 + (named.TypeArguments.Length > 0 ? $"`{named.TypeArguments.Length}" : "");
             var implementation = implementationCompilation.GetTypeByMetadataName(metadataName);
             return implementation is { IsGenericType: true } ? implementation.Construct([.. implementationType.TypeArguments]) : implementation;

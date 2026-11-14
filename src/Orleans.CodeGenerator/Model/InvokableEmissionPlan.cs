@@ -41,7 +41,7 @@ internal sealed record InvokableEmissionPlan(
     /// <summary>The metadata name of the generated type within <paramref name="generatedNamespace"/>.</summary>
     public string GetMetadataName(string generatedNamespace)
     {
-        var name = string.IsNullOrEmpty(generatedNamespace) ? ClassName : $"{generatedNamespace}.{ClassName}";
+        var name = string.IsNullOrEmpty(generatedNamespace) ? ClassName : $"{GeneratedCodeUtilities.GetMetadataNamespaceName(generatedNamespace)}.{ClassName}";
         return TypeParameters.Count == 0 ? name : $"{name}`{TypeParameters.Count}";
     }
 }

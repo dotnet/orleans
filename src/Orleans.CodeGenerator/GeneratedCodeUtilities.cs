@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
@@ -11,9 +12,14 @@ internal static class GeneratedCodeUtilities
 
     internal static string GetGeneratedNamespaceName(ITypeSymbol type) => type.GetNamespaceAndNesting() switch
     {
-        { Length: > 0 } ns => $"{CodeGeneratorName}.{ns}",
+        { Length: > 0 } ns => $"{CodeGeneratorName}.{string.Join(".", ns.Split('.').Select(static segment => segment.EscapeIdentifier()))}",
         _ => CodeGeneratorName
     };
+
+    /// <summary>
+    /// Gets the form of a generated namespace used in metadata names, where identifiers are never escaped.
+    /// </summary>
+    internal static string GetMetadataNamespaceName(string generatedNamespace) => generatedNamespace.Replace("@", string.Empty);
 
     internal static uint? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
     {
