@@ -362,6 +362,32 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
     }
 
     [Fact]
+    public async Task IdempotentWrites_RecoverCommittedMultiSegmentStreamingUpload()
+    {
+        var payload = new byte[4_096 * 3 + 137];
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)(i % 251);
+        }
+
+        var serializer = new StreamingSerializer(payload);
+        var storage = CreateStorage(Operation.Write, serializer, out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        _blob.FailFirstUploadAfterCommit = true;
+
+        await storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, _blob.RequestTokens.Count);
+        Assert.Equal(payload, _blob.UploadedContent!.ToArray());
+        Assert.NotNull(_blob.StoredMetadata);
+        Assert.Equal(
+            Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(payload)),
+            _blob.StoredMetadata["ContentSha256"]);
+        Assert.Equal(StoredETag, state.ETag);
+        Assert.True(state.RecordExists);
+    }
+
+    [Fact]
     public async Task IdempotentWrites_RecoverCommittedUploadThroughSdkRetryPipeline()
     {
         using var handler = new IdempotentRetryHttpHandler();
@@ -767,7 +793,7 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
         }
     }
 
-    private sealed class StreamingSerializer : BinarySerializer, IGrainStorageStreamingSerializer
+    private sealed class StreamingSerializer(byte[]? serializedPayload = null) : BinarySerializer, IGrainStorageStreamingSerializer
     {
         public List<CancellationToken> Tokens { get; } = [];
 
@@ -782,7 +808,14 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
                 await operation(cancellationToken);
             }
 
-            await destination.WriteAsync(BinaryData.FromObjectAsJson(input).ToMemory(), cancellationToken);
+            if (serializedPayload is { } payload)
+            {
+                await destination.WriteAsync(payload.AsMemory(), cancellationToken);
+            }
+            else
+            {
+                await destination.WriteAsync(BinaryData.FromObjectAsJson(input).ToMemory(), cancellationToken);
+            }
         }
 
         public async ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
