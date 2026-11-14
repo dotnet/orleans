@@ -36,8 +36,10 @@ public static class ServiceCollectionExtensions
     /// <param name="siloBuilder">The silo builder.</param>
     /// <param name="configureOptions">Optional configuration action for <see cref="DashboardOptions"/>.</param>
     /// <returns>The silo builder for method chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="siloBuilder"/> is null.</exception>
     public static ISiloBuilder AddDashboard(this ISiloBuilder siloBuilder, Action<DashboardOptions>? configureOptions = null)
     {
+        ArgumentNullException.ThrowIfNull(siloBuilder);
         siloBuilder.Services.AddOrleansDashboardForSiloCore(configureOptions);
         return siloBuilder;
     }
@@ -81,9 +83,12 @@ public static class ServiceCollectionExtensions
 
     /// <summary>
     /// Maps Orleans Dashboard endpoints using ASP.NET Core minimal APIs.
-    /// Returns an <see cref="IEndpointConventionBuilder"/> that can be used to apply authentication,
-    /// authorization, or other endpoint configuration.
+    /// The returned route group supports authentication, authorization, and other endpoint configuration.
     /// </summary>
+    /// <param name="endpoints">The application's endpoint route builder.</param>
+    /// <param name="routePrefix">The optional base route for the dashboard endpoints.</param>
+    /// <returns>The dashboard route group.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="endpoints"/> is null.</exception>
     /// <example>
     /// <code>
     /// // Basic usage
@@ -100,6 +105,7 @@ public static class ServiceCollectionExtensions
         this IEndpointRouteBuilder endpoints,
         [StringSyntax("Route")] string? routePrefix = null)
     {
+        ArgumentNullException.ThrowIfNull(endpoints);
         // Create static assets provider
         var assets = endpoints.ServiceProvider.GetService<EmbeddedAssetProvider>()
             ?? throw new InvalidOperationException("Orleans Dashboard services have not been registered. " +
@@ -436,9 +442,11 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="clientBuilder">The client builder.</param>
     /// <param name="configureOptions">Optional configuration action for <see cref="DashboardOptions"/>.</param>
-    /// <returns>The service collection for method chaining.</returns>
+    /// <returns>The client builder for method chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="clientBuilder"/> is null.</exception>
     public static IClientBuilder AddDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)
     {
+        ArgumentNullException.ThrowIfNull(clientBuilder);
         clientBuilder.Services.Configure(configureOptions ?? (x => { }));
         clientBuilder.Services.AddSingleton<DashboardLogger>();
         clientBuilder.Services.AddFromExisting<ILoggerProvider, DashboardLogger>();

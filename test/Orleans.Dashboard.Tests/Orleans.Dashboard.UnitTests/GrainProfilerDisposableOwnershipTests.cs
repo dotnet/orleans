@@ -1,4 +1,6 @@
 using System;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -15,6 +17,43 @@ namespace UnitTests;
 [TestArea("Dashboard")]
 public class GrainProfilerDisposableOwnershipTests
 {
+    [Fact]
+    public async Task Stop_WaitsForInFlightTimerCallback()
+    {
+        using var profiler = CreateProfiler();
+        var observer = CaptureObserver(profiler);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        await using var timer = new Timer(_ =>
+        {
+            entered.SetResult();
+            release.Wait();
+            finished.SetResult();
+        }, null, Timeout.Infinite, Timeout.Infinite);
+        typeof(GrainProfiler).GetField("_timer", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(profiler, timer);
+
+        Task stop;
+        try
+        {
+            timer.Change(0, Timeout.Infinite);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            stop = observer.OnStop(TestContext.Current.CancellationToken);
+
+            Assert.False(stop.IsCompleted);
+            Assert.False(finished.Task.IsCompleted);
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.True(finished.Task.IsCompletedSuccessfully);
+        Assert.False(timer.Change(0, Timeout.Infinite));
+    }
+
     [Fact]
     public async Task StartAndStop_CompleteSuccessfully()
     {
