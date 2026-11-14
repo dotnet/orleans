@@ -1,6 +1,11 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.EventSourcing;
 using Orleans.EventSourcing.Common;
 using Orleans.EventSourcing.CustomStorage;
+using Orleans.Hosting;
+using Orleans.Runtime;
+using Orleans.Storage;
 using Xunit;
 using CustomStorageAdaptor = Orleans.EventSourcing.CustomStorage.CustomStorageAdaptor<Tester.EventSourcingTests.TestLogView, Tester.EventSourcingTests.TestLogEntry>;
 using CustomUpdateNotification = Orleans.EventSourcing.CustomStorage.CustomStorageAdaptor<Tester.EventSourcingTests.TestLogView, Tester.EventSourcingTests.TestLogEntry>.UpdateNotificationMessage;
@@ -13,6 +18,90 @@ namespace Tester.EventSourcingTests;
 [TestArea("EventSourcing")]
 public sealed class CustomStorageLogViewAdaptorTests
 {
+    [Fact]
+    public async Task NamedFactories_SelectStorageByProviderAndPassGrainId()
+    {
+        var firstStorage = new DeterministicCustomStorageHost();
+        firstStorage.SetStoredState(["first"], 1);
+        var secondStorage = new DeterministicCustomStorageHost();
+        secondStorage.SetStoredState(["second"], 1);
+        var firstFactory = new RecordingCustomStorageFactory(firstStorage);
+        var secondFactory = new RecordingCustomStorageFactory(secondStorage);
+        var builder = Host.CreateApplicationBuilder();
+        builder.UseOrleans(silo => silo
+            .AddCustomStorageBasedLogConsistencyProvider("first")
+            .AddCustomStorageBasedLogConsistencyProvider("second"));
+        builder.Services.AddKeyedSingleton<ICustomStorageFactory>("first", firstFactory);
+        builder.Services.AddKeyedSingleton<ICustomStorageFactory>("second", secondFactory);
+        using var services = builder.Services.BuildServiceProvider();
+        var protocolServices = new RecordingProtocolServices();
+        var host = new RecordingLogViewAdaptorHost();
+        var first = CreateProviderAdaptor(services, "first", host, protocolServices);
+        var second = CreateProviderAdaptor(services, "second", host, protocolServices);
+
+        await Activate(first, "first factory-backed adaptor");
+        await Activate(second, "second factory-backed adaptor");
+        Assert.True(await TestPhase.Await(
+            first.TryAppend(new TestLogEntry("first-update")), "first factory-backed append"));
+        Assert.True(await TestPhase.Await(
+            second.TryAppend(new TestLogEntry("second-update")), "second factory-backed append"));
+        await TestPhase.Await(first.PostOnDeactivate(), "first factory-backed writer to finish");
+        await TestPhase.Await(second.PostOnDeactivate(), "second factory-backed writer to finish");
+
+        Assert.Equal(protocolServices.GrainId, Assert.Single(firstFactory.GrainIds));
+        Assert.Equal(protocolServices.GrainId, Assert.Single(secondFactory.GrainIds));
+        Assert.Equal(1, firstStorage.ReadCount);
+        Assert.Equal(1, secondStorage.ReadCount);
+        Assert.Equal(["first", "first-update"], firstStorage.StoredState.Entries);
+        Assert.Equal(["second", "second-update"], secondStorage.StoredState.Entries);
+        Assert.Equal(["first", "first-update"], first.ConfirmedView.Entries);
+        Assert.Equal(["second", "second-update"], second.ConfirmedView.Entries);
+    }
+
+    [Fact]
+    public async Task GrainStorage_TakesPrecedenceOverRegisteredFactory()
+    {
+        var host = new DeterministicCustomStorageHost();
+        host.SetStoredState(["grain"], 1);
+        var factoryStorage = new DeterministicCustomStorageHost();
+        factoryStorage.SetStoredState(["factory"], 1);
+        var factory = new RecordingCustomStorageFactory(factoryStorage);
+        var builder = Host.CreateApplicationBuilder();
+        builder.UseOrleans(silo => silo.AddCustomStorageBasedLogConsistencyProvider("custom"));
+        builder.Services.AddKeyedSingleton<ICustomStorageFactory>("custom", factory);
+        using var services = builder.Services.BuildServiceProvider();
+        var adaptor = CreateProviderAdaptor(services, "custom", host, new RecordingProtocolServices());
+
+        await Activate(adaptor, "grain-provided storage adaptor");
+        Assert.True(await TestPhase.Await(
+            adaptor.TryAppend(new TestLogEntry("update")), "grain-provided storage append"));
+        await TestPhase.Await(adaptor.PostOnDeactivate(), "grain-provided storage writer to finish");
+
+        Assert.Equal(["grain", "update"], host.StoredState.Entries);
+        Assert.Equal(["grain", "update"], adaptor.ConfirmedView.Entries);
+        Assert.Equal(1, host.ReadCount);
+        Assert.Equal(1, host.ApplyCount);
+        Assert.Empty(factory.GrainIds);
+        Assert.Equal(0, factoryStorage.ReadCount);
+        Assert.Equal(0, factoryStorage.ApplyCount);
+        Assert.Equal(["factory"], factoryStorage.StoredState.Entries);
+    }
+
+    [Fact]
+    public void MissingKeyedFactory_ReportsProviderConfigurationError()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.UseOrleans(silo => silo.AddCustomStorageBasedLogConsistencyProvider("missing"));
+        using var services = builder.Services.BuildServiceProvider();
+
+        var exception = Assert.Throws<BadProviderConfigException>(() =>
+            CreateProviderAdaptor(services, "missing", new RecordingLogViewAdaptorHost(), new RecordingProtocolServices()));
+
+        Assert.Contains("\"missing\"", exception.Message);
+        Assert.Contains(nameof(ICustomStorageFactory), exception.Message);
+        Assert.Contains(typeof(RecordingLogViewAdaptorHost).FullName!, exception.Message);
+    }
+
     [Fact]
     public async Task WriteAsync_WhenExpectedVersionMatches_PersistsEntriesInOrder()
     {
@@ -192,6 +281,17 @@ public sealed class CustomStorageLogViewAdaptorTests
         await TestPhase.Await(adaptor.PostOnDeactivate(), $"{phase} activation read to finish");
     }
 
+    private static CustomStorageAdaptor CreateProviderAdaptor(
+        IServiceProvider services,
+        string providerName,
+        RecordingLogViewAdaptorHost host,
+        RecordingProtocolServices protocolServices)
+    {
+        var provider = services.GetRequiredKeyedService<ILogViewAdaptorFactory>(providerName);
+        return Assert.IsType<CustomStorageAdaptor>(provider.MakeLogViewAdaptor(
+            host, new TestLogView(), host.GetType().FullName!, grainStorage: null, protocolServices));
+    }
+
     private static (TestCustomStorageAdaptor Adaptor, DeterministicCustomStorageHost Host, RecordingProtocolServices Services)
         CreateAdaptor(DeterministicCustomStorageHost? host = null)
     {
@@ -216,3 +316,16 @@ internal sealed class TestCustomStorageAdaptor(
     TestLogView initialState,
     RecordingProtocolServices services)
     : CustomStorageAdaptor(host, initialState, services, primaryCluster: null, host);
+
+internal sealed class RecordingCustomStorageFactory(DeterministicCustomStorageHost storage) : ICustomStorageFactory
+{
+    public List<GrainId> GrainIds { get; } = [];
+
+    public ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(GrainId grainId)
+    {
+        GrainIds.Add(grainId);
+        return storage is ICustomStorageInterface<TState, TDelta> result
+            ? result
+            : throw new InvalidOperationException("Unexpected custom storage types.");
+    }
+}

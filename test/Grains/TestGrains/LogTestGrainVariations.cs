@@ -204,7 +204,7 @@ namespace TestGrains
         {
             IReadOnlyList<TDelta> result = events
                 .GetRange(fromVersion, toVersion - fromVersion)
-                .Select(copier.Copy)
+                .Select(entry => copier.Copy(entry)!)
                 .ToList();
             return Task.FromResult(result);
         }
