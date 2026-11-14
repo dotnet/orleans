@@ -61,7 +61,9 @@ namespace Orleans.Metadata
 
         private GrainType GetGrainTypeByConvention(Type type)
         {
+#pragma warning disable CA1308 // Lowercase grain type identifiers preserve the established routing contract.
             var name = type.Name.ToLowerInvariant();
+#pragma warning restore CA1308
 
             // Trim generic arity
             var index = name.IndexOf('`', StringComparison.Ordinal);
