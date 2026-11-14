@@ -3519,6 +3519,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
         public static Cloning.IDeepCopier<T>? GetOptionalCopier<T>(Cloning.IDeepCopier<T> copier) { throw null; }
 
+        public static TCopiers GetProxyCopiers<TCopiers>(Serializers.ICodecProvider codecProvider, System.Func<Serializers.ICodecProvider, TCopiers> factory)
+            where TCopiers : class { throw null; }
+
         public static TService GetService<TService>(object caller, Serializers.ICodecProvider codecProvider) { throw null; }
 
         public static object InvokableThrowArgumentOutOfRange(int index, int maxArgs) { throw null; }

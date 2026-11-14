@@ -17,6 +17,9 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 {
     private const string CopyContextPoolMemberName = "CopyContextPool";
     private const string CodecProviderMemberName = "CodecProvider";
+    private const string CopiersTypeName = "ProxyCopiers";
+    private const string CopiersFieldName = "_copiers";
+    private const string CopiersCodecProviderParameterName = "codecProvider";
     private readonly IGeneratorServices _generatorServices = generatorServices;
     private readonly CopierGenerator _copierGenerator = copierGenerator;
 
@@ -29,19 +32,22 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
     public ProxyEmissionPlan CreatePlan(ProxyInterfaceDescription interfaceDescription)
     {
         var generatedClassName = GetSimpleClassName(interfaceDescription);
-        var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
-        var methods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
-        var (constructors, constructorStatements) = CreateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+        var copierFields = GetFieldDescriptions(interfaceDescription);
+        var hasCopiers = copierFields.Count > 0;
+        var methods = CreateProxyMethods(copierFields, interfaceDescription);
+        var (constructors, constructorStatements) = CreateConstructors(generatedClassName, hasCopiers, interfaceDescription.ProxyBaseType);
 
         return new ProxyEmissionPlan(
             generatedClassName,
             CodeText.Type(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
             CodeText.Type(interfaceDescription.InterfaceType.ToTypeSyntax()),
             GenericParameterEmissionPlan.Create(interfaceDescription.TypeParameters),
-            fieldDescriptions.Select(static field => $"private readonly {CodeText.Type(field.FieldType)} {field.FieldName};").ToImmutableArray(),
+            hasCopiers ? ImmutableArray.Create($"private readonly {CopiersTypeName} {CopiersFieldName};") : [],
             constructors,
             constructorStatements,
-            methods);
+            methods,
+            copierFields.Select(static field => $"public readonly {CodeText.Type(field.FieldType)} {CodeText.Identifier(field.FieldName)};").ToImmutableArray(),
+            copierFields.Select(static field => $"{CodeText.Identifier(field.FieldName)} = {GetServiceExpression(CodeText.Type(field.FieldType), CopiersCodecProviderParameterName)};").ToImmutableArray());
     }
 
     internal static void Write(SourceWriter writer, ProxyEmissionPlan plan)
@@ -82,6 +88,31 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             writer.CloseBlock();
         }
 
+        if (plan.CopierFields.Count > 0)
+        {
+            WriteCopiers(writer, plan);
+        }
+
+        writer.CloseBlock();
+    }
+
+    private static void WriteCopiers(SourceWriter writer, ProxyEmissionPlan plan)
+    {
+        writer.WriteLine($"private sealed class {CopiersTypeName}");
+        writer.OpenBlock();
+        foreach (var field in plan.CopierFields)
+        {
+            writer.WriteLine(field);
+        }
+
+        writer.WriteLine($"public {CopiersTypeName}(global::Orleans.Serialization.Serializers.ICodecProvider {CopiersCodecProviderParameterName})");
+        writer.OpenBlock();
+        foreach (var statement in plan.CopierStatements)
+        {
+            writer.WriteLine(statement);
+        }
+
+        writer.CloseBlock();
         writer.CloseBlock();
     }
 
@@ -323,7 +354,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                 hasCopyContext = true;
             }
 
-            var value = _copierGenerator.GenerateMemberCopy(fieldDescriptions, codecs, parameter).Copy($"arg{parameterIndex}", "copyContext");
+            var value = _copierGenerator.GenerateMemberCopy(fieldDescriptions, codecs, parameter, CopiersFieldName).Copy($"arg{parameterIndex}", "copyContext");
             statements.Add($"request.arg{parameterIndex} = {value};");
             parameterIndex++;
         }
@@ -407,7 +438,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     private static (EquatableArray<string> Declarations, EquatableArray<string> Statements) CreateConstructors(
         string simpleClassName,
-        List<GeneratedFieldDescription> fieldDescriptions,
+        bool hasCopiers,
         INamedTypeSymbol baseType)
     {
         if (baseType is null)
@@ -415,20 +446,10 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             return ([], []);
         }
 
-        var statements = ImmutableArray.CreateBuilder<string>();
-        foreach (var field in fieldDescriptions)
-        {
-            var name = CodeText.Identifier(field.FieldName);
-            switch (field)
-            {
-                case GeneratedFieldDescription _ when field.IsInjected:
-                    statements.Add($"this.{name} = OrleansGeneratedCodeHelper.UnwrapService(this, {name});");
-                    break;
-                case CopierFieldDescription:
-                    statements.Add($"{name} = {GetServiceExpression(CodeText.Type(field.FieldType), CodecProviderMemberName)};");
-                    break;
-            }
-        }
+        // Every proxy of this type shares the copier set which its codec provider resolved once.
+        EquatableArray<string> statements = hasCopiers
+            ? ImmutableArray.Create($"{CopiersFieldName} = OrleansGeneratedCodeHelper.GetProxyCopiers<{CopiersTypeName}>({CodecProviderMemberName}, {CopiersCodecProviderParameterName} => new {CopiersTypeName}({CopiersCodecProviderParameterName}));")
+            : [];
 
         var declarations = ImmutableArray.CreateBuilder<string>();
         foreach (var member in baseType.GetMembers())
@@ -474,7 +495,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             declarations.Add(declaration.Append(')').ToString());
         }
 
-        return (declarations.ToImmutable(), statements.ToImmutable());
+        return (declarations.ToImmutable(), statements);
     }
 
     private static void AppendParameters(StringBuilder builder, ImmutableArray<IParameterSymbol> parameters, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)

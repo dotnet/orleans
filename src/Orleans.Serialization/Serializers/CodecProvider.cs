@@ -37,6 +37,8 @@ namespace Orleans.Serialization.Serializers
         private readonly ConcurrentDictionary<Type, IDeepCopier> _typedCopiers = new();
 
         private readonly ConcurrentDictionary<Type, object> _serializerServices = new();
+        // Generated proxy copier sets, keyed by their generated type, which is unique to each closed proxy type.
+        private readonly ConcurrentDictionary<Type, object> _proxyCopiers = new();
         // A null target groups array and bare-parameter patterns for shape matching.
         private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationContract Contract)>> _implementationCandidates = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -795,6 +797,17 @@ namespace Orleans.Serialization.Serializers
                 scope.CacheValue(cache, key, value);
                 return value;
             }
+        }
+
+        internal TCopiers GetProxyCopiers<TCopiers>(Func<ICodecProvider, TCopiers> factory) where TCopiers : class
+            => _proxyCopiers.TryGetValue(typeof(TCopiers), out var copiers) ? (TCopiers)copiers : CreateProxyCopiers(factory);
+
+        private TCopiers CreateProxyCopiers<TCopiers>(Func<ICodecProvider, TCopiers> factory) where TCopiers : class
+        {
+            var copiers = factory(this);
+
+            // Like the provider's other caches, publish only copiers from completed construction graphs.
+            return IsConstructionPending ? copiers : (TCopiers)_proxyCopiers.GetOrAdd(typeof(TCopiers), copiers);
         }
 
         internal bool IsConstructionPending

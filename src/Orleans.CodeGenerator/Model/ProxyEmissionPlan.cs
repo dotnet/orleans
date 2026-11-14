@@ -3,6 +3,11 @@ namespace Orleans.CodeGenerator.Model;
 /// <summary>
 /// The spelled declaration of a generated proxy class. Every constructor shares <see cref="ConstructorStatements"/>.
 /// </summary>
+/// <remarks>
+/// Proxies with instance copiers declare a nested copier set holding <see cref="CopierFields"/>, which
+/// <see cref="CopierStatements"/> resolve from a codec provider. The codec provider caches one set per proxy type, and
+/// each proxy references that shared set.
+/// </remarks>
 internal sealed record ProxyEmissionPlan(
     string ClassName,
     string BaseType,
@@ -11,7 +16,9 @@ internal sealed record ProxyEmissionPlan(
     EquatableArray<string> Fields,
     EquatableArray<string> Constructors,
     EquatableArray<string> ConstructorStatements,
-    EquatableArray<ProxyMethodEmissionPlan> Methods)
+    EquatableArray<ProxyMethodEmissionPlan> Methods,
+    EquatableArray<string> CopierFields,
+    EquatableArray<string> CopierStatements)
 {
     /// <summary>The metadata name of the generated type within <paramref name="generatedNamespace"/>.</summary>
     public string GetMetadataName(string generatedNamespace)

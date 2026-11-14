@@ -464,10 +464,12 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     /// Plans the copy of a member value: shallow values are assigned, and other values are copied by a static, generated,
     /// or context-resolved copier.
     /// </summary>
+    /// <param name="copierFieldOwner">The expression which holds <paramref name="copierFields"/>, or <see langword="null"/> when they are fields of the current instance.</param>
     public MemberCopyPlan GenerateMemberCopy(
         List<GeneratedFieldDescription> copierFields,
         List<ICopierDescription>? copiers,
-        ISerializableMember member)
+        ISerializableMember member,
+        string? copierFieldOwner = null)
     {
         if (copiers is null || member.IsShallowCopyable)
             return MemberCopyPlan.Value;
@@ -492,7 +494,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         else
         {
             var instanceCopier = copierFields.OfType<CopierFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
-            copierExpression = GetCodecExpression(instanceCopier);
+            copierExpression = copierFieldOwner is null ? GetCodecExpression(instanceCopier) : $"{copierFieldOwner}.{instanceCopier.FieldName}";
         }
 
         // If the member type differs from the copier type (eg because the member is an array), cast the result.

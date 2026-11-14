@@ -105,10 +105,10 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Proxy_IComplexGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IComplexGrain
     {
-        private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
+        private readonly ProxyCopiers _copiers;
         public Proxy_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
-            _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
+            _copiers = OrleansGeneratedCodeHelper.GetProxyCopiers<ProxyCopiers>(CodecProvider, codecProvider => new ProxyCopiers(codecProvider));
         }
 
         global::System.Threading.Tasks.Task<global::TestProject.ComplexData> global::TestProject.IComplexGrain.ProcessData(int arg0, string arg1, global::TestProject.ComplexData arg2, global::System.Threading.CancellationToken arg3)
@@ -117,9 +117,18 @@ namespace OrleansCodeGen.TestProject
             request.arg0 = arg0;
             request.arg1 = arg1;
             using var copyContext = base.CopyContextPool.GetContext();
-            request.arg2 = _copier_ComplexData_765A40ED2309AF35.DeepCopy(arg2, copyContext);
+            request.arg2 = _copiers._copier_ComplexData_765A40ED2309AF35.DeepCopy(arg2, copyContext);
             request.arg3 = arg3;
             return base.InvokeAsync<global::TestProject.ComplexData>(request).AsTask();
+        }
+
+        private sealed class ProxyCopiers
+        {
+            public readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
+            public ProxyCopiers(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+            {
+                _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, codecProvider);
+            }
         }
     }
 
