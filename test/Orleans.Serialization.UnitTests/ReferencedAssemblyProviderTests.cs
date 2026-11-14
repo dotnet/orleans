@@ -1,18 +1,14 @@
 using System;
-#if NET10_0_OR_GREATER
 using System.Buffers.Binary;
-#endif
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-#if NET10_0_OR_GREATER
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
-#endif
 using Orleans.Serialization.Internal;
 
 namespace Orleans.Serialization.UnitTests;
@@ -23,6 +19,15 @@ namespace Orleans.Serialization.UnitTests;
 [TestArea("Serialization")]
 public sealed class ReferencedAssemblyProviderTests
 {
+    [Fact]
+    public void AddAssemblyRejectsNullPartsBeforeInspectingApplicationParts()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => ReferencedAssemblyProvider.AddAssembly(null!, typeof(object).Assembly));
+
+        Assert.Equal("parts", exception.ParamName);
+    }
+
     [Fact]
     public void AddAssemblyDiscoversGeneratedApplicationPartsWithoutAssemblyFiles()
     {
@@ -81,7 +86,6 @@ public sealed class ReferencedAssemblyProviderTests
         Assert.False(ReferencedAssemblyProvider.AreAssemblyFilesAvailable(assembly));
     }
 
-#if NET10_0_OR_GREATER
     [Fact]
     public void NetStandardAssetDependencyContextDiscoveryExposesAssemblyFileRequirement()
     {
@@ -119,7 +123,6 @@ public sealed class ReferencedAssemblyProviderTests
             attributeNames);
         Assert.True(methodBody.GetILBytes().AsSpan().IndexOf(expectedCall) >= 0);
     }
-#endif
 
     private static Assembly CreateApplicationPartAssembly(string referencedAssemblyName)
     {
@@ -131,7 +134,6 @@ public sealed class ReferencedAssemblyProviderTests
         return assembly;
     }
 
-#if NET10_0_OR_GREATER
     private static string GetAttributeTypeName(MetadataReader metadata, CustomAttribute attribute)
     {
         var typeHandle = attribute.Constructor.Kind switch
@@ -154,5 +156,4 @@ public sealed class ReferencedAssemblyProviderTests
 
     private static string GetTypeName(MetadataReader metadata, TypeReference type)
         => $"{metadata.GetString(type.Namespace)}.{metadata.GetString(type.Name)}";
-#endif
 }

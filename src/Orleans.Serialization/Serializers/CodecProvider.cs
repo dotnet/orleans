@@ -702,9 +702,9 @@ namespace Orleans.Serialization.Serializers
                 Initialize();
             }
             var current = OrleansGeneratedCodeHelper.GetConstructionScope(this);
-            var scope = current ?? new ConstructionScope(this);
-            var isRoot = current is null;
-            if (isRoot)
+            using var ownedScope = current is null ? new ConstructionScope(this) : null;
+            var scope = current ?? ownedScope!; // Nested resolutions borrow the root's scope.
+            if (ownedScope is not null)
             {
                 OrleansGeneratedCodeHelper.EnterServiceResolution(this, scope);
             }
@@ -742,7 +742,7 @@ namespace Orleans.Serialization.Serializers
             }
             finally
             {
-                if (isRoot)
+                if (ownedScope is not null)
                 {
                     try
                     {
@@ -751,7 +751,6 @@ namespace Orleans.Serialization.Serializers
                     finally
                     {
                         OrleansGeneratedCodeHelper.ExitServiceResolution();
-                        scope.Dispose();
                     }
                 }
             }

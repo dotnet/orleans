@@ -18,11 +18,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     private TaskCompletionSource? _queueChangedWaiter;
     private int _jobCount;
     private bool _isComplete;
-#if NET9_0_OR_GREATER
     private readonly Lock _syncLock = new();
-#else
-    private readonly object _syncLock = new();
-#endif
 
     public InMemoryJobQueue(TimeProvider? timeProvider = null)
     {

@@ -33,7 +33,7 @@ afterEach(async () => {
 });
 
 describe('documentation source quality', () => {
-  test('uses evaluated package metadata instead of raw conditional XML', async () => {
+  test('classifies prerelease alpha suffixes with a dev prefix', async () => {
     const repositoryRoot = await mkdtemp(path.join(os.tmpdir(), 'orleans-package-policy-'));
     temporaryDirectories.push(repositoryRoot);
     const projectRoot = path.join(repositoryRoot, 'src', 'Conditional');
@@ -57,7 +57,7 @@ describe('documentation source quality', () => {
         return {
           IsPackable: 'true',
           PackageId: 'Microsoft.Orleans.Conditional',
-          VersionSuffix: 'alpha.1',
+          VersionSuffix: 'dev.alpha.1',
         };
       },
     });

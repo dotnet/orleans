@@ -18,17 +18,22 @@ internal abstract partial class GrainTimer : IGrainTimer
     private readonly IGrainContext _grainContext;
     private readonly TimerRegistry _shared;
     private readonly LocalRequestOptions _options;
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "The reusable invocation adapter borrows this timer and owns no disposable resources; the activation owns timer disposal.")]
     private readonly TimerTickInvoker _invoker;
     private TimerState _state;
     // The current arm while idle; the next delay once a tick is queued. Change replaces it.
     private TimeSpan _dueTime;
     private TimeSpan _period;
 
+    [Flags]
     private enum TimerState : byte
     {
-        Idle,
-        Busy,
-        Disposed
+        Idle = 0,
+        Busy = 1,
+        CallbackRunning = 2,
+        Cancelling = 4,
+        Disposed = 8
     }
 
     public GrainTimer(TimerRegistry shared, IGrainContext grainContext, bool interleave, bool keepAlive)
@@ -73,7 +78,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             lock (_cts)
             {
-                return _state == TimerState.Disposed;
+                return (_state & TimerState.Disposed) != 0;
             }
         }
     }
@@ -135,14 +140,16 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            if (_state == TimerState.Disposed)
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return new(Response.Completed);
             }
 
             Debug.Assert(_state == TimerState.Busy);
+            _state |= TimerState.CallbackRunning;
         }
 
+        var completeSynchronously = true;
         try
         {
             LogTraceBeforeCallback(Logger, this);
@@ -154,6 +161,7 @@ internal abstract partial class GrainTimer : IGrainTimer
             if (task is { IsCompletedSuccessfully: false })
             {
                 // Complete asynchronously.
+                completeSynchronously = false;
                 return AwaitCallbackTask(task);
             }
             else
@@ -162,15 +170,20 @@ internal abstract partial class GrainTimer : IGrainTimer
                 LogTraceAfterCallback(Logger, this);
 
                 GrainTimerEvents.EmitTickStop(GrainContext, this);
-                OnTickCompleted();
                 return new(Response.Completed);
             }
         }
         catch (Exception exc)
         {
             GrainTimerEvents.EmitTickStop(GrainContext, this, exc);
-            OnTickCompleted();
             return new(Response.FromException(exc));
+        }
+        finally
+        {
+            if (completeSynchronously)
+            {
+                OnTickCompleted();
+            }
         }
     }
 
@@ -179,7 +192,8 @@ internal abstract partial class GrainTimer : IGrainTimer
         bool queueTick;
         lock (_cts)
         {
-            if (_state == TimerState.Disposed)
+            ReleaseCancellationSource(TimerState.CallbackRunning);
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return;
             }
@@ -192,6 +206,18 @@ internal abstract partial class GrainTimer : IGrainTimer
         if (queueTick)
         {
             QueueTickOnActivation();
+        }
+    }
+
+    // Cancellation and an admitted callback each retain the source until their completion.
+    private void ReleaseCancellationSource(TimerState owner)
+    {
+        Debug.Assert(Monitor.IsEntered(_cts));
+        Debug.Assert((_state & owner) != 0);
+        _state &= ~owner;
+        if (_state == TimerState.Disposed)
+        {
+            _cts.Dispose();
         }
     }
 
@@ -226,7 +252,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         var queueTick = false;
         lock (_cts)
         {
-            if (_state == TimerState.Disposed)
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return;
             }
@@ -266,13 +292,13 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            if (_state == TimerState.Disposed)
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return;
             }
 
             // Publish disposal before cancellation, whose registrations can reenter Change/Dispose.
-            _state = TimerState.Disposed;
+            _state = (_state & TimerState.CallbackRunning) | TimerState.Disposed | TimerState.Cancelling;
             _timer.Dispose();
         }
 
@@ -284,6 +310,13 @@ internal abstract partial class GrainTimer : IGrainTimer
         catch (Exception exception)
         {
             LogErrorCancellingCallback(Logger, exception);
+        }
+        finally
+        {
+            lock (_cts)
+            {
+                ReleaseCancellationSource(TimerState.Cancelling);
+            }
         }
 
         GrainTimerEvents.EmitDisposed(GrainContext, this);

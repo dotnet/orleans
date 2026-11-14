@@ -1,7 +1,8 @@
-using Orleans.Runtime;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Threading;
+using Orleans.Runtime;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -31,7 +32,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="dimensions">The block pool metric dimensions.</param>
         /// <param name="instruments">The Orleans runtime instruments.</param>
         public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
-            : this(new KeyValuePair<string, object>[] { new("BlockPoolId", dimensions.BlockPoolId) }, instruments.Meter)
+            : this(CreateDimensions(dimensions), GetMeter(instruments))
         {
         }
 
@@ -41,8 +42,20 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="dimensions">The dimensions attached to metrics reported by this monitor.</param>
         /// <param name="instruments">The Orleans runtime instruments.</param>
         protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
-            : this(dimensions, instruments.Meter)
+            : this(dimensions, GetMeter(instruments))
         {
+        }
+
+        private static KeyValuePair<string, object>[] CreateDimensions(BlockPoolMonitorDimensions dimensions)
+        {
+            ArgumentNullException.ThrowIfNull(dimensions);
+            return [new("BlockPoolId", dimensions.BlockPoolId)];
+        }
+
+        private static Meter GetMeter(OrleansInstruments instruments)
+        {
+            ArgumentNullException.ThrowIfNull(instruments);
+            return instruments.Meter;
         }
 
         private DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)

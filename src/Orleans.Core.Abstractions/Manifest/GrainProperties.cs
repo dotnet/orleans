@@ -278,6 +278,11 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain properties to <paramref name="properties"/>.
         /// </summary>
+        /// <remarks>
+        /// <see cref="AttributeGrainPropertiesProvider"/> validates that <paramref name="grainClass"/> and
+        /// <paramref name="properties"/> are non-null before dispatching to attributes. Direct callers must
+        /// also provide a non-null grain class and properties collection.
+        /// </remarks>
         /// <param name="services">
         /// The service provider.
         /// </param>
@@ -312,8 +317,11 @@ namespace Orleans.Metadata
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="grainClass"/> or <paramref name="properties"/> is <see langword="null"/>.</exception>
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
+            ArgumentNullException.ThrowIfNull(grainClass);
+            ArgumentNullException.ThrowIfNull(properties);
             foreach (var attr in grainClass.GetCustomAttributes(inherit: true))
             {
                 if (attr is IGrainPropertiesProviderAttribute providerAttribute)
@@ -371,8 +379,11 @@ namespace Orleans.Metadata
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="grainClass"/> or <paramref name="properties"/> is <see langword="null"/>.</exception>
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
+            ArgumentNullException.ThrowIfNull(grainClass);
+            ArgumentNullException.ThrowIfNull(properties);
             var bindingIndex = 1;
             foreach (var attr in grainClass.GetCustomAttributes(inherit: true))
             {

@@ -26,21 +26,23 @@ namespace Orleans.Runtime
         /// <summary>Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
         private readonly ILocalSiloDetails siloDetails;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
+            Justification = "The host service container owns this service and disposes it after silo shutdown.")]
         private readonly MessageCenter messageCenter;
         private readonly ILogger logger;
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly InsideRuntimeClient runtimeClient;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
+            Justification = "The host service container owns this service and disposes it after silo shutdown.")]
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-#if NET9_0_OR_GREATER
         private readonly Lock lockable = new();
-#else
-        private readonly object lockable = new();
-#endif
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly List<GrainService> grainServices = new List<GrainService>();
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
+            Justification = "The host service container owns this service and disposes it after silo shutdown.")]
         private readonly ILoggerFactory loggerFactory;
 
         internal IConsistentRingProvider RingProvider { get; }

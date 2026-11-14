@@ -1,10 +1,8 @@
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
-#if NET10_0_OR_GREATER
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
-#endif
 using Orleans.Runtime;
 using Xunit;
 
@@ -12,13 +10,11 @@ namespace Tester.Diagnostics;
 
 public class ApplicationRequestInstrumentsTests
 {
-#if NET10_0_OR_GREATER
     private static readonly double[] ExampleBoundaries =
     [
         1, 5, 10, 25, 50, 100, 250,
         500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000
     ];
-#endif
 
     [TestSuite("BVT")]
     [TestProvider("None")]
@@ -71,7 +67,6 @@ public class ApplicationRequestInstrumentsTests
         Assert.Empty(measurement.Tags);
     }
 
-#if NET10_0_OR_GREATER
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
@@ -250,5 +245,4 @@ public class ApplicationRequestInstrumentsTests
         IReadOnlyList<HistogramBucketSnapshot> Buckets);
 
     private sealed record HistogramBucketSnapshot(double Bound, long Count);
-#endif
 }

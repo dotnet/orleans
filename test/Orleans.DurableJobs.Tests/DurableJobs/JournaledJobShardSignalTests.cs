@@ -1,4 +1,5 @@
 using System.Net;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -121,6 +122,55 @@ public partial class JournaledJobShardManagerTests
         await test.Shard.DisposeAsync().AsTask().WaitAsync(test.Token);
         Assert.Equal(0, test.Storage.AppendCount);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => test.Schedule(0));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FlushSignal_CancellationCallbackFailureStillReleasesOwnedResources(bool activeWrite)
+    {
+        await using var test = await SignalTest.CreateAsync();
+        Task<DurableJob?>? active = null;
+        Task<DurableJob?>? queued = null;
+        if (activeWrite)
+        {
+            var write = test.GateNextAppend();
+            active = test.Schedule(0);
+            await write.Started.Task.WaitAsync(test.Token);
+            queued = test.Schedule(1);
+        }
+
+        var source = Assert.IsType<CancellationTokenSource>(
+            typeof(JournaledJobShard).GetField("_shutdownCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(test.Shard));
+        var processor = Assert.IsAssignableFrom<Task>(
+            typeof(JournaledJobShard).GetField("_operationProcessor", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(test.Shard));
+        var stateManager = Assert.IsAssignableFrom<IJournaledStateManager>(
+            typeof(JournaledJobShard).GetField("_stateManager", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(test.Shard));
+        var handle = source.Token.WaitHandle;
+        var expected = new InvalidOperationException("Shutdown notification failed.");
+        var callbackThread = 0;
+        using var registration = source.Token.Register(() =>
+        {
+            callbackThread = Environment.CurrentManagedThreadId;
+            throw expected;
+        });
+
+        var callerThread = Environment.CurrentManagedThreadId;
+        var disposal = test.Shard.DisposeAsync().AsTask();
+        var exception = await Assert.ThrowsAsync<AggregateException>(() => disposal.WaitAsync(test.Token));
+
+        Assert.Equal(callerThread, callbackThread);
+        Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+        Assert.True(processor.IsCompletedSuccessfully);
+        Assert.Throws<ObjectDisposedException>(() => handle.WaitOne(0));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => stateManager.InitializeAsync(test.Token).AsTask());
+        if (active is not null && queued is not null)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => active.WaitAsync(test.Token));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued.WaitAsync(test.Token));
+        }
+
+        await test.Shard.DisposeAsync();
     }
 
     [Fact]

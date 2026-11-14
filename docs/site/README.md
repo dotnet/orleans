@@ -88,7 +88,7 @@ may use a prerelease of `10.2.2` with the same property and a specific reason. T
 build and test the documentation projects locally, run:
 
 ```powershell
-dotnet test --solution ../Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false --minimum-expected-tests 1 --max-parallel-test-modules 1
+dotnet test --solution ../Docs.slnx --configuration Release --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1
 ```
 
 Build samples through `samples/Build-Samples.ps1`, which packs the current Orleans

@@ -415,24 +415,28 @@ internal sealed partial class ActivationRebalancerWorker(
         Debug.Assert(totalActivations > 0);
         Debug.Assert(meanMemoryUsage > 0);
 
-        var ratios = values.Select(x =>
-            // p_i = (n_i / N) * (m_i / M_m)
-            ((double)x.ActivationCount / totalActivations) * (x.MemoryUsage / meanMemoryUsage));
-
-        var ratiosSum = ratios.Sum();
-        var normalizedRatios = ratios.Select(r => r / ratiosSum);
+        var ratiosSum = 0d;
+        foreach (var statistics in values)
+        {
+            ratiosSum += GetRatio(statistics);
+        }
 
         const double epsilon = 1e-10d;
-
-        var entropy = -normalizedRatios.Sum(p =>
+        var entropySum = 0d;
+        foreach (var statistics in values)
         {
-            var value = Math.Max(p, epsilon);  // Avoid log(0)
-            return value * Math.Log(value);    // - sum(p_i * log(p_i))
-        });
+            var value = Math.Max(GetRatio(statistics) / ratiosSum, epsilon);
+            entropySum += value * Math.Log(value);
+        }
 
+        var entropy = -entropySum;
         Debug.Assert(entropy > 0);
 
         return entropy;
+
+        // p_i = (n_i / N) * (m_i / M_m)
+        double GetRatio(ResourceStatistics statistics)
+            => ((double)statistics.ActivationCount / totalActivations) * (statistics.MemoryUsage / meanMemoryUsage);
     }
 
     private static double ComputeHarmonicMean(Dictionary<SiloAddress, ResourceStatistics>.ValueCollection values)

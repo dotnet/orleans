@@ -37,6 +37,16 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
     internal SerializerEmissionPlan CreatePlan(ISerializableTypeDescription type, SerializableTypeEmissionPlan? typePlan = null)
     {
+        if (type is SerializableTypeDescription { UnionCases: { } unionCases })
+        {
+            return new UnionCodecGenerator(_generatorServices).CreateSerializerPlan(type, unionCases, typePlan);
+        }
+
+        // A tagged closed type is both a field codec and the base codec used by its cases.
+        var closedTypeCaseCodecs = type is SerializableTypeDescription { IsAbstractType: true } closedType && closedType.GetClosedTypeCases() is { } closedTypeCases
+            ? new UnionCodecGenerator(_generatorServices).GetCaseCodecs(closedTypeCases)
+            : null;
+        var isAbstractSerializer = type.IsAbstractType && closedTypeCaseCodecs is null;
         var members = new List<ISerializableMember>();
         foreach (var member in type.Members)
         {
@@ -60,7 +70,13 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
 
         var fieldDescriptions = GetFieldDescriptions(type, members);
-        var construction = new GeneratedTypeConstruction(LibraryTypes, fieldDescriptions, HasBaseCodec(type));
+        if (closedTypeCaseCodecs is not null)
+        {
+            fieldDescriptions.Add(new CodecFieldTypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, type.TypeSyntax));
+            fieldDescriptions.AddRange(closedTypeCaseCodecs.Where(static codec => codec.CodecField is not null).Select(static codec => codec.CodecField!));
+        }
+
+        var construction = new GeneratedTypeConstruction(LibraryTypes, fieldDescriptions, HasBaseCodec(type) || closedTypeCaseCodecs is not null);
         var hotReloadShape = UseHotReloadShape(type);
         var memberPlans = members.Select(member =>
         {
@@ -81,11 +97,12 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : construction.HasBaseContract ? LibraryTypes.BaseCodec_1 : null;
         return new(typePlan ?? SerializableTypeEmissionPlan.Create(type, LibraryTypes),
-            CodeText.Type((type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax)),
+            CodeText.Type((isAbstractSerializer ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax)),
             serializerInterface is not null ? CodeText.Type(serializerInterface.ToTypeSyntax(type.TypeSyntax)) : null,
             ConstructionEmissionPlan.Create(construction),
             fieldDescriptions.Select(FieldEmissionPlan.Create).ToImmutableArray(), memberPlans,
-            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null);
+            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null,
+            closedTypeCaseCodecs is null ? null : closedTypeCaseCodecs.Select(static codec => codec.ToEmissionPlan()).ToImmutableArray());
     }
 
     internal static void Write(SourceWriter writer, SerializerEmissionPlan plan)
@@ -93,12 +110,13 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         var type = plan.Type;
         var simpleClassName = GetSimpleClassName(type.Name);
         var members = plan.Members.ToList();
+        var isAbstractSerializer = type.IsAbstractType && plan.UnionCases is null;
 
         var declaration = new StringBuilder();
         declaration.Append(type.IsPublic ? "public" : "internal").Append(" sealed class ").Append(simpleClassName);
         type.AppendTypeParameterList(declaration);
         declaration.Append(" : ").Append(plan.BaseType);
-        if (plan.Enum is null && !type.IsAbstractType && plan.AdditionalInterface is { } additionalInterface)
+        if (plan.Enum is null && !isAbstractSerializer && plan.AdditionalInterface is { } additionalInterface)
         {
             declaration.Append(", ").Append(additionalInterface);
         }
@@ -114,11 +132,19 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             EnumSerializerGenerator.WriteWriteMethod(writer, enumPlan);
             EnumSerializerGenerator.WriteReadMethod(writer, enumPlan);
         }
+        else if (type.IsValueType && plan.UnionCases is { } unionCases)
+        {
+            UnionCodecGenerator.WriteUnionCodecMethods(writer, type, unionCases);
+        }
         else
         {
-            WriteSerializeMethod(writer, type, members);
-            WriteDeserializeMethod(writer, type, members);
-            if (!type.IsAbstractType)
+            WriteSerializeMethod(writer, type, members, isAbstractSerializer);
+            WriteDeserializeMethod(writer, type, members, isAbstractSerializer);
+            if (plan.UnionCases is { } closedTypeCases)
+            {
+                UnionCodecGenerator.WriteClosedTypeFieldCodecMethods(writer, type, closedTypeCases);
+            }
+            else if (!isAbstractSerializer)
             {
                 WriteCompoundTypeWriteFieldMethod(writer, type);
                 WriteCompoundTypeReadValueMethod(writer, type, plan.Fields);
@@ -392,10 +418,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     private static int CountCallbacks(SerializableTypeEmissionPlan type, string callbackMethodName)
         => type.SerializationHooks.Count(callback => callback.Method == callbackMethodName);
 
-    private static void WriteSerializeMethod(SourceWriter writer, SerializableTypeEmissionPlan type, List<MemberEmissionPlan> members)
+    private static void WriteSerializeMethod(SourceWriter writer, SerializableTypeEmissionPlan type, List<MemberEmissionPlan> members, bool isAbstractSerializer)
     {
         // An abstract base serializer contributes no member when it has nothing to write.
-        if (type.IsAbstractType && !type.HasComplexBaseType && !type.IncludePrimaryConstructorParameters && members.Count == 0
+        if (isAbstractSerializer && !type.HasComplexBaseType && !type.IncludePrimaryConstructorParameters && members.Count == 0
             && CountCallbacks(type, "OnSerializing") == 0 && CountCallbacks(type, "OnSerialized") == 0)
         {
             return;
@@ -403,8 +429,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
         var instanceModifiers = type.IsValueType ? type.Library.HasScopedKeyword ? "scoped ref " : "ref " : string.Empty;
-        writer.WriteLine($"public {(type.IsAbstractType ? "override " : string.Empty)}void Serialize<TBufferWriter>(ref {type.Library.Writer} writer, {instanceModifiers}{type.Type} instance)");
-        if (!type.IsAbstractType)
+        writer.WriteLine($"public {(isAbstractSerializer ? "override " : string.Empty)}void Serialize<TBufferWriter>(ref {type.Library.Writer} writer, {instanceModifiers}{type.Type} instance)");
+        if (!isAbstractSerializer)
         {
             WriteBufferWriterConstraint(writer, type.Library);
         }
@@ -482,13 +508,13 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private static void WriteDeserializeMethod(SourceWriter writer, SerializableTypeEmissionPlan type, List<MemberEmissionPlan> members)
+    private static void WriteDeserializeMethod(SourceWriter writer, SerializableTypeEmissionPlan type, List<MemberEmissionPlan> members, bool isAbstractSerializer)
     {
         var nonCtorMembers = type.IncludePrimaryConstructorParameters ? members.FindAll(static m => !m.IsPrimaryConstructorParameter) : members;
         var consumesEmptyObject = (members.Count == 0 || nonCtorMembers.Count == 0) && !type.IncludePrimaryConstructorParameters;
 
         // An abstract base serializer contributes no member when it only consumes the end of the object.
-        if (type.IsAbstractType && consumesEmptyObject && !type.HasComplexBaseType
+        if (isAbstractSerializer && consumesEmptyObject && !type.HasComplexBaseType
             && CountCallbacks(type, "OnDeserializing") == 0 && CountCallbacks(type, "OnDeserialized") == 0)
         {
             return;
@@ -496,7 +522,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
         var instanceModifiers = type.IsValueType ? type.Library.HasScopedKeyword ? "scoped ref " : "ref " : string.Empty;
-        writer.WriteLine($"public {(type.IsAbstractType ? "override " : string.Empty)}void Deserialize<TReaderInput>(ref {type.Library.Reader} reader, {instanceModifiers}{type.Type} instance)");
+        writer.WriteLine($"public {(isAbstractSerializer ? "override " : string.Empty)}void Deserialize<TReaderInput>(ref {type.Library.Reader} reader, {instanceModifiers}{type.Type} instance)");
         writer.OpenBlock();
         if (type.HasComplexBaseType)
         {
@@ -612,7 +638,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private static void WriteSerializationCallbacks(SourceWriter writer, SerializableTypeEmissionPlan type, string instance, string callbackMethodName)
+    internal static void WriteSerializationCallbacks(SourceWriter writer, SerializableTypeEmissionPlan type, string instance, string callbackMethodName)
     {
         foreach (var callback in type.SerializationHooks)
         {

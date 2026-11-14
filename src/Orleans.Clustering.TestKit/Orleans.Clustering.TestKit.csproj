@@ -14,9 +14,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Accordant" />
-    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" />
-    <PackageReference Include="System.IO.Pipelines" PrivateAssets="all" />
-    <PackageReference Include="System.Text.Json" PrivateAssets="all" />
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
     <InternalsVisibleTo Include="Orleans.Clustering.TestKit.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />

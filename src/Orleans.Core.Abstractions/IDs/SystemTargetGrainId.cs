@@ -40,7 +40,12 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="SystemTargetGrainId"/>.
         /// </returns>
-        public static SystemTargetGrainId Create(GrainType kind, SiloAddress address) => new SystemTargetGrainId(new GrainId(kind, new IdSpan(address.ToUtf8String())));
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
+        public static SystemTargetGrainId Create(GrainType kind, SiloAddress address)
+        {
+            ArgumentNullException.ThrowIfNull(address);
+            return new SystemTargetGrainId(new GrainId(kind, new IdSpan(address.ToUtf8String())));
+        }
 
         /// <summary>
         /// Creates a new <see cref="SystemTargetGrainId"/> instance.
@@ -57,8 +62,10 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="SystemTargetGrainId"/>.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public static SystemTargetGrainId Create(GrainType kind, SiloAddress address, string? extraIdentifier)
         {
+            ArgumentNullException.ThrowIfNull(address);
             var addr = address.ToUtf8String();
             if (extraIdentifier is not null)
             {
@@ -117,8 +124,10 @@ namespace Orleans.Runtime
         /// <returns>
         /// A new <see cref="SystemTargetGrainId"/> targeting the provided address.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="siloAddress"/> is <see langword="null"/>.</exception>
         public SystemTargetGrainId WithSiloAddress(SiloAddress siloAddress)
         {
+            ArgumentNullException.ThrowIfNull(siloAddress);
             var addr = siloAddress.ToUtf8String();
             var key = _grainId.Key.AsSpan();
             if (key.IndexOf((byte)SegmentSeparator) is int index && index >= 0)
@@ -159,14 +168,18 @@ namespace Orleans.Runtime
         /// The type code.
         /// </param>
         /// <param name="grainSystemId">
-        /// The system id.
+        /// The system id, or <see langword="null"/> to omit the system id suffix.
         /// </param>
         /// <param name="address">
         /// The silo address.
         /// </param>
         /// <returns>A grain id for a grain service instance.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public static GrainId CreateGrainServiceGrainId(int typeCode, string grainSystemId, SiloAddress address)
-            => CreateGrainServiceGrainId(CreateGrainServiceGrainType(typeCode, grainSystemId), address);
+        {
+            ArgumentNullException.ThrowIfNull(address);
+            return CreateGrainServiceGrainId(CreateGrainServiceGrainType(typeCode, grainSystemId), address);
+        }
 
         /// <summary>
         /// Creates a <see cref="GrainId"/> for a grain service.

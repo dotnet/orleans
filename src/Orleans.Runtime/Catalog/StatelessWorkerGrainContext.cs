@@ -35,6 +35,8 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     private bool _terminated;
 
     // Idle worker removal fields
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "DisposeAsyncInternal clears this field and awaits Timer.DisposeAsync before completing context disposal.")]
     private Timer? _inspectionTimer;
     private double _previousError;
     private double _integralTerm;
@@ -332,9 +334,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
         // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
         var requestContext = (message as Message)?.RequestContextData ?? [];
-        var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
-
-        newWorker.Activate(requestContext, cancellation.Token);
+        newWorker.Activate(requestContext, CancellationToken.None);
         _workers.Add(newWorker);
         StatelessWorkerEvents.EmitWorkerCreated(this, newWorker, _workers.Count);
 

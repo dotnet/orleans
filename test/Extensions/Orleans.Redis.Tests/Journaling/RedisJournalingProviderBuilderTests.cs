@@ -175,30 +175,16 @@ public sealed class RedisJournalingProviderBuilderTests
         Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
-    // The configuration binding source generator treats an empty value as absent on .NET 10 and rejects it on .NET 8.
-#if NET10_0_OR_GREATER
-    private static readonly bool EmptyValueIsAbsent = true;
-#else
-    private static readonly bool EmptyValueIsAbsent = false;
-#endif
-
+    // The configuration binding source generator treats an empty value as absent.
     [Theory]
-    [InlineData(nameof(RedisJournalStorageOptions.CompactionThresholdBytes), typeof(long))]
-    [InlineData(nameof(RedisJournalStorageOptions.ReadChunkSize), typeof(int))]
-    public void Configure_EmptyTypedValue_FollowsBinderContract(string key, Type expectedType)
+    [InlineData(nameof(RedisJournalStorageOptions.CompactionThresholdBytes))]
+    [InlineData(nameof(RedisJournalStorageOptions.ReadChunkSize))]
+    public void Configure_EmptyTypedValue_IsTreatedAsAbsent(string key)
     {
         var builder = ConfigureBuilder(PreconfigureNonDefaultValues, [(key, "")], []);
         using var services = builder.Services.BuildServiceProvider();
 
-        if (EmptyValueIsAbsent)
-        {
-            AssertPreconfiguredValues(GetStorageOptions(services));
-            return;
-        }
-
-        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
-        Assert.Contains($"at '{ConfigurationSectionName}:{key}'", exception.Message);
-        Assert.Contains($"type '{expectedType}'", exception.Message);
+        AssertPreconfiguredValues(GetStorageOptions(services));
     }
 
     [Theory]

@@ -20,6 +20,52 @@ public class ConsulMembershipTableConsistencyTests
     private static readonly DateTime Epoch = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
+    [Fact]
+    public void ConstructorRejectsNullRequiredOptions()
+    {
+        var membershipOptions = Options.Create(new ConsulClusteringOptions());
+        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "test" });
+        var logger = NullLogger<ConsulBasedMembershipTable>.Instance;
+
+        Assert.Throws<ArgumentNullException>(
+            "clusterOptions",
+            () => new ConsulBasedMembershipTable(logger, membershipOptions, null!));
+        Assert.Throws<ArgumentNullException>(
+            "membershipTableOptions",
+            () => new ConsulBasedMembershipTable(logger, null!, clusterOptions));
+    }
+
+    [Fact]
+    public async Task ReadAllRejectsNullConsulClient()
+    {
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => ConsulBasedMembershipTable.ReadAllAsync(
+                null!, "test", null, NullLogger.Instance, null, CancellationToken));
+        Assert.Equal("consulClient", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task MembershipMutationsRejectNullEntriesAndVersionsBeforeStorageAccess()
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        var entry = Entry();
+        var version = new TableVersion(1, "0");
+
+        await AssertArgumentNullAsync("entry", () => table.InsertRowAsync(null!, version, CancellationToken));
+        await AssertArgumentNullAsync("tableVersion", () => table.InsertRowAsync(entry, null!, CancellationToken));
+        await AssertArgumentNullAsync("entry", () => table.UpdateRowAsync(null!, "1", version, CancellationToken));
+        await AssertArgumentNullAsync("tableVersion", () => table.UpdateRowAsync(entry, "1", null!, CancellationToken));
+        await AssertArgumentNullAsync("entry", () => table.UpdateIAmAliveAsync(null!, CancellationToken));
+        Assert.Equal(0, store.RequestCount);
+
+        static async Task AssertArgumentNullAsync(string parameterName, Func<Task> action)
+        {
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(action);
+            Assert.Equal(parameterName, exception.ParamName);
+        }
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("membership/nested")]

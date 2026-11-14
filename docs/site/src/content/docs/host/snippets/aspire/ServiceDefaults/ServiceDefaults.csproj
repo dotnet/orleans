@@ -12,7 +12,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
-    <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="13.6.5" />
   </ItemGroup>
 
 </Project>

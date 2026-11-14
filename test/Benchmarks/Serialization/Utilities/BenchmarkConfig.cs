@@ -14,10 +14,6 @@ internal class BenchmarkConfig : ManualConfig
         AddExporter(MarkdownExporter.GitHub);
         AddDiagnoser(MemoryDiagnoser.Default);
         Options |= ConfigOptions.KeepBenchmarkFiles;
-        AddJob(Job.Default.WithRuntime(CoreRuntime.Core80));
-        AddJob(Job.Default.WithRuntime(CoreRuntime.Core90));
-#if NET10_0_OR_GREATER
         AddJob(Job.Default.WithRuntime(CoreRuntime.Core10_0));
-#endif
     }
 }

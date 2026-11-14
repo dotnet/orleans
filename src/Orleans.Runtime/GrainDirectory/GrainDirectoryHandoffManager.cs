@@ -163,7 +163,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (!tasks[i].IsCompletedSuccessfully) continue;
 
                     // Record the applications which lost the registration race (duplicate activations).
-                    var winner = tasks[i].Result;
+                    var winner = await tasks[i];
                     if (winner.Address is not { } winnerAddress || !winnerAddress.Equals(singleActivations[i]))
                     {
                         var duplicate = singleActivations[i];
@@ -174,15 +174,15 @@ namespace Orleans.Runtime.GrainDirectory
                     singleActivations.RemoveAt(i);
                 }
 
-                // Destroy any duplicate activations.
-                DestroyDuplicateActivations(duplicates);
+                // Queue duplicate cleanup behind the current handoff operation.
+                QueueDuplicateActivationDestruction(duplicates);
             }
         }
 
-        private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<GrainAddress>>? duplicates)
+        private void QueueDuplicateActivationDestruction(Dictionary<SiloAddress, List<GrainAddress>>? duplicates)
         {
             if (duplicates == null || duplicates.Count == 0) return;
-            EnqueueOperation(nameof(DestroyDuplicateActivations), duplicates,
+            EnqueueOperation(nameof(QueueDuplicateActivationDestruction), duplicates,
                 (t, state) => t.DestroyDuplicateActivationsAsync((Dictionary<SiloAddress, List<GrainAddress>>)state));
         }
 
@@ -356,7 +356,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(DestroyDuplicateActivations)} will destroy {{Count}} duplicate activations on silo {{SiloAddress}}: {{Duplicates}}"
+            Message = $"{nameof(QueueDuplicateActivationDestruction)} will destroy {{Count}} duplicate activations on silo {{SiloAddress}}: {{Duplicates}}"
         )]
         private static partial void LogDebugDestroyingDuplicates(ILogger logger, int count, SiloAddress siloAddress, GrainAddressesLogValue duplicates);
 

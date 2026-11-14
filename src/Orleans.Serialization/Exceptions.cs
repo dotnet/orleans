@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
@@ -162,6 +163,38 @@ namespace Orleans.Serialization
     }
 
     /// <summary>
+    /// A serialized tagged-union value identifies a case which the union type or closed type hierarchy does not declare.
+    /// </summary>
+    /// <remarks>
+    /// This occurs when data written by a newer version of a type, which declares additional cases, is read by an older version of that type.
+    /// </remarks>
+    [Serializable]
+    [GenerateSerializer]
+    public sealed class UnknownUnionCaseException : SerializerException
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UnknownUnionCaseException"/> class.
+        /// </summary>
+        /// <param name="unionType">The union type or closed base type being deserialized.</param>
+        /// <param name="caseId">The case identifier which was read.</param>
+        public UnknownUnionCaseException(Type unionType, uint caseId) : base($"Encountered unknown case {caseId} while deserializing a value of type {unionType}.")
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UnknownUnionCaseException"/> class.
+        /// </summary>
+        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+#if NET8_0_OR_GREATER
+        [Obsolete]
+#endif
+        private UnknownUnionCaseException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
     /// The extended wire type is invalid.
     /// </summary>
     [Serializable]
@@ -288,6 +321,8 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [SuppressMessage("Design", "CA1032:Implement standard exception constructors",
+        Justification = "The referenced type id is required error context and is preserved by the typed constructor and serialization contract.")]
     public sealed class UnknownReferencedTypeException : SerializerException
     {
         /// <summary>
@@ -309,7 +344,7 @@ namespace Orleans.Serialization
 #endif
         private UnknownReferencedTypeException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            info.AddValue(nameof(Reference), Reference);
+            Reference = info.GetUInt32(nameof(Reference));
         }
 
         /// <summary>
@@ -326,7 +361,7 @@ namespace Orleans.Serialization
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            Reference = info.GetUInt32(nameof(Reference));
+            info.AddValue(nameof(Reference), Reference);
         }
     }
 
@@ -383,6 +418,8 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [SuppressMessage("Design", "CA1032:Implement standard exception constructors",
+        Justification = "The well-known type id is required error context and is preserved by the typed constructor and serialization contract.")]
     public sealed class UnknownWellKnownTypeException : SerializerException
     {
         /// <summary>
@@ -404,7 +441,7 @@ namespace Orleans.Serialization
 #endif
         private UnknownWellKnownTypeException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            info.AddValue(nameof(Id), Id);
+            Id = info.GetUInt32(nameof(Id));
         }
 
         /// <summary>
@@ -421,7 +458,7 @@ namespace Orleans.Serialization
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            Id = info.GetUInt32(nameof(Id));
+            info.AddValue(nameof(Id), Id);
         }
     }
 

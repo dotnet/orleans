@@ -70,8 +70,10 @@ namespace Orleans.Runtime
         /// <param name="ep">IP endpoint address of the silo.</param>
         /// <param name="gen">Generation number of the silo.</param>
         /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="ep"/> is <see langword="null"/>.</exception>
         public static SiloAddress New(IPEndPoint ep, int gen)
         {
+            ArgumentNullException.ThrowIfNull(ep);
             return siloAddressInterningCache.FindOrCreate((ep.Address, ep.Port, gen),
                 // Normalize endpoints
                 (k, ep) => k.Address.IsIPv4MappedToIPv6 ? New(k.Address.MapToIPv4(), k.Port, k.Generation) : new(ep, k.Generation), ep);
@@ -426,6 +428,19 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
 
+        /// <summary>Determines whether two silo addresses have the same endpoint and generation.</summary>
+        /// <param name="left">The first address.</param>
+        /// <param name="right">The second address.</param>
+        /// <returns><see langword="true"/> if both addresses are null or represent the same silo; otherwise, <see langword="false"/>.</returns>
+        public static bool operator ==(SiloAddress? left, SiloAddress? right)
+            => ReferenceEquals(left, right) || (left is not null && left.Equals(right));
+
+        /// <summary>Determines whether two silo addresses differ in endpoint or generation.</summary>
+        /// <param name="left">The first address.</param>
+        /// <param name="right">The second address.</param>
+        /// <returns><see langword="true"/> if the addresses differ; otherwise, <see langword="false"/>.</returns>
+        public static bool operator !=(SiloAddress? left, SiloAddress? right) => !(left == right);
+
         /// <summary>Returns a consistent hash value for this silo address.</summary>
         /// <returns>Consistent hash value for this silo address.</returns>
         public int GetConsistentHashCode() => hashCodeSet ? hashCode : CalculateConsistentHashCode();
@@ -527,13 +542,13 @@ namespace Orleans.Runtime
         /// <returns>Returns <c>true</c> if the two SiloAddresses are considered to match -- if they are equal or if one generation or the other is 0. </returns>
         internal bool Matches([NotNullWhen(true)] SiloAddress? other)
         {
-            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
+            return other is not null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
                 (Generation == other.Generation || Generation == 0 || other.Generation == 0);
         }
 
         /// <inheritdoc/>
         public bool Equals([NotNullWhen(true)] SiloAddress? other)
-            => other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
+            => other is not null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
@@ -545,34 +560,36 @@ namespace Orleans.Runtime
         /// <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
         /// </returns>
         internal bool IsSameLogicalSilo([NotNullWhen(true)] SiloAddress? other)
-            => other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
+            => other is not null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </summary>
         /// <param name="other">
-        /// The other instance.
+        /// The other instance, or <see langword="null"/> to return <see langword="false"/>.
         /// </param>
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </returns>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "IsSameLogicalSilo returns false for null, short-circuiting the dereference and preserving the null-tolerant predicate contract.")]
         public bool IsSuccessorOf(SiloAddress other) => IsSameLogicalSilo(other) && other.Generation > 0 && Generation > other.Generation;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </summary>
         /// <param name="other">
-        /// The other instance.
+        /// The other instance, or <see langword="null"/> to return <see langword="false"/>.
         /// </param>
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </returns>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "IsSameLogicalSilo returns false for null, short-circuiting the dereference and preserving the null-tolerant predicate contract.")]
         public bool IsPredecessorOf(SiloAddress other) => IsSameLogicalSilo(other) && Generation > 0 && Generation < other.Generation;
 
         /// <inheritdoc/>
         public int CompareTo(SiloAddress? other)
         {
-            if (other == null) return 1;
+            if (other is null) return 1;
             // Compare Generation first. It gives a cheap and fast way to compare, avoiding allocations 
             // and is also semantically meaningful - older silos (with smaller Generation) will appear first in the comparison order.
             // Only if Generations are the same, go on to compare Ports and IPAddress (which is more expansive to compare).
@@ -597,12 +614,24 @@ namespace Orleans.Runtime
             => SiloAddress.FromParsableString(reader.GetString() ?? throw new JsonException($"Could not deserialize {nameof(SiloAddress)}."));
 
         /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
+        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WriteStringValue(value.ToUtf8String());
+        }
 
         /// <inheritdoc />
         public override SiloAddress ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
-        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] SiloAddress value, JsonSerializerOptions options) => writer.WritePropertyName(value.ToUtf8String());
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] SiloAddress value, JsonSerializerOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WritePropertyName(value.ToUtf8String());
+        }
     }
 }

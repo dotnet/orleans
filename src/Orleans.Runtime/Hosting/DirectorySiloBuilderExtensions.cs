@@ -21,9 +21,11 @@ namespace Orleans.Runtime.Hosting
         /// <param name="name">The name of the grain directory to add.</param>
         /// <param name="implementationFactory">Factory to build the grain directory provider.</param>
         /// <returns>The silo builder.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="implementationFactory"/> is <see langword="null"/>.</exception>
         public static ISiloBuilder AddGrainDirectory<T>(this ISiloBuilder builder, string name, Func<IServiceProvider, string, T> implementationFactory)
             where T : class, IGrainDirectory
         {
+            ArgumentNullException.ThrowIfNull(builder);
             builder.Services.AddGrainDirectory<T>(name, implementationFactory);
             return builder;
         }
@@ -37,9 +39,12 @@ namespace Orleans.Runtime.Hosting
         /// <param name="name">The name of the grain directory to add.</param>
         /// <param name="implementationFactory">Factory to build the grain directory provider.</param>
         /// <returns>The service collection.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="collection"/> or <paramref name="implementationFactory"/> is <see langword="null"/>.</exception>
         public static IServiceCollection AddGrainDirectory<T>(this IServiceCollection collection, string name, Func<IServiceProvider, string, T> implementationFactory)
             where T : class, IGrainDirectory
         {
+            ArgumentNullException.ThrowIfNull(collection);
+            ArgumentNullException.ThrowIfNull(implementationFactory);
             if (name == GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY)
             {
                 collection.RemoveDefaultGrainDirectory();

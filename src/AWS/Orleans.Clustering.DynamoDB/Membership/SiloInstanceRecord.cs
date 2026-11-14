@@ -106,8 +106,8 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 int idx1 = rowKey.IndexOf(Seperator, StringComparison.Ordinal);
-                int idx2 = rowKey.LastIndexOf(Seperator);
                 ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
+                int idx2 = rowKeySpan.LastIndexOf(Seperator);
                 ReadOnlySpan<char> addressStr = rowKeySpan[..idx1];
                 ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
                 ReadOnlySpan<char> genStr = rowKeySpan[(idx2 + 1)..];

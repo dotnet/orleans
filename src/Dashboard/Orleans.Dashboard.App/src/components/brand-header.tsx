@@ -1,5 +1,7 @@
 import React from 'react';
-import logo from '../assets/img/OrleansLogo.png';
+
+// Served from public/ so the build copies it verbatim, keeping the bundle and source map deterministic.
+const logo = `${import.meta.env.BASE_URL}img/OrleansLogo.png`;
 
 export default function BrandHeader() {
   return (

@@ -167,25 +167,29 @@ namespace Orleans.Runtime
             _componentWatchdogTimestamp = _timeProvider.GetTimestamp();
             foreach (var participant in _participants)
             {
+                bool healthy;
+                string? complaint;
                 try
                 {
-                    var ok = participant.CheckHealth(_lastComponentHealthCheckTime, out var complaint);
-                    if (!ok)
-                    {
-                        complaints ??= new StringBuilder();
-                        if (complaints.Length > 0)
-                        {
-                            complaints.Append(' ');
-                        }
-
-                        complaints.Append($"{participant.GetType()} failed health check with complaint \"{complaint}\".");
-                        ++numFailedChecks;
-                    }
+                    healthy = participant.CheckHealth(_lastComponentHealthCheckTime, out complaint);
                 }
                 catch (Exception exc)
                 {
+                    healthy = false;
+                    complaint = $"Health check threw {exc.GetType().Name}.";
                     LogWarningHealthCheckParticipantException(_logger, exc, participant.GetType());
                 }
+
+                if (healthy) continue;
+
+                complaints ??= new StringBuilder();
+                if (complaints.Length > 0)
+                {
+                    complaints.Append(' ');
+                }
+
+                complaints.Append($"{participant.GetType()} failed health check with complaint \"{complaint}\".");
+                ++numFailedChecks;
             }
 
             if (complaints != null)
@@ -199,31 +203,23 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            try
+            lock (_cancellation)
             {
+                if (_cancellation.IsCancellationRequested) return;
+
                 _cancellation.Cancel();
-            }
-            catch
-            {
-                // Ignore.
-            }
+                // Startup can fail before either thread is started.
+                if (_componentWatchdogThread is { IsAlive: true } componentThread)
+                {
+                    componentThread.Join();
+                }
 
-            try
-            {
-                _componentWatchdogThread?.Join();
-            }
-            catch
-            {
-                // Ignore.
-            }
+                if (_platformWatchdogThread is { IsAlive: true } platformThread)
+                {
+                    platformThread.Join();
+                }
 
-            try
-            {
-                _platformWatchdogThread?.Join();
-            }
-            catch
-            {
-                // Ignore.
+                _cancellation.Dispose();
             }
         }
 

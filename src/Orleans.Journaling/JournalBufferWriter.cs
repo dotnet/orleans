@@ -17,11 +17,7 @@ namespace Orleans.Journaling;
 /// </remarks>
 public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 {
-#if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
     private readonly ArcBufferWriter _buffer = new();
     private int _committedLength;
     private bool _hasActiveEntry;

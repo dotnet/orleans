@@ -24,6 +24,22 @@ namespace Orleans
         public string AssemblyName { get { throw null; } }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
+    public sealed partial class CaseAttribute : System.Attribute
+    {
+        public CaseAttribute(uint id) { }
+
+        public uint Id { get { throw null; } }
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Struct, Inherited = false)]
+    public sealed partial class CaseIdsAttribute : System.Attribute
+    {
+        public CaseIdsAttribute(params uint[] ids) { }
+
+        public uint[] Ids { get { throw null; } }
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Enum | System.AttributeTargets.Interface, AllowMultiple = true)]
     public sealed partial class CompoundTypeAliasAttribute : System.Attribute
     {

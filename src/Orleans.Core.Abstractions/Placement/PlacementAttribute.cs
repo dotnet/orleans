@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using static Orleans.Placement.ImmovableAttribute;
@@ -146,6 +147,8 @@ namespace Orleans.Placement
         public ImmovableKind Kind { get; } = kind;
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods",
+            Justification = "AttributeGrainPropertiesProvider validates the properties collection before dispatching to attributes.")]
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
             => properties[WellKnownGrainTypeProperties.Immovable] = ((byte)Kind).ToString();
     }

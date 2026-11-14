@@ -18,6 +18,9 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     sourcemap: true,
+    license: {
+      fileName: "THIRD-PARTY-NOTICES.md",
+    },
     commonjsOptions: {
       include: [/node_modules/, /src/],
       transformMixedEsModules: true,

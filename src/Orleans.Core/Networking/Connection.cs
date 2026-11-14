@@ -152,7 +152,9 @@ namespace Orleans.Runtime.Messaging
 
             using var _ = new ExecutionContextSuppressor();
             var task = new Task<Task>(CloseAsync);
+#pragma warning disable CA2025 // Unwrap completes after both task layers; the ref-struct suppressor only controls execution-context capture.
             if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is not null)
+#pragma warning restore CA2025
             {
                 return;
             }

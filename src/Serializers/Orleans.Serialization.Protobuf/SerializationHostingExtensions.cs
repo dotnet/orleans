@@ -41,23 +41,17 @@ public static class SerializationHostingExtensions
 
         var services = serializerBuilder.Services;
 
-        if (isSerializable != null)
+        services.AddSingleton<ICodecSelector>(new DelegateCodecSelector
         {
-            services.AddSingleton<ICodecSelector>(new DelegateCodecSelector
-            {
-                CodecName = ProtobufCodec.WellKnownAlias,
-                IsSupportedTypeDelegate = isSerializable
-            });
-        }
+            CodecName = ProtobufCodec.WellKnownAlias,
+            IsSupportedTypeDelegate = isSerializable
+        });
 
-        if (isCopyable != null)
+        services.AddSingleton<ICopierSelector>(new DelegateCopierSelector
         {
-            services.AddSingleton<ICopierSelector>(new DelegateCopierSelector
-            {
-                CopierName = ProtobufCodec.WellKnownAlias,
-                IsSupportedTypeDelegate = isCopyable
-            });
-        }
+            CopierName = ProtobufCodec.WellKnownAlias,
+            IsSupportedTypeDelegate = isCopyable
+        });
 
         if (!services.Contains(ServiceDescriptor))
         {

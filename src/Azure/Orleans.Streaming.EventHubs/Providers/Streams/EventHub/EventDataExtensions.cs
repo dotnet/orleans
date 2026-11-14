@@ -14,20 +14,22 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Adds stream namespace to the EventData
         /// </summary>
-        /// <param name="eventData"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="eventData">The event data to update.</param>
+        /// <param name="streamNamespace">The stream namespace value to store.</param>
         public static void SetStreamNamespaceProperty(this EventData eventData, string? streamNamespace)
         {
+            ArgumentNullException.ThrowIfNull(eventData);
             eventData.Properties[EventDataPropertyStreamNamespaceKey] = streamNamespace;
         }
 
         /// <summary>
         /// Gets stream namespace from the EventData
         /// </summary>
-        /// <param name="eventData"></param>
-        /// <returns></returns>
+        /// <param name="eventData">The event data to read.</param>
+        /// <returns>The stored stream namespace, or <see langword="null"/> if none is present.</returns>
         public static string? GetStreamNamespaceProperty(this EventData eventData)
         {
+            ArgumentNullException.ThrowIfNull(eventData);
             object? namespaceObj;
             if (eventData.Properties.TryGetValue(EventDataPropertyStreamNamespaceKey, out namespaceObj))
             {
@@ -39,8 +41,12 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Serializes event data properties
         /// </summary>
+        /// <param name="eventData">The event data containing the properties to serialize.</param>
+        /// <param name="serializer">The serializer used to serialize application properties.</param>
         public static byte[] SerializeProperties(this EventData eventData, Serialization.Serializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(eventData);
+            ArgumentNullException.ThrowIfNull(serializer);
             if (eventData.Properties.Count == 0
                 || (eventData.Properties.Count == 1 && eventData.Properties.ContainsKey(EventDataPropertyStreamNamespaceKey)))
             {
@@ -62,8 +68,11 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Deserializes event data properties
         /// </summary>
+        /// <param name="bytes">The serialized properties.</param>
+        /// <param name="serializer">The serializer used to deserialize application properties.</param>
         public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes, Serialization.Serializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(serializer);
             if (bytes.Count == 0)
             {
                 return new Dictionary<string, object>();

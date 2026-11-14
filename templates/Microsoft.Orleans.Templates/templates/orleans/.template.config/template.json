@@ -27,12 +27,12 @@
       "replaces": "net10.0",
       "choices": [
         {
-          "choice": "net10.0",
-          "description": "Target .NET 10."
+          "choice": "net11.0",
+          "description": "Target .NET 11."
         },
         {
-          "choice": "net8.0",
-          "description": "Target .NET 8."
+          "choice": "net10.0",
+          "description": "Target .NET 10."
         }
       ]
     },
@@ -52,7 +52,7 @@
       "type": "parameter",
       "datatype": "text",
       "description": "The Aspire package and AppHost SDK version.",
-      "defaultValue": "13.5.0",
+      "defaultValue": "13.6.5",
       "replaces": "__ASPIRE_VERSION__"
     },
     "skipRestore": {

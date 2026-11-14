@@ -373,8 +373,10 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="logEntries"/> is <see langword="null"/>.</exception>
         public void SubmitRange(IEnumerable<TLogEntry> logEntries)
         {
+            ArgumentNullException.ThrowIfNull(logEntries);
             EnsureConfirmedViewInitialized();
 
             if (!SupportSubmissions)
@@ -414,8 +416,10 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="logEntries"/> is <see langword="null"/>.</exception>
         public Task<bool> TryAppendRange(IEnumerable<TLogEntry> logEntries)
         {
+            ArgumentNullException.ThrowIfNull(logEntries);
             EnsureConfirmedViewInitialized();
 
             if (!SupportSubmissions)

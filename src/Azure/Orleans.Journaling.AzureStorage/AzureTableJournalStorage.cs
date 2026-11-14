@@ -1065,7 +1065,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         if (journalId is not null && !string.Equals(journalId, _journalId.Value, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"Azure Table journal header belongs to journal id \"{journalId ?? "<missing>"}\", not \"{_journalId.Value}\". " +
+                $"Azure Table journal header belongs to journal id \"{journalId}\", not \"{_journalId.Value}\". " +
                 "Ensure that configured partition keys are unique.");
         }
     }

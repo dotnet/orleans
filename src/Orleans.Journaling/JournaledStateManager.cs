@@ -11,11 +11,7 @@ namespace Orleans.Journaling;
 internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
-#if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
     private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _statesMap = [];
     private readonly JournaledStateManagerShared _shared;
