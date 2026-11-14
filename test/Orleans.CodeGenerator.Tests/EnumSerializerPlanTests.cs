@@ -135,7 +135,7 @@ public sealed class EnumSerializerPlanTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public async Task ImplicitFieldIdOption_PreservesDiagnosticAndRecovers()
+    public async Task ImplicitFieldIdOption_EmitsEnumCodecAndRecovers()
     {
         var compilation = await TestCompilationHelper.CreateCompilation("[Orleans.GenerateSerializer] public enum First { One }");
         var (driver, first) = Run(CreateDriver(), compilation);
@@ -143,14 +143,21 @@ public sealed class EnumSerializerPlanTests(ITestOutputHelper output)
         {
             ["build_property.orleans_generatefieldids"] = "PublicProperties",
         });
-        driver = driver.WithUpdatedAnalyzerConfigOptions(options).RunGenerators(compilation, TestContext.Current.CancellationToken);
-        var diagnostic = Assert.Single(driver.GetRunResult().Diagnostics);
-        Assert.Equal("ORLEANS0106", diagnostic.Id);
-        Assert.Same(compilation.SyntaxTrees.Single(), diagnostic.Location.SourceTree);
-        Assert.Empty(GetSerializerEntries(Assert.Single(driver.GetRunResult().Results)));
-        var (_, recovered) = Run(driver.WithUpdatedAnalyzerConfigOptions(TestCompilationHelper.CreateOptionsProvider()), compilation);
+        var (implicitDriver, implicitResult) = Run(driver.WithUpdatedAnalyzerConfigOptions(options), compilation);
+        Assert.Equal(GetSerializerEntries(first), GetSerializerEntries(implicitResult));
+        AssertFreshParity(compilation, implicitResult, options);
+        var (_, recovered) = Run(implicitDriver.WithUpdatedAnalyzerConfigOptions(TestCompilationHelper.CreateOptionsProvider()), compilation);
         Assert.Equal(GetSources(first), GetSources(recovered));
         AssertFreshParity(compilation, recovered);
+    }
+
+    [Fact]
+    public async Task ImplicitFieldIdAttribute_EmitsEnumCodec()
+    {
+        var compilation = await TestCompilationHelper.CreateCompilation(
+            "[Orleans.GenerateSerializer(GenerateFieldIds = Orleans.GenerateFieldIds.PublicProperties)] public enum First { One }");
+        var (_, result) = Run(CreateDriver(), compilation);
+        Assert.Contains("sealed class Codec_First", Assert.Single(GetSerializerEntries(result)).Source, StringComparison.Ordinal);
     }
 
     [Fact]
