@@ -41,4 +41,3 @@ jobs:
         filter-query: /[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]
         framework: ${{ matrix.framework }}
         solution: .github/solutions/CodeGenerator.slnf
-        static-instrumentation: 'true'
