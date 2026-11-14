@@ -3085,6 +3085,10 @@ namespace Orleans.Runtime
 
         public static SiloAddress New(System.Net.IPEndPoint ep, int gen) { throw null; }
 
+        public static bool operator ==(SiloAddress? left, SiloAddress? right) { throw null; }
+
+        public static bool operator !=(SiloAddress? left, SiloAddress? right) { throw null; }
+
         static SiloAddress System.IUtf8SpanParsable<SiloAddress>.Parse(System.ReadOnlySpan<byte> utf8Text, System.IFormatProvider? provider) { throw null; }
 
         public static SiloAddress Parse(System.ReadOnlySpan<byte> utf8Text) { throw null; }

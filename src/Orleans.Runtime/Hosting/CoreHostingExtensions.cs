@@ -41,8 +41,10 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder)
         {
+            ArgumentNullException.ThrowIfNull(builder);
             builder.Services.TryAddSingleton(DistributedContextPropagator.Current);
 
             return builder
@@ -168,8 +170,10 @@ namespace Orleans.Hosting
         /// Configure every silo with this option to defer migration to the distributed grain directory.
         /// Migration from the legacy directory to the distributed directory is one-way.
         /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="siloBuilder"/> is <see langword="null"/>.</exception>
         public static ISiloBuilder UseLegacyGrainDirectory(this ISiloBuilder siloBuilder)
         {
+            ArgumentNullException.ThrowIfNull(siloBuilder);
             siloBuilder.Services.RemoveDefaultGrainDirectory();
             return siloBuilder;
         }
@@ -198,8 +202,10 @@ namespace Orleans.Hosting
         /// <param name="siloBuilder">The silo builder to register the directory implementation with.</param>
         /// <param name="name">The name to register the directory under, or null to register it as the default. Multiple names share one directory instance.</param>
         /// <returns>The provided silo builder.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="siloBuilder"/> is <see langword="null"/>.</exception>
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null)
         {
+            ArgumentNullException.ThrowIfNull(siloBuilder);
             var services = siloBuilder.Services;
             if (string.IsNullOrEmpty(name))
             {

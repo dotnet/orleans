@@ -11,7 +11,7 @@
   <Target Name="Build">
     <MSBuild Projects="@(ApiProject)"
              Targets="Build"
-             Properties="TargetFramework=net8.0"
+             Properties="TargetFramework=net10.0"
              BuildInParallel="true" />
   </Target>
 
@@ -19,7 +19,7 @@
   <Target Name="GenerateApi" DependsOnTargets="Build">
     <MSBuild Projects="@(ApiProject)"
              Targets="GenAPIGenerateReferenceAssemblySource"
-             Properties="TargetFramework=net8.0;BuildProjectReferences=false"
+             Properties="TargetFramework=net10.0;BuildProjectReferences=false"
              BuildInParallel="true" />
   </Target>
 </Project>

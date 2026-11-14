@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Net;
 using System.Threading;
@@ -17,16 +18,21 @@ internal class InMemoryTransportListener : MessageTransportListener
     private readonly Channel<(InMemoryMessageTransport Connection, TaskCompletionSource<bool> ConnectionAcceptedTcs)> _acceptQueue = Channel.CreateUnbounded<(InMemoryMessageTransport, TaskCompletionSource<bool>)>();
     private readonly string? _endpointValue;
     private readonly InMemoryTransportConnectionHub _hub;
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "UnbindCore disposes this source in finally after cancellation notifications finish; concurrent disposal calls observe its shared completion task.")]
     private readonly CancellationTokenSource _disposedCts = new();
+    private readonly CancellationToken _disposedToken;
+    private Task? _unbindTask;
 
     public InMemoryTransportListener(string endpointName, string? endpointValue, InMemoryTransportConnectionHub hub)
     {
         ListenerName = endpointName;
         _endpointValue = endpointValue;
         _hub = hub;
+        _disposedToken = _disposedCts.Token;
     }
 
-    public CancellationToken OnDisposed => _disposedCts.Token;
+    public CancellationToken OnDisposed => _disposedToken;
 
     public override bool IsValid => _endpointValue is not null && !OnDisposed.IsCancellationRequested;
     public override IFeatureCollection Features { get; } = new FeatureCollection();
@@ -90,6 +96,25 @@ internal class InMemoryTransportListener : MessageTransportListener
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken = default)
     {
+        TaskCompletionSource completion;
+        lock (_disposedCts)
+        {
+            if (_unbindTask is { } task)
+            {
+                return new(task);
+            }
+
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Publish completion before cancellation callbacks can reenter shutdown.
+            _unbindTask = completion.Task;
+        }
+
+        UnbindCore(completion);
+        return new(completion.Task);
+    }
+
+    private void UnbindCore(TaskCompletionSource completion)
+    {
         _acceptQueue.Writer.TryComplete();
         while (_acceptQueue.Reader.TryRead(out var item))
         {
@@ -97,8 +122,24 @@ internal class InMemoryTransportListener : MessageTransportListener
             item.ConnectionAcceptedTcs.TrySetResult(false);
         }
 
-        _disposedCts.Cancel();
-        return default;
+        try
+        {
+            try
+            {
+                // Cancellation callbacks run on the initiating caller's scheduler.
+                _disposedCts.Cancel();
+            }
+            finally
+            {
+                _disposedCts.Dispose();
+            }
+
+            completion.SetResult();
+        }
+        catch (AggregateException exception)
+        {
+            completion.SetException(exception);
+        }
     }
 }
 
@@ -152,7 +193,9 @@ internal class InMemoryTransportConnector : MessageTransportConnector
         var pipePair = DuplexPipe.CreatePair();
         var local = new InMemoryMessageTransport(pipePair.Left, _connectionLogger);
         local.Start();
+#pragma warning disable CA2000 // AddConnection transfers the remote transport to AcceptAsync; failed acceptance disposes both transports below.
         var remote = new InMemoryMessageTransport(pipePair.Right, _connectionLogger);
+#pragma warning restore CA2000
         remote.Start();
         try
         {

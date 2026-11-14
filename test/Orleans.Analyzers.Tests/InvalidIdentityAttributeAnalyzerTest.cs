@@ -111,17 +111,29 @@ public class InvalidIdentityAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<I
 
     [Theory]
     [InlineData("A", "AliasAttribute", "class")]
+    [InlineData("GA", "AliasAttribute", "class")]
     [InlineData("O.Alias", "AliasAttribute", "class")]
+    [InlineData("O::AliasAttribute", "AliasAttribute", "class")]
+    [InlineData("GO.@AliasAttribute", "AliasAttribute", "class")]
+    [InlineData(@"Orleans.\u0041liasAttribute", "AliasAttribute", "class")]
     [InlineData("global::Orleans.AliasAttribute", "AliasAttribute", "class")]
     [InlineData("GT", "GrainTypeAttribute", "class")]
+    [InlineData("GGT", "GrainTypeAttribute", "class")]
     [InlineData("O.GrainType", "GrainTypeAttribute", "class")]
+    [InlineData("GO::GrainType", "GrainTypeAttribute", "class")]
     [InlineData("global::Orleans.GrainTypeAttribute", "GrainTypeAttribute", "class")]
     [InlineData("GIT", "GrainInterfaceTypeAttribute", "interface")]
     [InlineData("O.Runtime.GrainInterfaceType", "GrainInterfaceTypeAttribute", "interface")]
+    [InlineData("O::Runtime.GrainInterfaceTypeAttribute", "GrainInterfaceTypeAttribute", "interface")]
+    [InlineData("GR.@GrainInterfaceTypeAttribute", "GrainInterfaceTypeAttribute", "interface")]
     [InlineData("global::Orleans.Runtime.GrainInterfaceTypeAttribute", "GrainInterfaceTypeAttribute", "interface")]
     public async Task AttributeNames_ReportExactDiagnosticOnConstantExpression(string attributeName, string attributeType, string declaration)
     {
-        var (diagnostics, source) = await GetDiagnosticsAsync($$"""
+        var source = $$"""
+            global using GA = Orleans.AliasAttribute;
+            global using GGT = Orleans.GrainTypeAttribute;
+            global using GO = Orleans;
+            global using GR = Orleans.Runtime;
             using A = Orleans.AliasAttribute;
             using GT = Orleans.GrainTypeAttribute;
             using GIT = Orleans.Runtime.GrainInterfaceTypeAttribute;
@@ -137,11 +149,35 @@ public class InvalidIdentityAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<I
 
             [{{attributeName}}("valid" + "-identity")]
             public {{declaration}} ValidModel { }
-            """);
+            """;
 
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
         var diagnostic = Assert.Single(diagnostics);
         AssertIdentityDiagnostic(diagnostic, source, "Names.Invalid", attributeType);
     }
+
+    [Fact]
+    public Task QualifiedNamesOfOtherAttributes_AreUnaffected()
+        => AssertNoDiagnostics("""
+            namespace Other
+            {
+                public sealed class AliasAttribute : System.Attribute { public AliasAttribute(string value) { } }
+                public sealed class GrainTypeAttribute : System.Attribute { public GrainTypeAttribute(string value) { } }
+            }
+
+            namespace Models
+            {
+                using O = Orleans;
+                using AliasAttribute = System.ObsoleteAttribute;
+
+                [Alias("invalid identity")]
+                [Other.Alias("invalid identity")]
+                [global::Other.GrainTypeAttribute("invalid identity")]
+                [O.GenerateSerializer(GenerateFieldIds = O.GenerateFieldIds.PublicProperties)]
+                [global::System.Diagnostics.DebuggerDisplay("invalid identity")]
+                public class Model { }
+            }
+            """);
 
     [Theory]
     [InlineData(null)]

@@ -23,3 +23,8 @@
 
 # GitHub Actions helper scripts run under Bash on Linux.
 .github/scripts/*.sh text eol=lf
+
+# Frontend sources use LF on every platform so `npm run build` produces identical committed output.
+src/Dashboard/Orleans.Dashboard.App/** text=auto eol=lf
+# Generated assets keep their exact bytes, including whitespace in minified code and upstream notices.
+src/Dashboard/Orleans.Dashboard.App/dist/** -text -whitespace linguist-generated=true

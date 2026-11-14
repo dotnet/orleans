@@ -31,6 +31,26 @@ namespace UnitTests;
 public class ServiceCollectionExtensionsTests
 {
     [Fact]
+    public void AddDashboard_NullSiloBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => builder.AddDashboard());
+
+        Assert.Equal("siloBuilder", exception.ParamName);
+    }
+
+    [Fact]
+    public void AddDashboard_NullClientBuilder_ThrowsArgumentNullException()
+    {
+        IClientBuilder builder = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => builder.AddDashboard());
+
+        Assert.Equal("clientBuilder", exception.ParamName);
+    }
+
+    [Fact]
     public void AddDashboard_SiloBuilder_RegistersExpectedImplementationsLifetimesAndSharedIdentities()
     {
         var builder = new TestSiloBuilder();

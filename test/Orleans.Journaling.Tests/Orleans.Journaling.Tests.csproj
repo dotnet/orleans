@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Testcontainers" />
@@ -29,7 +30,6 @@
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Journaling.S3\Orleans.Journaling.S3.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="$(SourceRoot)test\Extensions\Orleans.Azure.Tests\Orleans.Azure.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 

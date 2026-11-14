@@ -36,6 +36,10 @@ namespace Orleans.Runtime.Membership
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(gatewayOptions);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+
             this.logger = logger;
             this.clusterId = clusterOptions.Value.ClusterId;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;

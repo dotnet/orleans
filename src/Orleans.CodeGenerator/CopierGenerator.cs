@@ -55,6 +55,11 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             return null;
         }
 
+        if (!isShallowCopyable && type is SerializableTypeDescription { UnionCases: { } unionCases })
+        {
+            return new UnionCodecGenerator(_generatorServices).CreateCopierPlan(type, unionCases, typePlan);
+        }
+
         var members = new List<ISerializableMember>();
         foreach (var member in type.Members)
         {
@@ -130,7 +135,11 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         {
             var members = plan.Members.ToList();
             WriteFieldDeclarations(writer, plan.Fields);
-            if (!isExceptionType)
+            if (plan.UnionCases is { } unionCases)
+            {
+                UnionCodecGenerator.WriteUnionCopyMethod(writer, type, unionCases);
+            }
+            else if (!isExceptionType)
             {
                 WriteMemberwiseDeepCopyMethod(writer, type, plan.Fields, members, plan.OnlyDeepFields);
             }
@@ -269,6 +278,13 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     private TypeSyntax GetCopierType(IMemberDescription member)
     {
         var t = member.Type;
+        if (LanguageFeatureSymbols.IsUnion(t)
+            && !SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly))
+        {
+            // A referenced shallow union can register ShallowCopier<T> without emitting a concrete generated copier.
+            return LibraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
+        }
+
         if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
             && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
             && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
@@ -484,7 +500,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return new(MemberCopyKind.Copier, copierExpression, castType);
     }
 
-    private static void WriteSerializationCallbacks(SourceWriter writer, SerializableTypeEmissionPlan type, string originalInstance, string resultInstance, string callbackMethodName)
+    internal static void WriteSerializationCallbacks(SourceWriter writer, SerializableTypeEmissionPlan type, string originalInstance, string resultInstance, string callbackMethodName)
     {
         foreach (var callback in type.SerializationHooks)
         {

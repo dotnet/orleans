@@ -11,7 +11,8 @@
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="$(AspireVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
+    <PackageVersion Update="Microsoft.Extensions.Hosting" Version="11.0.0" Condition="'$(TargetFramework)' == 'net11.0'" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="$(OrleansVersion)" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="$(OrleansVersion)" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="$(OrleansVersion)" />

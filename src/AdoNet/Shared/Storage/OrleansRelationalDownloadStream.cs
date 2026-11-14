@@ -21,8 +21,8 @@ namespace Orleans.Tests.SqlUtils
 #endif
 {
     /// <summary>
-    /// This is a chunked read implementation for ADO.NET providers which do
-    /// not otherwise implement <see cref="DbDataReader.GetStream(int)"/> natively.
+    /// Adapts <see cref="DbDataReader.GetBytes(int, long, byte[], int, int)"/>
+    /// into a chunked read-only stream.
     /// </summary>
     internal class OrleansRelationalDownloadStream : Stream
     {
@@ -51,13 +51,6 @@ namespace Orleans.Tests.SqlUtils
         /// The total number of bytes in the column.
         /// </summary>
         private readonly long _totalBytes;
-
-        /// <summary>
-        /// The internal byte array buffer size used in .CopyToAsync.
-        /// This size is just a guess and is likely dependent on the database
-        /// tuning settings (e.g. read_buffer_size in case of MySQL).
-        /// </summary>
-        private const int InternalReadBufferLength = 4092;
 
         /// <summary>
         /// Initializes a new <see cref="OrleansRelationalDownloadStream"/> instance.
@@ -131,9 +124,7 @@ namespace Orleans.Tests.SqlUtils
 
             if (cancellationToken.IsCancellationRequested)
             {
-                var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-                tcs.SetCanceled(cancellationToken);
-                return tcs.Task;
+                return Task.FromCanceled<int>(cancellationToken);
             }
 
             try
@@ -141,36 +132,15 @@ namespace Orleans.Tests.SqlUtils
                 //The last used task is saved in order to avoid one allocation when the number of bytes read
                 //will likely be the same multiple times.
                 int bytesRead = Read(buffer, offset, count);
+#pragma warning disable CA1849 // _lastTask is created only by Task.FromResult and is already successfully completed.
                 var ret = _lastTask != null && bytesRead == _lastTask.Result ? _lastTask : (_lastTask = Task.FromResult(bytesRead));
+#pragma warning restore CA1849
 
                 return ret;
             }
             catch (Exception e)
             {
-                //Due to call to Read, this is for sure a IOException and can be thrown out.
-                var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-                tcs.SetException(e);
-
-                return tcs.Task;
-            }
-        }
-
-        /// <inheritdoc/>
-        public override async Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
-        {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                byte[] buffer = new byte[InternalReadBufferLength];
-                int bytesRead;
-                while ((bytesRead = Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
-
-                    await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-                }
+                return Task.FromException<int>(e);
             }
         }
 

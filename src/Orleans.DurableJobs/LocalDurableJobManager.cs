@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -499,6 +500,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
     }
 
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "Writable-index expiry closes admission; running-shard cleanup or the shutdown cache drain owns final disposal.")]
     internal async Task ProcessShardCheckCycleAsync(CancellationToken cancellationToken)
     {
         LogCheckingPendingShards(_logger);

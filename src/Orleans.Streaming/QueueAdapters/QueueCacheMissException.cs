@@ -57,8 +57,14 @@ namespace Orleans.Streams
         /// <param name="low">The earliest available sequence token.</param>
         /// <param name="high">The latest available sequence token.</param>
         public QueueCacheMissException(StreamSequenceToken requested, StreamSequenceToken low, StreamSequenceToken high)
-            : this(requested.ToString(), low.ToString(), high.ToString())
+            : this(GetTokenString(requested, nameof(requested)), GetTokenString(low, nameof(low)), GetTokenString(high, nameof(high)))
         {
+        }
+
+        private static string? GetTokenString(StreamSequenceToken token, string parameterName)
+        {
+            ArgumentNullException.ThrowIfNull(token, parameterName);
+            return token.ToString();
         }
 
         /// <summary>
@@ -93,6 +99,7 @@ namespace Orleans.Streams
         [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            ArgumentNullException.ThrowIfNull(info);
             info.AddValue("Requested", Requested);
             info.AddValue("Low", Low);
             info.AddValue("High", High);

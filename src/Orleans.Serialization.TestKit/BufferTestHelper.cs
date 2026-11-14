@@ -19,11 +19,11 @@ namespace Orleans.Serialization.TestKit
             var result = new List<IBufferTestSerializer>();
             foreach (var size in maxSizes)
             {
-                result.Add(ActivatorUtilities.CreateInstance<MultiSegmentBufferWriterTester>(serviceProvider, new MultiSegmentBufferWriterTester.Options { MaxAllocationSize = size }));
+                result.Add(new MultiSegmentBufferWriterTester(serviceProvider, new MultiSegmentBufferWriterTester.Options { MaxAllocationSize = size }));
             }
 
-            result.Add(ActivatorUtilities.CreateInstance<StructBufferWriterTester>(serviceProvider));
-            result.Add(ActivatorUtilities.CreateInstance<PooledBufferWriterTester>(serviceProvider));
+            result.Add(new StructBufferWriterTester(serviceProvider));
+            result.Add(new PooledBufferWriterTester(serviceProvider));
             return result.ToArray();
         }
 

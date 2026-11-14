@@ -331,11 +331,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private readonly int _maxMessageBodySize;
     private readonly TimeSpan _systemResponseTimeout;
     private readonly ActivationDirectory _activations;
-#if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
 
 #pragma warning disable IDE0052 // Remove unread private members. Justification: this field is only for diagnostic purposes.
     private readonly Task? _membershipUpdatesTask;

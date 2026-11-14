@@ -88,7 +88,9 @@ namespace Orleans.Transactions.State
 
         internal Task StopAsync(CancellationToken cancellationToken)
         {
+#pragma warning disable CA1849 // Shutdown observers run on the calling activation scheduler before queued storage cycles resume.
             onDeactivating.Cancel(throwOnFirstException: false);
+#pragma warning restore CA1849
 
             // Storage cycles and shutdown run on the activation scheduler. Canceled cycles return before accessing storage.
             return cancellationToken.IsCancellationRequested
@@ -602,7 +604,9 @@ namespace Orleans.Transactions.State
                     timeStamp,
                     confirmStatus,
                     queueEntryFound: true,
+#pragma warning disable CA1508 // The catch sets UnknownException before this finally executes when persistence fails.
                     succeeded: confirmStatus == TransactionalStatus.Ok,
+#pragma warning restore CA1508
                     identity: diagnosticIdentity);
             }
         }

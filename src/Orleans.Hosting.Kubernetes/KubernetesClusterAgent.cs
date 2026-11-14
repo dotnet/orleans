@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -190,8 +191,13 @@ namespace Orleans.Hosting.Kubernetes
                 }
             }
 
-            // Start monitoring loop
-            ThreadPool.UnsafeQueueUserWorkItem(_ => _runTask = Task.WhenAll(Task.Run(MonitorOrleansClustering), Task.Run(MonitorKubernetesPods)), null);
+            // Publish the join before startup completes so shutdown can await both monitors.
+            using (new ExecutionContextSuppressor())
+            {
+                _runTask = Task.WhenAll(
+                    Task.Run(MonitorOrleansClustering, CancellationToken.None),
+                    Task.Run(MonitorKubernetesPods, CancellationToken.None));
+            }
         }
 
         private async Task AddClusterOptionsToPodLabels(CancellationToken cancellation)
@@ -224,6 +230,8 @@ namespace Orleans.Hosting.Kubernetes
         /// </summary>
         /// <param name="cancellationToken">A cancellation token which limits how long shutdown can wait for monitoring to stop.</param>
         /// <returns>A task representing the shutdown operation.</returns>
+        [SuppressMessage("Performance", "CA1849:Call async methods when in an async method",
+            Justification = "Shutdown cancellation callbacks run on the calling thread before monitoring is disabled and the monitor tasks are joined.")]
         public async Task OnStop(CancellationToken cancellationToken)
         {
             _shutdownToken.Cancel();
@@ -402,6 +410,8 @@ namespace Orleans.Hosting.Kubernetes
 
         internal readonly struct TestAccessor(KubernetesClusterAgent agent)
         {
+            public Task Start(CancellationToken cancellationToken) => agent.OnStart(cancellationToken);
+            public Task MonitoringTask => agent._runTask;
             public bool IsMonitoringEnabled => agent._enableMonitoring;
             public SemaphoreSlim PauseMonitoringSemaphore => agent._pauseMonitoringSemaphore;
             public Task MonitorOrleansClustering() => agent.MonitorOrleansClustering();

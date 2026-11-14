@@ -523,7 +523,10 @@ export async function collectPackageProjects(
     }
     projects.set(packageId, {
       file,
-      alpha: String(properties.VersionSuffix).startsWith('alpha.'),
+      alpha: String(properties.VersionSuffix)
+        .toLowerCase()
+        .split('.')
+        .includes('alpha'),
     });
   }
   return projects;

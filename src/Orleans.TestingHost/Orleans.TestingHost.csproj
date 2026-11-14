@@ -17,7 +17,6 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
-    <PackageReference Include="System.IO.Pipelines" />
   </ItemGroup>
 
   <ItemGroup>

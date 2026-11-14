@@ -573,7 +573,7 @@ namespace Orleans.Hosting
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans", StringComparison.Ordinal))
                 {
                     return true;
                 }

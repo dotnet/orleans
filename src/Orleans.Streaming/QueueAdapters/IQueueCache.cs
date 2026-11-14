@@ -29,7 +29,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="streamId">The stream identifier.</param>
         /// <param name="token">The token.</param>
-        /// <returns>The queue cache cursor.</returns>
+        /// <returns>The queue cache cursor, which the caller is responsible for disposing.</returns>
         /// <exception cref="QueueCacheMissException">
         /// The requested token is older than the messages retained by the cache.
         /// </exception>
@@ -43,7 +43,7 @@ namespace Orleans.Streams
         /// <param name="token">The token.</param>
         /// <returns>
         /// A successful result containing the acquired cursor, or a cache-miss result containing the
-        /// unavailable position and current cache bounds.
+        /// unavailable position and current cache bounds. The caller is responsible for disposing a successfully acquired cursor.
         /// </returns>
         QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
@@ -68,6 +68,7 @@ namespace Orleans.Streams
         /// <returns>
         /// A successful result containing the acquired cursor, a cache-miss result containing the unavailable
         /// position and current cache bounds, or <see cref="QueueCacheCursorResultKind.NotSupported"/>.
+        /// The caller is responsible for disposing a successfully acquired cursor.
         /// </returns>
         /// <remarks>
         /// The default implementation acquires the latest cursor using <see cref="TryGetCacheCursor"/>

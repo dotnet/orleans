@@ -62,8 +62,10 @@ namespace Orleans.Transactions
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="operation"/> is null.</exception>
         public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation)
         {
+            ArgumentNullException.ThrowIfNull(operation);
             if (detectReentrancy)
             {
                 throw new LockRecursionException("Cannot perform a read operation from within another operation");
@@ -116,6 +118,7 @@ namespace Orleans.Transactions
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="operation"/> is null.</exception>
         public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation, ReadIsolation isolation)
         {
             return isolation switch
@@ -128,6 +131,7 @@ namespace Orleans.Transactions
 
         private async Task<TResult> PerformReadCommitted<TResult>(Func<TState, TResult> operation)
         {
+            ArgumentNullException.ThrowIfNull(operation);
             if (detectReentrancy)
             {
                 throw new LockRecursionException("Cannot perform a read operation from within another operation");

@@ -305,10 +305,10 @@ namespace Orleans.Runtime.Management
             foreach (var silo in silos)
                 tasks.Add(GetSiloControlReference(silo).GetActivationCount(cancellationToken));
 
-            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
+            var counts = await Task.WhenAll(tasks).WaitAsync(cancellationToken);
             int sum = 0;
-            foreach (Task<int> task in tasks)
-                sum += task.Result;
+            foreach (var count in counts)
+                sum += count;
 
             return sum;
         }

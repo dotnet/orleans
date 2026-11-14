@@ -19,13 +19,9 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        var headerWriter = Writer.Create(output, session: null!);
-        headerWriter.WriteVarUInt32(SetValueCommand);
-        headerWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, SetValueCommand);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, state, output, sessionPool);
-        var versionWriter = Writer.Create(output, session: null!);
-        versionWriter.WriteVarUInt64(version);
-        versionWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteVersion(output, version);
         entry.Commit();
     }
 
@@ -33,9 +29,7 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
-        payloadWriter.WriteVarUInt32(ClearValueCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(entry.Writer, ClearValueCommand);
         entry.Commit();
     }
 

@@ -311,7 +311,7 @@ namespace Orleans.Storage
 
                         // if any payload type providing metadata is used
                         case byte[] binaryValue:
-                            if (binaryValue != null && binaryValue.Length > 0)
+                            if (binaryValue.Length > 0)
                             {
                                 yield return binaryValue;
                             }

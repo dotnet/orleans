@@ -47,6 +47,81 @@ public class DynamoDBGrainStorageCancellationTests
     };
 
     [Theory]
+    [InlineData("Read", "grainType", false)]
+    [InlineData("Read", "grainType", true)]
+    [InlineData("Read", "grainState", false)]
+    [InlineData("Read", "grainState", true)]
+    [InlineData("Write", "grainType", false)]
+    [InlineData("Write", "grainType", true)]
+    [InlineData("Write", "grainState", false)]
+    [InlineData("Write", "grainState", true)]
+    [InlineData("Clear", "grainType", false)]
+    [InlineData("Clear", "grainType", true)]
+    [InlineData("Clear", "grainState", false)]
+    [InlineData("Clear", "grainState", true)]
+    public async Task NullInputsFailBeforeSerializationOrStorageAccess(string operation, string parameterName, bool useCancellationOverload)
+    {
+        using var client = new RequestClient();
+        var serializer = new TrackingSerializer();
+        var activators = new TrackingActivatorProvider();
+        var storage = CreateStorage(client, serializer, activators, delete: false);
+        var state = CreateState("7");
+        var original = Assert.IsType<List<int>>(state.State);
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            Execute(storage, operation, parameterName == "grainState" ? null! : state,
+                TestContext.Current.CancellationToken, parameterName == "grainType" ? null! : GrainType, useCancellationOverload));
+
+        Assert.Equal(parameterName, exception.ParamName);
+        Assert.Empty(client.Requests);
+        Assert.Equal(0, serializer.SerializeCount);
+        Assert.Equal(0, serializer.DeserializeCount);
+        Assert.Equal(0, activators.CreateCount);
+        AssertPreservedState(state, original, "7");
+    }
+
+    [Theory]
+    [InlineData("Read")]
+    [InlineData("Write")]
+    [InlineData("Clear")]
+    public async Task PreCanceledOperationsPreserveCancellationPrecedenceForNullInputs(string operation)
+    {
+        foreach (var initialized in new[] { false, true })
+        {
+            using var client = new RequestClient();
+            var serializer = new TrackingSerializer();
+            var activators = new TrackingActivatorProvider();
+            var storage = CreateStorage(client, serializer, activators, delete: false, initialized);
+            var token = new CancellationToken(canceled: true);
+
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                Execute(storage, operation, null!, token, grainType: null!));
+
+            Assert.Equal(token, exception.CancellationToken);
+            Assert.Empty(client.Requests);
+            Assert.Equal(0, serializer.SerializeCount);
+            Assert.Equal(0, serializer.DeserializeCount);
+            Assert.Equal(0, activators.CreateCount);
+        }
+    }
+
+    [Theory]
+    [InlineData("Read")]
+    [InlineData("Write")]
+    [InlineData("Clear")]
+    public async Task UninitializedOperationsPreserveInitializationFailureForNullInputs(string operation)
+    {
+        using var client = new RequestClient();
+        var storage = CreateStorage(client, new TrackingSerializer(), new TrackingActivatorProvider(), delete: false, initialized: false);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            Execute(storage, operation, null!, TestContext.Current.CancellationToken, grainType: null!));
+
+        Assert.Equal("GrainState-Table property not initialized", exception.Message);
+        Assert.Empty(client.Requests);
+    }
+
+    [Theory]
     [MemberData(nameof(Operations))]
     public async Task OperationsForwardExactTokenAndApplyStateOnSuccess(string operation, string? etag, bool delete)
     {
@@ -77,13 +152,7 @@ public class DynamoDBGrainStorageCancellationTests
         var state = CreateState(etag);
         var original = Assert.IsType<List<int>>(state.State);
 
-        await (operation switch
-        {
-            "Read" => storage.ReadStateAsync(GrainType, GrainId, state),
-            "Write" => storage.WriteStateAsync(GrainType, GrainId, state),
-            "Clear" => storage.ClearStateAsync(GrainType, GrainId, state),
-            _ => throw new ArgumentOutOfRangeException(nameof(operation))
-        });
+        await Execute(storage, operation, state, CancellationToken.None, useCancellationOverload: false);
 
         Assert.Equal(CancellationToken.None, Assert.Single(client.Tokens));
         AssertRequest(Assert.Single(client.Requests), operation, etag, delete);
@@ -235,12 +304,17 @@ public class DynamoDBGrainStorageCancellationTests
         RecordExists = true,
     };
 
-    private static Task Execute(IGrainStorage storage, string operation, GrainState<List<int>> state, CancellationToken token)
-        => operation switch
+    private static Task Execute(
+        IGrainStorage storage, string operation, GrainState<List<int>> state, CancellationToken token,
+        string grainType = GrainType, bool useCancellationOverload = true)
+        => (operation, useCancellationOverload) switch
         {
-            "Read" => storage.ReadStateAsync(GrainType, GrainId, state, token),
-            "Write" => storage.WriteStateAsync(GrainType, GrainId, state, token),
-            "Clear" => storage.ClearStateAsync(GrainType, GrainId, state, token),
+            ("Read", true) => storage.ReadStateAsync(grainType, GrainId, state, token),
+            ("Write", true) => storage.WriteStateAsync(grainType, GrainId, state, token),
+            ("Clear", true) => storage.ClearStateAsync(grainType, GrainId, state, token),
+            ("Read", false) => storage.ReadStateAsync(grainType, GrainId, state),
+            ("Write", false) => storage.WriteStateAsync(grainType, GrainId, state),
+            ("Clear", false) => storage.ClearStateAsync(grainType, GrainId, state),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         };
 

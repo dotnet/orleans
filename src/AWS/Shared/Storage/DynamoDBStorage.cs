@@ -116,6 +116,8 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped signature and AWS SDK List<KeySchemaElement>, List<AttributeDefinition>, and List<GlobalSecondaryIndex> request contracts.")]
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -753,6 +755,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
         /// <returns>The object translated by the resolver function</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
             => ReadSingleEntryAsync(tableName, keys, resolver, CancellationToken.None);
 
@@ -762,9 +765,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The entry keys.</param>
         /// <param name="resolver">Converts the returned fields to the result.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public async Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken) where TResult : class
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(resolver);
+
             try
             {
                 var request = new GetItemRequest
@@ -805,6 +811,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
             => QueryAsync(tableName, keys, keyConditionExpression, resolver, CancellationToken.None, indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
 
@@ -819,9 +826,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="scanIndexForward">Whether the index is read in ascending order.</param>
         /// <param name="lastEvaluatedKey">The previous page's continuation key.</param>
         /// <param name="consistentRead">Whether reads must be strongly consistent.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(resolver);
+
             try
             {
                 var request = new QueryRequest
@@ -872,6 +882,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
                 string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
                 string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
@@ -887,6 +898,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="indexName">The optional secondary index name.</param>
         /// <param name="scanIndexForward">Whether the index is read in ascending order.</param>
         /// <param name="consistentRead">Whether reads must be strongly consistent.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public async Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
                 string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
                 CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
@@ -921,12 +933,15 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="expression">The filter expression</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="resolver"/> is <see langword="null"/>.</exception>
         public Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class =>
             ScanAsync(tableName, attributes, expression, resolver, CancellationToken.None);
 
         internal async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken) where TResult : class
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(resolver);
+
             // From the Amazon documentation:
             // "A single Scan operation will read up to the maximum number of items set
             // (if using the Limit parameter) or a maximum of 1 MB of data and then apply
@@ -1130,6 +1145,8 @@ namespace Orleans.Transactions.DynamoDB
         /// </summary>
         /// <param name="transactItems">Transact write items to be performed</param>
         /// <returns></returns>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped List<TransactWriteItem> signature and passes the AWS SDK request collection unchanged.")]
         public Task WriteTxAsync(List<TransactWriteItem> transactItems)
         {
             try

@@ -13,13 +13,11 @@ using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel.SubscriberTable
 {
+    [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
+        Justification = "AddBroadcastChannel registers this type as a singleton constructed by dependency injection.")]
     internal class ImplicitChannelSubscriberTable
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
-#else
-        private readonly object _lockObj = new();
-#endif
         private readonly GrainBindingsResolver _bindings;
         private readonly IChannelNamespacePredicateProvider[] _providers;
         private readonly IServiceProvider _serviceProvider;

@@ -40,6 +40,8 @@ namespace Orleans.Runtime.Membership
             IOptions<ConsulClusteringOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+            ArgumentNullException.ThrowIfNull(membershipTableOptions);
             this.clusterId = clusterOptions.Value.ClusterId;
             this.kvRootFolder = membershipTableOptions.Value.KvRootFolder;
             this._logger = logger;
@@ -122,6 +124,7 @@ namespace Orleans.Runtime.Membership
         public static async Task<MembershipTableData> ReadAllAsync(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(consulClient);
             var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder) + "/", ConsistentRead, cancellationToken);
             if (deploymentKVAddresses.Response == null)
             {
@@ -148,6 +151,8 @@ namespace Orleans.Runtime.Membership
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(tableVersion);
             try
             {
                 // Consul treats a CAS index of zero as an insert.
@@ -179,6 +184,8 @@ namespace Orleans.Runtime.Membership
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(tableVersion);
             try
             {
                 var expectedIndex = ulong.Parse(etag, CultureInfo.InvariantCulture);
@@ -220,6 +227,7 @@ namespace Orleans.Runtime.Membership
         public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(entry);
             var heartbeat = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(clusterId, kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
             var response = await _consulClient.KV.Put(heartbeat, cancellationToken);
             if (!response.Response)

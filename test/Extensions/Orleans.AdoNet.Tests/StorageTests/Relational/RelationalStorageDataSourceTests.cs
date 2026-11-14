@@ -176,6 +176,41 @@ public sealed class RelationalStorageDataSourceTests
     }
 
     [Fact]
+    public async Task ReadAndExecuteAsync_PreserveSqlLikeParameterValuesAsData()
+    {
+        using var fixture = new RelationalStorageLifecycleFixture();
+        fixture.ExecuteSetup(
+            """
+            CREATE TABLE Items(Id INTEGER PRIMARY KEY, Value TEXT NOT NULL);
+            INSERT INTO Items(Value) VALUES ('existing');
+            """);
+        const string value = "'); DELETE FROM Items; --";
+
+        var affected = await fixture.Storage.ExecuteAsync(
+            "INSERT INTO Items(Value) VALUES (@value);",
+            BindValue,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var results = await fixture.Storage.ReadAsync(
+            "SELECT Value FROM Items WHERE Value = @value;",
+            BindValue,
+            (record, _, _) => Task.FromResult(record.GetString(0)),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, affected);
+        Assert.Equal([value], results);
+        Assert.Equal(2L, fixture.ExecuteScalar<long>("SELECT COUNT(*) FROM Items;"));
+        Assert.Equal("existing", fixture.ExecuteScalar<string>("SELECT Value FROM Items WHERE Id = 1;"));
+
+        static void BindValue(System.Data.IDbCommand command)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@value";
+            parameter.Value = value;
+            command.Parameters.Add(parameter);
+        }
+    }
+
+    [Fact]
     public async Task ReadAsync_DisposesResourcesAfterSuccess()
     {
         using var fixture = new RelationalStorageLifecycleFixture();
@@ -246,6 +281,58 @@ public sealed class RelationalStorageDataSourceTests
         Assert.Equal(1, command.ExecuteReaderAsyncCallCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadAsync_KeepsResourcesAliveUntilSelectorCompletes(bool selectorThrows)
+    {
+        using var fixture = new RelationalStorageLifecycleFixture();
+        var selectorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSelector = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("Asynchronous selector failure.");
+        var read = fixture.Storage.ReadAsync(
+            "SELECT 17;",
+            parameterProvider: null,
+            async (record, _, cancellationToken) =>
+            {
+                Assert.Equal(TestContext.Current.CancellationToken, cancellationToken);
+                Assert.Equal(17, record.GetInt32(0));
+                selectorStarted.SetResult();
+                return await releaseSelector.Task;
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        try
+        {
+            await selectorStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            var connection = fixture.DataSource.Connections[1];
+            var command = Assert.Single(connection.Commands);
+            var reader = Assert.Single(command.Readers);
+            Assert.False(read.IsCompleted);
+            Assert.False(connection.IsDisposed);
+            Assert.False(command.IsDisposed);
+            Assert.False(reader.IsClosed);
+
+            if (selectorThrows)
+            {
+                releaseSelector.SetException(expected);
+                Assert.Same(expected, await Assert.ThrowsAsync<InvalidOperationException>(() => read));
+            }
+            else
+            {
+                releaseSelector.SetResult(29);
+                Assert.Equal([29], await read);
+            }
+
+            AssertOperationDisposed(fixture.DataSource, expectReader: true);
+        }
+        finally
+        {
+            releaseSelector.TrySetResult(29);
+            await ((Task)read).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
     [Fact]
     public async Task ReadAsync_RejectsInvalidResultSetIndex()
     {
@@ -295,6 +382,85 @@ public sealed class RelationalStorageDataSourceTests
         Assert.Equal(1, selectorCallCount);
         var command = AssertOperationDisposed(fixture.DataSource, expectReader: true);
         Assert.Equal(1, command.CancelCallCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadAsync_AwaitsPendingCancellationBeforeDisposingResources(bool cancellationThrows)
+    {
+        using var fixture = new RelationalStorageLifecycleFixture();
+        using var cancellation = new CancellationTokenSource();
+        var selectorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSelector = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readReturned = new TaskCompletionSource<Task<IEnumerable<int>>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var selectorException = new InvalidOperationException("Selector failed.");
+        var cancellationException = new InvalidOperationException("Provider cancellation failed.");
+        var read = Task.Run(() =>
+        {
+            var operation = fixture.Storage.ReadAsync<int>(
+                "SELECT 17;",
+                parameterProvider: null,
+                (_, _, _) =>
+                {
+                    selectorStarted.SetResult();
+                    releaseSelector.Task.GetAwaiter().GetResult();
+                    throw selectorException;
+                },
+                cancellationToken: cancellation.Token);
+            readReturned.SetResult(operation);
+            return operation;
+        }, TestContext.Current.CancellationToken);
+        var cancel = Task.CompletedTask;
+        try
+        {
+            await selectorStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            var connection = fixture.DataSource.Connections[1];
+            var command = Assert.Single(connection.Commands);
+            var reader = Assert.Single(command.Readers);
+            command.OnCancel = () =>
+            {
+                cancellationStarted.SetResult();
+                releaseCancellation.Task.GetAwaiter().GetResult();
+                if (cancellationThrows)
+                {
+                    throw cancellationException;
+                }
+            };
+            cancel = Task.Run(cancellation.Cancel, TestContext.Current.CancellationToken);
+            await cancellationStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            releaseSelector.SetResult();
+
+            // Cleanup yields the calling thread while the provider's cancellation callback is still running.
+            var operation = await readReturned.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.False(operation.IsCompleted);
+            Assert.False(connection.IsDisposed);
+            Assert.False(command.IsDisposed);
+            Assert.False(reader.IsClosed);
+
+            releaseCancellation.SetResult();
+            if (cancellationThrows)
+            {
+                var exception = await Assert.ThrowsAsync<AggregateException>(() => cancel);
+                Assert.Same(cancellationException, Assert.Single(exception.InnerExceptions));
+            }
+            else
+            {
+                await cancel;
+            }
+
+            Assert.Same(selectorException, await Assert.ThrowsAsync<InvalidOperationException>(() => read));
+            AssertOperationDisposed(fixture.DataSource, expectReader: true);
+            Assert.Equal(1, command.CancelCallCount);
+        }
+        finally
+        {
+            releaseSelector.TrySetResult();
+            releaseCancellation.TrySetResult();
+            await Task.WhenAll(read, cancel).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
     }
 
     [Fact]
@@ -810,11 +976,14 @@ internal sealed class LifecycleTrackingSqliteCommand(
 
     public int CancelCallCount { get; private set; }
 
+    public Action? OnCancel { get; set; }
+
     public bool IsDisposed { get; private set; }
 
     public override void Cancel()
     {
         CancelCallCount++;
+        OnCancel?.Invoke();
         base.Cancel();
     }
 

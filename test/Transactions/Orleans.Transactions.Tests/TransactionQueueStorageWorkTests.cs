@@ -31,6 +31,88 @@ namespace Orleans.Transactions.Tests;
 public class TransactionQueueStorageWorkTests
 {
     [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task PerformUpdateExtensionRejectsMissingInputsBeforeDelegation(bool missingState, bool missingAction)
+    {
+        var storage = new RecordingTransactionalState();
+        ITransactionalState<TestState> state = missingState ? null! : storage;
+        Action<TestState> update = missingAction ? null! : value => value.Value++;
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() => state.PerformUpdate(update));
+
+        Assert.Equal(missingState ? "transactionalState" : "updateAction", exception.ParamName);
+        Assert.Equal(0, storage.UpdateCalls);
+        Assert.Equal(0, storage.State.Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PerformUpdateExtensionPreservesCallbackResultAndFailure(bool callbackThrows)
+    {
+        var storage = new RecordingTransactionalState();
+        var expectedFailure = new InvalidOperationException("update failed");
+        var callbackCalls = 0;
+        var error = await Record.ExceptionAsync(() => storage.PerformUpdate(value =>
+        {
+            callbackCalls++;
+            value.Value = 42;
+            if (callbackThrows)
+            {
+                throw expectedFailure;
+            }
+        }));
+
+        Assert.Equal(1, storage.UpdateCalls);
+        Assert.Equal(1, callbackCalls);
+        Assert.Equal(42, storage.State.Value);
+        if (callbackThrows)
+        {
+            Assert.Same(expectedFailure, error);
+        }
+        else
+        {
+            Assert.Null(error);
+        }
+    }
+
+    private sealed class RecordingTransactionalState : ITransactionalState<TestState>
+    {
+        public TestState State { get; } = new();
+        public int UpdateCalls { get; private set; }
+
+        public Task<TResult> PerformUpdate<TResult>(Func<TestState, TResult> updateFunction)
+        {
+            UpdateCalls++;
+            return Task.FromResult(updateFunction(State));
+        }
+
+        public Task<TResult> PerformRead<TResult>(Func<TestState, TResult> readFunction) => throw new NotSupportedException();
+        public Task<TResult> PerformRead<TResult>(Func<TestState, TResult> readFunction, ReadIsolation isolation) => throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(ReadIsolation.Serializable)]
+    [InlineData(ReadIsolation.ReadCommitted)]
+    public async Task PerformReadRejectsMissingOperationBeforeTransactionOrQueueAccess(ReadIsolation? isolation)
+    {
+        var state = new TransactionalState<TestState>(
+            null!, new TestGrainContextAccessor(), new TestStateCopier(), null!,
+            NullLogger<TransactionalState<TestState>>.Instance);
+        Assert.Null(TransactionContext.GetTransactionInfo());
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() => isolation is { } value
+            ? state.PerformRead<TestState>(null!, value)
+            : state.PerformRead<TestState>(null!));
+
+        Assert.Equal("operation", exception.ParamName);
+        Assert.Null(TransactionContext.GetTransactionInfo());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ReadCommitted_PendingWriterReturnsCommittedCopyBeforeAbort(bool prepareCommit)
@@ -256,6 +338,13 @@ public class TransactionQueueStorageWorkTests
         Task? stop = null;
         var scheduled = Task.Factory.StartNew(() =>
         {
+            TaskScheduler? observerScheduler = null;
+            var observerThread = 0;
+            using var registration = queue.OnDeactivating.Register(() =>
+            {
+                observerScheduler = TaskScheduler.Current;
+                observerThread = Environment.CurrentManagedThreadId;
+            });
             work = queue.StartStorageWorkAsync();
             if (queueAnotherCycle)
             {
@@ -263,6 +352,8 @@ public class TransactionQueueStorageWorkTests
             }
 
             stop = queue.StopAsync(TestContext.Current.CancellationToken);
+            Assert.Same(scheduler, observerScheduler);
+            Assert.Equal(Environment.CurrentManagedThreadId, observerThread);
             Assert.False(work.IsCompleted);
             Assert.False(stop.IsCompleted);
         }, TestContext.Current.CancellationToken, TaskCreationOptions.None, scheduler);

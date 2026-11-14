@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Documentation.Deployment;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -381,6 +382,195 @@ public sealed class DirectoryMembershipSnapshotTests
         await directoryMembership.DisposeAsync();
 
         Assert.False(await nextUpdate);
+    }
+
+    [Fact]
+    public async Task DisposeWithoutCallbacksWaitsForSubscriptionAndClosesRetainedWaitHandle()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var processing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProcessing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var subscriptionStopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSubscription = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken subscriptionToken = default;
+        var membership = Substitute.For<IClusterMembershipService>();
+        membership.MembershipUpdates.Returns(Updates(CancellationToken.None));
+        var directoryMembership = new DirectoryMembershipService(
+            membership, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+
+        try
+        {
+            await processing.Task.WaitAsync(timeout.Token);
+            var waitHandle = subscriptionToken.WaitHandle;
+            Assert.False(waitHandle.WaitOne(0));
+
+            var firstDisposal = directoryMembership.DisposeAsync().AsTask();
+            var secondDisposal = directoryMembership.DisposeAsync().AsTask();
+            // Observe cancellation without registering a callback: CancelAsync's no-callback path must not leak this handle.
+            Assert.True(await Task.Run(() => waitHandle.WaitOne(TimeSpan.FromSeconds(10)), timeout.Token).WaitAsync(timeout.Token));
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.Same(firstDisposal, secondDisposal);
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseProcessing.SetResult();
+            await subscriptionStopping.Task.WaitAsync(timeout.Token);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseSubscription.SetResult();
+            await Task.WhenAll(firstDisposal, secondDisposal).WaitAsync(timeout.Token);
+            var repeatedDisposal = directoryMembership.DisposeAsync().AsTask();
+            Assert.Same(firstDisposal, repeatedDisposal);
+            await repeatedDisposal.WaitAsync(timeout.Token);
+            Assert.Throws<ObjectDisposedException>(() => subscriptionToken.WaitHandle);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        }
+        finally
+        {
+            releaseProcessing.TrySetResult();
+            releaseSubscription.TrySetResult();
+            await directoryMembership.DisposeAsync();
+        }
+
+        async IAsyncEnumerable<ClusterMembershipSnapshot> Updates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            subscriptionToken = cancellationToken;
+            try
+            {
+                yield return new ClusterMembershipSnapshot(
+                    ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(1));
+                processing.SetResult();
+                // Neither phase barrier registers with the owner token.
+                await releaseProcessing.Task;
+            }
+            finally
+            {
+                subscriptionStopping.SetResult();
+                await releaseSubscription.Task;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DisposeWaitsForSubscriptionAndReleasesCancellationResources(bool callbackThrows)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var subscribed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var subscriptionStopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSubscription = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var notifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseNotification = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken subscriptionToken = default;
+        var membership = Substitute.For<IClusterMembershipService>();
+        membership.MembershipUpdates.Returns(Updates(CancellationToken.None));
+        var directoryMembership = new DirectoryMembershipService(
+            membership, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+        var expected = new InvalidOperationException("Cancellation callback failed.");
+        Task? firstDisposal = null;
+        var callerThread = 0;
+        var callbackThread = 0;
+
+        try
+        {
+            await subscribed.Task.WaitAsync(timeout.Token);
+            var waitHandle = subscriptionToken.WaitHandle;
+            using var registration = subscriptionToken.Register(() =>
+            {
+                callbackThread = Environment.CurrentManagedThreadId;
+                notifying.SetResult();
+                releaseNotification.Task.WaitAsync(timeout.Token).GetAwaiter().GetResult();
+                if (callbackThrows)
+                {
+                    throw expected;
+                }
+            });
+
+            var initiateDisposal = Task.Run(() =>
+            {
+                callerThread = Environment.CurrentManagedThreadId;
+                firstDisposal = directoryMembership.DisposeAsync().AsTask();
+            }, timeout.Token);
+            await notifying.Task.WaitAsync(timeout.Token);
+            var secondDisposal = directoryMembership.DisposeAsync().AsTask();
+
+            Assert.Equal(callerThread, callbackThread);
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(initiateDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseNotification.SetResult();
+            await initiateDisposal.WaitAsync(timeout.Token);
+            Assert.NotNull(firstDisposal);
+            Assert.Same(firstDisposal, secondDisposal);
+            await subscriptionStopping.Task.WaitAsync(timeout.Token);
+
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+            releaseSubscription.SetResult();
+
+            if (callbackThrows)
+            {
+                var firstFailure = await Assert.ThrowsAsync<AggregateException>(() => firstDisposal.WaitAsync(timeout.Token));
+                Assert.Same(expected, Assert.Single(firstFailure.InnerExceptions));
+                foreach (var disposal in new[] { secondDisposal, directoryMembership.DisposeAsync().AsTask() })
+                {
+                    var failure = await Assert.ThrowsAsync<AggregateException>(() => disposal.WaitAsync(timeout.Token));
+                    Assert.Same(firstFailure, failure);
+                    Assert.Same(expected, Assert.Single(failure.InnerExceptions));
+                }
+            }
+            else
+            {
+                await Task.WhenAll(firstDisposal, secondDisposal).WaitAsync(timeout.Token);
+                await directoryMembership.DisposeAsync();
+            }
+
+            Assert.Throws<ObjectDisposedException>(() => subscriptionToken.WaitHandle);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        }
+        finally
+        {
+            releaseNotification.TrySetResult();
+            releaseSubscription.TrySetResult();
+            if (callbackThrows && firstDisposal is not null)
+            {
+                await Assert.ThrowsAsync<AggregateException>(() => directoryMembership.DisposeAsync().AsTask());
+            }
+            else
+            {
+                await directoryMembership.DisposeAsync();
+            }
+        }
+
+        async IAsyncEnumerable<ClusterMembershipSnapshot> Updates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            subscriptionToken = cancellationToken;
+            subscribed.SetResult();
+            try
+            {
+                yield return new ClusterMembershipSnapshot(
+                    ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(1));
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            finally
+            {
+                subscriptionStopping.SetResult();
+                await releaseSubscription.Task;
+            }
+        }
     }
 
     private static RingRange GetExpectedRange(uint[][] hashesByMember, int memberIndex, int partitionIndex)
