@@ -138,9 +138,7 @@ namespace Orleans.Tests.SqlUtils
 
                 return ret;
             }
-#pragma warning disable CA1031 // Stream.ReadAsync reports synchronous provider failures through the returned task.
             catch (Exception e)
-#pragma warning restore CA1031
             {
                 return Task.FromException<int>(e);
             }

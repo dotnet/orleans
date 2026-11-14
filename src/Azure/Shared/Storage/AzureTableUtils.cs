@@ -97,7 +97,6 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="restStatus">When <c>getRESTErrors=true</c>, will output REST error code if applicable, otherwise <c>null</c></param>
         /// <param name="getRESTErrors">Whether REST error code should also be examined / extracted.</param>
         /// <returns>Returns <c>true</c> if HTTP status code and REST error were extracted.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static bool EvaluateException(
             Exception? e,
             out HttpStatusCode httpStatusCode,
