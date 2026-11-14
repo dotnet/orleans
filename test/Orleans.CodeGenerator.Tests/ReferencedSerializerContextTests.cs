@@ -33,6 +33,7 @@ public sealed class ReferencedSerializerContextTests
                 .Select(static source => source.SourceText.ToString())), StringComparison.Ordinal);
         var consumer = await TestCompilationHelper.CreateCompilation("""
             [Orleans.GenerateSerializerContext<DynamicPayload<System.Collections.Generic.List<int>>>]
+            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             public static class DynamicProducerProof
             {
@@ -124,6 +125,10 @@ public sealed class ReferencedSerializerContextTests
         var reference = EmitReference(producerOutput);
         var consumer = await TestCompilationHelper.CreateCompilation($$"""
             [Orleans.GenerateSerializerContext<{{closedType}}>]
+            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
+            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<byte>>]
+            [Orleans.GenerateSerializerContext<byte[]>]
+            [Orleans.GenerateSerializerContext<byte[][]>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             """, $"ImplicitConsumer{Guid.NewGuid():N}", reference);
         consumer = consumer.WithOptions(consumer.Options.WithMetadataImportOptions(metadataImport));

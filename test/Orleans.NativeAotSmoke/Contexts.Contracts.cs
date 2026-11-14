@@ -600,25 +600,38 @@ public static partial class ContextContracts
 }
 
 [GenerateSerializerContext<List<Dictionary<string, int>>>]
+[GenerateSerializerContext<Dictionary<string, int>>]
 [GenerateSerializerContext<Dictionary<int, List<long>>>]
+[GenerateSerializerContext<List<long>>]
 [GenerateSerializerContext<Payload<int>>]
 [GenerateSerializerContext<int?[]>]
+[GenerateSerializerContext<int?>]
 [GenerateSerializerContext<byte[]>]
 [GenerateSerializerContext<Flavor>]
 [GenerateSerializerContext<List<int>>]
 [GenerateSerializerContext<Node>]
 [GenerateSerializerContext<Left>]
+[GenerateSerializerContext<Right>]
 [GenerateSerializerContext<List<Branch>>]
+[GenerateSerializerContext<Branch>]
 [GenerateSerializerContext<List<AliasedPayload<int>>>]
+[GenerateSerializerContext<AliasedPayload<int>>]
 [GenerateSerializerContext<IdentifiedPayload>]
 [GenerateSerializerContext<List<CompoundPayload>>]
+[GenerateSerializerContext<CompoundPayload>]
 [GenerateSerializerContext<ValuePayload<int>>]
 [GenerateSerializerContext<Box<byte>>]
 [GenerateSerializerContext<Box<int>>]
+[GenerateSerializerContext<int[]>]
 [GenerateSerializerContext<NamespaceBox<byte>>]
+[GenerateSerializerContext<byte[][]>]
 [GenerateSerializerContext<GenericArrayNode>]
+[GenerateSerializerContext<Box<GenericArrayNode>>]
+[GenerateSerializerContext<GenericArrayNode[]>]
 [GenerateSerializerContext<List<MultipleAliasPayload>>]
+[GenerateSerializerContext<MultipleAliasPayload>]
 [GenerateSerializerContext<List<NestedAliasPayload>>]
+[GenerateSerializerContext<NestedAliasPayload>]
 [GenerateSerializerContext<MetadataEnvelope<UnusedAliasMarker>>]
 [GenerateSerializerContext<MetadataEnvelope<UnusedAliasMarker[]>>]
 [GenerateSerializerContext<InterfaceTaggedPayload>]
@@ -628,10 +641,15 @@ public static partial class ContextContracts
 [GenerateSerializerContext<DocumentationPayload<int>>]
 [GenerateSerializerContext<DocumentationPrimitivePayload>]
 [GenerateSerializerContext<DocumentationImplicitPayload<byte>>]
+[GenerateSerializerContext<Child>]
+[GenerateSerializerContext<int[]>]
+[GenerateSerializerContext<List<byte>>]
+[GenerateSerializerContext<byte[][]>]
 #endif
 internal partial class SmokeContext : SerializerContext;
 
 [GenerateSerializerContext<List<Dictionary<string, int>>>]
+[GenerateSerializerContext<Dictionary<string, int>>]
 internal partial class DuplicateContext : SerializerContext;
 
 [GenerateSerializerContext<AliasedPayload<int>>]
@@ -639,9 +657,12 @@ internal partial class DuplicateContext : SerializerContext;
 internal partial class AliasRegistrationContext : SerializerContext;
 
 [GenerateSerializerContext<RecursiveValue?>]
+[GenerateSerializerContext<RecursiveValue>]
+[GenerateSerializerContext<RecursiveValue?[]>]
 internal partial class NullableCycleContext : SerializerContext;
 
 [GenerateSerializerContext<BaseServiceModel>]
+[GenerateSerializerContext<List<int>>]
 internal partial class BaseServiceContext : SerializerContext;
 
 [GenerateSerializer]
@@ -753,13 +774,17 @@ public sealed class GenericArrayNode
 }
 
 [GenerateSerializerContext<List<PrefixPayload>>]
+[GenerateSerializerContext<PrefixPayload>]
 [GenerateSerializerContext<List<ChildAliasPayload>>]
+[GenerateSerializerContext<ChildAliasPayload>]
 internal partial class PrefixAndChildContext : SerializerContext;
 
 [GenerateSerializerContext<List<PrefixPayload>>]
+[GenerateSerializerContext<PrefixPayload>]
 internal partial class PrefixContext : SerializerContext;
 
 [GenerateSerializerContext<List<ChildAliasPayload>>]
+[GenerateSerializerContext<ChildAliasPayload>]
 internal partial class ChildAliasContext : SerializerContext;
 
 [GenerateSerializer, CompoundTypeAlias("shared")]
@@ -772,6 +797,7 @@ public sealed class ChildAliasPayload { [Id(0)] public int Value { get; set; } }
 public sealed class MultipleAliasPayload { [Id(0)] public int Value { get; set; } }
 
 [GenerateSerializerContext<List<MultipleAliasPayload>>]
+[GenerateSerializerContext<MultipleAliasPayload>]
 internal partial class MultipleAliasContext : SerializerContext;
 
 [CompoundTypeAlias("metadata-marker")]

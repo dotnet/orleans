@@ -10,7 +10,7 @@ A <xref:Orleans.Serialization.SerializerContext> registers a closed graph of typ
 
 ## Declare the type graph
 
-Apply <xref:Orleans.GenerateSerializerContextAttribute`1> to a top-level, non-generic partial class derived from `SerializerContext`. The attribute's type argument declares one closed root type, using C# 11 or later. The compiler enforces closed attribute type arguments. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
+Apply <xref:Orleans.GenerateSerializerContextAttribute`1> to a top-level, non-generic partial class derived from `SerializerContext`. Each attribute declares one closed type, using C# 11 or later. The compiler enforces closed attribute type arguments. Closed types nested in a root's generic arguments and array element types are explicit dependencies and receive factories when needed; built-in leaf codecs are included automatically. Other closed dependencies introduced by serialized model members must also be declared, so generated implementations are explicit and finite. A `List<Dictionary<string, int>>` root includes its nested dictionary type; a model member of that list type requires the list type to be declared.
 
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_declaration":::
 
@@ -18,13 +18,15 @@ Models use the existing <xref:Orleans.GenerateSerializerAttribute> and stable <x
 
 Referenced dependency discovery follows the producer's emitted codec and copier service contracts, including private implementation fields and generated service properties. The producer's selected members and field identifiers therefore determine serialization and copying even when the consumer uses different field-ID settings. Provide complete implementation metadata for models using assembly-level implicit member selection.
 
-Metadata discovery also follows generic arguments, array elements, implemented interfaces, and declaring types. It preserves accessible alias metadata independently of codec registration. This traversal has separate limits of 1,024 closed metadata types and 128 nested dependencies; expanding generic-interface shapes produce `ORLEANS0115` with guidance to declare finite type metadata. Already visited types terminate finite metadata cycles.
+Metadata discovery also follows generic arguments, array elements, implemented interfaces, and declaring types. It preserves accessible alias metadata independently of codec registration. Already visited types terminate finite metadata cycles. A metadata chain deeper than 128 dependencies produces `ORLEANS0115`; this limit bounds metadata traversal, not the number of explicitly declared closed factory registrations.
 
 The supported graph includes primitive leaf codecs with parameterless construction, generated enums, `List<T>`, `Dictionary<TKey, TValue>`, nullable value types, and single-dimensional zero-based arrays. Generated models use default construction and an `object` base for classes. NativeAOT uses the existing model generator's direct-access and static-accessor support. Model hooks, custom activation, and additional collection families require their corresponding implementation support before being included in a context. The generator reports `ORLEANS0115` for an unsupported dependency. Native publication diagnoses referenced implementations which require unavailable runtime code generation.
 
-### Declare expanding generic instantiations
+### Declare closed dependencies
 
-The generator infers closed generic instantiations reached through finite recursion, such as `List<List<int>>`, a tree whose children reuse its node type, or a model whose member swaps its type arguments. A dependency which instantiates a generic type from its own dependency chain with larger type arguments requires that closed instantiation as an additional root. For example, a `Wrapper<T>` model with a `Wrapper<List<int>>` member registers from a `Wrapper<int>` root once the context also declares `Wrapper<List<int>>`. Each declared root continues the graph from its own instantiation. `ORLEANS0115` names an undeclared expanding instantiation and the generic type it expands. A definition which expands at every level, such as `Node<T>` with a `Node<List<T>>` member, has no finite closed graph.
+The generator checks each declared type's immediate codec and copier dependencies. A missing dependency produces `ORLEANS0115`, which identifies the closed type to add with another <xref:Orleans.GenerateSerializerContextAttribute`1> declaration. Declaring `Wrapper<int>` does not infer a member type such as `Wrapper<List<int>>`; declare both types when both are supported. This rule also supports finite cycles: declare each closed type in the cycle, and the generated factories connect them without discovering additional member types.
+
+An unbounded definition such as `Node<T>` with a `Node<List<T>>` member has no finite closed graph. Declare only the concrete instantiations the application supports, and ensure their immediate dependencies are also declared. For example, declaring `Node<int>` and `Node<List<int>>` still requires `Node<List<List<int>>>` if the latter's member graph is needed; an unbounded chain cannot be fully registered by a finite context.
 
 ## Register and use the context
 

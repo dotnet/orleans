@@ -468,26 +468,24 @@ internal static class SerializerFactoryGenerator
             ? csharp.WithOptions(csharp.Options.WithMetadataImportOptions(MetadataImportOptions.All))
             : services.Compilation;
         var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
-        // Each type's first dependent forms the discovery tree; roots and declared instantiations start new branches.
-        var parents = new Dictionary<ITypeSymbol, ITypeSymbol?>(SymbolEqualityComparer.Default);
-        var pending = new Queue<(ITypeSymbol Type, ITypeSymbol? Parent)>();
-        foreach (var root in roots) pending.Enqueue((root, null));
+        var declaredTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var pending = new Queue<ITypeSymbol>();
+        foreach (var root in roots)
+        {
+            AddClosedType(root);
+            pending.Enqueue(root);
+        }
+        if (declaredRoots is not null)
+        {
+            foreach (var root in declaredRoots) AddClosedType(root);
+        }
+
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var (next, parent) = pending.Dequeue();
-            var type = next.WithNullableAnnotation(NullableAnnotation.None);
+            var root = pending.Dequeue();
+            var type = root.WithNullableAnnotation(NullableAnnotation.None);
             if (registrations.ContainsKey(type)) continue;
-            if (declaredRoots?.Contains(type) == true)
-            {
-                parent = null;
-            }
-            else if (FindExpansion(type, Ancestors(parent)) is { } expanded)
-            {
-                failure = new(type, $"it expands recursive generic type '{expanded.ToDisplayString()}'; declare each supported closed instantiation as a serializer context root");
-                return false;
-            }
-            parents.Add(type, parent);
             var registration = new Registration(type);
             if (Describe(registration, services, implementationCompilation, cancellationToken, out var requiresImplementation) is { } reason)
             {
@@ -501,7 +499,23 @@ internal static class SerializerFactoryGenerator
                 failure ??= new(type, reason, RequiresImplementation: true);
             }
             registrations.Add(type, registration);
-            foreach (var dependency in registration.Dependencies) pending.Enqueue((dependency, type));
+
+            foreach (var dependency in registration.Dependencies)
+            {
+                var dependencyType = dependency.WithNullableAnnotation(NullableAnnotation.None);
+                if (registrations.ContainsKey(dependencyType)) continue;
+
+                // A root's type arguments are a finite part of its declaration. Model-member
+                // dependencies outside that set require their own closed root.
+                if (!declaredTypes.Contains(dependencyType)
+                    && services.LibraryTypes.StaticCodecs.FindByUnderlyingType(dependencyType) is null)
+                {
+                    failure = new(dependencyType, $"it is a dependency of '{type}'; declare it as a serializer context root");
+                    return false;
+                }
+
+                pending.Enqueue(dependencyType);
+            }
         }
 
         if (failure is not null)
@@ -523,20 +537,22 @@ internal static class SerializerFactoryGenerator
 
         return TryBuildGraph(services, registrations, implementationCompilation, cancellationToken, out graph, out failure, useDefaultFactories);
 
-        IEnumerable<ITypeSymbol> Ancestors(ITypeSymbol? type)
+        void AddClosedType(ITypeSymbol type)
         {
-            for (; type is not null; type = parents[type]) yield return type;
+            type = type.WithNullableAnnotation(NullableAnnotation.None);
+            if (!declaredTypes.Add(type)) return;
+            if (type is INamedTypeSymbol named)
+            {
+                foreach (var argument in named.TypeArguments) AddClosedType(argument);
+            }
+            else if (type is IArrayTypeSymbol array)
+            {
+                AddClosedType(array.ElementType);
+            }
         }
     }
 
-    /// <summary>
-    /// Finds an ancestor which <paramref name="type"/> expands: a smaller instantiation of the same generic definition.
-    /// </summary>
-    /// <remarks>
-    /// Every infinite dependency chain repeats a generic definition with growing type arguments, so rejecting growth
-    /// terminates inference. Finite recursive shapes keep or reduce their size, such as <c>List&lt;List&lt;int&gt;&gt;</c>
-    /// or a type whose members swap its type arguments.
-    /// </remarks>
+    // The JIT RPC fallback can inspect model members without a closed context, so stop expanding shapes there.
     private static ITypeSymbol? FindExpansion(ITypeSymbol type, IEnumerable<ITypeSymbol> ancestors)
     {
         if (type is not INamedTypeSymbol { IsGenericType: true } generic) return null;
@@ -1121,8 +1137,6 @@ internal static class SerializerFactoryGenerator
     private static Failure? AppendTypeMetadata(StringBuilder result, ITypeSymbol symbol, LibraryTypes library, HashSet<ITypeSymbol> visited, int depth = 0)
     {
         if (visited.Contains(symbol)) return null;
-        if (visited.Count >= 1024)
-            return new Failure(symbol, "the metadata dependency graph exceeds 1024 closed types; declare finite type metadata");
         if (depth >= 128)
             return new Failure(symbol, "the metadata dependency graph exceeds 128 nested dependencies; declare finite type metadata");
         visited.Add(symbol);

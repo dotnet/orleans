@@ -2627,10 +2627,11 @@ public class DemoClass
     [InlineData(true)]
     public async Task RpcCombinedGraphKeepsEveryResponseRegistration(bool validateFactories)
     {
-        // Each result graph exceeds 1,024 closed types; finite graphs register every type they reach.
-        const int membersPerResult = 1100;
+        // The combined context contains more than 1,024 explicitly declared closed factories.
+        const int membersPerResult = 520;
         var source = new System.Text.StringBuilder("""
             using Orleans;
+            using Orleans.Serialization;
             using System.Threading.Tasks;
             namespace CombinedGraph;
             [GenerateSerializer] public sealed class Tag<T> { }
@@ -2649,14 +2650,28 @@ public class DemoClass
                 source.AppendLine($"[Id({index})] public Tag<{name}Marker{index}> Member{index} {{ get; set; }}");
             source.AppendLine("}");
         }
+        foreach (var name in new[] { "First", "Second" })
+        {
+            for (var index = 0; index < membersPerResult; index++)
+                source.AppendLine($"[GenerateSerializerContext<Tag<{name}Marker{index}>>]");
+        }
+        source.AppendLine("public partial class DeclaredContext : SerializerContext { }");
         var compilation = await CreateCompilation(source.ToString());
         var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
         var response = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
+        var context = compilation.GetTypeByMetadataName("CombinedGraph.DeclaredContext")!;
+        var contextAttribute = compilation.GetTypeByMetadataName("Orleans.GenerateSerializerContextAttribute`1")!;
+        var declaredRoots = new HashSet<Microsoft.CodeAnalysis.ITypeSymbol>(context.GetAttributes()
+            .Where(attribute => Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                attribute.AttributeClass?.OriginalDefinition, contextAttribute))
+            .Select(static attribute => attribute.AttributeClass!.TypeArguments[0]),
+            Microsoft.CodeAnalysis.SymbolEqualityComparer.Default);
         foreach (var name in new[] { "First", "Second" })
         {
             var resultType = compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!;
             Assert.True(SerializerFactoryGenerator.TryCreate(services, [response.Construct(resultType)],
-                TestContext.Current.CancellationToken, out var individual, out var failure, useDefaultFactories: true), failure?.Reason);
+                TestContext.Current.CancellationToken, out var individual, out var failure, useDefaultFactories: true,
+                declaredRoots: declaredRoots), failure?.Reason);
             Assert.Equal(membersPerResult + 2, individual.Registrations.Count);
         }
         var result = RunSourceGenerator(compilation, new Dictionary<string, string>
@@ -2696,7 +2711,7 @@ public class DemoClass
                 [Id(0)] public T Value { get; set; }
                 [Id(1)] public Wrapper<List<int>> Other { get; set; }
             }
-            {{(declared ? "[GenerateSerializerContext<Wrapper<List<int>>>] public partial class DeclaredContext : SerializerContext { }" : "")}}
+            {{(declared ? "[GenerateSerializerContext<Wrapper<List<int>>>][GenerateSerializerContext<List<int>>] public partial class DeclaredContext : SerializerContext { }" : "")}}
             """);
         var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
         if (!declared)
@@ -2704,7 +2719,7 @@ public class DemoClass
             var diagnostic = Assert.Single(result.Diagnostics);
             Assert.Equal("ORLEANS0116", diagnostic.Id);
             Assert.Contains("'TestProject.Wrapper<System.Collections.Generic.List<int>>'", diagnostic.GetMessage());
-            Assert.Contains("expands recursive generic type 'TestProject.Wrapper<int>'", diagnostic.GetMessage());
+            Assert.Contains("declare it as a serializer context root", diagnostic.GetMessage());
             return;
         }
 
@@ -2723,7 +2738,7 @@ public class DemoClass
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task RpcResponseFactoriesTerminateInfinitelyExpandingResults(bool validateFactories)
+    public async Task RpcResponseFactoriesRequireDeclaredGenericDependencies(bool validateFactories)
     {
         var compilation = await CreateCompilation("""
             using Orleans;
@@ -2746,7 +2761,7 @@ public class DemoClass
         {
             var diagnostic = Assert.Single(result.Diagnostics);
             Assert.Equal("ORLEANS0116", diagnostic.Id);
-            Assert.Contains("'TestProject.Node<System.Collections.Generic.List<int>>': it expands recursive generic type 'TestProject.Node<int>'", diagnostic.GetMessage());
+            Assert.Contains("'TestProject.Node<System.Collections.Generic.List<int>>': it is a dependency of 'TestProject.Node<int>'; declare it as a serializer context root", diagnostic.GetMessage());
             return;
         }
 
@@ -3354,8 +3369,11 @@ public class DemoClass
         Assert.NotNull(definition);
         var element = compilation.GetSpecialType(rootName.Contains("byte", StringComparison.Ordinal) ? SpecialType.System_Byte : SpecialType.System_Int32);
         var type = definition.Construct(element);
+        var roots = arrayCase
+            ? new Microsoft.CodeAnalysis.ITypeSymbol[] { type, compilation.CreateArrayTypeSymbol(element) }
+            : [type];
         Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
-            [type], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+            roots, TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
         Assert.NotNull(graph);
         var generated = RunSourceGenerator(compilation);
         Assert.Empty(generated.Diagnostics);
@@ -3440,8 +3458,10 @@ public class DemoClass
             """, $"ArrayCycleProof{Guid.NewGuid():N}");
         var node = compilation.GetTypeByMetadataName("TestProject.Node");
         Assert.NotNull(node);
+        var box = compilation.GetTypeByMetadataName("TestProject.Box`1")!.Construct(node);
         Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
-            [node], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+            [node, box, compilation.CreateArrayTypeSymbol(node)], TestContext.Current.CancellationToken,
+            out var graph, out var failure), failure?.Reason);
         Assert.NotNull(graph);
         var generated = RunSourceGenerator(compilation);
         Assert.Empty(generated.Diagnostics);
