@@ -39,6 +39,7 @@ namespace Orleans.Serialization.Serializers
 
         private readonly ConcurrentDictionary<Type, object> _serializerServices = new();
         private readonly ConcurrentDictionary<Type, bool> _defaultServiceAdmission = new();
+        private int _activeConstructionScopes;
         // A null target groups array and bare-parameter patterns for shape matching.
         private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationContract Contract)>> _implementationCandidates = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -690,7 +691,7 @@ namespace Orleans.Serialization.Serializers
         // Inferred defaults preserve an automatic caller's DI boundary instead of starting a transaction inside it.
         private bool IsDefaultServiceEligible(Type service)
             => !_manifest.IsDefaultSerializerService(service)
-                || OrleansGeneratedCodeHelper.GetConstructionScope(this) is not { IsPending: false }
+                || CurrentConstructionScope is not { IsPending: false }
                     && _defaultServiceAdmission.GetOrAdd(service, static (service, provider) => provider.IsDefaultServiceAdmitted(service), this);
 
         // Admission depends only on the manifest, implementation candidates, and container registrations,
@@ -835,11 +836,12 @@ namespace Orleans.Serialization.Serializers
                 }
                 Initialize();
             }
-            var current = OrleansGeneratedCodeHelper.GetConstructionScope(this);
+            var current = CurrentConstructionScope;
             var scope = current ?? new ConstructionScope(this);
             var isRoot = current is null;
             if (isRoot)
             {
+                Interlocked.Increment(ref _activeConstructionScopes);
                 OrleansGeneratedCodeHelper.EnterServiceResolution(this, scope);
             }
 
@@ -886,6 +888,7 @@ namespace Orleans.Serialization.Serializers
                     {
                         OrleansGeneratedCodeHelper.ExitServiceResolution();
                         scope.Dispose();
+                        Interlocked.Decrement(ref _activeConstructionScopes);
                     }
                 }
             }
@@ -900,14 +903,19 @@ namespace Orleans.Serialization.Serializers
 #endif
         }
 
+        // A thread increments the active-scope count before entering its scope, so it always observes its own scope. Another thread
+        // observing a stale count has no scope for this provider either way, so steady-state lookups skip the thread-local read.
+        private ConstructionScope? CurrentConstructionScope
+            => Volatile.Read(ref _activeConstructionScopes) == 0 ? null : OrleansGeneratedCodeHelper.GetConstructionScope(this);
+
         // Construction scopes publish under the lock using add-only updates, so a thread without a scope reads published values directly.
         private bool TryGetCached<TValue>(ConcurrentDictionary<Type, TValue> cache, Type key, [NotNullWhen(true)] out TValue? result) where TValue : class
         {
-            if (_manifest.SerializerServiceFactories.Count == 0 || OrleansGeneratedCodeHelper.GetConstructionScope(this) is null)
+            if (CurrentConstructionScope is null)
                 return cache.TryGetValue(key, out result);
             lock (_serializerServices)
             {
-                var scope = OrleansGeneratedCodeHelper.GetConstructionScope(this);
+                var scope = CurrentConstructionScope;
                 scope?.ThrowIfFaulted();
                 if (ReferenceEquals(cache, _serializerServices)
                     && scope?.TryGetService(key, out var service, requireInstance: false) == true)
@@ -925,7 +933,7 @@ namespace Orleans.Serialization.Serializers
             if (_manifest.SerializerServiceFactories.Count == 0) return cache.GetOrAdd(key, value);
             lock (_serializerServices)
             {
-                var scope = OrleansGeneratedCodeHelper.GetConstructionScope(this);
+                var scope = CurrentConstructionScope;
                 scope?.ThrowIfFaulted();
                 if (scope is not { IsPending: true }) return cache.GetOrAdd(key, value);
                 if (TryGetCached(cache, key, out var existing)) return existing;
@@ -934,11 +942,11 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        internal bool IsConstructionPending => OrleansGeneratedCodeHelper.GetConstructionScope(this) is { IsPending: true };
+        internal bool IsConstructionPending => CurrentConstructionScope is { IsPending: true };
 
         internal void RecordConstructionFailure(Exception exception)
         {
-            OrleansGeneratedCodeHelper.GetConstructionScope(this)?.RecordFailure(exception);
+            CurrentConstructionScope?.RecordFailure(exception);
         }
 
         internal sealed class ConstructionScope(CodecProvider owner) : IDisposable
@@ -1060,18 +1068,22 @@ namespace Orleans.Serialization.Serializers
             var searchType = fieldType.IsConstructedGenericType ? fieldType.GetGenericTypeDefinition() : fieldType;
             if (!TrySelectImplementation(definition, fieldType, searchType, out var implementation)) return null;
             if (_serializerServices.TryGetValue(implementation, out var completed)) return completed;
-            return OrleansGeneratedCodeHelper.GetConstructionScope(this)?.TryGetService(implementation, out var pending, requireInstance: false) == true
+            return CurrentConstructionScope?.TryGetService(implementation, out var pending, requireInstance: false) == true
                 ? pending : null;
         }
 
         private sealed class ConstructionServiceProvider(CodecProvider owner) : IServiceProvider, IServiceProviderIsService,
             IKeyedServiceProvider, IServiceProviderIsKeyedService
         {
+            // Without a construction scope on this thread, resolution reads published state and needs no coordination.
             public object? GetService(Type serviceType)
             {
+                if (owner.CurrentConstructionScope is null)
+                    return serviceType == typeof(IServiceProvider) ? this : owner._serviceProvider.GetService(serviceType);
+
                 lock (owner._serializerServices)
                 {
-                    var scope = OrleansGeneratedCodeHelper.GetConstructionScope(owner);
+                    var scope = owner.CurrentConstructionScope;
                     scope?.ThrowIfFaulted();
                     if (scope is { IsPending: true })
                     {
@@ -1113,14 +1125,17 @@ namespace Orleans.Serialization.Serializers
                     return unkeyed;
                 }
 
-                lock (owner._serializerServices)
+                if (owner.CurrentConstructionScope is not null)
                 {
-                    var scope = OrleansGeneratedCodeHelper.GetConstructionScope(owner);
-                    scope?.ThrowIfFaulted();
-                    if (scope is { IsPending: true })
+                    lock (owner._serializerServices)
                     {
-                        var error = new InvalidOperationException($"Dependency injection cannot resolve keyed service {serviceType} while a serialization graph is unpublished. Supply the keyed dependency through an explicit closed factory registered with TypeManifestOptions.AddSerializerService.");
-                        owner.ThrowResolutionFailure(error);
+                        var scope = owner.CurrentConstructionScope;
+                        scope?.ThrowIfFaulted();
+                        if (scope is { IsPending: true })
+                        {
+                            var error = new InvalidOperationException($"Dependency injection cannot resolve keyed service {serviceType} while a serialization graph is unpublished. Supply the keyed dependency through an explicit closed factory registered with TypeManifestOptions.AddSerializerService.");
+                            owner.ThrowResolutionFailure(error);
+                        }
                     }
                 }
 
@@ -1134,13 +1149,16 @@ namespace Orleans.Serialization.Serializers
             public bool IsKeyedService(Type serviceType, object? serviceKey)
             {
                 if (serviceKey is null) return IsService(serviceType);
-                lock (owner._serializerServices)
+                if (owner.CurrentConstructionScope is not null)
                 {
-                    var scope = OrleansGeneratedCodeHelper.GetConstructionScope(owner);
-                    scope?.ThrowIfFaulted();
-                    if (scope is { IsPending: true })
+                    lock (owner._serializerServices)
                     {
-                        return false;
+                        var scope = owner.CurrentConstructionScope;
+                        scope?.ThrowIfFaulted();
+                        if (scope is { IsPending: true })
+                        {
+                            return false;
+                        }
                     }
                 }
 
@@ -1149,19 +1167,22 @@ namespace Orleans.Serialization.Serializers
 
             public bool IsService(Type serviceType)
             {
-                lock (owner._serializerServices)
+                if (owner.CurrentConstructionScope is not null)
                 {
-                    var scope = OrleansGeneratedCodeHelper.GetConstructionScope(owner);
-                    scope?.ThrowIfFaulted();
-                    if (scope is { IsPending: true })
+                    lock (owner._serializerServices)
                     {
-                        return owner.IsProviderService(serviceType)
-                            || serviceType == typeof(IServiceProvider)
-                            || serviceType == typeof(IServiceProviderIsService)
-                            || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
-                            || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType) && owner.IsDefaultServiceEligible(serviceType)
-                            || owner.IsRegisteredImplementation(serviceType)
-                            || ServiceCollectionExtensions.GetServiceHolderType(serviceType) is not null;
+                        var scope = owner.CurrentConstructionScope;
+                        scope?.ThrowIfFaulted();
+                        if (scope is { IsPending: true })
+                        {
+                            return owner.IsProviderService(serviceType)
+                                || serviceType == typeof(IServiceProvider)
+                                || serviceType == typeof(IServiceProviderIsService)
+                                || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
+                                || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType) && owner.IsDefaultServiceEligible(serviceType)
+                                || owner.IsRegisteredImplementation(serviceType)
+                                || ServiceCollectionExtensions.GetServiceHolderType(serviceType) is not null;
+                        }
                     }
                 }
 
