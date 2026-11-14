@@ -277,7 +277,12 @@ internal sealed record SerializerEmissionPlan(
     ConstructionEmissionPlan Construction,
     EquatableArray<FieldEmissionPlan> Fields,
     EquatableArray<MemberEmissionPlan> Members,
-    EnumSerializerPlan? Enum);
+    EnumSerializerPlan? Enum,
+    EquatableArray<UnionCaseSerializerPlan>? UnionCases = null);
+
+internal sealed record UnionCaseSerializerPlan(uint Id, string CaseType, string ValueType, string Codec, bool IsStatic);
+
+internal sealed record UnionCaseCopierPlan(string CaseType, string ValueType, string Copier);
 
 internal sealed record CopierEmissionPlan(
     SerializableTypeEmissionPlan Type,
@@ -288,7 +293,8 @@ internal sealed record CopierEmissionPlan(
     string AdditionalInterface,
     ConstructionEmissionPlan Construction,
     EquatableArray<FieldEmissionPlan> Fields,
-    EquatableArray<MemberEmissionPlan> Members);
+    EquatableArray<MemberEmissionPlan> Members,
+    EquatableArray<UnionCaseCopierPlan>? UnionCases = null);
 
 // Project shared construction data without retaining the symbol-bearing service fields.
 internal sealed record ConstructionEmissionPlan(
