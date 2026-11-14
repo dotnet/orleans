@@ -51,6 +51,8 @@ namespace Analyzers.Tests
         /// </summary>
         protected virtual DiagnosticAnalyzer CreateDiagnosticAnalyzer() => new TDiagnosticAnalyzer();
 
+        protected virtual ReportDiagnostic GetDiagnosticReport(DiagnosticDescriptor descriptor) => ReportDiagnostic.Default;
+
         /// <summary>
         /// Asserts that the provided source code produces no diagnostics when analyzed.
         /// Used to verify that valid code patterns don't trigger false positives.
@@ -94,14 +96,17 @@ namespace Analyzers.Tests
             var compilationWithAnalyzers
                 = compilation
                     .WithOptions(
-                        compilation.Options.WithSpecificDiagnosticOptions(
-                            analyzer.SupportedDiagnostics.ToDictionary(d => d.Id, d => ReportDiagnostic.Default)))
+                        // Older workspaces attach per-tree defaults which can override explicit activation of opt-in rules.
+                        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithSpecificDiagnosticOptions(
+                            analyzer.SupportedDiagnostics.ToDictionary(d => d.Id, GetDiagnosticReport)))
                     .WithAnalyzers(ImmutableArray.Create(analyzer));
 
             var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
 
             return diagnostics.OrderBy(d => d.Location.SourceSpan.Start).ToArray();
         }
+
+        protected static Project CreateAnalyzerTestProject(string source) => CreateProject(source);
 
         private static Project CreateProject(string source)
         {
@@ -115,6 +120,8 @@ namespace Analyzers.Tests
                 typeof(Task).Assembly,
                 typeof(Orleans.IGrain).Assembly,
                 typeof(Orleans.Grain).Assembly,
+                typeof(Orleans.Runtime.IPersistentState<>).Assembly,
+                typeof(Uri).Assembly,
                 typeof(Attribute).Assembly,
                 typeof(int).Assembly,
                 typeof(object).Assembly,
