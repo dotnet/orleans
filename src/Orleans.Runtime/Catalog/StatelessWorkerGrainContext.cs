@@ -334,6 +334,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
         // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
         var requestContext = (message as Message)?.RequestContextData ?? [];
+        // ActivationData owns and disposes the activation timeout.
         newWorker.Activate(requestContext, CancellationToken.None);
         _workers.Add(newWorker);
         StatelessWorkerEvents.EmitWorkerCreated(this, newWorker, _workers.Count);
