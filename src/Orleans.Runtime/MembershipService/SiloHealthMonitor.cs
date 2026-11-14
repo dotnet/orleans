@@ -136,7 +136,9 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+#pragma warning disable CA1849 // Signal shutdown on the caller, then apply the caller's cancellation to the worker wait.
             Dispose();
+#pragma warning restore CA1849
 
             if (_runTask is Task task)
             {
@@ -153,21 +155,73 @@ namespace Orleans.Runtime.MembershipService
                     return;
                 }
 
-                _stoppingCancellation.Cancel();
-                _pingTimer.Dispose();
+                try
+                {
+                    _stoppingCancellation.Cancel();
+                }
+                catch (AggregateException exception)
+                {
+                    LogErrorCancellingHealthMonitor(_log, exception, TargetSiloAddress);
+                    throw;
+                }
+                finally
+                {
+                    try
+                    {
+                        _pingTimer.Dispose();
+                    }
+                    finally
+                    {
+                        // Starting the worker transfers source disposal to its completion path.
+                        if (_runTask is null)
+                        {
+                            _stoppingCancellation.Dispose();
+                        }
+                    }
+                }
             }
         }
 
         public async ValueTask DisposeAsync()
         {
-            Dispose();
-            if (_runTask is Task task)
+            try
             {
-                await task.SuppressThrowing();
+                Dispose();
+            }
+            finally
+            {
+                if (_runTask is Task task)
+                {
+                    await task.SuppressThrowing();
+                }
             }
         }
 
         private async Task Run()
+        {
+            try
+            {
+                await RunCore().ConfigureAwait(false);
+            }
+            finally
+            {
+                lock (_lockObj)
+                {
+                    try
+                    {
+#pragma warning disable CA1849 // The worker signals shutdown inline; DisposeAsync would await this worker itself.
+                        Dispose();
+#pragma warning restore CA1849
+                    }
+                    finally
+                    {
+                        _stoppingCancellation.Dispose();
+                    }
+                }
+            }
+        }
+
+        private async Task RunCore()
         {
             MembershipTableSnapshot? activeMembersSnapshot = default;
             SiloAddress[]? otherNodes = default;
@@ -499,6 +553,12 @@ namespace Orleans.Runtime.MembershipService
             Failed,
             Succeeded
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error cancelling health monitor for silo {Silo}."
+        )]
+        private static partial void LogErrorCancellingHealthMonitor(ILogger logger, Exception exception, SiloAddress silo);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
