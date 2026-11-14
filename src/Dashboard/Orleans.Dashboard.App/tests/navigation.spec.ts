@@ -11,6 +11,118 @@ test.afterEach(async ({ page }) => {
   expect(await page.pageErrors()).toEqual([]);
 });
 
+for (const theme of ['light', 'dark']) {
+  test(`production lifecycle diagrams use the single bundle in the ${theme} theme`, async ({ page }) => {
+    await page.addInitScript(value => localStorage.setItem('theme', value), theme);
+    await page.route('**/LifecycleStages', route => route.fulfill({
+      json: [
+        {
+          stage: 1000, stageName: 'Initialize', isNamedStage: true,
+          observers: [{ name: 'Storage', hasOnStart: true, hasOnStop: true,
+            onStartMethod: 'StartStorage', onStopMethod: 'StopStorage' }],
+        },
+        {
+          stage: 2000, stageName: 'Active', isNamedStage: true,
+          observers: [{ name: 'Gateway', hasOnStart: true, hasOnStop: true,
+            onStartMethod: 'OpenGateway', onStopMethod: 'CloseGateway' }],
+        },
+      ],
+    }));
+    const scripts: string[] = [];
+    page.on('request', request => {
+      if (request.resourceType() === 'script') scripts.push(new URL(request.url()).pathname);
+    });
+    await page.goto('/#/lifecycle');
+    const nodes = page.getByRole('list', { name: 'Startup stages' }).getByRole('listitem');
+    await expect(nodes).toHaveCount(2);
+    await expect(nodes.nth(0)).toContainText('Initialize (start)');
+    await expect(nodes.nth(0)).toContainText('StartStorage');
+    await expect(nodes.nth(1)).toContainText('OpenGateway');
+    expect(await nodes.nth(0).evaluate(node => getComputedStyle(node, '::after').content)).toBe('"\u2193"');
+    await expect(page.getByRole('row', { name: 'Initialize Storage StartStorage' })).toBeVisible();
+    await expect(page.getByRole('row', { name: 'Active Gateway OpenGateway' })).toBeVisible();
+    const startupBackground = await nodes.nth(0).evaluate(node => getComputedStyle(node).backgroundColor);
+
+    await page.getByRole('tab', { name: 'Shutdown', exact: true }).click();
+    const shutdown = page.getByRole('list', { name: 'Shutdown stages' }).getByRole('listitem');
+    await expect(shutdown).toHaveCount(2);
+    await expect(shutdown.nth(0)).toContainText('Active (stop)');
+    await expect(shutdown.nth(0)).toContainText('CloseGateway');
+    await expect(shutdown.nth(1)).toContainText('StopStorage');
+    await expect(page.getByRole('row', { name: 'Active Gateway CloseGateway' })).toBeVisible();
+    expect(await shutdown.nth(0).evaluate(node => getComputedStyle(node).backgroundColor)).not.toBe(startupBackground);
+    await expect(page.locator('body')).toHaveAttribute('data-bs-theme', theme);
+    expect(scripts).toEqual(['/index.min.js']);
+  });
+}
+
+test('lifecycle shows loading followed by the empty cluster state', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => release = resolve);
+  await page.route('**/LifecycleStages', async route => {
+    await pending;
+    await route.fulfill({ json: [] });
+  });
+  await page.goto('/#/lifecycle');
+  await expect(page.getByText('Loading lifecycle data…')).toBeVisible();
+  release();
+  await expect(page.getByText('No active silo is available to report its lifecycle.')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Startup', exact: true })).toHaveCount(0);
+});
+
+test('lifecycle renders literal labels, empty stages, and unknown methods', async ({ page }) => {
+  const name = 'Observer "<img src=x onerror=alert(1)>" & [label]\nsecond line';
+  await page.route('**/LifecycleStages', route => route.fulfill({
+    json: [
+      { stage: 1000, stageName: 'Initialize "<tag>" & [stage]', isNamedStage: true, observers: [] },
+      { stage: 1500, stageName: '1500', isNamedStage: false,
+        observers: [{ name, hasOnStart: true, hasOnStop: false }] },
+    ],
+  }));
+  await page.goto('/#/lifecycle');
+  const diagram = page.getByRole('region', { name: 'Startup stages' });
+  const nodes = diagram.getByRole('listitem');
+  await expect(nodes.nth(0)).toContainText('Initialize "<tag>" & [stage] (start)');
+  await expect(nodes.nth(0)).toContainText('(no participants)');
+  expect(await nodes.nth(1).textContent()).toBe(`1500 (start)- ${name}`);
+  await expect(diagram.locator('img, tag')).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: '(unknown)', exact: true })).toBeVisible();
+  expect(await nodes.nth(0).evaluate(node => getComputedStyle(node).backgroundColor))
+    .not.toBe(await nodes.nth(1).evaluate(node => getComputedStyle(node).backgroundColor));
+
+  await page.getByRole('tab', { name: 'Shutdown', exact: true }).click();
+  await expect(page.getByRole('cell', { name: '—', exact: true })).toHaveCount(2);
+  await expect(page.getByRole('region', { name: 'Shutdown stages' }).getByRole('listitem').nth(0))
+    .toContainText('1500 (stop)');
+});
+
+test('large lifecycle diagrams scroll to their complete labels and last stage', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  const stages = Array.from({ length: 12 }, (_, index) => ({
+    stage: index,
+    stageName: `Stage ${index} with a deliberately long label to verify horizontal scrolling`,
+    isNamedStage: index === 0,
+    observers: [{ name: 'Storage', hasOnStart: true, hasOnStop: true,
+      onStartMethod: 'StartStorage', onStopMethod: 'StopStorage' }],
+  }));
+  await page.route('**/LifecycleStages', route => route.fulfill({ json: stages }));
+  await page.goto('/#/lifecycle');
+  const diagram = page.getByRole('region', { name: 'Startup stages' });
+  expect(await diagram.evaluate(node => node.scrollWidth > node.clientWidth && node.scrollHeight > node.clientHeight))
+    .toBe(true);
+  await diagram.focus();
+  await page.keyboard.press('End');
+  await expect.poll(() => diagram.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+  await diagram.evaluate(node => {
+    node.scrollTop = node.scrollHeight;
+    node.scrollLeft = node.scrollWidth;
+  });
+  const last = diagram.getByRole('listitem').last();
+  await expect(last).toContainText(stages[11].stageName);
+  await expect(last).toBeInViewport();
+  expect(await last.evaluate(node => getComputedStyle(node, '::after').content)).toBe('none');
+});
+
 test('all silo counters refresh while the page stays open', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
   await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
