@@ -1226,7 +1226,12 @@ internal sealed partial class ActivationData :
                             // The activation is not able to process this message right now, so try the next message.
                             ++i;
 
-                            if (_blockingRequest != null)
+                            // An incompatible body cannot be inspected to determine whether an interleaving
+                            // predicate would allow it. Only infer blocking when headers and the grain's
+                            // configuration establish that it cannot interleave.
+                            if (_blockingRequest != null
+                                && (!compatibilityBlocked
+                                    || (GetComponent<GrainCanInterleave>() is null && !MayInvokeRequest(message, inspectInterleavingPredicates: false))))
                             {
                                 var currentRequestActiveTime = _busyDuration.Elapsed;
                                 if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
@@ -1351,7 +1356,7 @@ internal sealed partial class ActivationData :
             GetDeactivationCompletionSource().TrySetResult(true);
         }
 
-        bool MayInvokeRequest(Message incoming)
+        bool MayInvokeRequest(Message incoming, bool inspectInterleavingPredicates = true)
         {
             if (!IsCurrentlyExecuting)
             {
@@ -1377,7 +1382,7 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            var canInterleave = GetComponent<GrainCanInterleave>();
+            var canInterleave = inspectInterleavingPredicates ? GetComponent<GrainCanInterleave>() : null;
             bool? incomingMayInterleave = null;
             foreach (var runningRequest in _runningRequests)
             {

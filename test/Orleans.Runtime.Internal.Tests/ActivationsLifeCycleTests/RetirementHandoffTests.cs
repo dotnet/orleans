@@ -1717,6 +1717,61 @@ public sealed class RetirementHandoffTests
         }
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task IncompatibleInterleavableRequest_DoesNotAbandonRunningActivation(bool reentrant, bool alwaysInterleave)
+    {
+        var maxRequestProcessingTime = TimeSpan.FromSeconds(1);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.Configure<SiloMessagingOptions>(options => options.MaxRequestProcessingTime = maxRequestProcessingTime);
+            silo.Configure<GrainVersioningOptions>(options => options.DefaultCompatibilityStrategy = nameof(StrictVersionCompatible));
+        }));
+        var caller = cluster.Silos[0];
+        var target = cluster.Silos[1];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grainClass = reentrant ? typeof(ReentrantRetirementHandoffGrain) : typeof(RetirementHandoffGrain);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, grainClass.FullName);
+        await PlaceOnAsync(target, () => grain.GetLocation());
+        var running = grain.Block().AsTask();
+        try
+        {
+            await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+            var activation = Assert.IsType<ActivationData>(FindActivation(target, grain.GetGrainId()));
+            await Task.Delay(maxRequestProcessingTime * 2, Cancellation);
+            var interfaceType = target.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>()
+                .GetGrainInterfaceType(typeof(IRetirementHandoffGrain));
+            var sender = GrainId.Create("test", "caller");
+            var request = new Message
+            {
+                Direction = Message.Directions.Request,
+                TargetGrain = grain.GetGrainId(),
+                SendingGrain = sender,
+                SendingSilo = caller.SiloAddress,
+                Id = new(123458),
+                InterfaceType = interfaceType,
+                InterfaceVersion = ushort.MaxValue,
+                IsAlwaysInterleave = alwaysInterleave,
+            };
+            activation.ReceiveMessage(request);
+
+            await grain.GetLocationInterleaved().AsTask().WaitAsync(Timeout, Cancellation);
+            Assert.Same(activation, FindActivation(target, grain.GetGrainId()));
+            Assert.Equal(ActivationState.Valid, activation.State);
+            Assert.Equal(1, activation.WaitingCount);
+            await ((IGrainCallCancellationExtension)activation)
+                .CancelRequestAsync(sender, request.Id, CancellationToken.None).AsTask().WaitAsync(Timeout, Cancellation);
+        }
+        finally
+        {
+            state.ReleaseBlock.TrySetResult();
+            await running.WaitAsync(Timeout, Cancellation);
+        }
+    }
+
     [Fact]
     public async Task CancellationReachingTheActivatingNewActivation_CancelsTheMigratedRequestBeforeItRuns()
     {
@@ -2831,6 +2886,9 @@ public interface IRetirementHandoffGrain : IGrainWithGuidKey
 {
     ValueTask<SiloAddress> GetLocation();
 
+    [AlwaysInterleave]
+    ValueTask<SiloAddress> GetLocationInterleaved();
+
     ValueTask Block();
 
     ValueTask<SiloAddress> HoldThenGetLocation();
@@ -3045,6 +3103,10 @@ public sealed class RetirementHandoffCallerGrain : Grain, IRetirementHandoffCall
     }
 }
 
+[Reentrant]
+[PreferLocalPlacement]
+public sealed class ReentrantRetirementHandoffGrain : RetirementHandoffGrain;
+
 [PreferLocalPlacement]
 public class RetirementHandoffGrain : Grain, IRetirementHandoffGrain
 {
@@ -3065,6 +3127,8 @@ public class RetirementHandoffGrain : Grain, IRetirementHandoffGrain
     }
 
     public ValueTask<SiloAddress> GetLocation() => new(GrainContext.Address.SiloAddress!);
+
+    public ValueTask<SiloAddress> GetLocationInterleaved() => GetLocation();
 
     public ValueTask<SiloAddress> GetLocationWithPayload(byte[] payload) => new(GrainContext.Address.SiloAddress!);
 
