@@ -55,6 +55,19 @@ public sealed class AsyncEnumerableTestFixture : BaseInProcessTestClusterFixture
 
     public int GetTimerChangeCount(object timer) => _timeProvider.GetTimerChangeCount(timer);
 
+    /// <summary>
+    /// Gets the long-poll timeout which client-hosted observers use for a pending MoveNext.
+    /// </summary>
+    public TimeSpan ClientLongPollTimeout =>
+        Client.ServiceProvider.GetRequiredService<IOptions<MessagingOptions>>().Value.ConfiguredResponseTimeout / 2;
+
+    public int GetCreatedTimerCount(TimeSpan dueTime) => _timeProvider.GetCreatedTimerCount(dueTime);
+
+    public Task WaitForCreatedTimerCountAsync(TimeSpan dueTime, int count, CancellationToken cancellationToken) =>
+        _timeProvider.WaitForCreatedTimerCountAsync(dueTime, count, cancellationToken);
+
+    public Task AdvanceTimeAsync(TimeSpan duration) => FakeTimeSilo.AdvanceAsync(_timeProvider, duration);
+
     public Task WaitForTimerChangeAsync(object timer, int changeCount, CancellationToken cancellationToken) =>
         _timeProvider.WaitForTimerChangeAsync(timer, changeCount, cancellationToken);
 }
@@ -1400,9 +1413,6 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
             await enumerator.DisposeAsync().AsTask().WaitAsync(TestTimeout);
             await observerImpl.BlockingEnumeratorFinished.WaitAsync(TestTimeout);
 
-            var completedTask = await Task.WhenAny(pendingMoveNext).WaitAsync(TestTimeout, cancellationToken);
-            Assert.Same(pendingMoveNext, completedTask);
-
             var exception = await Record.ExceptionAsync(async () => await pendingMoveNext.WaitAsync(TestTimeout, cancellationToken));
 
             Assert.True(exception is OperationCanceledException or EnumerationAbortedException or ObserverNotReachableException,
@@ -1736,6 +1746,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
             // Queue one value. Do NOT complete — the producer parks waiting for the next.
             await observerRef.OnNext("0");
 
+            var longPollTimeout = fixture.ClientLongPollTimeout;
+            var initialLongPolls = fixture.GetCreatedTimerCount(longPollTimeout);
             var enumerator = observerRef.GetValues(cts.Token).WithBatchSize(1).GetAsyncEnumerator(cts.Token);
             try
             {
@@ -1743,17 +1755,17 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
                 Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cts.Token));
                 Assert.Equal("0", enumerator.Current);
 
-                // Start the next pull — it long-polls against the parked producer.
+                // Start the next pull and wait until the observer parks it in its long-poll.
                 var pending = enumerator.MoveNextAsync().AsTask();
+                await fixture.WaitForCreatedTimerCountAsync(longPollTimeout, initialLongPolls + 1, cts.Token).WaitAsync(TestTimeout, cts.Token);
 
-                // Advance the fake silo clock so the long-poll (CRT/2) fires a heartbeat.
-                // The pull must NOT complete: nothing has been produced yet.
-                await fixture.AdvanceTimeByResponseTimeoutAsync().WaitAsync(TestTimeout, cts.Token);
+                // Elapse the long-poll so the observer replies with a heartbeat, then wait for the client's re-issued pull to park.
+                // The pending pull must NOT complete: nothing has been produced yet.
+                await fixture.AdvanceTimeAsync(longPollTimeout).WaitAsync(TestTimeout, cts.Token);
+                await fixture.WaitForCreatedTimerCountAsync(longPollTimeout, initialLongPolls + 2, cts.Token).WaitAsync(TestTimeout, cts.Token);
                 Assert.False(pending.IsCompleted, "The heartbeat must not deliver a value.");
 
-                // Now release the next value. Whatever pull is in-flight (the original or the
-                // one re-issued by the heartbeat) must complete with exactly "1", not skip it
-                // and not deliver anything else.
+                // Now release the next value. The re-issued pull must complete with exactly "1".
                 await observerRef.OnNext("1");
 
                 Assert.True(await pending.WaitAsync(TestTimeout, cts.Token));
@@ -1767,8 +1779,9 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
                 await enumerator.DisposeAsync().AsTask().WaitAsync(TestTimeout, cts.Token);
             }
 
+            // Pulls: "0", the heartbeat, "1", and completion.
             var calls = await observerRef.GetIncomingCalls();
-            Assert.True(CountPullCalls(calls) >= 3, $"Expected at least 3 pulls (0, heartbeat, 1); got {CountPullCalls(calls)}.");
+            Assert.Equal(4, CountPullCalls(calls));
             Assert.Contains(calls, IsDisposeCall);
         });
     }

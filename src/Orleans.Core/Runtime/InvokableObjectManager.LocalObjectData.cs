@@ -72,43 +72,9 @@ internal partial class InvokableObjectManager
         {
             if (componentType == typeof(IAsyncEnumerableGrainExtension))
             {
-                if (Volatile.Read(ref _asyncEnumerableExtension) is { } existing)
-                {
-                    return existing;
-                }
-
-                ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeTask) is not null, typeof(LocalObjectData));
-
-                var newExtension = new AsyncEnumerableGrainObserverExtension(this,
-                    _manager.runtimeClient.ServiceProvider.GetRequiredService<TimeProvider>(),
-                    _manager.runtimeClient.ServiceProvider.GetRequiredService<IOptions<MessagingOptions>>(),
-                    _manager.runtimeClient.ServiceProvider.GetRequiredService<ILogger<AsyncEnumerableGrainObserverExtension>>());
-
-                if (Interlocked.CompareExchange(ref _asyncEnumerableExtension, newExtension, null) is { } current)
-                {
-                    // We lost the race, so we dispose the extension we just created.
-                    newExtension.DisposeAsync().Ignore();
-                    return current;
-                }
-
-                // Disposal could have started between: "is { } existing" and "CompareExchange(ref _asyncEnumerableExtension...)" checks.
-                // If _disposeTask was set while we were allocating, disposal already set _asyncEnumerableExtension as null
-                // and it wont dispose ours, so we gotta do it ourselves.
-                if (Volatile.Read(ref _disposeTask) is not null)
-                {
-                    // Someone other thread may have already claimed our extension for disposal, if so we let it carry out the disposal.
-                    if (Interlocked.CompareExchange(ref _asyncEnumerableExtension, null, newExtension) == newExtension)
-                    {
-                        newExtension.DisposeAsync().Ignore();
-                    }
-
-                    // We proceed to throw ODE now regardless of which thread is doing the disposal.
-                    throw new ObjectDisposedException(nameof(LocalObjectData));
-                }
-
-                // There is a small chance the newExtension will be a soon-to-be-disposed extension,
-                // but its ok as StartEnumeration detects it itself and will fault accordingly.
-                return newExtension;
+                // A caller which reads the extension just before disposal receives a disposing extension, which
+                // rejects new enumerations with ObserverNotReachableException and reports existing ones as missing.
+                return Volatile.Read(ref _asyncEnumerableExtension) ?? GetOrCreateAsyncEnumerableExtension();
             }
             else if (componentType.IsAssignableFrom(this.LocalObject.Target?.GetType()))
             {
@@ -120,6 +86,31 @@ internal partial class InvokableObjectManager
             }
 
             return _manager.rootGrainContext.GetComponent(componentType);
+        }
+
+        private AsyncEnumerableGrainObserverExtension GetOrCreateAsyncEnumerableExtension()
+        {
+            // Creation and disposal both run under the Messages lock, so an extension is never created after disposal starts.
+            lock (Messages)
+            {
+                if (_disposeTask is not null)
+                {
+                    throw new ObserverNotReachableException($"The observer '{ObserverId}' has been disposed and can not process the request.");
+                }
+
+                if (_asyncEnumerableExtension is not { } extension)
+                {
+                    var services = _manager.runtimeClient.ServiceProvider;
+                    extension = new AsyncEnumerableGrainObserverExtension(
+                        this,
+                        services.GetRequiredService<TimeProvider>(),
+                        services.GetRequiredService<IOptions<MessagingOptions>>(),
+                        services.GetRequiredService<ILogger<AsyncEnumerableGrainObserverExtension>>());
+                    Volatile.Write(ref _asyncEnumerableExtension, extension);
+                }
+
+                return extension;
+            }
         }
 
         public object? GetTarget() => this.LocalObject.Target;
@@ -156,7 +147,6 @@ internal partial class InvokableObjectManager
             var obj = this.LocalObject.Target;
             if (obj is null)
             {
-
                 LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
 
                 // The target has been garbage collected so we remove it from the registry so future dispatches
@@ -298,7 +288,7 @@ internal partial class InvokableObjectManager
 
         private async Task ProcessMessageAsync(Message message)
         {
-            // We caputure the gate before we start as if the message is expired, Dispose() on it sets _bodyObject to null.
+            // We capture the gate before we start as if the message is expired, Dispose() on it sets _bodyObject to null.
             // IsCancellationRequest(message) would read now a null body, so an expired IGrainCallCancellationExtension message
             // exits _invocations instead of _cancellations.
             var gate = _manager.GetAdmissionGate(message);
@@ -367,15 +357,7 @@ internal partial class InvokableObjectManager
                 }
                 catch (Exception exc)
                 {
-                    if (exc is ObjectDisposedException && _disposeTask is not null)
-                    {
-                        ReportException(message, new ObserverNotReachableException(
-                            $"The observer '{ObserverId}' has been disposed and can not process the request."));
-                    }
-                    else
-                    {
-                        ReportException(message, exc);
-                    }
+                    ReportException(message, exc);
                 }
             }
             catch (Exception outerException)
@@ -623,59 +605,41 @@ internal partial class InvokableObjectManager
 
         public ValueTask DisposeAsync()
         {
-            if (Volatile.Read(ref _disposeTask) is { } existingDisposeTask)
-            {
-                // Another thread already claimed disposal.
-                return new ValueTask(existingDisposeTask);
-            }
-
-            // Now we claim the disposal so that only one disposer proceeds.
-            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (Interlocked.CompareExchange(ref _disposeTask, completion.Task, null) is { } existingDisposeTask2)
-            {
-                // We lost the race, so return the winner's task.
-                return new ValueTask(existingDisposeTask2);
-            }
-
-            // Next we atomically capture-and-null the extension.
-            // Any concurrent GetComponent() that installs *before* this exchange, gets its extension disposed by us here.
-            // Any that installs *after* observes _disposeTask as non-null (in its post-CAS recheck), and disposes its own extension.
-            var extension = Interlocked.Exchange(ref _asyncEnumerableExtension, null);
+            AsyncEnumerableGrainObserverExtension? extension;
+            TaskCompletionSource completion;
 
             lock (Messages)
             {
+                if (_disposeTask is { } existingDisposeTask)
+                {
+                    return new ValueTask(existingDisposeTask);
+                }
+
                 _pendingCancellations.Clear();
                 _pendingCancellationOrder.Clear();
+
+                extension = _asyncEnumerableExtension;
+                Volatile.Write(ref _asyncEnumerableExtension, null);
+
+                if (extension is null)
+                {
+                    _disposeTask = Task.CompletedTask;
+                    return default;
+                }
+
+                completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _disposeTask = completion.Task;
             }
 
-            if (extension is null)
-            {
-                // No extension was ever created, or the fast path of GetComponent() observed the
-                // non-null _disposeTask, and never installed one.
-                completion.TrySetResult();
-            }
-            else
-            {
-                DisposeExtensionAsync(extension, completion).Ignore();
-            }
-
+            // Extension disposal signals parked enumerations, whose continuations may run inline, so it starts outside the Messages lock.
+            DisposeExtensionAsync(extension, completion).Ignore();
             return new ValueTask(completion.Task);
 
-            async Task DisposeExtensionAsync(AsyncEnumerableGrainObserverExtension? extension, TaskCompletionSource completion)
+            async Task DisposeExtensionAsync(AsyncEnumerableGrainObserverExtension extension, TaskCompletionSource completion)
             {
                 try
                 {
-                    if (extension is not null)
-                    {
-                        try
-                        {
-                            await extension.DisposeAsync().ConfigureAwait(false);
-                        }
-                        catch (Exception exception)
-                        {
-                            LogErrorDisposingAsyncEnumerableExtension(_manager.logger, exception);
-                        }
-                    }
+                    await extension.DisposeAsync().ConfigureAwait(false);
                 }
                 catch (Exception exception)
                 {

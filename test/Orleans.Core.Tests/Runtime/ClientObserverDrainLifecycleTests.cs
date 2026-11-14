@@ -410,7 +410,7 @@ public class ClientObserverDrainLifecycleTests
             Assert.True(stop.IsCanceled);
             fixture.AssertHeldInvocation(invocation);
 
-            actualDrain = fixture.Manager.StopAsync(TestContext.Current.CancellationToken);
+            actualDrain = fixture.Manager.StopAsync();
             Assert.False(actualDrain.IsCompleted, fixture.Describe(invocation, actualDrain));
             invocation.Release.TrySetResult();
             await fixture.WaitAsync(actualDrain, "2301 actual drain after caller cancellation", invocation);
@@ -467,7 +467,7 @@ public class ClientObserverDrainLifecycleTests
             Assert.Equal(1, fixture.ConnectionLog.CloseCount);
             fixture.AssertHeldInvocation(invocation);
 
-            actualDrain = fixture.Manager.StopAsync(TestContext.Current.CancellationToken);
+            actualDrain = fixture.Manager.StopAsync();
             Assert.False(actualDrain.IsCompleted, fixture.Describe(invocation, actualDrain));
             invocation.Release.TrySetResult();
             await fixture.WaitAsync(actualDrain, "2311 actual drain after cluster caller cancellation", invocation);
@@ -518,7 +518,7 @@ public class ClientObserverDrainLifecycleTests
             await fixture.WaitAsync(repeatDisposeWorker, "repeated Dispose returned while 2401 held", invocation);
             fixture.AssertHeldInvocation(invocation);
 
-            actualDrain = fixture.Manager.StopAsync(TestContext.Current.CancellationToken);
+            actualDrain = fixture.Manager.StopAsync();
             Assert.False(actualDrain.IsCompleted, fixture.Describe(invocation, actualDrain));
             invocation.Release.TrySetResult();
             await fixture.WaitAsync(actualDrain, "2401 actual drain after direct Dispose", invocation);

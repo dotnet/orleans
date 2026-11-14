@@ -59,7 +59,7 @@ internal sealed partial class InvokableObjectManager
     }
 
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
-        Justification = "LocalObjectData acquires no resources in its constructor." +
+        Justification = "LocalObjectData acquires no resources in its constructor. " +
         "The async-enumerable extension is created lazily on first use, not here.")]
     public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
     {
@@ -72,9 +72,9 @@ internal sealed partial class InvokableObjectManager
     }
 
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
-        Justification = "Disposal is fired and tracked instead of performing it inline." +
-        "This ensures we have a gated way to ensure disposal is handled if the manager itself starts shutdown while an existing" +
-        "dispoal is going on, triggered likely by the deregistration itself.")]
+        Justification = "Disposal is fired and tracked instead of performing it inline. " +
+        "This ensures we have a gated way to ensure disposal is handled if the manager itself starts shutdown while an existing " +
+        "disposal is going on, triggered likely by the deregistration itself.")]
     public bool TryDeregister(ObserverGrainId objectId)
     {
         lock (_observerLifecycleLock)
@@ -110,7 +110,7 @@ internal sealed partial class InvokableObjectManager
         {
             var manager = (InvokableObjectManager)state!;
 
-            lock (manager._observerLifecycleLock) // This is fine as due to lock reentracy.
+            lock (manager._observerLifecycleLock) // This is fine due to lock reentrancy.
             {
                 manager._observerDisposals.Remove(completedTask);
             }
@@ -130,7 +130,7 @@ internal sealed partial class InvokableObjectManager
     /// Closes observer admission and drains invocation processing, including cancellation controls and response handling.
     /// </summary>
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Symmetric reasoning as with TryDeregister.")]
-    public async Task StopAsync(CancellationToken cancellationToken = default)
+    public async Task StopAsync()
     {
         Task drainInvocations;
         Task[] disposalTasks;
@@ -197,7 +197,7 @@ internal sealed partial class InvokableObjectManager
     public void Dispatch(Message message)
     {
         // We allow cancellation requests only so they can cancel in-flight work during shutdown.
-        // Besides that we dont allow invocations!
+        // Besides that we don't allow invocations!
         if (_isStopping && !IsCancellationRequest(message))
         {
             RejectMessage(message);
@@ -216,6 +216,13 @@ internal sealed partial class InvokableObjectManager
         }
         else
         {
+            if (_isStopping)
+            {
+                // Shutdown removes every observer, so a missing observer is a shutdown rejection rather than a terminal one.
+                RejectMessage(message);
+                return;
+            }
+
             LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
             if (message.Direction == Message.Directions.Request)
             {
