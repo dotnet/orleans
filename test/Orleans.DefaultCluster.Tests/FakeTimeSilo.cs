@@ -78,10 +78,14 @@ internal static class FakeTimeSilo
 internal sealed class TrackingFakeTimeProvider(DateTimeOffset startDateTime) : FakeTimeProvider(startDateTime)
 {
     private readonly ConcurrentDictionary<object, TrackingTimer> _timers = new(ReferenceEqualityComparer.Instance);
+    private readonly object _createdTimersLock = new();
+    private readonly Dictionary<TimeSpan, int> _createdTimerCounts = [];
+    private TaskCompletionSource _timerCreated = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         var timer = base.CreateTimer(callback, state, dueTime, period);
+        OnTimerCreated(dueTime);
         if (state is null)
         {
             return timer;
@@ -90,6 +94,52 @@ internal sealed class TrackingFakeTimeProvider(DateTimeOffset startDateTime) : F
         var trackingTimer = new TrackingTimer(this, state, timer);
         _timers[state] = trackingTimer;
         return trackingTimer;
+    }
+
+    /// <summary>
+    /// Gets the number of timers with the specified due time which have been created.
+    /// </summary>
+    public int GetCreatedTimerCount(TimeSpan dueTime)
+    {
+        lock (_createdTimersLock)
+        {
+            return _createdTimerCounts.GetValueOrDefault(dueTime);
+        }
+    }
+
+    /// <summary>
+    /// Waits until at least <paramref name="count"/> timers with the specified due time have been created.
+    /// </summary>
+    public async Task WaitForCreatedTimerCountAsync(TimeSpan dueTime, int count, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            Task created;
+            lock (_createdTimersLock)
+            {
+                if (_createdTimerCounts.GetValueOrDefault(dueTime) >= count)
+                {
+                    return;
+                }
+
+                created = _timerCreated.Task;
+            }
+
+            await created.WaitAsync(cancellationToken);
+        }
+    }
+
+    private void OnTimerCreated(TimeSpan dueTime)
+    {
+        TaskCompletionSource created;
+        lock (_createdTimersLock)
+        {
+            _createdTimerCounts[dueTime] = _createdTimerCounts.GetValueOrDefault(dueTime) + 1;
+            created = _timerCreated;
+            _timerCreated = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        created.TrySetResult();
     }
 
     public int GetTimerChangeCount(object timer) => GetTimer(timer).ChangeCount;

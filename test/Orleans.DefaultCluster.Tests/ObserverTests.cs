@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -381,6 +380,24 @@ namespace DefaultCluster.Tests.General
             Assert.Throws<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(reference));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact, TestCategory("BVT")]
+        public async Task ObserverTest_CallDeletedObserver_ThrowsObserverNotReachableException()
+        {
+            TestInitialize();
+
+            observer1 = new SimpleGrainObserver(null, null, Logger);
+
+            var observerRef = GrainFactory.CreateObjectReference<IPingableGrainObserver>(observer1);
+
+            await observerRef.Ping();
+
+            GrainFactory.DeleteObjectReference<IPingableGrainObserver>(observerRef);
+
+            await Assert.ThrowsAsync<ObserverNotReachableException>(observerRef.Ping);
+        }
+
         public class DummyObserverGrain : Grain, ISimpleGrainObserver
         {
             public void StateChanged(int a, int b) { }
@@ -391,11 +408,10 @@ namespace DefaultCluster.Tests.General
             public void StateChanged(int a, int b) { }
         }
 
-        internal class SimpleGrainObserver : ISimpleGrainObserver
+        internal class SimpleGrainObserver : ISimpleGrainObserver, IPingableGrainObserver
         {
             private readonly Action<int, int, AsyncResultHandle>? action;
             private readonly AsyncResultHandle? result;
-
             private readonly ILogger logger;
 
             public SimpleGrainObserver(Action<int, int, AsyncResultHandle>? action, AsyncResultHandle? result, ILogger logger)
@@ -410,6 +426,8 @@ namespace DefaultCluster.Tests.General
                 this.logger.LogDebug("SimpleGrainObserver.StateChanged a={A} b={B}", a, b);
                 action?.Invoke(a, b, result!);
             }
+
+            public Task Ping() => Task.CompletedTask;
         }
     }
 }

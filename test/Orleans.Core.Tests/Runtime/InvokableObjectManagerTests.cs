@@ -1,18 +1,15 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
-using Orleans;
-using Orleans.Runtime;
+using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
-using TestExtensions;
 using Xunit;
 
 namespace UnitTests.Runtime;
@@ -339,6 +336,37 @@ public class InvokableObjectManagerTests
     }
 
     [Fact]
+    public async Task StopAsync_PreservesCancellationWhileTargetIsInitializing()
+    {
+        await using var fixture = new ManagerFixture();
+        var request = new DeferredCancellationTestInvokable();
+        var message = fixture.Request(11, request);
+        var control = new CancellationControlInvokable(message.SendingGrain, message.Id);
+        control.Release.TrySetResult();
+        var cancellation = fixture.Request(91, control, alwaysInterleave: true);
+
+        try
+        {
+            fixture.Manager.Dispatch(message);
+            await fixture.WaitAsync(request.TargetEntered.Task, "11: target initialization entered");
+            fixture.Manager.Dispatch(cancellation);
+            await fixture.WaitAsync(control.CancellationSent.Task, "91: cancellation retained during initialization");
+
+            var stop = fixture.StopAsync();
+            fixture.AssertPending(stop, "11: target initialization held");
+            request.ReleaseTarget();
+
+            await fixture.WaitAsync(stop, "retained cancellation and shutdown drain");
+            fixture.AssertException<TaskCanceledException>(message);
+            fixture.AssertCompletedControl(cancellation, control);
+        }
+        finally
+        {
+            request.ReleaseTarget();
+        }
+    }
+
+    [Fact]
     public async Task CancelRequestAsync_ReleasesQueuedAdmissionExactlyOnce()
     {
         await using var fixture = new ManagerFixture(registerObserver: false);
@@ -500,9 +528,50 @@ public class InvokableObjectManagerTests
 
         Assert.Equal(0, body.InvocationCount);
         Assert.Null(body.TargetHolder);
-        fixture.AssertNoResponse(message);
-        fixture.AssertResponseCount(0);
+        fixture.AssertException<ObserverNotReachableException>(message);
+        fixture.AssertResponseCount(1);
         fixture.AssertOrder();
+    }
+
+    [Fact]
+    public async Task Dispatch_UnregisteredObserver_Request_SendsNotReachableException()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: false);
+        var body = new TestInvokable("must not run");
+        var message = fixture.Request(11, body);
+
+        fixture.Manager.Dispatch(message);
+
+        var exception = fixture.AssertException<ObserverNotReachableException>(message);
+        Assert.Equal(0, body.InvocationCount);
+        fixture.AssertResponseCount(1);
+    }
+
+    [Fact]
+    public async Task Dispatch_UnregisteredObserver_OneWay_DoesNotSendResponse()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: false);
+        var body = new TestInvokable("must not run");
+        var message = fixture.Request(11, body);
+
+        message.Direction = Message.Directions.OneWay;
+        fixture.Manager.Dispatch(message);
+
+        fixture.AssertNoResponse(message);
+        Assert.Equal(0, body.InvocationCount);
+        fixture.AssertResponseCount(0);
+    }
+
+    [Fact]
+    public async Task TryRegister_RejectsNewObserversDuringShutdown()
+    {
+        await using var fixture = new ManagerFixture();
+        await fixture.WaitAsync(fixture.StopAsync(), "manager drained");
+
+        var newObserver = new DrainObserver();
+        var newObserverId = ObserverGrainId.Create(ClientGrainId.Create("observer-new"), IdSpan.Create("new-observer"));
+
+        Assert.False(fixture.Manager.TryRegister(newObserver, newObserverId));
     }
 
     [Fact]
@@ -562,6 +631,141 @@ public class InvokableObjectManagerTests
         }
     }
 
+
+    [Fact]
+    public async Task LocalObjectData_GetAsyncEnumerableExtensionAfterDispose_ThrowsNotReachable()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: false);
+        var data = new InvokableObjectManager.LocalObjectData(fixture.Observer, fixture.ObserverId, fixture.Manager);
+        var extension = data.GetComponent(typeof(IAsyncEnumerableGrainExtension));
+        Assert.NotNull(extension);
+
+        await data.DisposeAsync();
+
+        Assert.Throws<ObserverNotReachableException>(() => data.GetComponent(typeof(IAsyncEnumerableGrainExtension)));
+    }
+
+    [Fact]
+    public async Task LocalObjectData_DisposeAsync_CompletesWithParkedEnumerator()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: false);
+
+        var data = new InvokableObjectManager.LocalObjectData(fixture.Observer, fixture.ObserverId, fixture.Manager);
+        var extension = (IAsyncEnumerableGrainExtension)data.GetComponent(typeof(IAsyncEnumerableGrainExtension))!;
+        var producerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestId = Guid.NewGuid();
+        var timeout = TimeSpan.FromSeconds(5);
+
+        try
+        {
+            // First pull returns 1 and leaves the iterator suspended at 'yield return'.
+            var (status, value) = await extension.StartEnumeration(requestId, new ParkedAsyncEnumerableRequest<int>(1, producerStarted), CancellationToken.None);
+
+            Assert.Equal(EnumerationResult.Element, status);
+            Assert.Equal(1, Assert.IsType<int>(value));
+
+            // Second pull advances past 'yield return' and parks the producer in the infinite delay.
+            var parked = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
+            await producerStarted.Task.WaitAsync(timeout, TestContext.Current.CancellationToken);
+            Assert.False(parked.IsCompleted);
+
+            // Then we trigger disposal which in turn triggers RemovalTokenSource in the enumerator.
+            var dispose = data.DisposeAsync().AsTask();
+
+            // We wait for the parked MoveNext to unblock first. If the RemovalTokenSource link is missing,
+            // the parked task will not complete until the long-poll heartbeat fires (which would be ResponseTimeout/2 = 15 sec).
+            // So we assert it completes within that time.
+            var parkedResult = await parked.WaitAsync(timeout, TestContext.Current.CancellationToken);
+
+            Assert.Equal(EnumerationResult.MissingEnumeratorError, parkedResult.Status);
+
+            // Now that MoveNext is unblocked and released the gate, the disposal worker
+            // can proceed to cancel the producer and complete teardown.
+            await dispose.WaitAsync(timeout, TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            await data.DisposeAsync().AsTask().WaitAsync(timeout, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task StopAsync_CompletesWithParkedEnumerator()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: true);
+
+        var producerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var parkedMoveNextStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var parkedMoveNextResult = new TaskCompletionSource<(EnumerationResult Status, object? Value)>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var requestId = Guid.NewGuid();
+
+        const string ParkedInvokableResult = "parked-enumerator-result";
+
+        var body = new TestInvokable(ParkedInvokableResult)
+        {
+            Body = async request =>
+            {
+                // The request is being invoked through the registered observer.
+                // Its target context is the LocalObjectData owned by the manager.
+                var context = Assert.IsAssignableFrom<IGrainContext>(request.TargetHolder);
+
+                var extension = (IAsyncEnumerableGrainExtension)context.GetComponent(typeof(IAsyncEnumerableGrainExtension))!;
+
+                // First pull returns 1 and leaves the iterator suspended at 'yield return'.
+                var (status, value) = await extension.StartEnumeration(requestId, new ParkedAsyncEnumerableRequest<int>(1, producerStarted), CancellationToken.None);
+
+                Assert.Equal(EnumerationResult.Element, status);
+                Assert.Equal(1, Assert.IsType<int>(value));
+
+                // Second pull advances past 'yield return' and parks the producer in the delay.
+                var parked = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
+                parkedMoveNextStarted.TrySetResult();
+
+                var result = await parked;
+                parkedMoveNextResult.TrySetResult(result);
+
+                return Response.FromResult(ParkedInvokableResult);
+            }
+        };
+
+        var message = fixture.Request(11, body);
+        fixture.Manager.Dispatch(message);
+
+        await fixture.WaitAsync(producerStarted.Task, "11: producer entered parked delay");
+        await fixture.WaitAsync(parkedMoveNextStarted.Task, "11: second MoveNext entered long-poll");
+
+        Assert.False(parkedMoveNextResult.Task.IsCompleted);
+
+        // StopAsync must dispose the registered LocalObjectData, which disposes its IAE extension.
+        var stop = fixture.StopAsync();
+
+        fixture.AssertPending(stop, "11: observer enumerator parked during manager shutdown");
+
+        await fixture.WaitAsync(stop, "observer disposal and invocation drain");
+
+        var parkedResult = await parkedMoveNextResult.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(EnumerationResult.MissingEnumeratorError, parkedResult.Status);
+        Assert.Null(parkedResult.Value);
+
+        fixture.AssertSuccess(message, body, "parked-enumerator-result");
+        fixture.AssertResponseCount(1);
+    }
+
+    private sealed class ParkedAsyncEnumerableRequest<T>(T first, TaskCompletionSource producerStarted)
+        : TestAsyncEnumerableRequest<T>(() => IterateAsync(first, producerStarted), maxBatchSize: 1)
+    {
+        private static async IAsyncEnumerable<T> IterateAsync(T first, TaskCompletionSource producerStarted, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            yield return first;
+
+            producerStarted.TrySetResult();
+
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+    }
+
     private sealed class FilteringObserver : IGrainObserver, IIncomingGrainCallFilter
     {
         internal int InvocationCount { get; private set; }
@@ -593,6 +797,8 @@ public class InvokableObjectManagerTests
             services.AddSerializer();
             services.AddLogging();
             services.AddMetrics();
+            services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<IOptions<MessagingOptions>>(Options.Create(new SiloMessagingOptions()));
             _services = services.BuildServiceProvider();
             var runtime = Substitute.For<IRuntimeClient>();
             runtime.ServiceProvider.Returns(_services);
