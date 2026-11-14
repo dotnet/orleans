@@ -428,6 +428,19 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
 
+        /// <summary>Determines whether two silo addresses have the same endpoint and generation.</summary>
+        /// <param name="left">The first address.</param>
+        /// <param name="right">The second address.</param>
+        /// <returns><see langword="true"/> if both addresses are null or represent the same silo; otherwise, <see langword="false"/>.</returns>
+        public static bool operator ==(SiloAddress? left, SiloAddress? right)
+            => ReferenceEquals(left, right) || (left is not null && left.Equals(right));
+
+        /// <summary>Determines whether two silo addresses differ in endpoint or generation.</summary>
+        /// <param name="left">The first address.</param>
+        /// <param name="right">The second address.</param>
+        /// <returns><see langword="true"/> if the addresses differ; otherwise, <see langword="false"/>.</returns>
+        public static bool operator !=(SiloAddress? left, SiloAddress? right) => !(left == right);
+
         /// <summary>Returns a consistent hash value for this silo address.</summary>
         /// <returns>Consistent hash value for this silo address.</returns>
         public int GetConsistentHashCode() => hashCodeSet ? hashCode : CalculateConsistentHashCode();
@@ -529,13 +542,13 @@ namespace Orleans.Runtime
         /// <returns>Returns <c>true</c> if the two SiloAddresses are considered to match -- if they are equal or if one generation or the other is 0. </returns>
         internal bool Matches([NotNullWhen(true)] SiloAddress? other)
         {
-            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
+            return other is not null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port &&
                 (Generation == other.Generation || Generation == 0 || other.Generation == 0);
         }
 
         /// <inheritdoc/>
         public bool Equals([NotNullWhen(true)] SiloAddress? other)
-            => other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
+            => other is not null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
@@ -547,7 +560,7 @@ namespace Orleans.Runtime
         /// <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
         /// </returns>
         internal bool IsSameLogicalSilo([NotNullWhen(true)] SiloAddress? other)
-            => other != null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
+            => other is not null && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
@@ -576,7 +589,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public int CompareTo(SiloAddress? other)
         {
-            if (other == null) return 1;
+            if (other is null) return 1;
             // Compare Generation first. It gives a cheap and fast way to compare, avoiding allocations 
             // and is also semantically meaningful - older silos (with smaller Generation) will appear first in the comparison order.
             // Only if Generations are the same, go on to compare Ports and IPAddress (which is more expansive to compare).
