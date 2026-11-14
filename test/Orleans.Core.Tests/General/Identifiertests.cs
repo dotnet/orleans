@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Net;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
@@ -58,6 +59,49 @@ namespace UnitTests.General
             Assert.True(IPAddressComparer.Instance.Compare(lowerScopeAddress, higherScopeAddress) < 0);
             Assert.True(lowerScopeSilo.CompareTo(higherScopeSilo) < 0);
             Assert.NotEqual(lowerScopeSilo, higherScopeSilo);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressEqualityOperatorsCompareValues()
+        {
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+            var constructor = typeof(SiloAddress).GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic, null, [typeof(IPEndPoint), typeof(int)], null)!;
+            var equal = (SiloAddress)constructor.Invoke([new IPEndPoint(IPAddress.Loopback, 11111), 1]);
+            var differentAddress = SiloAddress.New(IPAddress.IPv6Loopback, 11111, 1);
+            var differentPort = SiloAddress.New(IPAddress.Loopback, 11112, 1);
+            var differentGeneration = SiloAddress.New(IPAddress.Loopback, 11111, 2);
+
+            Assert.NotSame(address, equal);
+            Assert.True(address.Equals(equal));
+            Assert.Equal(address.GetHashCode(), equal.GetHashCode());
+            Assert.True(address == equal);
+            Assert.True(equal == address);
+            Assert.False(address != equal);
+            Assert.False(equal != address);
+
+            foreach (var other in new[] { differentAddress, differentPort, differentGeneration })
+            {
+                Assert.False(address.Equals(other));
+                Assert.False(address == other);
+                Assert.False(other == address);
+                Assert.True(address != other);
+                Assert.True(other != address);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressEqualityOperatorsHandleNull()
+        {
+            SiloAddress? missing = null;
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+
+            Assert.True(missing == null);
+            Assert.False(missing != null);
+            Assert.False(address == missing);
+            Assert.False(missing == address);
+            Assert.True(address != missing);
+            Assert.True(missing != address);
         }
 
         [TestSuite("BVT")]
