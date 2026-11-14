@@ -67,7 +67,7 @@ Not every capability supports every database. The presence of a script in the pr
 1. Back up application data according to the database recovery policy.
 2. Apply the main script for a new database.
 3. Apply the script for each configured Orleans capability.
-4. Review and apply scripts under the provider's `Migrations` directory when upgrading from an older schema.
+4. For MySQL/MariaDB clustering and streaming upgrades, reapply `MySQL-Main.sql` and the canonical provider scripts. They create missing tables and refresh procedures and queries while preserving stored data. Stop all affected silos during procedure replacement and restart them after every required script succeeds. For other providers, review the provider's `Migrations` directory.
 5. Validate with a staging cluster using the same driver and database engine version.
 
 ## Production database layout

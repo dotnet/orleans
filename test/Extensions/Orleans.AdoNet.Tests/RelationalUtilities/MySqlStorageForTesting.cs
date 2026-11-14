@@ -15,6 +15,20 @@ namespace UnitTests.General
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData LONGBLOB NOT NULL);"; } }
 
+        /// <summary>
+        /// Executes a script with the MySQL client's DELIMITER semantics, as users run migrations.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="SplitScript"/> rewrites procedure terminators and splits on DELIMITER lines, so it accepts scripts
+        /// which the MySQL client rejects. Run migrations through this method to validate them as shipped.
+        /// </remarks>
+        public static async Task ExecuteClientScriptAsync(string connectionString, string script, CancellationToken cancellationToken)
+        {
+            await using var connection = new MySqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await new MySqlScript(connection, script).ExecuteAsync(cancellationToken);
+        }
+
         public IEnumerable<string> SplitScript(string setupScript)
         {
             return setupScript.Replace("END$$", "END;")
