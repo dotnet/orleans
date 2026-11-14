@@ -64,6 +64,27 @@ public sealed class AdoNetTransactionsRegistrationTests
     }
 
     [Fact]
+    public void AddAdoNetTransactionalStateStorage_GeneratesSqlAfterAdditionalConfiguration()
+    {
+        var builder = new TestSiloBuilder();
+        builder.AddAdoNetTransactionalStateStorage("transactions");
+        builder.Services.Configure<TransactionalStateStorageOptions>("transactions", options =>
+        {
+            options.Invariant = AdoNetInvariants.InvariantNameOracleDatabase;
+            options.StateEntityTableName = "ConfiguredState";
+            options.KeyEntityTableName = "ConfiguredKey";
+        });
+
+        using var services = builder.Services.BuildServiceProvider();
+        var options = services.GetRequiredService<IOptionsMonitor<TransactionalStateStorageOptions>>().Get("transactions");
+
+        Assert.Equal(Utils.Constants.OracleParameterDot, options.SqlParameterDot);
+        Assert.Contains("ConfiguredState", options.ExecuteSqlDictionary[Utils.Constants.QueryStateSql]);
+        Assert.Contains("ConfiguredKey", options.ExecuteSqlDictionary[Utils.Constants.QueryKeySql]);
+        Assert.All(options.ExecuteSqlDictionary.Values, sql => Assert.DoesNotContain("@", sql));
+    }
+
+    [Fact]
     public void AddAdoNetTransactionalStateStorageAsDefault_UsesDefaultProviderName()
     {
         var builder = new TestSiloBuilder();

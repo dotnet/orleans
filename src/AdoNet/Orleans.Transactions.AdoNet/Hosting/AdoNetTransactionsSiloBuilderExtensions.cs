@@ -44,15 +44,15 @@ public static class AdoNetTransactionsSiloBuilderExtensions
         string name,
         Action<TransactionalStateStorageOptions>? configureOptions = null)
     {
-        return builder.AddAdoNetTransactionalStateStorage(name, (OptionsBuilder<TransactionalStateStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
+        return builder.AddAdoNetTransactionalStateStorage(name, optionsBuilder =>
         {
-            configureOptions?.Invoke(options);
-            if (options.Invariant == AdoNetInvariants.InvariantNameOracleDatabase)
+            if (configureOptions is not null)
             {
-                options.SqlParameterDot = Constants.OracleParameterDot;
+                optionsBuilder.Configure(configureOptions);
             }
-            options.InitExecuteSqlDic();
-        }));
+
+            optionsBuilder.PostConfigure(options => options.InitExecuteSqlDic());
+        });
     }
 }
 
@@ -61,13 +61,13 @@ public static class AdoNetTransactionsSiloBuilderExtensions
 /// </summary>
 internal static class AdoNetTransactionServicecollectionExtensions
 {
-    internal static ISiloBuilder AddAdoNetTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<TransactionalStateStorageOptions>>? configureOptions = null)
+    internal static ISiloBuilder AddAdoNetTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<TransactionalStateStorageOptions>>? configureOptions)
     {
         return builder.ConfigureServices(services => services.AddAdoNetTransactionalStateStorage(name, configureOptions));
     }
 
     internal static IServiceCollection AddAdoNetTransactionalStateStorage(this IServiceCollection services, string name,
-        Action<OptionsBuilder<TransactionalStateStorageOptions>>? configureOptions = null)
+        Action<OptionsBuilder<TransactionalStateStorageOptions>>? configureOptions)
     {
         configureOptions?.Invoke(services.AddOptions<TransactionalStateStorageOptions>(name));
 
@@ -93,6 +93,11 @@ internal static class ExecuteSqlExtensions
     /// <param name="options"></param>
     internal static void InitExecuteSqlDic(this TransactionalStateStorageOptions options)
     {
+        if (options.Invariant == AdoNetInvariants.InvariantNameOracleDatabase)
+        {
+            options.SqlParameterDot = Constants.OracleParameterDot;
+        }
+
         var queryKeySql = ActionToSql.QuerySimpleSql(options.KeyEntityTableName, new List<string>()
         {
             nameof(KeyEntity.StateId),nameof(KeyEntity.CommittedSequenceId),

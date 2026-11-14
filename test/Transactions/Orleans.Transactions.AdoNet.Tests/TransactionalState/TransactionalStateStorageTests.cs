@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Orleans.Hosting;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AdoNet.Entity;
+using Orleans.Transactions.AdoNet.Storage;
 using Orleans.Transactions.AdoNet.Tests.Fakes;
 using Orleans.Transactions.AdoNet.TransactionalState;
 using Orleans.Transactions.AdoNet.Utils;
@@ -55,6 +56,27 @@ public sealed class TransactionalStateStorageTests
             NullLogger<TransactionalStateStorage<SimpleState>>.Instance);
 
         Assert.Equal(8, options.ExecuteSqlDictionary.Count);
+    }
+
+    [Fact]
+    public void Constructor_InitializesOracleQueriesWithColonParameters()
+    {
+        var options = new TransactionalStateStorageOptions
+        {
+            Invariant = AdoNetInvariants.InvariantNameOracleDatabase,
+            ConnectionString = "Data Source=orleans"
+        };
+
+        _ = new TransactionalStateStorage<SimpleState>(
+            "state-id",
+            new JsonSerializerSettings(),
+            options,
+            NullLogger<TransactionalStateStorage<SimpleState>>.Instance);
+
+        Assert.Equal(Constants.OracleParameterDot, options.SqlParameterDot);
+        Assert.Equal(8, options.ExecuteSqlDictionary.Count);
+        Assert.All(options.ExecuteSqlDictionary.Values, sql => Assert.DoesNotContain("@", sql));
+        Assert.Contains(":", options.ExecuteSqlDictionary[Constants.QueryKeySql]);
     }
 
     /// <summary>

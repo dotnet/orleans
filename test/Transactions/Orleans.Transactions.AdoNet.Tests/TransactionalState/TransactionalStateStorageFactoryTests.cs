@@ -68,6 +68,22 @@ public sealed class TransactionalStateStorageFactoryTests
     }
 
     [Fact]
+    public void CreateStateId_BinaryGrainKeyBytesDoNotCollide()
+    {
+        var type = GrainType.Create("grain");
+        var first = TransactionalStateStorageFactory.CreateStateId(
+            GrainId.Create(type, new IdSpan(new byte[] { 0x80 })),
+            "service",
+            "state");
+        var second = TransactionalStateStorageFactory.CreateStateId(
+            GrainId.Create(type, new IdSpan(new byte[] { 0x81 })),
+            "service",
+            "state");
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public void CreateStateId_IsStableAndFixedLength()
     {
         var grainId = GrainId.Create("grain", "key");

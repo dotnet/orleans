@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
@@ -72,10 +73,20 @@ public class TransactionalStateStorageFactory : ITransactionalStateStorageFactor
 
     internal static string CreateStateId(GrainId grainId, string serviceId, string stateName)
     {
-        var grainType = grainId.Type.ToString();
-        var grainKey = grainId.Key.ToString();
-        var value = $"{grainType.Length}:{grainType}{grainKey.Length}:{grainKey}{serviceId.Length}:{serviceId}{stateName.Length}:{stateName}";
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        AppendHashPart(hash, grainId.Type.AsSpan());
+        AppendHashPart(hash, grainId.Key.AsSpan());
+        AppendHashPart(hash, Encoding.UTF8.GetBytes(serviceId));
+        AppendHashPart(hash, Encoding.UTF8.GetBytes(stateName));
+        return Convert.ToHexString(hash.GetHashAndReset());
+    }
+
+    private static void AppendHashPart(IncrementalHash hash, ReadOnlySpan<byte> value)
+    {
+        Span<byte> length = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32BigEndian(length, value.Length);
+        hash.AppendData(length);
+        hash.AppendData(value);
     }
 
     private string ValidateStateId(string key)
