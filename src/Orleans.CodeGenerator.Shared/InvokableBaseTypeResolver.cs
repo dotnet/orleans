@@ -802,7 +802,7 @@ internal sealed class InvokableBaseTypeResolver
     }
 
     private bool HasUsableConstructor(INamedTypeSymbol baseType)
-        => _bindingCache.ConstructorBindings.GetOrAdd(baseType, _constructorBindingFactory).Value;
+        => _bindingCache.ConstructorBindings.GetOrAdd(baseType.OriginalDefinition, _constructorBindingFactory).Value;
 
     private bool HasUsableConstructorCore(INamedTypeSymbol baseType)
     {
