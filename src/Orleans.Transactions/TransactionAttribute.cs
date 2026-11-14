@@ -505,8 +505,6 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -528,8 +526,6 @@ namespace Orleans
             }
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask resultTask)
         {
             try
@@ -568,8 +564,6 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -588,8 +582,6 @@ namespace Orleans
             }
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask)
         {
             try
@@ -628,8 +620,6 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -649,8 +639,6 @@ namespace Orleans
             }
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(Task<TResult> resultTask)
         {
             try
@@ -688,8 +676,6 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -712,8 +698,6 @@ namespace Orleans
             }
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(Task resultTask)
         {
             try

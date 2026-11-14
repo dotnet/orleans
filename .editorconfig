@@ -276,6 +276,9 @@ dotnet_diagnostic.CA1001.severity = suggestion
 # CA1018: Mark attributes with AttributeUsageAttribute
 dotnet_diagnostic.CA1018.severity = suggestion
 
+# CA1031: Do not catch general exception types
+dotnet_diagnostic.CA1031.severity = none
+
 # CA1036: Override methods on comparable types
 dotnet_diagnostic.CA1036.severity = suggestion
 

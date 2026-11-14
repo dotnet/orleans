@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -28,8 +27,6 @@ namespace Orleans.Runtime.Scheduler
             return workItem.Task;
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Inline delegate failures are returned as faulted tasks, matching the queued work-item boundary.")]
         internal static Task RunOrQueueTask(this IGrainContext targetContext, Func<Task> taskFunc)
         {
             var currentContext = RuntimeContext.Current;
@@ -72,8 +69,6 @@ namespace Orleans.Runtime.Scheduler
             return await workItem.Task;
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Inline delegate failures are returned as faulted tasks, matching the queued work-item boundary.")]
         internal static Task<TResult> RunOrQueueTaskResult<TResult>(this IGrainContext targetContext, Func<TResult> taskFunc)
         {
             var currentContext = RuntimeContext.Current;
@@ -94,8 +89,6 @@ namespace Orleans.Runtime.Scheduler
             return task;
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Inline delegate failures are returned as faulted tasks, matching the queued work-item boundary.")]
         internal static ValueTask RunOrQueueTask<TState>(this IGrainContext targetContext, Func<TState, ValueTask> taskFunc, TState state)
         {
             var currentContext = RuntimeContext.Current;

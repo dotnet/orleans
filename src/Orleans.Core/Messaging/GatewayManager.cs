@@ -240,7 +240,6 @@ namespace Orleans.Messaging
             });
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         internal async Task PeriodicallyRefreshGatewaySnapshot()
         {
             await Task.Yield();
