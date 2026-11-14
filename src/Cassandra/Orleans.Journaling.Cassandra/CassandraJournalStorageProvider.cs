@@ -219,7 +219,6 @@ internal sealed class CassandraJournalStorageQueries
     private PreparedStatement? _updateMetadata;
     private PreparedStatement? _deleteHeader;
     private PreparedStatement? _deleteGeneration;
-    private PreparedStatement? _deleteOlderGenerations;
     private PreparedStatement? _registerCatalogEntry;
     private PreparedStatement[]? _readCatalogEntries;
 
@@ -335,10 +334,6 @@ internal sealed class CassandraJournalStorageQueries
         _deleteGeneration = await PrepareAsync($"""
             DELETE FROM {_tableName}
             WHERE journal_id = ? AND generation = ?
-            """, cancellationToken).ConfigureAwait(false);
-        _deleteOlderGenerations = await PrepareAsync($"""
-            DELETE FROM {_tableName}
-            WHERE journal_id = ? AND generation > ? AND generation < ?
             """, cancellationToken).ConfigureAwait(false);
     }
 
@@ -536,13 +531,6 @@ internal sealed class CassandraJournalStorageQueries
     public BoundStatement DeleteGeneration(string journalId, Guid generation)
     {
         var statement = Get(_deleteGeneration).Bind(journalId, generation);
-        statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
-        return statement;
-    }
-
-    public BoundStatement DeleteOlderGenerations(string journalId, Guid cutoff)
-    {
-        var statement = Get(_deleteOlderGenerations).Bind(journalId, CassandraJournalStorageOptions.HeaderGenerationId, cutoff);
         statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
         return statement;
     }

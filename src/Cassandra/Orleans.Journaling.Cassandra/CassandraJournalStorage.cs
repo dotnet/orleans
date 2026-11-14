@@ -344,7 +344,7 @@ internal sealed class CassandraJournalStorage : IJournalStorage
                         Revision = revision,
                         ContentRevision = contentRevision,
                     });
-                    await CleanupReplacedGenerationsAsync(oldGeneration, generation).ConfigureAwait(false);
+                    await CleanupReplacedGenerationAsync(oldGeneration).ConfigureAwait(false);
                     return;
                 }
 
@@ -381,36 +381,18 @@ internal sealed class CassandraJournalStorage : IJournalStorage
         }
     }
 
-    private async ValueTask CleanupReplacedGenerationsAsync(Guid oldGeneration, Guid newGeneration)
+    private async ValueTask CleanupReplacedGenerationAsync(Guid oldGeneration)
     {
-        if (oldGeneration != newGeneration)
-        {
-            try
-            {
-                await _queries.Session.ExecuteAsync(_queries.DeleteGeneration(_journalId.Value, oldGeneration))
-                    .ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                _logger.LogWarning(
-                    exception,
-                    "Failed to delete previous Cassandra journal generation {Generation} for journal {JournalId}; replacement is already committed.",
-                    oldGeneration,
-                    _journalId.Value);
-            }
-        }
-
         try
         {
-            await _queries.Session.ExecuteAsync(
-                _queries.DeleteOlderGenerations(_journalId.Value, CassandraJournalGenerationId.CreateCleanupCutoff()))
+            await _queries.Session.ExecuteAsync(_queries.DeleteGeneration(_journalId.Value, oldGeneration))
                 .ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(
-                exception,
-                "Failed to delete old Cassandra journal generations for journal {JournalId}; replacement is already committed.",
+            _logger.LogWarning(exception,
+                "Failed to delete previous Cassandra journal generation {Generation} for journal {JournalId}; replacement is already committed.",
+                oldGeneration,
                 _journalId.Value);
         }
     }

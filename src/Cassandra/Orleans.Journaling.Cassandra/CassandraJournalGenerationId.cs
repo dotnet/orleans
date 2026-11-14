@@ -18,17 +18,6 @@ internal static class CassandraJournalGenerationId
         return new Guid(bytes, bigEndian: true);
     }
 
-    public static Guid CreateCleanupCutoff()
-    {
-        Span<byte> bytes = stackalloc byte[16];
-        bytes.Clear();
-        WriteTimestamp(bytes, DateTimeOffset.UtcNow.AddDays(-1));
-        // Use the minimum random bits so every UUIDv7 from the cutoff millisecond sorts at or above it.
-        bytes[6] = 0x70;
-        bytes[8] = 0x80;
-        return new Guid(bytes, bigEndian: true);
-    }
-
     private static void WriteTimestamp(Span<byte> bytes, DateTimeOffset timestamp)
     {
         var milliseconds = timestamp.ToUnixTimeMilliseconds();

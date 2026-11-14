@@ -120,8 +120,7 @@ written inside an LWT or one large Cassandra batch:
 3. Use one header LWT to set the new active generation, sequence count, byte
    length, format, and fresh revisions. The LWT compares the header state read
    before staging. This header update is the replacement's commit point.
-4. After publication, attempt an exact delete of the prior active generation,
-   then issue a range delete for older UUID generations as a safety sweep.
+4. After publication, attempt an exact delete of the prior active generation.
 
 An empty replacement publishes a generation with zero entries. Row sequence
 numbers restart at zero because generation identity distinguishes replacement
@@ -140,10 +139,9 @@ provider must not delete the staged generation, since the header may already
 point to it. The exception is surfaced; recovery reads the header to determine
 the committed generation.
 
-After the LWT reports success, cleanup is not part of the commit. Failures of
-either post-publication delete are logged and do not cause `ReplaceAsync` to
-fail. The range sweep is attempted even if the exact old-generation delete
-fails. A later successful replacement can retry cleanup.
+After the LWT reports success, cleanup is not part of the commit. Failure of
+the post-publication delete is logged and does not cause `ReplaceAsync` to
+fail.
 
 Delete compares the freshly read header's `content_revision` with the content
 revision last observed by that storage handle, when one exists. A content
@@ -156,53 +154,18 @@ Delete removes the header with an LWT and only then deletes the active
 generation. Removing the header makes the journal absent to new readers. Unlike
 replacement cleanup, a failure to delete the active generation is surfaced by
 `DeleteAsync` after the header has been removed; the surviving rows are
-unreachable. A later replacement's age-based sweep may tombstone them after they
-pass the cleanup cutoff. Cassandra removes tombstoned data later during
-compaction; no provider background task currently reclaims unreachable rows.
+unreachable. Cassandra removes tombstoned data later during compaction; no
+provider background task currently reclaims unreachable rows.
 
-## UUIDv7 generations and best-effort cleanup
+## UUIDv7 generations and cleanup
 
 Generation IDs are UUID version 7. Their leading bits encode Unix time in
-milliseconds, followed by random bits. Cassandra's `uuid` clustering-key order
-therefore allows generation-time range deletes without first listing every
-generation or entry row in the partition.
-
-After a replacement is committed and the exact previous generation delete is
-attempted, the provider issues the equivalent of:
-
-```sql
-DELETE FROM journal_table
-WHERE journal_id = ?
-  AND generation > <header-sentinel>
-  AND generation < <UUIDv7 cutoff>;
-```
-
-The cutoff is the minimum UUIDv7 value for the UTC timestamp one day before
-cleanup runs. The lower bound excludes the header sentinel. The partition-key
-restriction limits the delete to the journal being replaced; it does not scan
-other journals. Cassandra represents the range delete with tombstones, so
-physical bytes are reclaimed later by compaction.
-
-This is deliberately best-effort eventual cleanup, not a lease or a proof that
-every deleted generation is abandoned:
-
-- A process can stop before or during staging, leaving rows behind.
-- A newer orphan generation is not included by a range below the cutoff; a
-  later replacement may clean it once it is old enough.
-- Generations within the one-day grace period are retained.
-- A large clock error or an operation which stages for more than a day can
-  violate the assumption that generations below the cutoff are inactive.
-- A reader which already selected a generation can race its deletion. The read
-  may fail its consistency checks; callers decide whether and how to retry.
-- A cleanup failure is logged. Cleanup is retried only by a later successful
-  replacement; there is no background reaper.
-
-UUIDv7 provides time-sortable IDs, not a distributed clock or a commit-order
-service. Do not shorten the grace period or change the range semantics without
-reviewing clock skew, maximum replacement duration, active-reader behavior,
-and the reserved header key. If stronger guarantees are required, generation
-ownership must be coordinated in durable header state and cleanup must fence
-writers before deleting their staged rows.
+milliseconds, followed by random bits. The provider deletes only a generation
+known to have been superseded. Age alone cannot establish that a generation is
+abandoned: a writer may still be staging it or its clock may be skewed.
+A reader which selected a superseded generation can race its deletion and fail
+consistency checks. Process failures, ambiguous publication outcomes, and
+cleanup failures can leave inactive rows in the partition.
 
 ## Compaction and capacity
 
@@ -211,14 +174,12 @@ The storage layer counts successful appends and appended bytes. When either
 snapshot. The journaling state manager observes that request before a later
 write and calls `ReplaceAsync`. These thresholds are triggers, not hard caps:
 one append can cross a threshold, replacement snapshots are not capped by
-`MaxAppendBytes`, and failed-generation debris can remain until a later
-replacement.
+`MaxAppendBytes`, and failed-generation debris can remain.
 
 Each journal's active rows and inactive generations share one partition.
 `RowSizeBytes`, append thresholds, journal workload, partition growth, and
-tombstone accumulation must be considered together. Do not treat range deletes
-as immediate physical erasure or as a substitute for Cassandra repair and
-compaction operations.
+tombstone accumulation must be considered together. Cassandra repair and
+compaction operations govern physical reclamation of deleted rows.
 
 ## Schema and deployment
 
@@ -272,7 +233,7 @@ coverage includes:
   deletion;
 - replacement spanning multiple full staging batches plus a partial final
   batch, and failure in the second batch with old-generation recovery intact;
-- range cleanup of an old UUIDv7 generation while retaining a recent one;
+- preservation of other generations regardless of age;
 - successful replacement when a post-publication delete fails;
 - replacement whose publication commits but whose client response is lost;
 - delete LWT conflict when a concurrent append wins after the delete header read;

@@ -678,7 +678,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
-    public async Task ReplaceAsync_DeletesGenerationsOlderThanTheCleanupCutoff()
+    public async Task ReplaceAsync_PreservesOtherGenerationsRegardlessOfAge()
     {
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
@@ -707,7 +707,8 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
 
         var activeGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
         Assert.Equal('7', activeGeneration.ToString("N")[12]);
-        Assert.Empty(await GetSequencesAsync(harness.Session, harness.Options.TableName, id, staleGeneration));
+        var staleSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, staleGeneration);
+        Assert.Equal([0L], staleSequences);
         var recentSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, recentGeneration);
         Assert.Equal([0L], recentSequences);
         var activeSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, activeGeneration);
@@ -725,15 +726,6 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var previousGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
 
-        var staleGeneration = CassandraJournalGenerationId.Create(DateTimeOffset.UtcNow.AddDays(-2));
-        await harness.Session.ExecuteAsync(new SimpleStatement(
-            $"INSERT INTO {harness.Options.TableName} (journal_id, generation, sequence, operation_id, payload) VALUES (?, ?, ?, ?, ?)",
-            id.Value,
-            staleGeneration,
-            0L,
-            Guid.NewGuid(),
-            new byte[] { 99 }));
-
         failureInjector.Arm(
             IsGenerationDelete,
             FailureInjectionTiming.BeforeExecution,
@@ -745,7 +737,6 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         Assert.NotEqual(previousGeneration, activeGeneration);
         var previousSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, previousGeneration);
         Assert.Equal([0L], previousSequences);
-        Assert.Empty(await GetSequencesAsync(harness.Session, harness.Options.TableName, id, staleGeneration));
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
         Assert.Equal([2], consumer.Bytes.ToArray());
