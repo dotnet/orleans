@@ -28,6 +28,9 @@ namespace TestVersionGrainInterfaces
 
         Task WaitForRelease(IVersionUpgradeTestObserver observer);
 
+        [AlwaysInterleave]
+        Task<int> GetWaitingCount();
+
         Task<bool> LongRunningTask(TimeSpan taskTime);
 
 #if !VERSION_1

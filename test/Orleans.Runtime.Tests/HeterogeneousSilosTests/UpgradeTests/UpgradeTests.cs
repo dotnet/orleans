@@ -3,6 +3,7 @@ using Orleans.Metadata;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using TestVersionGrainInterfaces;
+using TestVersionGrains;
 using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
@@ -189,6 +190,83 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 targetBarrier.Release();
                 Client.DeleteObjectReference<IVersionUpgradeTestObserver>(callerObserver);
                 Client.DeleteObjectReference<IVersionUpgradeTestObserver>(targetObserver);
+            }
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task IncompatibleRequestQueuedOnBusyOldActivationIsForwarded(bool reentrant, bool oneWay)
+        {
+            await StartSiloV1();
+            var grainClass = reentrant ? typeof(ReentrantVersionUpgradeTestGrain) : typeof(VersionUpgradeTestGrain);
+            var target = Client.GetGrain<IVersionUpgradeTestGrain>(0, grainClass.FullName);
+            Assert.Equal(1, await target.GetVersion());
+            await StartSiloV2();
+            var caller = Client.GetGrain<IVersionUpgradeTestGrain>(1);
+            Assert.Equal(2, await caller.GetVersion());
+
+            var resolver = Client.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
+            var interfaceType = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
+            var targetBarrier = new UpgradeBarrier();
+            var callerBarrier = new UpgradeBarrier();
+            var deliveryBarrier = new UpgradeBarrier();
+            var targetObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(targetBarrier);
+            var callerObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(callerBarrier);
+            var deliveryObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(deliveryBarrier);
+            try
+            {
+                var blockingCall = target.WaitForRelease(targetObserver);
+                await targetBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                if (reentrant)
+                {
+                    Assert.Equal(1, await target.GetVersion().WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+                }
+
+                Task<int>? call = null;
+                if (oneWay)
+                {
+                    var oneWayCall = caller.ProxyCallVersion2OneWayMethodAfterBarrier(target, callerObserver, deliveryObserver);
+                    await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                    callerBarrier.Release();
+                    await oneWayCall.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                }
+                else
+                {
+                    call = caller.ProxyCallCancellableVersion2MethodAfterBarrier(target, callerObserver, CancellationToken.None);
+                    await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                }
+
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(30));
+                while (await target.GetWaitingCount() == 0)
+                {
+                    await Task.Delay(50, timeout.Token);
+                }
+
+                await ManagementGrain.SetCompatibilityStrategy(interfaceType, StrictVersionCompatible.Singleton, timeout.Token);
+                targetBarrier.Release();
+                callerBarrier.Release();
+                await blockingCall.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                if (oneWay)
+                {
+                    await deliveryBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                }
+                else
+                {
+                    Assert.Equal(2, await call!.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+                }
+            }
+            finally
+            {
+                targetBarrier.Release();
+                callerBarrier.Release();
+                deliveryBarrier.Release();
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(targetObserver);
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(callerObserver);
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(deliveryObserver);
             }
         }
 

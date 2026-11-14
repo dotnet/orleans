@@ -66,6 +66,13 @@ namespace TestVersionGrains
 
         public Task WaitForRelease(IVersionUpgradeTestObserver observer) => observer.WaitForRelease();
 
+        public Task<int> GetWaitingCount()
+        {
+            var property = GrainContext.GetType().GetProperty("WaitingCount")
+                ?? throw new InvalidOperationException("The activation does not expose its waiting request count.");
+            return Task.FromResult((int)property.GetValue(GrainContext)!);
+        }
+
         public async Task ProxyCallVersion2OneWayMethodAfterBarrier(
             IVersionUpgradeTestGrain other,
             IVersionUpgradeTestObserver barrier,
@@ -108,6 +115,10 @@ namespace TestVersionGrains
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
     }
+
+    [Reentrant]
+    [RandomPlacement]
+    public class ReentrantVersionUpgradeTestGrain(ILogger<VersionUpgradeTestGrain> logger) : VersionUpgradeTestGrain(logger);
 
     [VersionAwareStrategy]
     public class VersionPlacementTestGrain : Grain, IVersionPlacementTestGrain
