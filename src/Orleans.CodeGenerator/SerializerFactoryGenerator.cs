@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -120,20 +121,33 @@ internal static class SerializerFactoryGenerator
         IGeneratorServices services,
         INamedTypeSymbol type,
         CancellationToken cancellationToken)
-        => CreateRpcModelRoot(services, type, cancellationToken, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default), includeResponse: true);
+        => CreateRpcModelRoot(services, type, cancellationToken, new ConstructionScope(), includeResponse: true);
+
+    /// <summary>
+    /// Tracks the construction fallback's visited types and the generated models whose members it is visiting.
+    /// </summary>
+    private sealed class ConstructionScope
+    {
+        public HashSet<ITypeSymbol> Types { get; } = new(SymbolEqualityComparer.Default);
+
+        public List<ITypeSymbol> Models { get; } = [];
+    }
 
     private static Graph? CreateRpcModelRoot(
         IGeneratorServices services,
         INamedTypeSymbol type,
         CancellationToken cancellationToken,
-        HashSet<ITypeSymbol> constructionTypes,
+        ConstructionScope scope,
         bool includeResponse)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var originalBinding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
         type = originalBinding.GetSpeculativeTypeInfo(0, type.ToTypeSyntax(), SpeculativeBindingOption.BindAsTypeOrNamespace).Type as INamedTypeSymbol
             ?? throw new InvalidOperationException($"Unable to bind serialization construction type {type}.");
-        if (!constructionTypes.Add(type) || ContainsTypeParameter(type) || type.ContainingType is { IsGenericType: true }
+        // Built-in collection codecs depend only on their elements, so model members are the only edges which grow types.
+        // Expanding models therefore end the fallback graph.
+        if (!scope.Types.Add(type) || ContainsTypeParameter(type) || type.ContainingType is { IsGenericType: true }
+            || FindExpansion(type, scope.Models) is not null
             || type.IsAbstract || type.TypeKind == TypeKind.Interface
             || !type.HasAttribute(services.LibraryTypes.GenerateSerializerAttribute))
         {
@@ -263,6 +277,7 @@ internal static class SerializerFactoryGenerator
             if (member.IsCopyable && !services.LibraryTypes.IsShallowCopyable(type))
                 copierDependencies.Add($"global::Orleans.Serialization.Cloning.IDeepCopier<{memberName}>");
         }
+        scope.Models.Add(type);
         foreach (var memberType in constructionModel.Members
             .Where(static member => member.IsSerializable || member.IsCopyable)
             .Select(static member => member.Type)
@@ -270,8 +285,9 @@ internal static class SerializerFactoryGenerator
         {
             var originalType = originalBinding.GetSpeculativeTypeInfo(0, memberType.ToTypeSyntax(), SpeculativeBindingOption.BindAsTypeOrNamespace).Type
                 ?? throw new InvalidOperationException($"Unable to bind serialization construction dependency {memberType}.");
-            AppendConstructionDependency(services, originalType, cancellationToken, constructionTypes, result);
+            AppendConstructionDependency(services, originalType, cancellationToken, scope, result);
         }
+        scope.Models.RemoveAt(scope.Models.Count - 1);
 
         if (referencedActivator is not null)
         {
@@ -336,46 +352,46 @@ internal static class SerializerFactoryGenerator
     internal static Graph CreateRpcConstructionRoot(IGeneratorServices services, ITypeSymbol type, CancellationToken cancellationToken)
     {
         var result = new StringBuilder();
-        AppendConstructionDependency(services, type, cancellationToken, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default), result);
+        AppendConstructionDependency(services, type, cancellationToken, new ConstructionScope(), result);
         return new Graph(new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default), result.ToString());
     }
 
     private static void AppendConstructionDependency(IGeneratorServices services, ITypeSymbol dependency, CancellationToken cancellationToken,
-        HashSet<ITypeSymbol> constructionTypes, StringBuilder result)
+        ConstructionScope scope, StringBuilder result)
     {
         cancellationToken.ThrowIfCancellationRequested();
         dependency = dependency.WithNullableAnnotation(NullableAnnotation.None);
-        if (constructionTypes.Contains(dependency)) return;
+        if (scope.Types.Contains(dependency)) return;
         if (TryCreate(services, [dependency], cancellationToken, out var finite, out _, useDefaultFactories: true)
             && !finite.Registrations.Keys.OfType<INamedTypeSymbol>().Any(named =>
                 SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, services.Compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2"))))
         {
-            foreach (var registered in finite.Registrations.Keys) constructionTypes.Add(registered);
+            foreach (var registered in finite.Registrations.Keys) scope.Types.Add(registered);
             result.AppendLine(finite.ConfigurationStatements);
             return;
         }
 
         if (dependency is INamedTypeSymbol modelType && modelType.HasAttribute(services.LibraryTypes.GenerateSerializerAttribute)
-            && CreateRpcModelRoot(services, modelType, cancellationToken, constructionTypes, includeResponse: false) is { } modelGraph)
+            && CreateRpcModelRoot(services, modelType, cancellationToken, scope, includeResponse: false) is { } modelGraph)
         {
             result.AppendLine(modelGraph.ConfigurationStatements);
             return;
         }
         else
         {
-            constructionTypes.Add(dependency);
+            scope.Types.Add(dependency);
         }
 
         if (dependency is INamedTypeSymbol tupleType && TryGetTupleServices(services, tupleType, out var tupleCodec, out var tupleCopier))
         {
-            foreach (var element in tupleType.TypeArguments) AppendConstructionDependency(services, element, cancellationToken, constructionTypes, result);
+            foreach (var element in tupleType.TypeArguments) AppendConstructionDependency(services, element, cancellationToken, scope, result);
             AppendReferencedRegistration(result, tupleType, tupleCodec, tupleCopier);
             return;
         }
 
         if (dependency is IArrayTypeSymbol { IsSZArray: true } arrayType)
         {
-            AppendConstructionDependency(services, arrayType.ElementType, cancellationToken, constructionTypes, result);
+            AppendConstructionDependency(services, arrayType.ElementType, cancellationToken, scope, result);
             var codec = services.LibraryTypes.ArrayCodec.Construct(arrayType.ElementType);
             var copier = services.LibraryTypes.ArrayCopier.Construct(arrayType.ElementType);
             AppendReferencedRegistration(result, arrayType, codec, copier);
@@ -387,13 +403,13 @@ internal static class SerializerFactoryGenerator
         {
             var codec = collectionCodec;
             var copier = collectionCopier;
-            foreach (var argument in collection.TypeArguments) AppendConstructionDependency(services, argument, cancellationToken, constructionTypes, result);
+            foreach (var argument in collection.TypeArguments) AppendConstructionDependency(services, argument, cancellationToken, scope, result);
             foreach (var parameter in codec.InstanceConstructors.SelectMany(static constructor => constructor.Parameters))
             {
                 if (parameter.Type is INamedTypeSymbol contract
                     && (SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.FieldCodec_1)
                         || SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.ValueSerializer)))
-                    AppendConstructionDependency(services, contract.TypeArguments[0], cancellationToken, constructionTypes, result);
+                    AppendConstructionDependency(services, contract.TypeArguments[0], cancellationToken, scope, result);
             }
             AppendReferencedRegistration(result, collection, codec, copier, preferCompleteCodecConstructor: true);
             return;
@@ -415,7 +431,7 @@ internal static class SerializerFactoryGenerator
             .Append(">(), dependencies: ").Append(DefaultDependencyServices(bridgeDependencies, codec: false)).AppendLine(");");
         if (dependency is INamedTypeSymbol named)
         {
-            foreach (var argument in named.TypeArguments) AppendConstructionDependency(services, argument, cancellationToken, constructionTypes, result);
+            foreach (var argument in named.TypeArguments) AppendConstructionDependency(services, argument, cancellationToken, scope, result);
             if (services.LibraryTypes.GraphCodecs.FindByUnderlyingType(named.OriginalDefinition) is { } knownCodec
                 && knownCodec.CodecType.IsGenericType)
             {
@@ -426,14 +442,14 @@ internal static class SerializerFactoryGenerator
                         && (SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.FieldCodec_1)
                             || SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.DeepCopier_1)))
                     {
-                        AppendConstructionDependency(services, service.TypeArguments[0], cancellationToken, constructionTypes, result);
+                        AppendConstructionDependency(services, service.TypeArguments[0], cancellationToken, scope, result);
                     }
                 }
             }
         }
         else if (dependency is IArrayTypeSymbol array)
         {
-            AppendConstructionDependency(services, array.ElementType, cancellationToken, constructionTypes, result);
+            AppendConstructionDependency(services, array.ElementType, cancellationToken, scope, result);
         }
     }
 
@@ -443,7 +459,8 @@ internal static class SerializerFactoryGenerator
         CancellationToken cancellationToken,
         [NotNullWhen(true)] out Graph? graph,
         [NotNullWhen(false)] out Failure? failure,
-        bool useDefaultFactories = false)
+        bool useDefaultFactories = false,
+        ISet<ITypeSymbol>? declaredRoots = null)
     {
         graph = null;
         failure = null;
@@ -451,17 +468,26 @@ internal static class SerializerFactoryGenerator
             ? csharp.WithOptions(csharp.Options.WithMetadataImportOptions(MetadataImportOptions.All))
             : services.Compilation;
         var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
-        var pending = new Queue<ITypeSymbol>(roots);
+        // Each type's first dependent forms the discovery tree; roots and declared instantiations start new branches.
+        var parents = new Dictionary<ITypeSymbol, ITypeSymbol?>(SymbolEqualityComparer.Default);
+        var pending = new Queue<(ITypeSymbol Type, ITypeSymbol? Parent)>();
+        foreach (var root in roots) pending.Enqueue((root, null));
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var type = pending.Dequeue().WithNullableAnnotation(NullableAnnotation.None);
+            var (next, parent) = pending.Dequeue();
+            var type = next.WithNullableAnnotation(NullableAnnotation.None);
             if (registrations.ContainsKey(type)) continue;
-            if (registrations.Count >= 1024)
+            if (declaredRoots?.Contains(type) == true)
             {
-                failure = new(type, "the dependency graph exceeds 1024 closed types; declare a finite serialization graph");
+                parent = null;
+            }
+            else if (FindExpansion(type, Ancestors(parent)) is { } expanded)
+            {
+                failure = new(type, $"it expands recursive generic type '{expanded.ToDisplayString()}'; declare each supported closed instantiation as a serializer context root");
                 return false;
             }
+            parents.Add(type, parent);
             var registration = new Registration(type);
             if (Describe(registration, services, implementationCompilation, cancellationToken, out var requiresImplementation) is { } reason)
             {
@@ -475,7 +501,7 @@ internal static class SerializerFactoryGenerator
                 failure ??= new(type, reason, RequiresImplementation: true);
             }
             registrations.Add(type, registration);
-            foreach (var dependency in registration.Dependencies) pending.Enqueue(dependency);
+            foreach (var dependency in registration.Dependencies) pending.Enqueue((dependency, type));
         }
 
         if (failure is not null)
@@ -496,10 +522,38 @@ internal static class SerializerFactoryGenerator
         }
 
         return TryBuildGraph(services, registrations, implementationCompilation, cancellationToken, out graph, out failure, useDefaultFactories);
+
+        IEnumerable<ITypeSymbol> Ancestors(ITypeSymbol? type)
+        {
+            for (; type is not null; type = parents[type]) yield return type;
+        }
     }
 
-    internal static bool TryCombine(IGeneratorServices services, IEnumerable<Graph> graphs, CancellationToken cancellationToken,
-        [NotNullWhen(true)] out Graph? graph, [NotNullWhen(false)] out Failure? failure)
+    /// <summary>
+    /// Finds an ancestor which <paramref name="type"/> expands: a smaller instantiation of the same generic definition.
+    /// </summary>
+    /// <remarks>
+    /// Every infinite dependency chain repeats a generic definition with growing type arguments, so rejecting growth
+    /// terminates inference. Finite recursive shapes keep or reduce their size, such as <c>List&lt;List&lt;int&gt;&gt;</c>
+    /// or a type whose members swap its type arguments.
+    /// </remarks>
+    private static ITypeSymbol? FindExpansion(ITypeSymbol type, IEnumerable<ITypeSymbol> ancestors)
+    {
+        if (type is not INamedTypeSymbol { IsGenericType: true } generic) return null;
+        var size = GetSize(generic);
+        return ancestors.FirstOrDefault(ancestor => ancestor is INamedTypeSymbol candidate
+            && SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, generic.OriginalDefinition)
+            && GetSize(candidate) < size);
+
+        static int GetSize(ITypeSymbol symbol) => symbol switch
+        {
+            INamedTypeSymbol named => 1 + named.TypeArguments.Sum(GetSize) + (named.ContainingType is { } containing ? GetSize(containing) : 0),
+            IArrayTypeSymbol array => 1 + GetSize(array.ElementType),
+            _ => 1,
+        };
+    }
+
+    internal static Graph Combine(IGeneratorServices services, IEnumerable<Graph> graphs, CancellationToken cancellationToken)
     {
         var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
         foreach (var candidate in graphs)
@@ -507,17 +561,14 @@ internal static class SerializerFactoryGenerator
             foreach (var entry in candidate.Registrations)
             {
                 if (registrations.ContainsKey(entry.Key)) continue;
-                if (registrations.Count >= 1024)
-                {
-                    graph = null;
-                    failure = new(entry.Key, "the dependency graph exceeds 1024 closed types; declare a finite serialization graph");
-                    return false;
-                }
                 registrations.Add(entry.Key, entry.Value.Clone());
             }
         }
         var compilation = services.Compilation.WithOptions(services.Compilation.Options.WithMetadataImportOptions(MetadataImportOptions.All));
-        return TryBuildGraph(services, registrations, compilation, cancellationToken, out graph, out failure, useDefaultFactories: true);
+        // Default-factory graphs skip metadata admission, the only way graph building fails.
+        var built = TryBuildGraph(services, registrations, compilation, cancellationToken, out var graph, out _, useDefaultFactories: true);
+        Debug.Assert(built);
+        return graph!;
     }
 
     private static bool TryBuildGraph(IGeneratorServices services, Dictionary<ITypeSymbol, Registration> registrations,

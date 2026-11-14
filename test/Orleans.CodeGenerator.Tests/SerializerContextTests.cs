@@ -432,6 +432,82 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         Assert.Contains("typeof(global::ITag<>)", context, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("[Orleans.GenerateSerializerContext<Node<System.Collections.Generic.List<int>>>]")]
+    public void InfinitelyExpandingGenericInstantiationsProduceGeneratorErrors(string declaration)
+    {
+        var (_, result) = Generate($$"""
+            [Orleans.GenerateSerializer]
+            public sealed class Node<T>
+            {
+                [Orleans.Id(0)] public Node<System.Collections.Generic.List<T>> Next { get; set; }
+            }
+            [Orleans.GenerateSerializerContext<Node<int>>]
+            {{declaration}}
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0115");
+        Assert.Contains("expands recursive generic type", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("declare each supported closed instantiation as a serializer context root", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExpandingGenericInstantiationsRequireDeclaredRoots(bool declared)
+    {
+        var (compilation, result) = Generate($$"""
+            [Orleans.GenerateSerializer]
+            public sealed class Wrapper<T>
+            {
+                [Orleans.Id(0)] public T Value { get; set; }
+                [Orleans.Id(1)] public Wrapper<System.Collections.Generic.List<int>> Other { get; set; }
+            }
+            [Orleans.GenerateSerializerContext<Wrapper<int>>]
+            {{(declared ? "[Orleans.GenerateSerializerContext<Wrapper<System.Collections.Generic.List<int>>>]" : "")}}
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        var contexts = result.Results.SelectMany(static result => result.GeneratedSources)
+            .Where(static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).ToArray();
+        if (!declared)
+        {
+            var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0115");
+            Assert.Contains("'global::Wrapper<global::System.Collections.Generic.List<int>>'", diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.Contains("expands recursive generic type 'Wrapper<int>'", diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.Empty(contexts);
+            return;
+        }
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var context = Assert.Single(contexts).SourceText.ToString();
+        Assert.Contains("options.AddSerializer<global::Wrapper<int>>(", context, StringComparison.Ordinal);
+        Assert.Contains("options.AddSerializer<global::Wrapper<global::System.Collections.Generic.List<int>>>(", context, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("public sealed class Either<T1, T2> { [Orleans.Id(0)] public Either<T2, T1> Swapped { get; set; } }", "Either<int, string>")]
+    [InlineData("public sealed class Tree<T> { [Orleans.Id(0)] public System.Collections.Generic.List<Tree<T>> Children { get; set; } }", "Tree<int>")]
+    [InlineData("public sealed class Box<T> { [Orleans.Id(0)] public T Value { get; set; } }", "Box<Box<System.Collections.Generic.List<int>>>")]
+    public void FiniteRecursiveGenericInstantiationsAreInferred(string declaration, string root)
+    {
+        var (compilation, result) = Generate($$"""
+            [Orleans.GenerateSerializer]
+            {{declaration}}
+            [Orleans.GenerateSerializerContext<{{root}}>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void RecursiveCollectionFactoriesUseTypedCycleEdges()
     {

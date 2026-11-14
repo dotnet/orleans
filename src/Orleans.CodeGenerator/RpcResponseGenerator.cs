@@ -31,6 +31,7 @@ internal static class RpcResponseGenerator
         Compilation compilation,
         ProxyOutputPreparationResult preparation,
         SourceGeneratorOptions options,
+        ImmutableArray<string> serializerContextRoots,
         CancellationToken cancellationToken)
     {
         var proxies = preparation.ProxyOutputModels;
@@ -128,6 +129,13 @@ internal static class RpcResponseGenerator
 
         var responseDefinition = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
         var dictionaryDefinition = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2");
+        var declaredRoots = new HashSet<ITypeSymbol>(
+            serializerContextRoots
+                .Select(root => binding.GetSpeculativeTypeInfo(0, SyntaxFactory.ParseTypeName(root), SpeculativeBindingOption.BindAsTypeOrNamespace).Type)
+                .OfType<ITypeSymbol>()
+                .Where(static root => root.TypeKind != TypeKind.Error)
+                .Select(static root => root.WithNullableAnnotation(NullableAnnotation.None)),
+            SymbolEqualityComparer.Default);
         var resultGraphs = new List<SerializerFactoryGenerator.Graph>();
         var coveredConstructionTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
         var metadataModelRoots = new List<SerializerFactoryGenerator.Graph>();
@@ -137,7 +145,7 @@ internal static class RpcResponseGenerator
             var resultType = entry.Key;
             var method = entry.Value;
             if (SerializerFactoryGenerator.TryCreate(services, [responseDefinition.Construct(resultType)], cancellationToken,
-                out var resultGraph, out var failure, useDefaultFactories: true))
+                out var resultGraph, out var failure, useDefaultFactories: true, declaredRoots: declaredRoots))
             {
                 if (FindDictionary(resultGraph) is { } dictionary)
                 {
@@ -162,7 +170,8 @@ internal static class RpcResponseGenerator
         foreach (var argument in arguments.OrderBy(static entry => entry.Key.ToDisplayString(), StringComparer.Ordinal))
         {
             if (coveredConstructionTypes.Contains(argument.Key)) continue;
-            if (SerializerFactoryGenerator.TryCreate(services, [argument.Key], cancellationToken, out var argumentGraph, out var failure, useDefaultFactories: true)
+            if (SerializerFactoryGenerator.TryCreate(services, [argument.Key], cancellationToken, out var argumentGraph, out var failure,
+                    useDefaultFactories: true, declaredRoots: declaredRoots)
                 && FindDictionary(argumentGraph) is null)
             {
                 argumentRoots.Add(argumentGraph);
@@ -183,12 +192,7 @@ internal static class RpcResponseGenerator
             return output.ToImmutable();
         }
 
-        SerializerFactoryGenerator.Graph? graph = null;
-        if (resultGraphs.Count > 0 && !SerializerFactoryGenerator.TryCombine(services, resultGraphs, cancellationToken, out graph, out var graphFailure))
-        {
-            output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
-                UnsupportedResponse, Location.None, compilation.AssemblyName, graphFailure.Type.ToDisplayString(), graphFailure.Reason)));
-        }
+        var graph = resultGraphs.Count > 0 ? SerializerFactoryGenerator.Combine(services, resultGraphs, cancellationToken) : null;
 
         var generatedNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(compilation.AssemblyName ?? "Assembly").EscapeIdentifier()}";
         var source = new StringBuilder();

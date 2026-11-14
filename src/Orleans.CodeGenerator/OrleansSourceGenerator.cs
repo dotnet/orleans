@@ -53,6 +53,17 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .WithComparer(ImmutableArrayComparer<SerializerContextOutput>.Instance)
             .WithTrackingName(SerializerContextOutputsTrackingName);
         var serializerContextEntries = serializerContextOutputs.SelectMany(static (outputs, _) => outputs);
+        // Serializer context roots declare closed instantiations which RPC response graphs accept without inference.
+        var serializerContextRoots = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                "Orleans.GenerateSerializerContextAttribute`1",
+                predicate: static (node, _) => node is ClassDeclarationSyntax,
+                transform: static (ctx, _) => ctx.Attributes
+                    .Select(static attribute => attribute.AttributeClass!.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                    .ToImmutableArray())
+            .Collect()
+            .Select(static (roots, _) => roots.SelectMany(static root => root).Distinct().OrderBy(static root => root, StringComparer.Ordinal).ToImmutableArray())
+            .WithComparer(ImmutableArrayComparer<string>.Instance);
         context.RegisterSourceOutput(
             serializerContextEntries.Select(static (output, _) => output.Declaration),
             static (productionContext, output) =>
@@ -230,7 +241,9 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
         var responseOutputs = preparedProxyOutputs
             .Combine(compilationProvider)
             .Combine(generatorOptions)
-            .SelectMany(static (input, ct) => RpcResponseGenerator.Generate(input.Left.Right, input.Left.Left, input.Right, ct));
+            .Combine(serializerContextRoots)
+            .SelectMany(static (input, ct) => RpcResponseGenerator.Generate(
+                input.Left.Left.Right, input.Left.Left.Left, input.Left.Right, input.Right, ct));
 
         GeneratedSourceOutput.RegisterImplementationSourceOutputs(context, responseOutputs);
 

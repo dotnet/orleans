@@ -2336,9 +2336,9 @@ public class DemoClass
         Assert.Empty(preparation.Diagnostics);
 
         var responses = RpcResponseGenerator.Generate(
-            metadataCompilation, preparation, options, TestContext.Current.CancellationToken);
+            metadataCompilation, preparation, options, [], TestContext.Current.CancellationToken);
         var baseline = RpcResponseGenerator.Generate(
-            compilation, preparation, options, TestContext.Current.CancellationToken);
+            compilation, preparation, options, [], TestContext.Current.CancellationToken);
         Assert.Equal(baseline, responses);
         Assert.NotEmpty(responses);
         Assert.All(responses, static output => Assert.Null(output.Diagnostic));
@@ -2623,12 +2623,12 @@ public class DemoClass
     }
 
     [Theory]
-    [InlineData(510, false)]
-    [InlineData(510, true)]
-    [InlineData(511, false)]
-    [InlineData(511, true)]
-    public async Task RpcCombinedGraphLimitKeepsResponseRegistrations(int membersPerResult, bool validateFactories)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcCombinedGraphKeepsEveryResponseRegistration(bool validateFactories)
     {
+        // Each result graph exceeds 1,024 closed types; finite graphs register every type they reach.
+        const int membersPerResult = 1100;
         var source = new System.Text.StringBuilder("""
             using Orleans;
             using System.Threading.Tasks;
@@ -2659,33 +2659,102 @@ public class DemoClass
                 TestContext.Current.CancellationToken, out var individual, out var failure, useDefaultFactories: true), failure?.Reason);
             Assert.Equal(membersPerResult + 2, individual.Registrations.Count);
         }
-        if (membersPerResult == 510)
-        {
-            Assert.True(SerializerFactoryGenerator.TryCreate(services,
-                new[] { "First", "Second" }.Select(name => response.Construct(compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!)),
-                TestContext.Current.CancellationToken, out var combined, out var failure, useDefaultFactories: true), failure?.Reason);
-            Assert.Equal(1024, combined.Registrations.Count);
-        }
         var result = RunSourceGenerator(compilation, new Dictionary<string, string>
         {
             ["build_property.OrleansValidateRpcResponseFactories"] = validateFactories.ToString()
         });
-        var errors = result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        if (membersPerResult == 510)
+        Assert.Empty(result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var responses = Assert.Single(result.GeneratedSources, static entry => entry.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal))
+            .SourceText.ToString();
+        foreach (var name in new[] { "First", "Second" })
         {
-            Assert.Empty(errors);
+            Assert.Contains($"global::Orleans.Serialization.Invocation.Response<global::CombinedGraph.{name}>", responses);
+            Assert.Contains($"global::CombinedGraph.Tag<global::CombinedGraph.{name}Marker{membersPerResult - 1}>", responses);
         }
-        else
-        {
-            var diagnostic = Assert.Single(errors);
-            Assert.Equal("ORLEANS0116", diagnostic.Id);
-            Assert.Contains("exceeds 1024 closed types", diagnostic.GetMessage());
-        }
-        Assert.Contains(result.GeneratedSources, static entry => entry.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
         compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
             .AddSyntaxTrees(result.GeneratedSources.Select(static entry => CSharpSyntaxTree.ParseText(entry.SourceText,
                 options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]), path: entry.HintName)));
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcResponseFactoriesUseSerializerContextDeclaredInstantiations(bool declared)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using Orleans.Serialization;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { Task<Wrapper<int>> Get(); }
+            [GenerateSerializer]
+            public sealed class Wrapper<T>
+            {
+                [Id(0)] public T Value { get; set; }
+                [Id(1)] public Wrapper<List<int>> Other { get; set; }
+            }
+            {{(declared ? "[GenerateSerializerContext<Wrapper<List<int>>>] public partial class DeclaredContext : SerializerContext { }" : "")}}
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        if (!declared)
+        {
+            var diagnostic = Assert.Single(result.Diagnostics);
+            Assert.Equal("ORLEANS0116", diagnostic.Id);
+            Assert.Contains("'TestProject.Wrapper<System.Collections.Generic.List<int>>'", diagnostic.GetMessage());
+            Assert.Contains("expands recursive generic type 'TestProject.Wrapper<int>'", diagnostic.GetMessage());
+            return;
+        }
+
+        Assert.Empty(result.Diagnostics);
+        var responses = Assert.Single(result.GeneratedSources, static entry => entry.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal))
+            .SourceText.ToString();
+        Assert.Contains("ResponseCodec<global::TestProject.Wrapper<int>,", responses);
+        Assert.Contains("global::TestProject.Wrapper<global::System.Collections.Generic.List<int>>", responses);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static entry => CSharpSyntaxTree.ParseText(entry.SourceText,
+                options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]), path: entry.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcResponseFactoriesTerminateInfinitelyExpandingResults(bool validateFactories)
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { Task<Node<int>> Get(); }
+            [GenerateSerializer]
+            public sealed class Node<T>
+            {
+                [Id(0)] public Node<List<T>> Next { get; set; }
+            }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string>
+        {
+            ["build_property.publishaot"] = "true",
+            ["build_property.orleansvalidaterpcresponsefactories"] = validateFactories.ToString(),
+        });
+        if (validateFactories)
+        {
+            var diagnostic = Assert.Single(result.Diagnostics);
+            Assert.Equal("ORLEANS0116", diagnostic.Id);
+            Assert.Contains("'TestProject.Node<System.Collections.Generic.List<int>>': it expands recursive generic type 'TestProject.Node<int>'", diagnostic.GetMessage());
+            return;
+        }
+
+        Assert.Empty(result.Diagnostics);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static entry => CSharpSyntaxTree.ParseText(entry.SourceText,
+                options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]), path: entry.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
     }
 
