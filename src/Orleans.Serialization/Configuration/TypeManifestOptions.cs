@@ -100,6 +100,26 @@ namespace Orleans.Serialization.Configuration
         internal Dictionary<Type, Type> ResponseTypes { get; } = new();
         private readonly HashSet<Type> _defaultSerializerServices = new();
         internal HashSet<Type> ContextTypes { get; } = new();
+        internal Dictionary<Type, Func<Exception>> ExceptionActivators { get; } = new();
+
+        /// <summary>
+        /// Registers a closed factory for reconstructing an exception received from another process.
+        /// </summary>
+        /// <typeparam name="TException">The concrete exception type.</typeparam>
+        /// <param name="factory">A factory which supports concurrent calls and creates a new exception instance on each call.</param>
+        /// <remarks>
+        /// The exception codec restores the message, inner exception, stack trace, error code, and data
+        /// after activation. The first registration for a type is used. NativeAOT uses these factories
+        /// to preserve concrete exception types; unregistered types use
+        /// <see cref="UnavailableExceptionFallbackException"/> with the original type name.
+        /// </remarks>
+        public void AddExceptionActivator<TException>(Func<TException> factory) where TException : Exception
+        {
+            if (factory is null) throw new ArgumentNullException(nameof(factory));
+            ExceptionActivators.TryAdd(typeof(TException), factory);
+            ContextTypes.Add(typeof(TException));
+            AddAllowedType(typeof(TException));
+        }
 
         /// <summary>
         /// Registers statically constructed serialization and copying implementations for a closed type.
@@ -274,7 +294,7 @@ namespace Orleans.Serialization.Configuration
         internal bool IsDefaultSerializerService(Type type) => _defaultSerializerServices.Contains(type);
 
         /// <summary>
-        /// Registers default closed serializers and copiers for <see cref="Response"/> and <see cref="CompletedResponse"/>.
+        /// Registers default closed serializers and copiers for response envelopes and their exception dependencies.
         /// </summary>
         /// <remarks>
         /// Generated code calls this method for assemblies which declare methods returning invocation results.
@@ -299,6 +319,39 @@ namespace Orleans.Serialization.Configuration
                 static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ShallowCopier<CompletedResponse>>(null!, provider),
                 codecDependencies: [typeof(CompletedResponseActivator)]);
             AddAllowedType(typeof(CompletedResponse));
+            AddExceptionResponseSerializers();
+        }
+
+        private void AddExceptionResponseSerializers()
+        {
+            AddDefaultSerializerService<IFieldCodec<object>>(static provider => provider.GetCodec<object>());
+            AddDefaultSerializerService<IDeepCopier<object>>(static provider => provider.GetDeepCopier<object>());
+            AddDefaultSerializerService<IFieldCodec<IEqualityComparer<object>>>(static provider => provider.GetCodec<IEqualityComparer<object>>());
+            AddDefaultSerializerService(static provider => new DictionaryCodec<object, object?>(
+                GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<object>>(null!, provider),
+                GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<object?>>(null!, provider),
+                GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<IEqualityComparer<object>>>(null!, provider)));
+            AddDefaultSerializerService(static provider => new DictionaryCopier<object, object?>(
+                GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<object>>(null!, provider),
+                GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<object?>>(null!, provider)));
+            AddDefaultSerializer<Dictionary<object, object?>, DictionaryCodec<object, object?>, DictionaryCopier<object, object?>>(
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<DictionaryCodec<object, object?>>(null!, provider),
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<DictionaryCopier<object, object?>>(null!, provider),
+                codecDependencies: [typeof(IFieldCodec<object>), typeof(IFieldCodec<IEqualityComparer<object>>)],
+                copierDependencies: [typeof(IDeepCopier<object>)]);
+            AddDefaultSerializerService(static _ => new ShallowCopier<Exception>());
+            AddDefaultSerializer<Exception, ExceptionCodec, ShallowCopier<Exception>>(
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ExceptionCodec>(null!, provider),
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ShallowCopier<Exception>>(null!, provider),
+                codecDependencies: [typeof(ExceptionCodec)]);
+            AddDefaultSerializerService(static provider => new OrleansCodeGen.Orleans.Serialization.Invocation.Codec_ExceptionResponse(provider));
+            AddDefaultSerializerService(static _ => new ShallowCopier<ExceptionResponse>());
+            AddDefaultSerializer<ExceptionResponse, OrleansCodeGen.Orleans.Serialization.Invocation.Codec_ExceptionResponse, ShallowCopier<ExceptionResponse>>(
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.Orleans.Serialization.Invocation.Codec_ExceptionResponse>(null!, provider),
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ShallowCopier<ExceptionResponse>>(null!, provider),
+                codecDependencies: [typeof(ExceptionCodec)]);
+            AddAllowedType(typeof(ExceptionResponse));
+            AddAllowedType(typeof(Dictionary<object, object?>));
         }
 
         private void RegisterDefaultImplementationService(Type service, Type implementation)

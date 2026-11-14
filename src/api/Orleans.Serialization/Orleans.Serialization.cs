@@ -3470,6 +3470,9 @@ namespace Orleans.Serialization.Configuration
         public void AddDefaultSerializerService<TService, TImplementation>(System.Func<Serializers.ICodecProvider, TService> factory, System.Type? compatibleImplementationType = null, System.Type[]? dependencies = null)
             where TService : class where TImplementation : class, TService { }
 
+        public void AddExceptionActivator<TException>(System.Func<TException> factory)
+            where TException : System.Exception { }
+
         public void AddFieldCodec(System.Type type, System.Type targetType) { }
 
         public void AddFieldCodec(System.Type type) { }

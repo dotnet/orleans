@@ -132,6 +132,57 @@ public sealed class RpcResponseTests : IDisposable
         => NativeAotSmoke.RpcResponseContracts.CompletedResponseRoundTrip();
 
     [Fact]
+    public void GeneratedExceptionResponsesPreserveTransportBehavior()
+        => NativeAotSmoke.RpcResponseContracts.ExceptionResponsesRoundTrip();
+
+    [Fact]
+    public void GeneratedExceptionResponsesPreserveDataReferences()
+        => NativeAotSmoke.RpcResponseContracts.ExceptionResponseDataRoundTrip();
+
+    [Fact]
+    public void UnregisteredExceptionResponsesPreserveManagedActivation()
+        => NativeAotSmoke.RpcResponseContracts.UnregisteredExceptionResponseRoundTrip();
+
+    [Fact]
+    public void ExceptionActivatorsCreateFreshInstancesAndPreserveFirstRegistration()
+    {
+        var activations = 0;
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            options.AddExceptionActivator(() =>
+            {
+                activations++;
+                return new InvalidOperationException();
+            });
+            options.AddExceptionActivator<InvalidOperationException>(() => throw new InvalidOperationException("unused factory"));
+        })).BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var bytes = serializer.SerializeToArray(Response.FromException(new InvalidOperationException("remote failure")));
+        using var first = Assert.IsType<ExceptionResponse>(serializer.Deserialize<Response>(bytes));
+        using var second = Assert.IsType<ExceptionResponse>(serializer.Deserialize<Response>(bytes));
+
+        Assert.Equal(2, activations);
+        Assert.NotSame(first.Exception, second.Exception);
+        Assert.Equal("remote failure", Assert.IsType<InvalidOperationException>(first.Exception).Message);
+        Assert.Equal("remote failure", Assert.IsType<InvalidOperationException>(second.Exception).Message);
+    }
+
+    [Fact]
+    public void FailingExceptionActivatorPreservesRemoteFailure()
+    {
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+            options.AddExceptionActivator<InvalidOperationException>(() => throw new InvalidOperationException("factory failure"))))
+            .BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var bytes = serializer.SerializeToArray(Response.FromException(new InvalidOperationException("remote failure")));
+        using var result = Assert.IsType<ExceptionResponse>(serializer.Deserialize<Response>(bytes));
+
+        var exception = Assert.IsType<UnavailableExceptionFallbackException>(result.Exception);
+        Assert.Equal("System.InvalidOperationException", exception.ExceptionType);
+        Assert.Equal("remote failure", exception.Message);
+    }
+
+    [Fact]
     public void GeneratedValueAndArrayServicesRoundTripAndCopy()
         => NativeAotSmoke.RpcResponseContracts.CanonicalValueAndArrayServices();
 
@@ -670,6 +721,7 @@ public sealed class RpcResponseTests : IDisposable
             {
                 options.AddCopier(typeof(CustomResponseCopier), typeof(Response));
                 options.AddSerializer(typeof(CustomCompletedResponseCodec), typeof(CompletedResponse));
+                options.AddSerializer(typeof(CustomExceptionResponseCodec), typeof(ExceptionResponse));
             }))
             .BuildServiceProvider();
         var provider = services.GetRequiredService<CodecProvider>();
@@ -677,6 +729,8 @@ public sealed class RpcResponseTests : IDisposable
         Assert.IsType<CustomResponseCopier>(provider.GetDeepCopier(typeof(Response)));
         Assert.IsType<CustomCompletedResponseCodec>(provider.GetCodec<CompletedResponse>());
         Assert.IsType<CustomCompletedResponseCodec>(provider.GetCodec(typeof(CompletedResponse)));
+        Assert.IsType<CustomExceptionResponseCodec>(provider.GetCodec<ExceptionResponse>());
+        Assert.IsType<CustomExceptionResponseCodec>(provider.GetCodec(typeof(ExceptionResponse)));
     }
 
     [Fact]
@@ -727,6 +781,15 @@ public sealed class RpcResponseTests : IDisposable
             where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
 
         public CompletedResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    }
+
+    private sealed class CustomExceptionResponseCodec : IFieldCodec<ExceptionResponse>
+    {
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ExceptionResponse value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+
+        public ExceptionResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
     }
 
     private sealed class CountingImmutableListCopier : IDeepCopier<ImmutableList<MutableMemberPayload>>

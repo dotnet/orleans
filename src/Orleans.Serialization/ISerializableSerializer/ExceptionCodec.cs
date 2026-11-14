@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
@@ -36,6 +37,7 @@ namespace Orleans.Serialization
         private readonly IDeepCopier<Dictionary<object, object?>> _dictionaryCopier;
         private readonly IDeepCopier<Exception> _exceptionCopier;
         private readonly ExceptionSerializationOptions _options;
+        private readonly Dictionary<Type, Func<Exception>>? _exceptionActivators;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ExceptionCodec"/> class.
@@ -64,6 +66,18 @@ namespace Orleans.Serialization
             _dictionaryCopier = dictionaryCopier;
             _exceptionCopier = exceptionCopier;
             _options = exceptionSerializationOptions.Value;
+        }
+
+        internal ExceptionCodec(
+            TypeConverter typeConverter,
+            IFieldCodec<Dictionary<object, object?>> dictionaryCodec,
+            IDeepCopier<Dictionary<object, object?>> dictionaryCopier,
+            IDeepCopier<Exception> exceptionCopier,
+            IOptions<ExceptionSerializationOptions> exceptionSerializationOptions,
+            IOptions<TypeManifestOptions> typeManifestOptions)
+            : this(typeConverter, dictionaryCodec, dictionaryCopier, exceptionCopier, exceptionSerializationOptions)
+        {
+            _exceptionActivators = typeManifestOptions.Value.ExceptionActivators;
         }
 
         /// <inheritdoc />
@@ -234,7 +248,10 @@ namespace Orleans.Serialization
         [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Exception fields invoke this method only after handling null references.")]
         public void SerializeException<TBufferWriter>(ref Writer<TBufferWriter> writer, Exception value) where TBufferWriter : IBufferWriter<byte>
         {
-            StringCodec.WriteField(ref writer, 0, _typeConverter.Format(value.GetType()));
+            var typeName = value is UnavailableExceptionFallbackException { ExceptionType: { } unavailableType }
+                ? unavailableType
+                : _typeConverter.Format(value.GetType());
+            StringCodec.WriteField(ref writer, 0, typeName);
             StringCodec.WriteField(ref writer, 1, value.Message);
             StringCodec.WriteField(ref writer, 1, value.StackTrace);
             WriteField(ref writer, 1, typeof(Exception), value.InnerException!);
@@ -272,7 +289,7 @@ namespace Orleans.Serialization
         [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Codec selection supplies the non-null candidate type.")]
         public bool IsSupportedType(Type type)
         {
-            if (type == typeof(ExceptionCodec))
+            if (type == typeof(ExceptionCodec) || type == typeof(UnavailableExceptionFallbackException))
             {
                 return true;
             }
@@ -422,13 +439,21 @@ namespace Orleans.Serialization
             {
                 try
                 {
-                    if (type.GetConstructor(Array.Empty<Type>()) is not null)
+                    if (_exceptionActivators?.TryGetValue(type, out var factory) == true)
                     {
-                        result = (Exception)Activator.CreateInstance(type)!;
+                        result = factory();
+                    }
+                    else if (type == typeof(Exception))
+                    {
+                        result = new Exception();
+                    }
+                    else if (RuntimeFeature.IsDynamicCodeSupported)
+                    {
+                        result = CreateException(type);
                     }
                     else
                     {
-                        result = (Exception)RuntimeHelpers.GetUninitializedObject(type);
+                        result = new UnavailableExceptionFallbackException { ExceptionType = typeName };
                     }
                 }
                 catch (Exception constructorException)
@@ -447,6 +472,14 @@ namespace Orleans.Serialization
             SetBasePropertiesCore(result, message, stackTrace, innerException, hResult, data);
             return result;
         }
+
+#if NET5_0_OR_GREATER
+        [RequiresUnreferencedCode("Runtime exception activation requires constructor metadata. Register a closed exception activator for trimmed applications.")]
+#endif
+        private static Exception CreateException(Type type)
+            => type.GetConstructor(Array.Empty<Type>()) is not null
+                ? (Exception)Activator.CreateInstance(type)!
+                : (Exception)RuntimeHelpers.GetUninitializedObject(type);
 
         /// <inheritdoc />
         [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "The Orleans deep-copy pipeline supplies non-null source, destination, and context instances.")]

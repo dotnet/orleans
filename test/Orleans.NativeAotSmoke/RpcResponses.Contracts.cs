@@ -82,6 +82,17 @@ public static class RpcResponseContracts
         integerCompletion.SetResult(42);
         Ensure(await pendingInteger == 42, "Asynchronous value-task completion produces the result.");
 
+        target.BooleanResult = System.Threading.Tasks.Task.FromException<bool>(new InvalidOperationException("invocation failure"));
+        _ = proxy.Boolean();
+        using (var request = ((RpcTupleProxyBase)proxy).Captured!)
+        {
+            request.SetTarget(target);
+            using var response = await request.Invoke();
+            using var result = RoundTrip(services, Copy(services, response));
+            Ensure(result.Exception is InvalidOperationException { Message: "invocation failure" },
+                "A generated invokable's exception survives copying and transport.");
+        }
+
         // Mirrors the runtime: invoke, copy the response, write it raw, and read it with the codec registered for its result type.
         async System.Threading.Tasks.Task<T?> Invoke<T>(IInvokable invocation)
         {
@@ -284,25 +295,76 @@ public static class RpcResponseContracts
         }
     }
 
-#if NATIVE_AOT_SMOKE
-    public static void ExceptionTransportRequiresDeclaredGraph()
+    public static void ExceptionResponsesRoundTrip()
     {
-        using var services = CreateServices();
-        using var exception = Response.FromException(new InvalidOperationException("response failure"));
+        using var services = new ServiceCollection().AddSerializerContext(new ResponseOnlyContext()).BuildServiceProvider();
+        using var response = Response.FromException(new InvalidOperationException("response failure", new Exception("inner failure")));
+        using var result = RoundTrip(services, response);
+        Ensure(result.Exception is InvalidOperationException { Message: "response failure", InnerException.Message: "inner failure" },
+            "Exception responses preserve their exception type, message, and inner exception without assembly discovery.");
+        Ensure(!ReferenceEquals(response.Exception, result.Exception), "Exception transport creates an independent exception.");
         try
         {
-            using var result = RoundTrip(services, exception);
+            result.GetResult<int>();
         }
-        catch (CodecNotFoundException error)
+        catch (InvalidOperationException error) when (ReferenceEquals(error, result.Exception))
         {
-            Ensure(error.Message.Contains("ExceptionResponse", StringComparison.Ordinal),
-                "Exception transport identifies the codec missing from the registered graph.");
             return;
         }
 
-        throw new InvalidOperationException("Exception transport requires its registered codec dependencies.");
+        throw new InvalidOperationException("Reading a failed response must rethrow its transported exception.");
     }
 
+    public static void ExceptionResponseDataRoundTrip()
+    {
+        using var services = CreateServices();
+        var payload = new RpcResponsePayload { Value = 17 };
+        payload.Left = payload;
+        var cause = new InvalidOperationException("response data");
+        cause.Data[1] = payload;
+        cause.Data[2] = payload;
+        using var response = Response.FromException(cause);
+        using var result = RoundTrip(services, response);
+        Ensure(result.Exception is InvalidOperationException { Message: "response data" } exception
+            && exception.Data[1] is RpcResponsePayload { Value: 17 } copy
+            && !ReferenceEquals(payload, copy)
+            && ReferenceEquals(copy, exception.Data[2])
+            && ReferenceEquals(copy, copy.Left),
+            "Exception data preserves registered payloads, shared references, and payload cycles.");
+    }
+
+    public static void UnregisteredExceptionResponseRoundTrip()
+    {
+        using var services = new ServiceCollection().AddSerializerContext(new ResponseOnlyContext()).BuildServiceProvider();
+        using var response = Response.FromException(new ArgumentException("unregistered failure", new Exception("inner failure")));
+        using var result = RoundTrip(services, response);
+#if NATIVE_AOT_SMOKE
+        Ensure(result.Exception is UnavailableExceptionFallbackException { ExceptionType: "System.ArgumentException" },
+            "An exception without a closed native activator retains its remote type name.");
+#else
+        Ensure(result.Exception is ArgumentException, "Managed exception transport preserves runtime constructor resolution.");
+#endif
+        Ensure(result.Exception is { Message: "unregistered failure", InnerException.Message: "inner failure" },
+            "An unregistered exception retains the remote failure details.");
+        using var forwarded = RoundTrip(services, result);
+        Ensure(forwarded.Exception is { Message: "unregistered failure", InnerException.Message: "inner failure" },
+            "Forwarding an exception response preserves the remote failure details.");
+#if NATIVE_AOT_SMOKE
+        Ensure(forwarded.Exception is UnavailableExceptionFallbackException { ExceptionType: "System.ArgumentException" },
+            "Forwarding an unavailable exception retains its original remote type name.");
+#endif
+    }
+
+    private sealed class ResponseOnlyContext : SerializerContext
+    {
+        protected override void ConfigureInner(TypeManifestOptions options)
+        {
+            options.AddResponseSerializers();
+            options.AddExceptionActivator(static () => new InvalidOperationException());
+        }
+    }
+
+#if NATIVE_AOT_SMOKE
     public static void MissingNativeResponseRegistration()
     {
         using var services = CreateServices();
@@ -332,6 +394,7 @@ public static class RpcResponseContracts
     {
 #if NATIVE_AOT_SMOKE
         var collection = new ServiceCollection().AddSerializerContext(new global::OrleansCodeGen.OrleansNativeAotSmoke.RpcResponseFactories());
+        collection.AddSerializerContext(new ResponseOnlyContext());
 #else
         var collection = new ServiceCollection().AddSerializer(builder => builder.AddAssembly(typeof(IRpcResponses).Assembly));
 #endif

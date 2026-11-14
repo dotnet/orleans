@@ -99,6 +99,13 @@ namespace Orleans.Serialization.Serializers
                 _generalizedCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedCodec>());
                 _generalizedBaseCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedBaseCodec>());
                 _generalizedCopiers.AddRange(_serviceProvider.GetServices<IGeneralizedCopier>());
+                // The generalized exception codec is fully initialized outside construction graphs.
+                // Its concrete dependency is shared by generated exception codecs.
+                if (!_manifest.SerializerServiceFactories.ContainsKey(typeof(ExceptionCodec))
+                    && _serviceProvider.GetService<ExceptionCodec>() is { } exceptionCodec)
+                {
+                    _serializerServices.TryAdd(typeof(ExceptionCodec), exceptionCodec);
+                }
 
                 _specializableCodecs.AddRange(_serviceProvider.GetServices<ISpecializableCodec>());
                 _specializableCopiers.AddRange(_serviceProvider.GetServices<ISpecializableCopier>());
@@ -719,7 +726,8 @@ namespace Orleans.Serialization.Serializers
         }
 
         private bool IsProviderService(Type serviceType)
-            => serviceType != typeof(object)
+            => serviceType == typeof(ExceptionCodec) && _serviceRegistrations?.IsService(serviceType) == true
+                || serviceType != typeof(object)
                 && (serviceType == typeof(CodecProvider) || serviceType.IsInterface)
                 && serviceType.IsInstanceOfType(this);
 
@@ -730,6 +738,8 @@ namespace Orleans.Serialization.Serializers
             if (!IsDefaultContractImplementationEligible(contract)) return false;
             foreach (var dependency in contract.Dependencies)
             {
+                // Provider services are initialized before a construction graph begins.
+                if (IsProviderService(dependency)) continue;
                 if (IsContainerImplementation(dependency)) return false;
                 if (_manifest.SerializerServiceFactories.ContainsKey(dependency) && !_manifest.IsDefaultSerializerService(dependency))
                     continue;
@@ -1089,7 +1099,7 @@ namespace Orleans.Serialization.Serializers
                     {
                         if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider) return this;
-                        if (owner.IsProviderService(serviceType)) return owner;
+                        if (serviceType != typeof(ExceptionCodec) && owner.IsProviderService(serviceType)) return owner;
                         if (owner._serializerServices.TryGetValue(serviceType, out var completed)) return completed;
                         if (scope.TryGetService(serviceType, out var constructed, requireInstance: false)) return constructed;
                         if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,9 +44,6 @@ namespace Orleans.Serialization
 
                 builder.Services.AddSingleton<IGeneralizedCodec, WellKnownStringComparerCodec>();
                 builder.Services.AddSingleton<IGeneralizedCodec, InterfaceCollectionCodecResolver>();
-                builder.Services.AddSingleton<ExceptionCodec>();
-                builder.Services.AddSingleton<IGeneralizedCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
-                builder.Services.AddSingleton<IGeneralizedBaseCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
             });
             configure?.Invoke(context.Builder);
             return services;
@@ -102,6 +100,20 @@ namespace Orleans.Serialization
                 services.TryAddSingleton<TypeCodec>();
                 services.TryAddSingleton(typeof(IDeepCopier<>), typeof(CopierHolder<>));
                 services.TryAddSingleton(typeof(IBaseCopier<>), typeof(BaseCopierHolder<>));
+
+                // Keep the exception serializer's closed DI dependencies available in context-only NativeAOT applications.
+                services.TryAddSingleton<IFieldCodec<Dictionary<object, object?>>>(sp => new FieldCodecHolder<Dictionary<object, object?>>(sp.GetRequiredService<IFieldCodecProvider>()));
+                services.TryAddSingleton<IDeepCopier<Dictionary<object, object?>>>(sp => new CopierHolder<Dictionary<object, object?>>(sp.GetRequiredService<IDeepCopierProvider>()));
+                services.TryAddSingleton<IDeepCopier<Exception>>(sp => new CopierHolder<Exception>(sp.GetRequiredService<IDeepCopierProvider>()));
+                services.TryAddSingleton<ExceptionCodec>(sp => new ExceptionCodec(
+                    sp.GetRequiredService<TypeConverter>(),
+                    sp.GetRequiredService<IFieldCodec<Dictionary<object, object?>>>(),
+                    sp.GetRequiredService<IDeepCopier<Dictionary<object, object?>>>(),
+                    sp.GetRequiredService<IDeepCopier<Exception>>(),
+                    sp.GetRequiredService<IOptions<ExceptionSerializationOptions>>(),
+                    sp.GetRequiredService<IOptions<TypeManifestOptions>>()));
+                services.AddSingleton<IGeneralizedCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
+                services.AddSingleton<IGeneralizedBaseCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
 
                 // Type filtering
                 services.AddSingleton<ITypeNameFilter, DefaultTypeFilter>();
