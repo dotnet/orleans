@@ -61,6 +61,8 @@ describe('native API Markdown companions', () => {
     expect(nugetHref(unpublishedPackage, {})).toBe(
       `https://www.nuget.org/packages/${unpublishedPackage}`,
     );
+    expect(nugetHref('Microsoft.Orleans.DurableJobs.Cassandra')).toBeUndefined();
+    expect(nugetHref('Microsoft.Orleans.Journaling.Cassandra')).toBeUndefined();
   });
 
   test('renders member documentation, parameters, returns, exceptions, and examples', () => {
