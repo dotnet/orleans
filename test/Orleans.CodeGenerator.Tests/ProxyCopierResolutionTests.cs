@@ -47,4 +47,37 @@ public sealed class ProxyCopierResolutionTests
         Assert.DoesNotContain("CodecProvider.GetDeepCopier<", text);
         Assert.Equal(4, proxy.Members.OfType<ClassDeclarationSyntax>().Single().Members.OfType<FieldDeclarationSyntax>().Count());
     }
+
+    [Fact]
+    public async Task ProxySharedTypeNameAvoidsTypeParameterNames()
+    {
+        // The generic method reads the copier which Send declares, so both type parameters are in scope at that access.
+        const string source = """
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; set; }
+            }
+            public interface IProxyGrain<ProxyShared> : IGrainWithStringKey
+            {
+                ValueTask Send(ProxyShared value, List<Payload> list);
+                ValueTask Other<ProxyShared_1>(ProxyShared_1 value, List<Payload> list);
+            }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(new OrleansSerializationSourceGenerator().AsSourceGenerator());
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var updated, out var diagnostics, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Empty(diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var proxy = driver.GetRunResult().GeneratedTrees.SelectMany(tree => tree.GetRoot(TestContext.Current.CancellationToken).DescendantNodes())
+            .OfType<ClassDeclarationSyntax>().Single(type => type.Identifier.ValueText == "Proxy_IProxyGrain");
+        Assert.Equal("ProxyShared_2", proxy.Members.OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText);
+        var text = proxy.NormalizeWhitespace().ToFullString();
+        Assert.Contains("base(arg0 as ProxyShared_2 ?? new ProxyShared_2(arg0), arg1)", text);
+        Assert.Contains("request.arg1 = ((ProxyShared_2)base.Shared)._copier", text);
+    }
 }

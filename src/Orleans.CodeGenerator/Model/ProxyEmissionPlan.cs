@@ -4,10 +4,10 @@ namespace Orleans.CodeGenerator.Model;
 /// The spelled declaration of a generated proxy class. Every constructor shares <see cref="ConstructorStatements"/>.
 /// </summary>
 /// <remarks>
-/// Grain reference proxies with instance copiers declare a nested type derived from <c>GrainReferenceShared</c> which holds
-/// <see cref="SharedFields"/>, resolved by <see cref="SharedStatements"/>. Each proxy passes that shared instance to its
-/// base, and every reference created from the same shared instance reuses it. Other proxies hold their copiers in
-/// <see cref="Fields"/>.
+/// Grain reference proxies with instance copiers declare a nested type named <see cref="SharedTypeName"/>, derived from
+/// <c>GrainReferenceShared</c>, which holds <see cref="SharedFields"/>, resolved by <see cref="SharedStatements"/>. Each
+/// proxy passes that shared instance to its base, and every reference created from the same shared instance reuses it.
+/// Other proxies hold their copiers in <see cref="Fields"/>.
 /// </remarks>
 internal sealed record ProxyEmissionPlan(
     string ClassName,
@@ -18,6 +18,7 @@ internal sealed record ProxyEmissionPlan(
     EquatableArray<string> Constructors,
     EquatableArray<string> ConstructorStatements,
     EquatableArray<ProxyMethodEmissionPlan> Methods,
+    string? SharedTypeName,
     EquatableArray<string> SharedFields,
     EquatableArray<string> SharedStatements)
 {
