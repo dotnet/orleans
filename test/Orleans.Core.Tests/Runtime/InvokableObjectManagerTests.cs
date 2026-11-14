@@ -233,8 +233,8 @@ public class InvokableObjectManagerTests
         Assert.True(InvokableObjectManager.IsCancellationRequest(message));
 
         fixture.Manager.Dispatch(message);
-        fixture.AssertException<ObserverNotReachableException>(message);
 
+        fixture.AssertUnavailable(message);
         Assert.Equal(0, control.InvocationCount);
         Assert.Null(control.CancellationTarget);
         Assert.False(control.CancellationSent.Task.IsCompleted);
@@ -602,6 +602,19 @@ public class InvokableObjectManagerTests
 
 
     [Fact]
+    public async Task LocalObjectData_GetAsyncEnumerableExtensionAfterDispose_ThrowsNotReachable()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: false);
+        var data = new InvokableObjectManager.LocalObjectData(fixture.Observer, fixture.ObserverId, fixture.Manager);
+        var extension = data.GetComponent(typeof(IAsyncEnumerableGrainExtension));
+        Assert.NotNull(extension);
+
+        await data.DisposeAsync();
+
+        Assert.Throws<ObserverNotReachableException>(() => data.GetComponent(typeof(IAsyncEnumerableGrainExtension)));
+    }
+
+    [Fact]
     public async Task LocalObjectData_DisposeAsync_CompletesWithParkedEnumerator()
     {
         await using var fixture = new ManagerFixture(registerObserver: false);
@@ -620,7 +633,7 @@ public class InvokableObjectManagerTests
             Assert.Equal(EnumerationResult.Element, status);
             Assert.Equal(1, Assert.IsType<int>(value));
 
-            // Second pull advances past 'yield return' and parks the producer in the infinit delay.
+            // Second pull advances past 'yield return' and parks the producer in the infinite delay.
             var parked = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
             await producerStarted.Task.WaitAsync(timeout, TestContext.Current.CancellationToken);
             Assert.False(parked.IsCompleted);

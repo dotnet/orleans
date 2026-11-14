@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Xunit;
@@ -97,17 +98,21 @@ public class AsyncEnumerableGrainObserverExtensionTests
     }
 
     [Fact]
-    public async Task MoveNext_WrongType_ReturnsError()
+    public async Task MoveNext_WrongType_ThrowsAndKeepsEnumerator()
     {
         await using var extension = CreateExtension();
         var requestId = Guid.NewGuid();
 
         // We start as int, but then pull as string.
-        await extension.StartEnumeration(requestId, CreateRequest(1), CancellationToken.None);
-        var result = await extension.MoveNext<string>(requestId, CancellationToken.None);
+        await extension.StartEnumeration(requestId, CreateRequest(1, 2), CancellationToken.None);
 
-        Assert.Equal(EnumerationResult.Error, result.Status);
-        Assert.IsType<InvalidCastException>(result.Value);
+        await Assert.ThrowsAsync<InvalidCastException>(async () =>
+            await extension.MoveNext<string>(requestId, CancellationToken.None));
+
+        // A pull with the right element type continues the same enumeration.
+        var result = await extension.MoveNext<int>(requestId, CancellationToken.None);
+        Assert.Equal(EnumerationResult.Element, result.Status);
+        Assert.Equal(2, result.Value);
     }
 
     [Fact]
@@ -150,6 +155,40 @@ public class AsyncEnumerableGrainObserverExtensionTests
         }
 
         await disposeTask.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_RepliesBeforeCallerTimeoutWhenTeardownIsBlocked()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var responseTimeout = TimeSpan.FromSeconds(30);
+        await using var extension = new AsyncEnumerableGrainObserverExtension(
+            Substitute.For<IGrainContext>(),
+            timeProvider,
+            Options.Create(new SiloMessagingOptions { ResponseTimeout = responseTimeout }),
+            NullLogger<AsyncEnumerableGrainObserverExtension>.Instance);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finallyStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestId = Guid.NewGuid();
+
+        try
+        {
+            await extension.StartEnumeration(requestId, CreateGateableRequest(started, finallyStarted, release), CancellationToken.None);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+
+            var disposeTask = extension.DisposeAsync(requestId, CancellationToken.None).AsTask();
+            await finallyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            Assert.False(disposeTask.IsCompleted);
+
+            // The producer's teardown stays blocked, but the reply must not wait for the caller's full response timeout.
+            timeProvider.Advance(responseTimeout / 2);
+            await disposeTask.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
     }
 
     [Fact]

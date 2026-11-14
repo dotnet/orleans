@@ -8,7 +8,7 @@ namespace UnitTests.Grains;
 
 public sealed class ObservableGrainObserver : IObservableGrainObserver, IIncomingGrainCallFilter
 {
-    // The implemention is done with thread-saftey in mind, because observer AlwaysInterleave calls can execute concurrently.
+    // The implementation is done with thread-safety in mind, because observer AlwaysInterleave calls can execute concurrently.
     private readonly ConcurrentQueue<(string InterfaceName, string MethodName)> _localCalls = new();
     private readonly Channel<string> _updates = Channel.CreateUnbounded<string>();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _receivedCalls = new();

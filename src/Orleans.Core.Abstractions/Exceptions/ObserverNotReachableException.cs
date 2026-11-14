@@ -8,7 +8,6 @@ namespace Orleans.Runtime;
 /// for example because it was deregistered, garbage collected, or its hosting extension was disposed.
 /// This exception is terminal: retrying the same call will not succeed!
 /// </remarks>
-[Serializable]
 [GenerateSerializer]
 #pragma warning disable RCS1194 // Implement exception constructors.
 public sealed class ObserverNotReachableException : OrleansException
