@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using Orleans.Transactions.AdoNet.Utils;
 using Xunit;
@@ -35,8 +36,8 @@ public sealed class ActionToSqlTests
 
         Assert.Equal("INSERT INTO T (A,B,C) VALUES (@A,@B,@C)", result);
         // secondary: columns appear in declared order
-        Assert.True(result.IndexOf("@A") < result.IndexOf("@B"));
-        Assert.True(result.IndexOf("@B") < result.IndexOf("@C"));
+        Assert.True(result.IndexOf("@A", StringComparison.Ordinal) < result.IndexOf("@B", StringComparison.Ordinal));
+        Assert.True(result.IndexOf("@B", StringComparison.Ordinal) < result.IndexOf("@C", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -78,9 +79,9 @@ public sealed class ActionToSqlTests
 
         Assert.Equal("UPDATE T SET A=@A,B=@B WHERE C=@C AND D=@D", result);
         // SET columns are comma-separated (not AND-separated)
-        Assert.Contains(",", result.Substring(0, result.IndexOf("WHERE")));
+        Assert.Contains(",", result.Substring(0, result.IndexOf("WHERE", StringComparison.Ordinal)));
         // WHERE columns are AND-separated
-        Assert.Contains("AND", result.Substring(result.IndexOf("WHERE")));
+        Assert.Contains("AND", result.Substring(result.IndexOf("WHERE", StringComparison.Ordinal)));
     }
 
     [Fact]

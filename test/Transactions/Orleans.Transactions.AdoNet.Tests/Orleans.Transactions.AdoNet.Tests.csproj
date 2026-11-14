@@ -15,4 +15,10 @@
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Transactions.AdoNet\Orleans.Transactions.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Transactions.AdoNet\SQLServer-Transactions.sql"
+          Link="SQLServer-Transactions.sql"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
