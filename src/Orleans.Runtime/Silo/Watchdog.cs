@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -158,8 +157,6 @@ namespace Orleans.Runtime
             }
         }
 
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "Health-check participants can throw arbitrary exceptions; the watchdog reports a failed check and continues checking other participants.")]
         private void CheckComponentHealth()
         {
             _watchdogInstruments.OnHealthCheck();
