@@ -29,8 +29,7 @@ internal partial class InvokableObjectManager
         private readonly ILogger<AsyncEnumerableGrainObserverExtension> _logger;
 
         private Task? _cleanupTask;
-#pragma warning disable CA2213 // Disposable fields should be disposed
-        // Will be auto-disposed by the cleanup timer loop breaking out
+#pragma warning disable CA2213 // The cleanup loop disposes its cancellation source.
         private CancellationTokenSource? _cleanupCts;
 #pragma warning restore CA2213 // Disposable fields should be disposed
         private readonly CancellationTokenSource _shutdownCts = new();
@@ -86,7 +85,7 @@ internal partial class InvokableObjectManager
 
         private async Task RunCleanupLoopAsync(CancellationTokenSource cancellationTokenSource)
         {
-            using (cancellationTokenSource)
+            try
             {
                 using var timer = new PeriodicTimer(_messagingOptions.ResponseTimeout, _timeProvider);
 
@@ -108,6 +107,7 @@ internal partial class InvokableObjectManager
                                 if (_enumerators.Count == 0)
                                 {
                                     _cleanupTask = null;
+                                    _cleanupCts = null;
                                     return;
                                 }
 
@@ -171,6 +171,19 @@ internal partial class InvokableObjectManager
                     LogWarningErrorCleaningUpEnumerators(_logger, exception);
                 }
             }
+            finally
+            {
+                lock (_lock)
+                {
+                    if (ReferenceEquals(_cleanupCts, cancellationTokenSource))
+                    {
+                        _cleanupCts = null;
+                        _cleanupTask = null;
+                    }
+
+                    cancellationTokenSource.Dispose();
+                }
+            }
         }
 
         public async ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(
@@ -209,7 +222,7 @@ internal partial class InvokableObjectManager
                     // Otherwise its a caller-side programming error: duplicate request GUID so we throw.
                     validationException = new InvalidOperationException("An enumerator with the same id already exists.");
                 }
-                else if (_enumerators.Count == 1)
+                else if (_cleanupTask is null)
                 {
                     _cleanupCts = CancellationTokenSource.CreateLinkedTokenSource(_shutdownCts.Token);
 
@@ -671,11 +684,6 @@ Done:;
                     state.ExitGate();
                 }
 
-                // It's generally safer to mark completion *before* we remove the teardown task from the outstanding disposals.
-                // Since continuations are configured to run asynchronously, this should NOT result in synchronous execution of continuation code.
-
-                work.TeardownCompletion.TrySetResult();
-
                 lock (_lock)
                 {
                     // Now that the teardown is fully complete, we can finally remove the state
@@ -685,6 +693,8 @@ Done:;
                         _enumerators.Remove(state.RequestId);
                     }
                 }
+
+                work.TeardownCompletion.TrySetResult();
             }
         }
         private async Task WaitWithTimeoutAsync(Task task, string operationName, TimeSpan? timeout = null)
@@ -773,25 +783,17 @@ Done:;
             // _shutdownCts.Token is used by WaitWithTimeoutAsync inside CompleteDisposalWorkAsync
             // to wait for the producer's pending MoveNextAsync. If we would cancel here it could result
             // in the iterator's finally block to never run.
-            CancellationTokenSource? cleanupCts;
-
-            lock (_lock)
-            {
-                cleanupCts = _cleanupCts;
-                _cleanupCts = null;
-            }
-
-            if (cleanupCts is not null)
-            {
-                await cleanupCts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-                // Disposal of the cleanup cts is done implicitly by RunCleanupLoopAsync's using statement.
-            }
-
             Task? cleanupTask;
-
+            Task? cancelCleanupTask;
             lock (_lock)
             {
                 cleanupTask = _cleanupTask;
+                cancelCleanupTask = _cleanupCts?.CancelAsync();
+            }
+
+            if (cancelCleanupTask is not null)
+            {
+                await cancelCleanupTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
 
             if (cleanupTask is not null)

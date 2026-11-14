@@ -52,12 +52,17 @@ internal class TestInvokable : IInvokable
     internal TaskCompletionSource Release { get; } = DrainTestHelpers.CreateSignal();
     internal TaskCompletionSource Exited { get; } = DrainTestHelpers.CreateSignal();
     internal Action? OnEntered { get; set; }
+    internal Action? OnSetTarget { get; set; }
     internal Func<TestInvokable, ValueTask<Response>>? Body { get; set; }
     internal ITargetHolder? TargetHolder { get; private set; }
     internal int InvocationCount => Volatile.Read(ref _invocationCount);
 
     object? IInvokable.GetTarget() => TargetHolder?.GetTarget();
-    void IInvokable.SetTarget(ITargetHolder holder) => TargetHolder = holder;
+    void IInvokable.SetTarget(ITargetHolder holder)
+    {
+        TargetHolder = holder;
+        OnSetTarget?.Invoke();
+    }
 
     async ValueTask<Response> IInvokable.Invoke()
     {
@@ -145,6 +150,57 @@ internal sealed class CancellableTestInvokable : TestInvokable
     }
 
     protected override void DisposeCore() => _cancellation.Dispose();
+}
+
+internal sealed class DeferredCancellationTestInvokable : TestInvokable
+{
+    private readonly CancellationTokenSource _cancellation = new();
+    private readonly ManualResetEventSlim _releaseTarget = new();
+    private int _ready;
+
+    internal DeferredCancellationTestInvokable() : base("must be canceled")
+    {
+        OnSetTarget = () =>
+        {
+            TargetEntered.TrySetResult();
+            _releaseTarget.Wait();
+            Volatile.Write(ref _ready, 1);
+        };
+    }
+
+    internal TaskCompletionSource TargetEntered { get; } = DrainTestHelpers.CreateSignal();
+    internal void ReleaseTarget() => _releaseTarget.Set();
+    protected override bool SupportsCancellation => true;
+    protected override CancellationToken RequestCancellationToken => _cancellation.Token;
+    protected override bool CancelRequest()
+    {
+        if (Volatile.Read(ref _ready) == 0)
+        {
+            return false;
+        }
+
+        _cancellation.Cancel();
+        return true;
+    }
+
+    protected override async ValueTask<Response> InvokeCoreAsync()
+    {
+        await Task.Delay(Timeout.Infinite, _cancellation.Token);
+        throw new InvalidOperationException("The delay completed without cancellation.");
+    }
+
+    internal override void ReleaseForCleanup()
+    {
+        ReleaseTarget();
+        _cancellation.Cancel();
+        base.ReleaseForCleanup();
+    }
+
+    protected override void DisposeCore()
+    {
+        _releaseTarget.Dispose();
+        _cancellation.Dispose();
+    }
 }
 
 internal sealed class CancellationControlInvokable : TestInvokable
