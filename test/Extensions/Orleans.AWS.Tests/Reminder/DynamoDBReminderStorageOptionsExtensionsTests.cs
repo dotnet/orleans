@@ -13,6 +13,44 @@ namespace AWSUtils.Tests.RemindersTest;
 public sealed class DynamoDBReminderStorageOptionsExtensionsTests
 {
     [Fact]
+    public void ParseConnectionString_NullOptions_ReportsParameter()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => DynamoDBReminderStorageOptionsExtensions.ParseConnectionString(null!, string.Empty));
+
+        Assert.Equal("options", exception.ParamName);
+    }
+
+    [Fact]
+    public void ParseConnectionString_NullConnectionString_PreservesOptions()
+    {
+        var options = CreateSentinelOptions();
+
+        var exception = Assert.Throws<ArgumentNullException>(() => options.ParseConnectionString(null!));
+
+        Assert.Equal("connectionString", exception.ParamName);
+        AssertSentinelOptions(options);
+    }
+
+    [Theory]
+    [InlineData("service=changed")]
+    [InlineData("secretKey=changed")]
+    [InlineData("accessKey=changed")]
+    [InlineData("readCapacityUnits=1")]
+    [InlineData("writeCapacityUnits=1")]
+    [InlineData("useProvisionedThroughput=true")]
+    [InlineData("createIfNotExists=true")]
+    [InlineData("updateIfExists=true")]
+    public void ParseConnectionString_PropertyNamesRemainCaseSensitive(string connectionString)
+    {
+        var options = CreateSentinelOptions();
+
+        options.ParseConnectionString(connectionString);
+
+        AssertSentinelOptions(options);
+    }
+
+    [Fact]
     public void ParseConnectionString_Service_SetsService()
     {
         var options = CreateSentinelOptions();
