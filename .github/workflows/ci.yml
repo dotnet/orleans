@@ -133,7 +133,7 @@ jobs:
       if: always()
       run: docker rm -f redis || true
   test-mongodb:
-    name: MongoDB provider tests
+    name: MongoDB provider tests (${{ matrix.mongodb.version }}, ${{ matrix.framework }})
     runs-on: ubuntu-24.04
     env:
       MONGODB_IMAGE: ${{ matrix.mongodb.image }}
@@ -146,7 +146,8 @@ jobs:
         - version: "7.0"
           image: mongo:7.0@sha256:1f995ad6fdb93244a1addab1b58f934a0bc2f5643c38e02f5e9d7f0c7d227a7b
         - version: "8.0"
-          image: mongo:8.0@sha256:d0d926f94df099bff534b7ee5b5986458131a22489dfff8664509af0c1e2ca9c
+          # Includes SERVER-131779: recognize fixed Ubuntu kernels through /proc/version_signature.
+          image: mongo:8.0.38@sha256:d97fea17ccb8d004cd137be8dab54d70d0df11be69c9f422aefe4484c8414ab7
         framework: ["net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
