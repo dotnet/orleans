@@ -10,6 +10,9 @@ test_output_test-dynamodb_net10.0
 test_output_test-google_net10.0
 test_output_test-kinesis_net10.0
 test_output_test-mariadb_net10.0
+test_output_test-mongodb_6.0_net10.0
+test_output_test-mongodb_7.0_net10.0
+test_output_test-mongodb_8.0_net10.0
 test_output_test-nats_net10.0
 test_output_test-postgres_net10.0
 test_output_test-redis_net10.0

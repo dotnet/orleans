@@ -63,6 +63,18 @@ describe('native API Markdown companions', () => {
     );
   });
 
+  test.each([
+    'Microsoft.Orleans.Clustering.MongoDB',
+    'Microsoft.Orleans.Persistence.MongoDB',
+    'Microsoft.Orleans.Reminders.MongoDB',
+  ])('keeps unpublished MongoDB API reference without broken NuGet link: %s', (name) => {
+    const mongodbPackage = { ...pkg, package: { ...pkg.package, name } };
+    expect(nugetHref(name)).toBeUndefined();
+    const markdown = renderPackageMarkdown(mongodbPackage);
+    expect(markdown).toContain(`# ${name}`);
+    expect(markdown).not.toContain('https://www.nuget.org/packages/');
+  });
+
   test('renders member documentation, parameters, returns, exceptions, and examples', () => {
     const markdown = renderMemberKindMarkdown(pkg, grain, 'method', '/orleans/');
 

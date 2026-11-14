@@ -244,6 +244,8 @@ items:
                 href: host/configuration-guide/clustering/consul.md
               - name: Google Cloud Firestore
                 href: host/configuration-guide/google-firestore-providers.md
+              - name: MongoDB
+                href: host/configuration-guide/mongodb-providers.md
           - name: Options classes
             href: host/configuration-guide/list-of-options-classes.md
           - name: Silo metadata
