@@ -44,9 +44,16 @@ The build writes the bundle, source map, fonts, images, and `THIRD-PARTY-NOTICES
 
 The `Dashboard` workflow runs when a pull request or push changes this directory. It runs the same commands and fails if the output differs from the committed `dist/`, and runs the navigation tests. Frontend sources use LF line endings on every platform, so builds on Windows, Linux, and macOS produce identical files.
 
+## Lifecycle diagrams
+
+The lifecycle view renders ordered HTML stage cards connected by CSS arrows.
+Startup follows increasing stage order; shutdown reverses it. Observer names and
+methods are rendered as text, and the diagram scrolls for large lifecycles and
+long labels. Cards use the selected light or dark theme.
+
 ## Navigation tests
 
-The browser tests exercise the production bundle's counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
+The browser tests exercise lifecycle diagrams, counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
 
 ```shell
 npx playwright install chromium

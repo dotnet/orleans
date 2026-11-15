@@ -1,0 +1,46 @@
+.lifecycle-diagram {
+  overflow: auto;
+  max-height: 80vh;
+}
+
+.lifecycle-stages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: 1rem;
+  list-style: none;
+  color: var(--bs-body-color);
+}
+
+.lifecycle-stage {
+  position: relative;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.25rem;
+  background: var(--bs-secondary-bg);
+  white-space: pre;
+}
+
+.lifecycle-stage.named {
+  border-color: var(--bs-primary-border-subtle);
+  background: var(--bs-primary-bg-subtle);
+}
+
+.lifecycle-stages.shutdown .lifecycle-stage.named {
+  border-color: var(--bs-danger-border-subtle);
+  background: var(--bs-danger-bg-subtle);
+}
+
+.lifecycle-stage:not(:last-child)::after {
+  content: "\2193";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.5rem;
+  line-height: 2rem;
+}

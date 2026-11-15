@@ -76,7 +76,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         var logger = Logger;
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceEnqueueWorkItem(logger, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
+            LogTraceEnqueueWorkItem(logger, task.ToString()!, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
         }
 #endif
 
@@ -108,7 +108,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
             var runQueueLogger = Logger;
             if (runQueueLogger.IsEnabled(LogLevel.Trace))
             {
-                LogTraceAddToRunQueue(runQueueLogger, task, thisSequenceNumber, GrainContext);
+                LogTraceAddToRunQueue(runQueueLogger, task.ToString()!, thisSequenceNumber, GrainContext);
             }
 #endif
             ScheduleExecution(this);
@@ -223,7 +223,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         var logger = Logger;
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceAboutToExecuteTask(logger, task, GrainContext);
+            LogTraceAboutToExecuteTask(logger, task.ToString()!, GrainContext);
         }
     }
 #endif
@@ -237,15 +237,16 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogLongRunningTurn(Task task, long taskDurationMs)
     {
-        if (Debugger.IsAttached)
+        var logger = Logger;
+        if (Debugger.IsAttached || !logger.IsEnabled(LogLevel.Warning))
         {
             return;
         }
 
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
         LogWarningLongRunningTurn(
-            Logger,
-            task.AsyncState ?? task,
+            logger,
+            (task.AsyncState ?? task).ToString()!,
             GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,
@@ -295,13 +296,13 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         Level = LogLevel.Trace,
         Message = "EnqueueWorkItem {Task} into {GrainContext} when TaskScheduler.Current={TaskScheduler}"
     )]
-    private static partial void LogTraceEnqueueWorkItem(ILogger logger, Task task, IGrainContext grainContext, TaskScheduler taskScheduler);
+    private static partial void LogTraceEnqueueWorkItem(ILogger logger, string task, IGrainContext grainContext, TaskScheduler taskScheduler);
 
     [LoggerMessage(
         Level = LogLevel.Trace,
         Message = "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}"
     )]
-    private static partial void LogTraceAddToRunQueue(ILogger logger, Task task, long sequenceNumber, IGrainContext grainContext);
+    private static partial void LogTraceAddToRunQueue(ILogger logger, string task, long sequenceNumber, IGrainContext grainContext);
 
     [LoggerMessage(
         EventId = (int)ErrorCode.SchedulerTooManyPendingItems,
@@ -314,7 +315,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         Level = LogLevel.Trace,
         Message = "About to execute task '{Task}' in GrainContext={GrainContext}"
     )]
-    private static partial void LogTraceAboutToExecuteTask(ILogger logger, Task task, IGrainContext grainContext);
+    private static partial void LogTraceAboutToExecuteTask(ILogger logger, string task, IGrainContext grainContext);
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Runtime_Error_100032,
@@ -328,5 +329,5 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         Level = LogLevel.Warning,
         Message = "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}"
     )]
-    private static partial void LogWarningLongRunningTurn(ILogger logger, object task, string grainContext, string duration, TimeSpan turnWarningLengthThreshold, string thread);
+    private static partial void LogWarningLongRunningTurn(ILogger logger, string task, string grainContext, string duration, TimeSpan turnWarningLengthThreshold, string thread);
 }
