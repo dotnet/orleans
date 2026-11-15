@@ -120,19 +120,25 @@ public class SiloStartFailureTests
         var membership = host.Services.GetRequiredService<IMembershipManager>();
 
         var start = host.StartAsync(cancellationToken);
-        await participant.StopBlocked.WaitAsync(Timeout, cancellationToken);
+        Task dispose;
+        try
+        {
+            await participant.StopBlocked.WaitAsync(Timeout, cancellationToken);
 
-        // Disposal hurries the rollback, whose stop observer then runs its cleanup until the barrier is released.
-        var dispose = disposeAsync ? silo.DisposeAsync().AsTask() : Task.Run(silo.Dispose, CancellationToken.None);
-        await participant.StopCancelled.WaitAsync(Timeout, cancellationToken);
+            // Disposal hurries the rollback, whose stop observer then runs its cleanup until the barrier is released.
+            dispose = disposeAsync ? silo.DisposeAsync().AsTask() : Task.Run(silo.Dispose, CancellationToken.None);
+            await participant.StopCancelled.WaitAsync(Timeout, cancellationToken);
 
-        // The rollback has not reached the membership and listener stages yet, so disposal must still be pending.
-        await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
-        Assert.False(dispose.IsCompleted);
-        Assert.False(silo.SiloTerminated.IsCompleted);
-        Assert.True(await CanConnectAsync(siloPort, cancellationToken));
-
-        cleanupBarrier.SetResult();
+            // The rollback has not reached the membership and listener stages yet, so disposal must still be pending.
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+            Assert.False(dispose.IsCompleted);
+            Assert.False(silo.SiloTerminated.IsCompleted);
+            Assert.True(await CanConnectAsync(siloPort, cancellationToken));
+        }
+        finally
+        {
+            cleanupBarrier.TrySetResult();
+        }
         await dispose.WaitAsync(Timeout, cancellationToken);
 
         Assert.True(silo.SiloTerminated.IsCompletedSuccessfully);
