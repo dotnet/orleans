@@ -127,6 +127,60 @@ public class AsyncEnumerableGrainObserverExtensionTests
     }
 
     [Fact]
+    public async Task MoveNext_ConcurrentCalls_SerializeEnumerator()
+    {
+        await using var extension = CreateExtension();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestId = Guid.NewGuid();
+        var request = new TestAsyncEnumerableRequest<int>(() => ControlledSequence(started, release));
+
+        var first = await extension.StartEnumeration(requestId, request, CancellationToken.None);
+        Assert.Equal((EnumerationResult.Element, 1), (first.Status, first.Value));
+
+        try
+        {
+            var second = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var third = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
+
+            release.TrySetResult();
+
+            var secondResult = await second.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var thirdResult = await third.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal((EnumerationResult.Element, 2), (secondResult.Status, secondResult.Value));
+            Assert.Equal((EnumerationResult.Element, 3), (thirdResult.Status, thirdResult.Value));
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task MoveNext_AfterExtensionDisposalStarts_ReturnsMissingEnumerator()
+    {
+        await using var extension = CreateExtension();
+        var requestId = Guid.NewGuid();
+        await extension.StartEnumeration(requestId, CreateRequest(1, 2), CancellationToken.None);
+
+        var disposal = extension.DisposeAsync();
+        var result = await extension.MoveNext<int>(requestId, CancellationToken.None);
+
+        Assert.Equal(EnumerationResult.MissingEnumeratorError, result.Status);
+        await disposal;
+    }
+
+    private static async IAsyncEnumerable<int> ControlledSequence(TaskCompletionSource started, TaskCompletionSource release)
+    {
+        yield return 1;
+        started.TrySetResult();
+        await release.Task;
+        yield return 2;
+        yield return 3;
+    }
+
+    [Fact]
     public async Task DisposeAsync_JoinsProducerTeardown()
     {
         await using var extension = CreateExtension();
@@ -220,6 +274,35 @@ public class AsyncEnumerableGrainObserverExtensionTests
         await extension.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
+    [Fact]
+    public async Task DisposeAsync_CancelsPendingLongPollTimer()
+    {
+        var timeProvider = new TrackingTimeProvider();
+        await using var extension = CreateExtension(timeProvider);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finallyStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestId = Guid.NewGuid();
+
+        await extension.StartEnumeration(requestId, CreateGateableRequest(started, finallyStarted, release), CancellationToken.None);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var moveNext = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
+        await timeProvider.LongPollTimerCreated.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var disposal = extension.DisposeAsync().AsTask();
+        try
+        {
+            var result = await moveNext.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(EnumerationResult.MissingEnumeratorError, result.Status);
+            await timeProvider.LongPollTimerDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await disposal.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+        }
+    }
+
     private static AsyncEnumerableGrainObserverExtension CreateExtension(TimeProvider timeProvider) =>
         new(
             Substitute.For<IGrainContext>(),
@@ -232,6 +315,8 @@ public class AsyncEnumerableGrainObserverExtensionTests
         private int _periodicTimerCount;
         public FakeTimeProvider Clock { get; } = new();
         public TaskCompletionSource TimerDisposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource LongPollTimerCreated { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource LongPollTimerDisposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int PeriodicTimerCount => Volatile.Read(ref _periodicTimerCount);
         public override DateTimeOffset GetUtcNow() => Clock.GetUtcNow();
         public override long GetTimestamp() => Clock.GetTimestamp();
@@ -244,6 +329,12 @@ public class AsyncEnumerableGrainObserverExtensionTests
             {
                 Interlocked.Increment(ref _periodicTimerCount);
                 return new TrackingTimer(timer, TimerDisposed);
+            }
+
+            if (dueTime == TimeSpan.FromSeconds(15))
+            {
+                LongPollTimerCreated.TrySetResult();
+                return new TrackingTimer(timer, LongPollTimerDisposed);
             }
 
             return timer;

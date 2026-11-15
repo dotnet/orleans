@@ -740,8 +740,6 @@ public class InvokableObjectManagerTests
         // StopAsync must dispose the registered LocalObjectData, which disposes its IAE extension.
         var stop = fixture.StopAsync();
 
-        fixture.AssertPending(stop, "11: observer enumerator parked during manager shutdown");
-
         await fixture.WaitAsync(stop, "observer disposal and invocation drain");
 
         var parkedResult = await parkedMoveNextResult.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);

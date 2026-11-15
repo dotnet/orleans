@@ -328,7 +328,7 @@ internal partial class InvokableObjectManager
 
                 lock (_lock)
                 {
-                    if (state.IsDisposing || !_enumerators.TryGetValue(requestId, out var existingState) || !ReferenceEquals(existingState, state))
+                    if (_disposeTask is not null || state.IsDisposing || !_enumerators.TryGetValue(requestId, out var existingState) || !ReferenceEquals(existingState, state))
                     {
                         // Cleanup or explicit disposal claimed this state while we waited on the gate.
                         // We report the enumerator as terminated; the owner of the disposal task cleans it up.
@@ -430,19 +430,13 @@ internal partial class InvokableObjectManager
                 // If WaitAsync throws synchronously or the inner task faults/cancels, the await returns normally.
                 // We classify the result directly below.
 
-                // Contrary to the entry point, we chain two WaitAsync calls here instead of allocating a linked CTS.
-                // That is safe because we already hold the gate: the outer wait acquires nothing, so cancelling it just
-                // returns from this method, which releases the gate in the finally. The abandoned inner wrapper observes
-                // `moveNextTask` in the background and completes unobserved once the producer finishes as state.MoveNextTask
-                // still references the real producer task, so teardown waits for it as before.
-
-                // At the entry point this is not possible because the inner wait is `_gate.WaitAsync(...)`, which acquires
-                // the semaphore. If the outer wait cancelled and we returned, the inner wait could still take the gate with
-                // nobody left to release it, hence the single linked CTS there.
-                await ((Task)moveNextTask
-                    .WaitAsync(longPollTimeout, _timeProvider, cancellationToken)
-                    .WaitAsync(state.RemovalTokenSource.Token))
-                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                // A single wait ensures that removal cannot leave a timeout wrapper faulting unobserved.
+                using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, state.RemovalTokenSource.Token))
+                {
+                    await ((Task)moveNextTask
+                        .WaitAsync(longPollTimeout, _timeProvider, linkedCts.Token))
+                        .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                }
 
                 if (cancellationToken.IsCancellationRequested)
                 {
