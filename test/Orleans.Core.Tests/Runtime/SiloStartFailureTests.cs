@@ -106,6 +106,43 @@ public class SiloStartFailureTests
         Assert.False(await CanConnectAsync(siloPort, cancellationToken));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DisposeDuringFailedStartRollback_WaitsForTheRollbackToComplete(bool disposeAsync)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var cleanupBarrier = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var participant = new StartParticipant(blockUntilCancelled: false, blockStopUntilCancelled: true, stopCleanup: cleanupBarrier.Task);
+        var (siloPort, gatewayPort) = GetFreePorts();
+        using var host = BuildHost(participant, siloPort, gatewayPort);
+        var silo = host.Services.GetRequiredService<Silo>();
+        var membership = host.Services.GetRequiredService<IMembershipManager>();
+
+        var start = host.StartAsync(cancellationToken);
+        await participant.StopBlocked.WaitAsync(Timeout, cancellationToken);
+
+        // Disposal hurries the rollback, whose stop observer then runs its cleanup until the barrier is released.
+        var dispose = disposeAsync ? silo.DisposeAsync().AsTask() : Task.Run(silo.Dispose, CancellationToken.None);
+        await participant.StopCancelled.WaitAsync(Timeout, cancellationToken);
+
+        // The rollback has not reached the membership and listener stages yet, so disposal must still be pending.
+        await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        Assert.False(dispose.IsCompleted);
+        Assert.False(silo.SiloTerminated.IsCompleted);
+        Assert.True(await CanConnectAsync(siloPort, cancellationToken));
+
+        cleanupBarrier.SetResult();
+        await dispose.WaitAsync(Timeout, cancellationToken);
+
+        Assert.True(silo.SiloTerminated.IsCompletedSuccessfully);
+        Assert.Equal(SystemStatus.Terminated, silo.SystemStatus);
+        Assert.Equal(SiloStatus.Dead, membership.LocalSiloStatus);
+        Assert.False(await CanConnectAsync(siloPort, cancellationToken));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => start).WaitAsync(Timeout, cancellationToken);
+        Assert.Same(participant.Failure, exception);
+    }
+
     [Fact]
     public async Task StopDuringGrainServiceInit_CancelsTheWaitForInit()
     {
@@ -197,12 +234,13 @@ public class SiloStartFailureTests
     /// <summary>
     /// Runs at <see cref="ServiceLifecycleStage.ApplicationServices"/>, after the silo listener has started and the
     /// silo has written its <see cref="SiloStatus.Joining"/> row, and either fails or blocks until the start is cancelled.
-    /// Its stop can block until the stop is cancelled.
+    /// Its stop can block until the stop is cancelled, and then wait for <c>stopCleanup</c> before it completes.
     /// </summary>
-    private sealed class StartParticipant(bool blockUntilCancelled, bool blockStopUntilCancelled = false) : ILifecycleParticipant<ISiloLifecycle>
+    private sealed class StartParticipant(bool blockUntilCancelled, bool blockStopUntilCancelled = false, Task? stopCleanup = null) : ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly TaskCompletionSource _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _stopBlocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _stopCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public InvalidOperationException Failure { get; } = new("Start failed after the silo started joining.");
 
@@ -212,6 +250,8 @@ public class SiloStartFailureTests
 
         public Task StopBlocked => _stopBlocked.Task;
 
+        public Task StopCancelled => _stopCancelled.Task;
+
         public void Participate(ISiloLifecycle lifecycle) =>
             lifecycle.Subscribe(nameof(StartParticipant), ServiceLifecycleStage.ApplicationServices, OnStart, OnStop);
 
@@ -220,7 +260,16 @@ public class SiloStartFailureTests
             if (blockStopUntilCancelled)
             {
                 _stopBlocked.SetResult();
-                await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+                try
+                {
+                    await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException) when (stopCleanup is not null)
+                {
+                    // Cleanup which still has to finish after the stop is hurried.
+                    _stopCancelled.SetResult();
+                    await stopCleanup;
+                }
             }
         }
 

@@ -554,27 +554,30 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public async ValueTask DisposeAsync()
-        {
-            using var cts = new CancellationTokenSource();
-            cts.Cancel();
-            await StopAsync(cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        }
+        public ValueTask DisposeAsync() => new(StopForDisposalAsync());
 
         /// <inheritdoc/>
         public void Dispose()
         {
-            try
-            {
-                using var cts = new CancellationTokenSource();
-                cts.Cancel();
 #pragma warning disable RS0030 // IDisposable requires synchronously completing silo shutdown.
-                StopAsync(cts.Token).Wait();
+            StopForDisposalAsync().Wait();
 #pragma warning restore RS0030
-            }
-            catch
-            {
-            }
+        }
+
+        /// <summary>
+        /// Stops the silo non-gracefully and completes once it has terminated, including when another stop, or the
+        /// rollback of a failed start, owns the shutdown.
+        /// </summary>
+        private async Task StopForDisposalAsync()
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // The cancelled token makes the stop non-graceful and hurries a stop which is already in progress. When
+            // another caller owns that stop, StopAsync stops waiting for it as soon as the token is cancelled, so wait
+            // for termination here: the services must not be released while the stop is still using them.
+            await StopAsync(cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await this.SiloTerminated.ConfigureAwait(false);
         }
 
         [LoggerMessage(
