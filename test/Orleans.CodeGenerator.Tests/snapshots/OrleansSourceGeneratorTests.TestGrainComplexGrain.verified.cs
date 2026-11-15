@@ -103,9 +103,10 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::Orleans.GrainReferences.GrainReferenceActivatorAttribute(typeof(Proxy_IComplexGrain.ProxyActivator))]
     internal sealed class Proxy_IComplexGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IComplexGrain
     {
-        public Proxy_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0 as ProxyShared ?? new ProxyShared(arg0), arg1)
+        public Proxy_IComplexGrain(ProxyShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
         }
 
@@ -120,7 +121,20 @@ namespace OrleansCodeGen.TestProject
             return base.InvokeAsync<global::TestProject.ComplexData>(request).AsTask();
         }
 
-        private sealed class ProxyShared : global::Orleans.Runtime.GrainReferenceShared
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+        internal sealed class ProxyActivator : global::Orleans.GrainReferences.IGrainReferenceActivator
+        {
+            private readonly ProxyShared _shared;
+            public ProxyActivator(global::Orleans.Runtime.GrainReferenceShared shared)
+            {
+                _shared = new ProxyShared(shared);
+            }
+
+            public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new Proxy_IComplexGrain(_shared, grainId.Key);
+        }
+
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+        internal sealed class ProxyShared : global::Orleans.Runtime.GrainReferenceShared
         {
             public readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
             public ProxyShared(global::Orleans.Runtime.GrainReferenceShared shared) : base(shared)

@@ -87,6 +87,13 @@ namespace Orleans.GrainReferences
                         throw new InvalidOperationException($"Unable to find an {nameof(IGrainReferenceActivatorProvider)} for grain type {grainType}");
                     }
 
+                    // Activators can hold copiers. Like the codec provider's caches, retain only activators created
+                    // outside unpublished serializer construction graphs.
+                    if (_serviceProvider.GetService<CodecProvider>() is { IsConstructionPending: true })
+                    {
+                        return activator;
+                    }
+
                     entry = activator;
                     _activators = new(_activators) { [(grainType, interfaceType)] = entry };
                 }
@@ -353,8 +360,43 @@ namespace Orleans.GrainReferences
                 _codecProvider,
                 _copyContextPool,
                 _serviceProvider);
-            activator = new GrainReferenceActivator(proxyType, shared);
+            activator = CreateGeneratedActivator(proxyType, shared) ?? new GrainReferenceActivator(proxyType, shared);
             return true;
+        }
+
+        /// <summary>
+        /// Creates the activator which a generated proxy declares with <see cref="GrainReferenceActivatorAttribute"/>.
+        /// </summary>
+        /// <returns>The activator, or <see langword="null"/> if the proxy declares none.</returns>
+        [UnconditionalSuppressMessage(
+            "AOT",
+            "IL3050",
+            Justification = "Generic proxy types are already constructed with MakeGenericType by RpcProvider, and their nested activators share those type arguments.")]
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2055",
+            Justification = "GrainReferenceActivatorAttribute preserves the public constructors of the activator's generic type definition.")]
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2073",
+            Justification = "GrainReferenceActivatorAttribute preserves the public constructors of the activator's generic type definition.")]
+        internal static IGrainReferenceActivator? CreateGeneratedActivator(Type proxyType, GrainReferenceShared shared)
+        {
+            if (proxyType.GetCustomAttribute<GrainReferenceActivatorAttribute>(inherit: false) is not { } attribute)
+            {
+                return null;
+            }
+
+            var activatorType = GetActivatorType(attribute, proxyType);
+            var constructor = activatorType.GetConstructor([typeof(GrainReferenceShared)])
+                ?? throw new SerializerException("Invalid grain reference activator type: " + activatorType);
+            return (IGrainReferenceActivator)ConstructorInvoker.Create(constructor).Invoke(shared);
+
+            [return: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+            static Type GetActivatorType(GrainReferenceActivatorAttribute attribute, Type proxyType)
+                => attribute.ActivatorType.IsGenericTypeDefinition
+                    ? attribute.ActivatorType.MakeGenericType(proxyType.GenericTypeArguments)
+                    : attribute.ActivatorType;
         }
 
         /// <summary>
@@ -362,7 +404,7 @@ namespace Orleans.GrainReferences
         /// </summary>
         private sealed class GrainReferenceActivator : IGrainReferenceActivator
         {
-            private GrainReferenceShared _shared;
+            private readonly GrainReferenceShared _shared;
             private readonly Func<GrainReferenceShared, IdSpan, GrainReference> _create;
 
             /// <summary>
@@ -400,27 +442,7 @@ namespace Orleans.GrainReferences
                 _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
             }
 
-            public GrainReference CreateReference(GrainId grainId)
-            {
-                var reference = _create(_shared, grainId.Key);
-                if (!ReferenceEquals(reference.Shared, _shared))
-                {
-                    AdoptShared(reference.Shared);
-                }
-
-                return reference;
-            }
-
-            // A generated proxy replaces the shared instance it receives with a derived instance holding its copiers,
-            // and passes that instance through unchanged. Later references reuse it, so the copiers are resolved once.
-            private void AdoptShared(GrainReferenceShared shared)
-            {
-                // Like the codec provider's caches, retain only copiers from completed serializer construction graphs.
-                if (!shared.CodecProvider.IsConstructionPending)
-                {
-                    _shared = shared;
-                }
-            }
+            public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);
         }
     }
 
@@ -450,5 +472,26 @@ namespace Orleans.GrainReferences
         /// <param name="grainId">The grain id.</param>
         /// <returns>A new grain reference.</returns>
         public GrainReference CreateReference(GrainId grainId);
+    }
+
+    /// <summary>
+    /// Specifies the <see cref="IGrainReferenceActivator"/> which creates instances of a generated grain reference proxy.
+    /// </summary>
+    /// <remarks>
+    /// The activator type has a public constructor which accepts the <see cref="GrainReferenceShared"/> for a grain type
+    /// and grain interface type. The runtime creates one activator for each of those pairs. The activator holds the state
+    /// which every reference it creates shares, such as the copiers its proxy uses for method arguments. An activator
+    /// nested in a generic proxy is specified as its generic type definition and is closed with the proxy's type arguments.
+    /// </remarks>
+    /// <param name="activatorType">The activator type.</param>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public sealed class GrainReferenceActivatorAttribute(
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type activatorType) : Attribute
+    {
+        /// <summary>
+        /// Gets the activator type.
+        /// </summary>
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+        public Type ActivatorType { get; } = activatorType ?? throw new ArgumentNullException(nameof(activatorType));
     }
 }

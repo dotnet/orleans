@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.CodeGeneration;
+using Orleans.GrainReferences;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -352,7 +353,8 @@ public class MembershipTableCancellationTests
             services);
         var proxyType = Assert.Single(services.GetRequiredService<IOptions<TypeManifestOptions>>().Value.InterfaceProxies,
             type => type.Assembly == typeof(IMembershipTable).Assembly && typeof(IMembershipTableSystemTarget).IsAssignableFrom(type));
-        var proxy = Activator.CreateInstance(proxyType, shared, IdSpan.Create("membership"));
+        var activator = Assert.IsAssignableFrom<IGrainReferenceActivator>(GrainReferenceActivatorProvider.CreateGeneratedActivator(proxyType, shared));
+        var proxy = activator.CreateReference(GrainId.Create(shared.GrainType, IdSpan.Create("membership")));
 
         var method = Assert.Single(typeof(IMembershipTable).GetMethods(), method => method.Name == operation);
         await Assert.IsAssignableFrom<Task>(method.Invoke(proxy, arguments));

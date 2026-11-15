@@ -43,7 +43,9 @@ public sealed class GeneratedSourceVisibilityTests
             {
                 var type = semanticModel.GetDeclaredSymbol(declaration, TestContext.Current.CancellationToken);
                 Assert.NotNull(type);
-                if (!declaration.Modifiers.Any(SyntaxKind.PartialKeyword))
+
+                // Nested generated types are hidden through their containing type.
+                if (!declaration.Modifiers.Any(SyntaxKind.PartialKeyword) && type.ContainingType is null)
                 {
                     AssertEditorBrowsableNever(type);
                 }

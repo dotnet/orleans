@@ -1,8 +1,8 @@
-using System.Reflection;
 using BenchmarkDotNet.Attributes;
 using Benchmarks.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using Orleans.GrainReferences;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -14,18 +14,16 @@ namespace Benchmarks.Serialization;
 /// Measures generated grain reference proxy construction, which runs on every GetGrain call and every grain reference deserialization.
 /// </summary>
 /// <remarks>
-/// Each proxy type is constructed from the shared instance which its first construction produced, as a grain reference
-/// activator does for every later reference.
+/// Proxies are created by their generated activators, as the runtime creates them.
 /// </remarks>
 [Config(typeof(BenchmarkConfig))]
 public class ProxyConstructionBenchmark
 {
-    private static readonly PropertyInfo SharedProperty = typeof(GrainReference).GetProperty("Shared", BindingFlags.Instance | BindingFlags.NonPublic)!;
-    private readonly IdSpan _key = IdSpan.Create("key");
-    private readonly GrainReferenceShared _noCopiers;
-    private readonly GrainReferenceShared _concrete;
-    private readonly GrainReferenceShared _interface;
-    private readonly GrainReferenceShared _fourInterfaces;
+    private readonly GrainId _grainId = GrainId.Create("proxy-benchmark", "key");
+    private readonly IGrainReferenceActivator _noCopiers;
+    private readonly IGrainReferenceActivator _concrete;
+    private readonly IGrainReferenceActivator _interface;
+    private readonly IGrainReferenceActivator _fourInterfaces;
 
     public ProxyConstructionBenchmark()
     {
@@ -41,25 +39,23 @@ public class ProxyConstructionBenchmark
             services.GetRequiredService<CodecProvider>(),
             services.GetRequiredService<CopyContextPool>(),
             services);
-        _noCopiers = GetShared(new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyNoCopierGrain(shared, _key));
-        _concrete = GetShared(new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyConcreteCopierGrain(shared, _key));
-        _interface = GetShared(new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyInterfaceCopierGrain(shared, _key));
-        _fourInterfaces = GetShared(new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyFourInterfaceCopiersGrain(shared, _key));
+        _noCopiers = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyNoCopierGrain.ProxyActivator(shared);
+        _concrete = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyConcreteCopierGrain.ProxyActivator(shared);
+        _interface = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyInterfaceCopierGrain.ProxyActivator(shared);
+        _fourInterfaces = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyFourInterfaceCopiersGrain.ProxyActivator(shared);
     }
 
-    private static GrainReferenceShared GetShared(GrainReference reference) => (GrainReferenceShared)SharedProperty.GetValue(reference)!;
-
     [Benchmark(Baseline = true)]
-    public object NoCopiers() => new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyNoCopierGrain(_noCopiers, _key);
+    public object NoCopiers() => _noCopiers.CreateReference(_grainId);
 
     [Benchmark]
-    public object OneConcreteCopier() => new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyConcreteCopierGrain(_concrete, _key);
+    public object OneConcreteCopier() => _concrete.CreateReference(_grainId);
 
     [Benchmark]
-    public object OneInterfaceCopier() => new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyInterfaceCopierGrain(_interface, _key);
+    public object OneInterfaceCopier() => _interface.CreateReference(_grainId);
 
     [Benchmark]
-    public object FourInterfaceCopiers() => new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyFourInterfaceCopiersGrain(_fourInterfaces, _key);
+    public object FourInterfaceCopiers() => _fourInterfaces.CreateReference(_grainId);
 }
 
 [GenerateSerializer]

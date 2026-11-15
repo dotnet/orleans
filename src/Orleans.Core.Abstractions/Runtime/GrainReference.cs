@@ -304,8 +304,8 @@ namespace Orleans.Runtime
         /// Gets the grain reference functionality which is shared by all grain references of a given type.
         /// </summary>
         /// <remarks>
-        /// Generated proxies pass their base constructor an instance derived from the one they receive, which holds their
-        /// copiers, and read it back through this property.
+        /// Generated proxies with copiers receive a type derived from <see cref="GrainReferenceShared"/> which holds them,
+        /// constructed once by the proxy's activator, and read their copiers through this property.
         /// </remarks>
         protected internal GrainReferenceShared Shared => _shared ?? throw new GrainReferenceNotBoundException(this);
 

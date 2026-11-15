@@ -166,6 +166,8 @@ internal sealed class LibraryTypes
         RequestBaseOrDefault = TypeOrDefault("Orleans.Runtime.RequestBase");
         GrainReferenceOrDefault = TypeOrDefault("Orleans.Runtime.GrainReference");
         GrainReferenceSharedOrDefault = TypeOrDefault("Orleans.Runtime.GrainReferenceShared");
+        IGrainReferenceActivatorOrDefault = TypeOrDefault("Orleans.GrainReferences.IGrainReferenceActivator");
+        GrainReferenceActivatorAttributeOrDefault = TypeOrDefault("Orleans.GrainReferences.GrainReferenceActivatorAttribute");
         _immutableContainerTypes =
         [
                 compilation.GetSpecialType(SpecialType.System_Nullable_T),
@@ -280,6 +282,8 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol? RequestBaseOrDefault { get; }
     public INamedTypeSymbol? GrainReferenceOrDefault { get; }
     public INamedTypeSymbol? GrainReferenceSharedOrDefault { get; }
+    public INamedTypeSymbol? IGrainReferenceActivatorOrDefault { get; }
+    public INamedTypeSymbol? GrainReferenceActivatorAttributeOrDefault { get; }
     public INamedTypeSymbol Guid { get; private set; }
     public Compilation Compilation { get; private set; }
     public INamedTypeSymbol TimeSpan { get; private set; }
