@@ -48,6 +48,8 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly List<GrainService> grainServices = new List<GrainService>();
+        private Task? grainServiceInit;
+        private bool grainServicesStarting;
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
             Justification = "The host service container owns this service and disposes it after silo shutdown.")]
         private readonly ILoggerFactory loggerFactory;
@@ -269,6 +271,7 @@ namespace Orleans.Runtime
 
         private async Task OnActiveStart(CancellationToken ct)
         {
+            grainServicesStarting = true;
             foreach (var grainService in grainServices)
             {
                 await StartGrainService(grainService, ct);
@@ -291,9 +294,11 @@ namespace Orleans.Runtime
             activationDirectory.RecordNewTarget(grainService);
             grainServices.Add(grainService);
 
+            // Kept so that a stop can wait for an Init whose wait timed out or was cancelled; Inits run one at a time.
+            var init = grainServiceInit = grainService.QueueTask(() => grainService.Init(Services));
             try
             {
-                await grainService.QueueTask(() => grainService.Init(Services)).WaitAsync(this.initTimeout, cancellationToken);
+                await init.WaitAsync(this.initTimeout, cancellationToken);
             }
             catch (TimeoutException exception)
             {
@@ -362,17 +367,28 @@ namespace Orleans.Runtime
                 pendingStart = startTask;
             }
 
-            if (pendingStart is { IsCompleted: false })
+            try
             {
-                // Stopping the stages while they are still starting would race with their start, so cancel the start
-                // and wait for it to end first. It does not roll back by itself, since this stop has begun.
-                // The silo's own start waits observe the cancellation; other lifecycle participants are expected to.
-                stopRequested.Cancel();
-                await pendingStart.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                if (pendingStart is { IsCompleted: false })
+                {
+                    // Stopping the stages while they are still starting would race with their start, so cancel the start
+                    // and wait for it to end first. It does not roll back by itself, since this stop has begun.
+                    // The silo's own start waits observe the cancellation; other lifecycle participants are expected to.
+                    stopRequested.Cancel();
+                }
             }
+            finally
+            {
+                // This caller owns the stop, so it must run even if a cancellation callback registered by a start
+                // participant throws; the callback's exception propagates once the silo has terminated.
+                if (pendingStart is not null)
+                {
+                    await pendingStart.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                }
 
-            using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopEscalation.Token);
-            await StopCoreAsync(gracefully, stopCancellation.Token).ConfigureAwait(false);
+                using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopEscalation.Token);
+                await StopCoreAsync(gracefully, stopCancellation.Token).ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -427,6 +443,36 @@ namespace Orleans.Runtime
 
                 // signal to all awaiters that the silo has terminated.
                 await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
+            }
+        }
+
+        private async Task OnRuntimeGrainServicesStop(CancellationToken ct)
+        {
+            // The Active stage stops the grain services once it has started. A start which ended before that stage
+            // leaves them to this stage, and an Init whose wait was cancelled or timed out may still be running: stop the
+            // services, so that the Init can observe the stop through the service's stopped token, and wait for it.
+            // Like the Active stage, a non-graceful stop skips this.
+            if (grainServicesStarting || ct.IsCancellationRequested)
+                return;
+
+            foreach (var grainService in grainServices)
+            {
+                try
+                {
+                    await grainService.QueueTask(grainService.Stop).WaitAsync(ct);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorStoppingGrainService(logger, grainService, exception);
+                    continue;
+                }
+
+                LogDebugGrainServiceStopped(logger, grainService.GetType().FullName!, grainService.GetGrainId());
+            }
+
+            if (grainServiceInit is { } init)
+            {
+                await init.WaitAsync(ct).SuppressThrowing();
             }
         }
 
@@ -534,7 +580,7 @@ namespace Orleans.Runtime
         {
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, RunOnRuntimeInitializeStart, RunOnRuntimeInitializeStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, RunOnRuntimeServicesStart, RunOnRuntimeServicesStop);
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, RunOnRuntimeGrainServicesStart);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, RunOnRuntimeGrainServicesStart, RunOnRuntimeGrainServicesStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, RunOnBecomeActiveStart);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.GrainDeactivation, NoOpStart, RunOnBecomeActiveStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, RunOnActiveStart, RunOnActiveStop);
@@ -547,6 +593,7 @@ namespace Orleans.Runtime
             Task RunOnRuntimeServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStart(ct), CancellationToken.None);
             Task RunOnRuntimeServicesStop(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStop(ct), CancellationToken.None);
             Task RunOnRuntimeGrainServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct), CancellationToken.None);
+            Task RunOnRuntimeGrainServicesStop(CancellationToken ct) => Task.Run(() => OnRuntimeGrainServicesStop(ct), CancellationToken.None);
             Task RunOnBecomeActiveStart(CancellationToken ct) => Task.Run(() => OnBecomeActiveStart(ct), CancellationToken.None);
             Task RunOnBecomeActiveStop(CancellationToken ct) => Task.Run(() => OnBecomeActiveStop(ct), CancellationToken.None);
             Task RunOnActiveStart(CancellationToken ct) => Task.Run(() => OnActiveStart(ct), CancellationToken.None);

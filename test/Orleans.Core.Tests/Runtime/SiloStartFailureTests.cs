@@ -137,8 +137,10 @@ public class SiloStartFailureTests
         }
         finally
         {
+            // Also released when a wait or assertion above fails, so that disposing the host does not hang the test.
             cleanupBarrier.TrySetResult();
         }
+
         await dispose.WaitAsync(Timeout, cancellationToken);
 
         Assert.True(silo.SiloTerminated.IsCompletedSuccessfully);
@@ -150,29 +152,55 @@ public class SiloStartFailureTests
     }
 
     [Fact]
-    public async Task StopDuringGrainServiceInit_CancelsTheWaitForInit()
+    public async Task StopDuringGrainServiceInit_CancelsTheWaitAndStopsTheService()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var (siloPort, gatewayPort) = GetFreePorts();
-        var initBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initProbe = new GrainServiceInitProbe();
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.ClearProviders())
             .UseOrleans(silo => silo
                 .UseLocalhostClustering(siloPort, gatewayPort)
                 .AddGrainService<BlockedInitGrainService>()
-                .ConfigureServices(services => services.AddSingleton(initBlocked)))
+                .ConfigureServices(services => services.AddSingleton(initProbe)))
             .Build();
         var silo = host.Services.GetRequiredService<Silo>();
 
         // Without cancellation, the start would wait for Init until MaxJoinAttemptTime (5 minutes by default).
         var start = host.StartAsync(cancellationToken);
-        await initBlocked.Task.WaitAsync(Timeout, cancellationToken);
+        await initProbe.Blocked.Task.WaitAsync(Timeout, cancellationToken);
 
         await host.StopAsync(cancellationToken).WaitAsync(Timeout, cancellationToken);
+
+        // The stop reached the service, whose Init ended before the silo terminated.
+        Assert.True(initProbe.Ended.Task.IsCompletedSuccessfully);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start).WaitAsync(Timeout, cancellationToken);
+        Assert.True(silo.SiloTerminated.IsCompletedSuccessfully);
+        Assert.Equal(SystemStatus.Terminated, silo.SystemStatus);
+        Assert.False(await CanConnectAsync(siloPort, cancellationToken));
+    }
+
+    [Fact]
+    public async Task StopDuringStart_WithAThrowingCancellationCallback_StillStopsTheStartedStages()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var participant = new StartParticipant(blockUntilCancelled: true, throwOnStartCancellation: true);
+        var (siloPort, gatewayPort) = GetFreePorts();
+        using var host = BuildHost(participant, siloPort, gatewayPort);
+        var silo = host.Services.GetRequiredService<Silo>();
+        var membership = host.Services.GetRequiredService<IMembershipManager>();
+
+        var start = host.StartAsync(cancellationToken);
+        await participant.Blocked.WaitAsync(Timeout, cancellationToken);
+
+        // The callback's exception reaches the caller which cancelled the start, but only after the silo has stopped.
+        var exception = await Assert.ThrowsAsync<AggregateException>(() => silo.StopAsync(cancellationToken)).WaitAsync(Timeout, cancellationToken);
+        Assert.Contains(participant.CancellationCallbackFailure, exception.Flatten().InnerExceptions);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start).WaitAsync(Timeout, cancellationToken);
         Assert.True(silo.SiloTerminated.IsCompletedSuccessfully);
         Assert.Equal(SystemStatus.Terminated, silo.SystemStatus);
+        Assert.Equal(SiloStatus.Dead, membership.LocalSiloStatus);
         Assert.False(await CanConnectAsync(siloPort, cancellationToken));
     }
 
@@ -226,14 +254,22 @@ public class SiloStartFailureTests
     {
     }
 
-    /// <summary>A grain service whose <see cref="GrainService.Init"/> never completes.</summary>
-    public sealed class BlockedInitGrainService(GrainId id, Silo silo, ILoggerFactory loggerFactory, TaskCompletionSource initBlocked)
+    public sealed class GrainServiceInitProbe
+    {
+        public TaskCompletionSource Blocked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Ended { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>A grain service whose <see cref="GrainService.Init"/> runs until the service is stopped.</summary>
+    public sealed class BlockedInitGrainService(GrainId id, Silo silo, ILoggerFactory loggerFactory, GrainServiceInitProbe probe)
         : GrainService(id, silo, loggerFactory), IBlockedInitGrainService
     {
-        public override Task Init(IServiceProvider serviceProvider)
+        public override async Task Init(IServiceProvider serviceProvider)
         {
-            initBlocked.TrySetResult();
-            return new TaskCompletionSource().Task;
+            probe.Blocked.TrySetResult();
+            await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, StoppedCancellationTokenSource.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            probe.Ended.TrySetResult();
         }
     }
 
@@ -241,14 +277,21 @@ public class SiloStartFailureTests
     /// Runs at <see cref="ServiceLifecycleStage.ApplicationServices"/>, after the silo listener has started and the
     /// silo has written its <see cref="SiloStatus.Joining"/> row, and either fails or blocks until the start is cancelled.
     /// Its stop can block until the stop is cancelled, and then wait for <c>stopCleanup</c> before it completes.
+    /// With <c>throwOnStartCancellation</c>, it registers a start-token callback which throws.
     /// </summary>
-    private sealed class StartParticipant(bool blockUntilCancelled, bool blockStopUntilCancelled = false, Task? stopCleanup = null) : ILifecycleParticipant<ISiloLifecycle>
+    private sealed class StartParticipant(
+        bool blockUntilCancelled,
+        bool blockStopUntilCancelled = false,
+        Task? stopCleanup = null,
+        bool throwOnStartCancellation = false) : ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly TaskCompletionSource _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _stopBlocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _stopCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public InvalidOperationException Failure { get; } = new("Start failed after the silo started joining.");
+
+        public InvalidOperationException CancellationCallbackFailure { get; } = new("Start cancellation callback failed.");
 
         public bool ReachedAfterJoining { get; private set; }
 
@@ -287,6 +330,9 @@ public class SiloStartFailureTests
                 throw Failure;
             }
 
+            using var registration = throwOnStartCancellation
+                ? cancellationToken.Register(() => throw CancellationCallbackFailure)
+                : default;
             _blocked.SetResult();
             await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
         }
