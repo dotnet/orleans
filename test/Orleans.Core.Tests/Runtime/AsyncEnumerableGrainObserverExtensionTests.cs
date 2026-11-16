@@ -189,17 +189,13 @@ public class AsyncEnumerableGrainObserverExtensionTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var requestId = Guid.NewGuid();
 
-        // First pull returns element 1 and parks the producer in Task.Delay(Infinite, linkedToken).
-        await extension.StartEnumeration(requestId, CreateGateableRequest(started, finallyStarted, release), CancellationToken.None);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-
-        var disposeTask = extension.DisposeAsync(requestId, CancellationToken.None).AsTask();
-
+        Task disposeTask;
         try
         {
-            // Wait deterministically for the producer to enter its finally block. At that instant teardown
-            // is blocked in GracefullyWaitForCompletionAsync on the still-pending producer MoveNextAsync,
-            // so disposeTask cannot possibly be complete.
+            await extension.StartEnumeration(requestId, CreateGateableRequest(started, finallyStarted, release), CancellationToken.None);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+
+            disposeTask = extension.DisposeAsync(requestId, CancellationToken.None).AsTask();
             await finallyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
             Assert.False(disposeTask.IsCompleted, "DisposeAsync must not complete before producer teardown finishes.");
         }
@@ -394,14 +390,15 @@ public class AsyncEnumerableGrainObserverExtensionTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var requestId = Guid.NewGuid();
 
-        await extension.StartEnumeration(requestId, CreateGateableRequest(started, finallyStarted, release), CancellationToken.None);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var moveNext = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
-        await timeProvider.LongPollTimerCreated.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        var disposal = extension.DisposeAsync().AsTask();
+        Task disposal;
         try
         {
+            await extension.StartEnumeration(requestId, CreateGateableRequest(started, finallyStarted, release), CancellationToken.None);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var moveNext = extension.MoveNext<int>(requestId, CancellationToken.None).AsTask();
+            await timeProvider.LongPollTimerCreated.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            disposal = extension.DisposeAsync().AsTask();
             var result = await moveNext.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(EnumerationResult.MissingEnumeratorError, result.Status);
             await timeProvider.LongPollTimerDisposed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -409,8 +406,9 @@ public class AsyncEnumerableGrainObserverExtensionTests
         finally
         {
             release.TrySetResult();
-            await disposal.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
         }
+
+        await disposal.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
     }
 
     private static AsyncEnumerableGrainObserverExtension CreateExtension(TimeProvider timeProvider) =>
