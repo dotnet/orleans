@@ -212,6 +212,116 @@ public class AsyncEnumerableGrainObserverExtensionTests
     }
 
     [Fact]
+    public async Task DisposeAsync_ProducerIgnoresCancellation_WaitsForProducerAndCleanup()
+    {
+        var responseTimeout = TimeSpan.FromMilliseconds(100);
+        var extension = new AsyncEnumerableGrainObserverExtension(
+            Substitute.For<IGrainContext>(),
+            TimeProvider.System,
+            Options.Create(new SiloMessagingOptions { ResponseTimeout = responseTimeout }),
+            NullLogger<AsyncEnumerableGrainObserverExtension>.Instance);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProducer = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tokenUsed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cleanupStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = new TestAsyncEnumerableRequest<int>(
+            () => IgnoreCancellationSequence(started, canceled, releaseProducer, tokenUsed, cleanupStarted, releaseCleanup),
+            maxBatchSize: 2);
+
+        try
+        {
+            var result = await extension.StartEnumeration(Guid.NewGuid(), request, CancellationToken.None);
+            Assert.Equal((EnumerationResult.Element, 1), (result.Status, result.Value));
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            var shutdown = extension.DisposeAsync().AsTask();
+            await canceled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await Assert.ThrowsAsync<TimeoutException>(() => shutdown.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken));
+
+            releaseProducer.TrySetResult();
+            await tokenUsed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await cleanupStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.False(shutdown.IsCompleted);
+
+            releaseCleanup.TrySetResult();
+            await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            releaseProducer.TrySetResult();
+            releaseCleanup.TrySetResult();
+            await extension.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+        }
+    }
+
+    private static async IAsyncEnumerable<int> IgnoreCancellationSequence(
+        TaskCompletionSource started,
+        TaskCompletionSource canceled,
+        TaskCompletionSource releaseProducer,
+        TaskCompletionSource tokenUsed,
+        TaskCompletionSource cleanupStarted,
+        TaskCompletionSource releaseCleanup,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var registration = cancellationToken.Register(() => canceled.TrySetResult());
+        try
+        {
+            yield return 1;
+            started.TrySetResult();
+            await releaseProducer.Task;
+            _ = cancellationToken.WaitHandle;
+            tokenUsed.TrySetResult();
+        }
+        finally
+        {
+            cleanupStarted.TrySetResult();
+            await releaseCleanup.Task;
+        }
+    }
+
+    [Fact]
+    public async Task DisposeAsync_EnumeratorCleanupIsSlow_WaitsForCleanup()
+    {
+        var extension = new AsyncEnumerableGrainObserverExtension(
+            Substitute.For<IGrainContext>(),
+            TimeProvider.System,
+            Options.Create(new SiloMessagingOptions { ResponseTimeout = TimeSpan.FromMilliseconds(100) }),
+            NullLogger<AsyncEnumerableGrainObserverExtension>.Instance);
+        var cleanupStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var enumerator = Substitute.For<IAsyncEnumerator<int>>();
+        enumerator.MoveNextAsync().Returns(new ValueTask<bool>(true));
+        enumerator.Current.Returns(1);
+        enumerator.DisposeAsync().Returns(_ =>
+        {
+            cleanupStarted.TrySetResult();
+            return new ValueTask(releaseCleanup.Task);
+        });
+        var enumerable = Substitute.For<IAsyncEnumerable<int>>();
+        enumerable.GetAsyncEnumerator(Arg.Any<CancellationToken>()).Returns(enumerator);
+        var request = new TestAsyncEnumerableRequest<int>(() => enumerable);
+
+        try
+        {
+            var result = await extension.StartEnumeration(Guid.NewGuid(), request, CancellationToken.None);
+            Assert.Equal((EnumerationResult.Element, 1), (result.Status, result.Value));
+            var shutdown = extension.DisposeAsync().AsTask();
+            await cleanupStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await Assert.ThrowsAsync<TimeoutException>(() => shutdown.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken));
+
+            releaseCleanup.TrySetResult();
+            await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            releaseCleanup.TrySetResult();
+            await extension.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task DisposeAsync_RepliesBeforeCallerTimeoutWhenTeardownIsBlocked()
     {
         var timeProvider = new FakeTimeProvider();

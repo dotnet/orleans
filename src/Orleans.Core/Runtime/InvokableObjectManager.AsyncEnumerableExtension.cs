@@ -630,32 +630,24 @@ Done:;
 
             try
             {
-                // The cancellation signalling above ensures that we won't get stuck
-                // waiting here for the full ResponseTimeout duration.
                 await state.WaitToEnterGateAsync(CancellationToken.None).ConfigureAwait(false);
 
                 gateEntered = true;
 
-                // DisposeAsync must not overlap a running MoveNextAsync, so we wait until a running MoveNextAsync completes fully,
-                // but only up to ResponseTimeout. If the producer ignores cancellation and the wait times out, the
-                // "MoveNextTask is null or { IsCompleted: true }" guard below ensures we abandon instead of calling
-                // DisposeAsync concurrently with the still-pending MoveNextAsync.
-
-                var pendingMoveNextTask = state.MoveNextTask;
-                if (pendingMoveNextTask is not null)
+                // Keep ownership until the producer and its cancellation callbacks finish: disposing
+                // the iterator or token source earlier could race with user code still using them.
+                if (state.MoveNextTask is { } pendingMoveNextTask)
                 {
-                    await WaitWithTimeoutAsync(pendingMoveNextTask, "the producer's pending MoveNextAsync").ConfigureAwait(false);
+                    await WaitForTeardownOperationAsync(pendingMoveNextTask).ConfigureAwait(false);
                 }
 
-                // Then we finalize cancellation (bounded by ResponseTimeout).
-                await WaitWithTimeoutAsync(cancellationTask, "cancellation callbacks to complete").ConfigureAwait(false);
+                await WaitForTeardownOperationAsync(cancellationTask).ConfigureAwait(false);
 
-                // Finally we dispose the enumerator, but only if the producer is no longer running a MoveNextAsync.
-                if (pendingMoveNextTask is null or { IsCompleted: true } && state.Enumerator is { } enumerator)
+                if (state.Enumerator is { } enumerator)
                 {
                     try
                     {
-                        await WaitWithTimeoutAsync(enumerator.DisposeAsync().AsTask(), "the enumerator's disposal").ConfigureAwait(false);
+                        await enumerator.DisposeAsync().ConfigureAwait(false);
                     }
                     catch (Exception exception)
                     {
@@ -691,6 +683,23 @@ Done:;
                 work.TeardownCompletion.TrySetResult();
             }
         }
+
+        private async Task WaitForTeardownOperationAsync(Task task)
+        {
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (task.IsCanceled)
+            {
+                // Cancellation is expected when the producer observes its token.
+            }
+            catch (Exception exception)
+            {
+                LogWarningErrorDisposingEnumerator(_logger, exception);
+            }
+        }
+
         private async Task WaitWithTimeoutAsync(Task task, string operationName, TimeSpan? timeout = null)
         {
             try
@@ -773,10 +782,7 @@ Done:;
                 _ = StartEnumeratorDisposal(state);
             }
 
-            // We cancel the cleanup loop directly via _cleanupCts, NOT via _shutdownCts.
-            // _shutdownCts.Token is used by WaitWithTimeoutAsync inside CompleteDisposalWorkAsync
-            // to wait for the producer's pending MoveNextAsync. If we would cancel here it could result
-            // in the iterator's finally block to never run.
+            // Stop the cleanup loop while retaining ownership of each enumerator's teardown.
             Task? cleanupTask;
             Task? cancelCleanupTask;
             lock (_lock)
@@ -797,13 +803,7 @@ Done:;
 
             try
             {
-                await Task.WhenAll(states.Select(s => s.TeardownTask!))
-                    .WaitAsync(_messagingOptions.ResponseTimeout, _timeProvider)
-                    .ConfigureAwait(false);
-            }
-            catch (TimeoutException)
-            {
-                LogWarningErrorDisposingEnumerator(_logger, new TimeoutException("Timed out waiting for all observer async enumerators to dispose."));
+                await Task.WhenAll(states.Select(s => s.TeardownTask!)).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
