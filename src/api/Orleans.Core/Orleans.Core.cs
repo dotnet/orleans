@@ -1024,15 +1024,6 @@ namespace Orleans.GrainReferences
         public Runtime.GrainReference CreateReference(Runtime.GrainId grainId, Runtime.GrainInterfaceType interfaceType) { throw null; }
     }
 
-    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public sealed partial class GrainReferenceActivatorAttribute : System.Attribute
-    {
-        public GrainReferenceActivatorAttribute(System.Type activatorType) { }
-
-        [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors)]
-        public System.Type ActivatorType { get { throw null; } }
-    }
-
     public partial interface IGrainReferenceActivator
     {
         Runtime.GrainReference CreateReference(Runtime.GrainId grainId);

@@ -33,8 +33,7 @@ public class GeneratedProxySharedCopierTests
         Assert.NotEqual(typeof(GrainReferenceShared), first.Shared.GetType());
         Assert.Equal(1, constructions);
         Assert.True(fixture.Provider.TryGet(ReferenceConstructionFixture.GrainType, InterfaceType, out var activator));
-        Assert.Equal("ProxyActivator", activator.GetType().Name);
-        Assert.Same(first.GetType(), activator.GetType().DeclaringType);
+        Assert.Equal("ProxyActivator_ICopyingConstructionGrain", activator.GetType().Name);
         Assert.Equal(ReferenceConstructionFixture.GrainType, first.Shared.GrainType);
         Assert.Equal(InterfaceType, first.Shared.InterfaceType);
         Assert.Same(fixture.Runtime, first.Shared.Runtime);

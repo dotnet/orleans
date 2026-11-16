@@ -60,7 +60,6 @@ namespace OrleansCodeGen
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::Orleans.GrainReferences.GrainReferenceActivatorAttribute(typeof(Proxy_IMyGrain.ProxyActivator))]
     internal sealed class Proxy_IMyGrain : global::Orleans.Runtime.GrainReference, global::IMyGrain
     {
         public Proxy_IMyGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
@@ -73,18 +72,18 @@ namespace OrleansCodeGen
             request.arg0 = arg0;
             return base.InvokeAsync<string>(request).AsTask();
         }
+    }
 
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-        internal sealed class ProxyActivator : global::Orleans.GrainReferences.IGrainReferenceActivator
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class ProxyActivator_IMyGrain : global::Orleans.GrainReferences.IGrainReferenceActivator
+    {
+        private readonly global::Orleans.Runtime.GrainReferenceShared _shared;
+        public ProxyActivator_IMyGrain(global::Orleans.Runtime.GrainReferenceShared shared)
         {
-            private readonly global::Orleans.Runtime.GrainReferenceShared _shared;
-            public ProxyActivator(global::Orleans.Runtime.GrainReferenceShared shared)
-            {
-                _shared = shared;
-            }
-
-            public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new Proxy_IMyGrain(_shared, grainId.Key);
+            _shared = shared;
         }
+
+        public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new global::OrleansCodeGen.Proxy_IMyGrain(_shared, grainId.Key);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -177,6 +176,7 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404), typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddCopier(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404), typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.Proxy_IMyGrain));
+            config.AddInterfaceProxyActivator(typeof(OrleansCodeGen.Proxy_IMyGrain), typeof(OrleansCodeGen.ProxyActivator_IMyGrain));
             config.AddInterface(typeof(global::IMyGrain));
             var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
             var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));

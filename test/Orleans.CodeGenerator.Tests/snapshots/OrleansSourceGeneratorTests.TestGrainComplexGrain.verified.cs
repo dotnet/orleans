@@ -103,10 +103,9 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::Orleans.GrainReferences.GrainReferenceActivatorAttribute(typeof(Proxy_IComplexGrain.ProxyActivator))]
     internal sealed class Proxy_IComplexGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IComplexGrain
     {
-        public Proxy_IComplexGrain(ProxyShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
+        public Proxy_IComplexGrain(global::OrleansCodeGen.TestProject.ProxyShared_IComplexGrain arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
         }
 
@@ -116,31 +115,9 @@ namespace OrleansCodeGen.TestProject
             request.arg0 = arg0;
             request.arg1 = arg1;
             using var copyContext = base.CopyContextPool.GetContext();
-            request.arg2 = ((ProxyShared)base.Shared)._copier_ComplexData_765A40ED2309AF35.DeepCopy(arg2, copyContext);
+            request.arg2 = ((global::OrleansCodeGen.TestProject.ProxyShared_IComplexGrain)base.Shared)._copier_ComplexData_765A40ED2309AF35.DeepCopy(arg2, copyContext);
             request.arg3 = arg3;
             return base.InvokeAsync<global::TestProject.ComplexData>(request).AsTask();
-        }
-
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-        internal sealed class ProxyActivator : global::Orleans.GrainReferences.IGrainReferenceActivator
-        {
-            private readonly ProxyShared _shared;
-            public ProxyActivator(global::Orleans.Runtime.GrainReferenceShared shared)
-            {
-                _shared = new ProxyShared(shared);
-            }
-
-            public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new Proxy_IComplexGrain(_shared, grainId.Key);
-        }
-
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-        internal sealed class ProxyShared : global::Orleans.Runtime.GrainReferenceShared
-        {
-            public readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
-            public ProxyShared(global::Orleans.Runtime.GrainReferenceShared shared) : base(shared)
-            {
-                _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
-            }
         }
     }
 
@@ -460,6 +437,28 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class ProxyActivator_IComplexGrain : global::Orleans.GrainReferences.IGrainReferenceActivator
+    {
+        private readonly global::OrleansCodeGen.TestProject.ProxyShared_IComplexGrain _shared;
+        public ProxyActivator_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared shared)
+        {
+            _shared = new global::OrleansCodeGen.TestProject.ProxyShared_IComplexGrain(shared);
+        }
+
+        public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new global::OrleansCodeGen.TestProject.Proxy_IComplexGrain(_shared, grainId.Key);
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class ProxyShared_IComplexGrain : global::Orleans.Runtime.GrainReferenceShared
+    {
+        public readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
+        public ProxyShared_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared shared) : base(shared)
+        {
+            _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
@@ -475,6 +474,7 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain), typeof(global::TestProject.ComplexGrain));
             config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain), typeof(global::TestProject.ComplexGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain));
+            config.AddInterfaceProxyActivator(typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain), typeof(OrleansCodeGen.TestProject.ProxyActivator_IComplexGrain));
             config.AddInterface(typeof(global::TestProject.IComplexGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ComplexGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexData), typeof(global::TestProject.ComplexData));

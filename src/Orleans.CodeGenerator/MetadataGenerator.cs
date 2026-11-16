@@ -131,7 +131,12 @@ internal class MetadataGenerator(
 
         foreach (var type in orderedProxyInterfaces)
         {
-            WriteRegistration(writer, "AddInterfaceProxy", CodeText.Type(GetGeneratedProxyTypeSyntax(type)));
+            var proxyType = CodeText.Type(GetGeneratedProxyTypeSyntax(type));
+            WriteRegistration(writer, "AddInterfaceProxy", proxyType);
+            if (type.HasActivator)
+            {
+                WriteRegistration(writer, "AddInterfaceProxyActivator", proxyType, CodeText.Type(GetGeneratedProxyActivatorTypeSyntax(type)));
+            }
         }
 
         foreach (var type in orderedProxyInterfaces.Select(static proxy => proxy.InterfaceType).Distinct())
@@ -513,10 +518,13 @@ internal class MetadataGenerator(
     }
 
     private static TypeSyntax GetGeneratedProxyTypeSyntax(ProxyInterfaceModel proxy)
-    {
-        var genericArity = Math.Max(proxy.TypeParameters.Length, CountGenericArguments(proxy.InterfaceType));
-        return CreateGeneratedTypeSyntax(proxy.GeneratedNamespace, ProxyGenerator.GetSimpleClassName(proxy.Name), genericArity);
-    }
+        => CreateGeneratedTypeSyntax(proxy.GeneratedNamespace, ProxyGenerator.GetSimpleClassName(proxy.Name), GetGeneratedProxyArity(proxy));
+
+    private static TypeSyntax GetGeneratedProxyActivatorTypeSyntax(ProxyInterfaceModel proxy)
+        => CreateGeneratedTypeSyntax(proxy.GeneratedNamespace, ProxyGenerator.GetActivatorClassName(proxy.Name), GetGeneratedProxyArity(proxy));
+
+    private static int GetGeneratedProxyArity(ProxyInterfaceModel proxy)
+        => Math.Max(proxy.TypeParameters.Length, CountGenericArguments(proxy.InterfaceType));
 
     private static int CountGenericArguments(TypeRef typeRef)
     {

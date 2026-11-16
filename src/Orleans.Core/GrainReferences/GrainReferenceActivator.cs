@@ -183,12 +183,13 @@ namespace Orleans.GrainReferences
     }
 
     /// <summary>
-    /// Provides functionality for mapping from a <see cref="GrainInterfaceType"/> to the corresponding generated proxy type.
+    /// Provides functionality for mapping from a <see cref="GrainInterfaceType"/> to the corresponding generated proxy type
+    /// and the activator type which creates its instances.
     /// </summary>
     internal class RpcProvider
     {
         private readonly TypeConverter _typeConverter;
-        private readonly Dictionary<GrainInterfaceType, Type> _mapping;
+        private readonly Dictionary<GrainInterfaceType, (Type Proxy, Type? Activator)> _mapping;
 
         /// <summary>
         /// Initializes a new  instance of the <see cref="RpcProvider"/> class.
@@ -203,7 +204,8 @@ namespace Orleans.GrainReferences
         {
             _typeConverter = typeConverter;
             var proxyTypes = config.Value.InterfaceProxyTypes;
-            _mapping = new Dictionary<GrainInterfaceType, Type>();
+            var activatorTypes = config.Value.InterfaceProxyActivatorTypes;
+            _mapping = new Dictionary<GrainInterfaceType, (Type, Type?)>();
             foreach (var proxyType in proxyTypes)
             {
                 if (!typeof(IAddressable).IsAssignableFrom(proxyType))
@@ -219,7 +221,7 @@ namespace Orleans.GrainReferences
 
                 var grainInterface = GetMainInterface(type);
                 var id = resolver.GetGrainInterfaceType(grainInterface);
-                _mapping[id] = type;
+                _mapping[id] = (type, activatorTypes.GetValueOrDefault(type));
             }
 
             [UnconditionalSuppressMessage(
@@ -254,12 +256,14 @@ namespace Orleans.GrainReferences
         }
 
         /// <summary>
-        /// Gets the generated proxy object type corresponding to the specified <see cref="GrainInterfaceType"/>.
+        /// Gets the generated proxy object type corresponding to the specified <see cref="GrainInterfaceType"/>, and the
+        /// activator type registered for it.
         /// </summary>
         /// <param name="interfaceType">The grain interface type.</param>
         /// <param name="result">The proxy object type.</param>
+        /// <param name="activatorType">The activator type, or <see langword="null"/> if none is registered for the proxy.</param>
         /// <returns>A value indicating whether a suitable type was found and was able to be constructed.</returns>
-        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Type? result)
+        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Type? result, out Type? activatorType)
         {
             GrainInterfaceType lookupId;
             Type[]? args;
@@ -274,14 +278,18 @@ namespace Orleans.GrainReferences
                 args = default;
             }
 
-            if (!_mapping.TryGetValue(lookupId, out result))
+            if (!_mapping.TryGetValue(lookupId, out var entry))
             {
+                result = null;
+                activatorType = null;
                 return false;
             }
 
+            (result, activatorType) = entry;
             if (args is not null)
             {
                 result = result.MakeGenericType(args);
+                activatorType = activatorType?.MakeGenericType(args);
             }
 
             return true;
@@ -331,9 +339,13 @@ namespace Orleans.GrainReferences
             "Trimming",
             "IL2067",
             Justification = "Generated proxies are registered using TypeManifestOptions.AddInterfaceProxy, which preserves their public constructors before they enter RpcProvider's mapping.")]
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2072",
+            Justification = "Proxies and their activators are registered using TypeManifestOptions.AddInterfaceProxy and AddInterfaceProxyActivator, which preserve their public constructors before they enter RpcProvider's mapping.")]
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator? activator)
         {
-            if (!_rpcProvider.TryGet(interfaceType, out var proxyType))
+            if (!_rpcProvider.TryGet(interfaceType, out var proxyType, out var activatorType))
             {
                 activator = default;
                 return false;
@@ -360,43 +372,31 @@ namespace Orleans.GrainReferences
                 _codecProvider,
                 _copyContextPool,
                 _serviceProvider);
-            activator = CreateGeneratedActivator(proxyType, shared) ?? new GrainReferenceActivator(proxyType, shared);
+            activator = CreateActivator(proxyType, activatorType, shared);
             return true;
         }
 
         /// <summary>
-        /// Creates the activator which a generated proxy declares with <see cref="GrainReferenceActivatorAttribute"/>.
+        /// Creates the activator for a proxy type: the activator registered for it in the type manifest, or a reflection-based
+        /// activator for proxies without one.
         /// </summary>
-        /// <returns>The activator, or <see langword="null"/> if the proxy declares none.</returns>
-        [UnconditionalSuppressMessage(
-            "AOT",
-            "IL3050",
-            Justification = "Generic proxy types are already constructed with MakeGenericType by RpcProvider, and their nested activators share those type arguments.")]
-        [UnconditionalSuppressMessage(
-            "Trimming",
-            "IL2055",
-            Justification = "GrainReferenceActivatorAttribute preserves the public constructors of the activator's generic type definition.")]
-        [UnconditionalSuppressMessage(
-            "Trimming",
-            "IL2073",
-            Justification = "GrainReferenceActivatorAttribute preserves the public constructors of the activator's generic type definition.")]
-        internal static IGrainReferenceActivator? CreateGeneratedActivator(Type proxyType, GrainReferenceShared shared)
+        /// <remarks>
+        /// The registered activator's constructor runs once for each grain type and interface, so its exceptions, such as
+        /// copier resolution failures, surface directly from reference creation.
+        /// </remarks>
+        internal static IGrainReferenceActivator CreateActivator(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type proxyType,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type? activatorType,
+            GrainReferenceShared shared)
         {
-            if (proxyType.GetCustomAttribute<GrainReferenceActivatorAttribute>(inherit: false) is not { } attribute)
+            if (activatorType is null)
             {
-                return null;
+                return new GrainReferenceActivator(proxyType, shared);
             }
 
-            var activatorType = GetActivatorType(attribute, proxyType);
             var constructor = activatorType.GetConstructor([typeof(GrainReferenceShared)])
                 ?? throw new SerializerException("Invalid grain reference activator type: " + activatorType);
             return (IGrainReferenceActivator)ConstructorInvoker.Create(constructor).Invoke(shared);
-
-            [return: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
-            static Type GetActivatorType(GrainReferenceActivatorAttribute attribute, Type proxyType)
-                => attribute.ActivatorType.IsGenericTypeDefinition
-                    ? attribute.ActivatorType.MakeGenericType(proxyType.GenericTypeArguments)
-                    : attribute.ActivatorType;
         }
 
         /// <summary>
@@ -472,26 +472,5 @@ namespace Orleans.GrainReferences
         /// <param name="grainId">The grain id.</param>
         /// <returns>A new grain reference.</returns>
         public GrainReference CreateReference(GrainId grainId);
-    }
-
-    /// <summary>
-    /// Specifies the <see cref="IGrainReferenceActivator"/> which creates instances of a generated grain reference proxy.
-    /// </summary>
-    /// <remarks>
-    /// The activator type has a public constructor which accepts the <see cref="GrainReferenceShared"/> for a grain type
-    /// and grain interface type. The runtime creates one activator for each of those pairs. The activator holds the state
-    /// which every reference it creates shares, such as the copiers its proxy uses for method arguments. An activator
-    /// nested in a generic proxy is specified as its generic type definition and is closed with the proxy's type arguments.
-    /// </remarks>
-    /// <param name="activatorType">The activator type.</param>
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public sealed class GrainReferenceActivatorAttribute(
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type activatorType) : Attribute
-    {
-        /// <summary>
-        /// Gets the activator type.
-        /// </summary>
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
-        public Type ActivatorType { get; } = activatorType ?? throw new ArgumentNullException(nameof(activatorType));
     }
 }

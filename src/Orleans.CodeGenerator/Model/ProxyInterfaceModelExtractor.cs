@@ -109,7 +109,8 @@ internal static class ProxyInterfaceModelExtractor
             proxyBase,
             methods,
             SourceLocation: SymbolSourceLocationExtractor.GetSourceLocation(typeSymbol),
-            MetadataIdentity: TypeMetadataIdentity.Create(typeSymbol));
+            MetadataIdentity: TypeMetadataIdentity.Create(typeSymbol),
+            HasActivator: ProxyGenerator.HasActivator(libraryTypes, proxyBaseType));
     }
 
     private static string GetProxyInterfaceName(INamedTypeSymbol typeSymbol, LibraryTypes libraryTypes)

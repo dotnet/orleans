@@ -4,10 +4,10 @@ namespace Orleans.CodeGenerator.Model;
 /// The spelled declaration of a generated proxy class. Every constructor shares <see cref="ConstructorStatements"/>.
 /// </summary>
 /// <remarks>
-/// Grain reference proxies declare a nested <see cref="Activator"/>, which the runtime creates once for each grain type and
-/// interface, and which creates every reference for them. Proxies with instance copiers also declare a nested type named
-/// <see cref="SharedTypeName"/>, derived from <c>GrainReferenceShared</c>, which holds <see cref="SharedFields"/>, resolved
-/// by <see cref="SharedStatements"/>. The activator constructs one instance of it and passes it to every proxy it creates.
+/// Grain reference proxies have an <see cref="Activator"/>, a sibling type which the runtime creates once for each grain
+/// type and interface, and which creates every reference for them. Proxies with instance copiers also have a sibling type
+/// derived from <c>GrainReferenceShared</c> which holds <see cref="SharedFields"/>, resolved by
+/// <see cref="SharedStatements"/>. The activator constructs one instance of it and passes it to every proxy it creates.
 /// Other proxies hold their copiers in <see cref="Fields"/>.
 /// </remarks>
 internal sealed record ProxyEmissionPlan(
@@ -20,7 +20,6 @@ internal sealed record ProxyEmissionPlan(
     EquatableArray<string> ConstructorStatements,
     EquatableArray<ProxyMethodEmissionPlan> Methods,
     ProxyActivatorEmissionPlan? Activator,
-    string? SharedTypeName,
     EquatableArray<string> SharedFields,
     EquatableArray<string> SharedStatements)
 {
@@ -33,15 +32,15 @@ internal sealed record ProxyEmissionPlan(
 }
 
 /// <summary>
-/// The nested activator of a grain reference proxy: the attribute which names it on the proxy, its type name, the type
-/// and initializer of the shared state it holds, and the proxy type it creates.
+/// The activator of a grain reference proxy: its class name, the type and initializer of the shared state it holds, the
+/// proxy type it creates, and the class name of the proxy's shared state type when the proxy has copiers.
 /// </summary>
 internal sealed record ProxyActivatorEmissionPlan(
-    string Attribute,
-    string TypeName,
+    string ClassName,
     string SharedType,
     string SharedInitializer,
-    string ProxyType);
+    string ProxyType,
+    string? SharedClassName);
 
 /// <summary>An explicit interface implementation: its declaration line and body statements.</summary>
 internal sealed record ProxyMethodEmissionPlan(string Declaration, EquatableArray<string> Statements);

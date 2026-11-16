@@ -351,9 +351,10 @@ public class MembershipTableCancellationTests
             services.GetRequiredService<CodecProvider>(),
             services.GetRequiredService<CopyContextPool>(),
             services);
-        var proxyType = Assert.Single(services.GetRequiredService<IOptions<TypeManifestOptions>>().Value.InterfaceProxies,
+        var options = services.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var proxyType = Assert.Single(options.InterfaceProxyTypes,
             type => type.Assembly == typeof(IMembershipTable).Assembly && typeof(IMembershipTableSystemTarget).IsAssignableFrom(type));
-        var activator = Assert.IsAssignableFrom<IGrainReferenceActivator>(GrainReferenceActivatorProvider.CreateGeneratedActivator(proxyType, shared));
+        var activator = GrainReferenceActivatorProvider.CreateActivator(proxyType, options.InterfaceProxyActivatorTypes[proxyType], shared);
         var proxy = activator.CreateReference(GrainId.Create(shared.GrainType, IdSpan.Create("membership")));
 
         var method = Assert.Single(typeof(IMembershipTable).GetMethods(), method => method.Name == operation);

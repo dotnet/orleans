@@ -39,10 +39,10 @@ public class ProxyConstructionBenchmark
             services.GetRequiredService<CodecProvider>(),
             services.GetRequiredService<CopyContextPool>(),
             services);
-        _noCopiers = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyNoCopierGrain.ProxyActivator(shared);
-        _concrete = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyConcreteCopierGrain.ProxyActivator(shared);
-        _interface = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyInterfaceCopierGrain.ProxyActivator(shared);
-        _fourInterfaces = new OrleansCodeGen.Benchmarks.Serialization.Proxy_IProxyFourInterfaceCopiersGrain.ProxyActivator(shared);
+        _noCopiers = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyNoCopierGrain(shared);
+        _concrete = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyConcreteCopierGrain(shared);
+        _interface = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyInterfaceCopierGrain(shared);
+        _fourInterfaces = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyFourInterfaceCopiersGrain(shared);
     }
 
     [Benchmark(Baseline = true)]
