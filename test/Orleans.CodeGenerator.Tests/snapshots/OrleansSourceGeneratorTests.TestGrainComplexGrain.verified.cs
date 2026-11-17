@@ -442,9 +442,9 @@ namespace OrleansCodeGen.TestProject
     internal sealed class ProxyActivator_IComplexGrain : global::Orleans.GrainReferences.IGrainReferenceActivator
     {
         private readonly global::OrleansCodeGen.TestProject.ProxyShared_IComplexGrain _shared;
-        public ProxyActivator_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared shared)
+        public ProxyActivator_IComplexGrain(global::Orleans.Runtime.GrainType arg0, global::Orleans.Runtime.GrainInterfaceType arg1, ushort arg2, global::Orleans.Runtime.IGrainReferenceRuntime arg3, global::Orleans.CodeGeneration.InvokeMethodOptions arg4, global::Orleans.Serialization.Serializers.CodecProvider arg5, global::Orleans.Serialization.Cloning.CopyContextPool arg6, global::System.IServiceProvider arg7)
         {
-            _shared = new global::OrleansCodeGen.TestProject.ProxyShared_IComplexGrain(shared);
+            _shared = new global::OrleansCodeGen.TestProject.ProxyShared_IComplexGrain(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         }
 
         public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new global::OrleansCodeGen.TestProject.Proxy_IComplexGrain(_shared, grainId.Key);
@@ -454,7 +454,7 @@ namespace OrleansCodeGen.TestProject
     internal sealed class ProxyShared_IComplexGrain : global::Orleans.Runtime.GrainReferenceShared
     {
         public readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
-        public ProxyShared_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared shared) : base(shared)
+        public ProxyShared_IComplexGrain(global::Orleans.Runtime.GrainType arg0, global::Orleans.Runtime.GrainInterfaceType arg1, ushort arg2, global::Orleans.Runtime.IGrainReferenceRuntime arg3, global::Orleans.CodeGeneration.InvokeMethodOptions arg4, global::Orleans.Serialization.Serializers.CodecProvider arg5, global::Orleans.Serialization.Cloning.CopyContextPool arg6, global::System.IServiceProvider arg7) : base(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
         {
             _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
         }

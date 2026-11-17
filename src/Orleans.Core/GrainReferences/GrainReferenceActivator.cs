@@ -362,7 +362,9 @@ namespace Orleans.GrainReferences
 
             var invokeMethodOptions = unordered ? InvokeMethodOptions.Unordered : InvokeMethodOptions.None;
             var runtime = _grainReferenceRuntime ??= _serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
-            var shared = new GrainReferenceShared(
+            activator = CreateActivator(
+                proxyType,
+                activatorType,
                 grainType,
                 interfaceType,
                 interfaceVersion,
@@ -371,7 +373,6 @@ namespace Orleans.GrainReferences
                 _codecProvider,
                 _copyContextPool,
                 _serviceProvider);
-            activator = CreateActivator(proxyType, activatorType, shared);
             return true;
         }
 
@@ -386,16 +387,27 @@ namespace Orleans.GrainReferences
         internal static IGrainReferenceActivator CreateActivator(
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type proxyType,
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type? activatorType,
-            GrainReferenceShared shared)
+            GrainType grainType,
+            GrainInterfaceType interfaceType,
+            ushort interfaceVersion,
+            IGrainReferenceRuntime runtime,
+            InvokeMethodOptions invokeMethodOptions,
+            CodecProvider codecProvider,
+            CopyContextPool copyContextPool,
+            IServiceProvider serviceProvider)
         {
             if (activatorType is null)
             {
-                return new GrainReferenceActivator(proxyType, shared);
+                return new GrainReferenceActivator(proxyType, new GrainReferenceShared(
+                    grainType, interfaceType, interfaceVersion, runtime, invokeMethodOptions, codecProvider, copyContextPool, serviceProvider));
             }
 
-            var constructor = activatorType.GetConstructor([typeof(GrainReferenceShared)])
+            var constructor = activatorType.GetConstructor([
+                typeof(GrainType), typeof(GrainInterfaceType), typeof(ushort), typeof(IGrainReferenceRuntime),
+                typeof(InvokeMethodOptions), typeof(CodecProvider), typeof(CopyContextPool), typeof(IServiceProvider)])
                 ?? throw new SerializerException("Invalid grain reference activator type: " + activatorType);
-            return (IGrainReferenceActivator)ConstructorInvoker.Create(constructor).Invoke(shared);
+            return (IGrainReferenceActivator)ConstructorInvoker.Create(constructor).Invoke([
+                grainType, interfaceType, interfaceVersion, runtime, invokeMethodOptions, codecProvider, copyContextPool, serviceProvider]);
         }
 
         /// <summary>

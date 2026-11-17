@@ -254,18 +254,18 @@ internal static class Program
         var proxyType = options.InterfaceProxies.Single(type => typeof(ITrimSmokeGrain).IsAssignableFrom(type));
         var grainType = GrainType.Create("trim-smoke");
         var interfaceType = GrainInterfaceType.Create("trim-smoke-interface");
-        var shared = new GrainReferenceShared(
+        object?[] arguments = [
             grainType,
             interfaceType,
-            interfaceVersion: 0,
-            runtime: null!,
+            (ushort)0,
+            null,
             InvokeMethodOptions.None,
             codecProvider,
             serviceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(),
-            serviceProvider);
+            serviceProvider];
         var referenceActivator = new Orleans.GrainReferences.GrainReferenceActivator(
             serviceProvider,
-            [new TrimSmokeReferenceActivatorProvider(options.InterfaceProxyActivators[proxyType], shared)]);
+            [new TrimSmokeReferenceActivatorProvider(options.InterfaceProxyActivators[proxyType], arguments)]);
 
         var proxy = referenceActivator.CreateReference(
             GrainId.Create(grainType, IdSpan.Create("key")),
@@ -371,7 +371,7 @@ internal sealed class CustomGenericActivator<T> : Orleans.Serialization.Activato
 
 internal sealed class TrimSmokeReferenceActivatorProvider(
     Type activatorType,
-    GrainReferenceShared shared) : Orleans.GrainReferences.IGrainReferenceActivatorProvider
+    object?[] arguments) : Orleans.GrainReferences.IGrainReferenceActivatorProvider
 {
     [UnconditionalSuppressMessage(
         "Trimming",
@@ -386,7 +386,7 @@ internal sealed class TrimSmokeReferenceActivatorProvider(
         GrainInterfaceType interfaceType,
         [NotNullWhen(true)] out Orleans.GrainReferences.IGrainReferenceActivator? activator)
     {
-        activator = (Orleans.GrainReferences.IGrainReferenceActivator)Activator.CreateInstance(activatorType, shared)!;
+        activator = (Orleans.GrainReferences.IGrainReferenceActivator)Activator.CreateInstance(activatorType, arguments)!;
         return true;
     }
 }

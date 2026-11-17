@@ -75,6 +75,36 @@ public class GeneratedProxySharedCopierTests
         Assert.Equal(2, calls);
     }
 
+    [Theory]
+    [InlineData(InvokeMethodOptions.None)]
+    [InlineData(InvokeMethodOptions.Unordered)]
+    public void DerivedSharedStateIsInitializedFromActivatorArguments(InvokeMethodOptions invokeMethodOptions)
+    {
+        using var fixture = new ReferenceConstructionFixture();
+        var options = fixture.Services.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var proxyType = Assert.Single(options.InterfaceProxyTypes, typeof(ICopyingConstructionGrain).IsAssignableFrom);
+        var codecProvider = fixture.Services.GetRequiredService<CodecProvider>();
+        var copyContextPool = fixture.Services.GetRequiredService<CopyContextPool>();
+        var grainType = GrainType.Create("direct-shared-construction");
+        var activator = GrainReferenceActivatorProvider.CreateActivator(
+            proxyType, options.InterfaceProxyActivatorTypes[proxyType],
+            grainType, InterfaceType, interfaceVersion: 29, fixture.Runtime,
+            invokeMethodOptions, codecProvider, copyContextPool, fixture.Services);
+        var first = activator.CreateReference(GrainId.Create(grainType, IdSpan.Create("first")));
+        var second = activator.CreateReference(GrainId.Create(grainType, IdSpan.Create("second")));
+
+        Assert.NotEqual(typeof(GrainReferenceShared), first.Shared.GetType());
+        Assert.Same(first.Shared, second.Shared);
+        Assert.Equal(grainType, first.Shared.GrainType);
+        Assert.Equal(InterfaceType, first.Shared.InterfaceType);
+        Assert.Equal(29, first.Shared.InterfaceVersion);
+        Assert.Equal(invokeMethodOptions, first.Shared.InvokeMethodOptions);
+        Assert.Same(fixture.Runtime, first.Shared.Runtime);
+        Assert.Same(codecProvider, first.Shared.CodecProvider);
+        Assert.Same(copyContextPool, first.Shared.CopyContextPool);
+        Assert.Same(fixture.Services, first.Shared.ServiceProvider);
+    }
+
     [Fact]
     public void ReferencesDoNotRetainCopiersFromAnUnpublishedConstructionGraph()
     {

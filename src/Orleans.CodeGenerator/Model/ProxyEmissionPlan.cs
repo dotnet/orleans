@@ -33,13 +33,14 @@ internal sealed record ProxyEmissionPlan(
 }
 
 /// <summary>
-/// The activator of a grain reference proxy: its class name, the type and initializer of the shared state it holds, the
+/// The activator of a grain reference proxy: its class name, the type and constructor arguments of the shared state it holds, the
 /// proxy type it creates, and the class name of the proxy's shared state type when the proxy has copiers.
 /// </summary>
 internal sealed record ProxyActivatorEmissionPlan(
     string ClassName,
     string SharedType,
-    string SharedInitializer,
+    string ConstructorParameters,
+    string ConstructorArguments,
     string ProxyType,
     string? SharedClassName);
 

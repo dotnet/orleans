@@ -30,19 +30,18 @@ public class ProxyConstructionBenchmark
         var services = new ServiceCollection()
             .AddSerializer(builder => builder.AddAssembly(typeof(ProxyConstructionBenchmark).Assembly))
             .BuildServiceProvider();
-        var shared = new GrainReferenceShared(
-            GrainType.Create("proxy-benchmark"),
-            GrainInterfaceType.Create("proxy-benchmark"),
-            interfaceVersion: 0,
-            runtime: null!,
-            InvokeMethodOptions.None,
-            services.GetRequiredService<CodecProvider>(),
-            services.GetRequiredService<CopyContextPool>(),
-            services);
-        _noCopiers = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyNoCopierGrain(shared);
-        _concrete = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyConcreteCopierGrain(shared);
-        _interface = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyInterfaceCopierGrain(shared);
-        _fourInterfaces = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyFourInterfaceCopiersGrain(shared);
+        var grainType = GrainType.Create("proxy-benchmark");
+        var interfaceType = GrainInterfaceType.Create("proxy-benchmark");
+        var codecProvider = services.GetRequiredService<CodecProvider>();
+        var copyContextPool = services.GetRequiredService<CopyContextPool>();
+        _noCopiers = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyNoCopierGrain(
+            grainType, interfaceType, 0, null!, InvokeMethodOptions.None, codecProvider, copyContextPool, services);
+        _concrete = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyConcreteCopierGrain(
+            grainType, interfaceType, 0, null!, InvokeMethodOptions.None, codecProvider, copyContextPool, services);
+        _interface = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyInterfaceCopierGrain(
+            grainType, interfaceType, 0, null!, InvokeMethodOptions.None, codecProvider, copyContextPool, services);
+        _fourInterfaces = new OrleansCodeGen.Benchmarks.Serialization.ProxyActivator_IProxyFourInterfaceCopiersGrain(
+            grainType, interfaceType, 0, null!, InvokeMethodOptions.None, codecProvider, copyContextPool, services);
     }
 
     [Benchmark(Baseline = true)]

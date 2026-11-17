@@ -45,10 +45,16 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             var typeArguments = typeParameters.Count == 0 ? string.Empty : $"<{string.Join(", ", typeParameters.Select(static parameter => parameter.Name))}>";
             var sharedClassName = fieldDescriptions.Count > 0 ? GetSharedClassName(interfaceDescription.Name) : null;
             sharedType = sharedClassName is null ? null : $"{qualifier}{sharedClassName}{typeArguments}";
+            var sharedConstructor = LibraryTypes.GrainReferenceSharedOrDefault!.InstanceConstructors.Single(
+                constructor => constructor.DeclaredAccessibility == Accessibility.Public);
+            var constructorParameters = new StringBuilder();
+            AppendParameters(constructorParameters, sharedConstructor.Parameters, typeParameterSubstitutions: null);
+            var constructorArguments = string.Join(", ", Enumerable.Range(0, sharedConstructor.Parameters.Length).Select(static index => $"arg{index}"));
             activator = new(
                 GetActivatorClassName(interfaceDescription.Name),
                 sharedType ?? SharedBaseTypeName,
-                sharedType is null ? "shared" : $"new {sharedType}(shared)",
+                constructorParameters.ToString(),
+                constructorArguments,
                 $"{qualifier}{generatedClassName}{typeArguments}",
                 sharedClassName);
         }
@@ -154,7 +160,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             WriteActivator(writer, activator, plan);
             if (activator.SharedClassName is { } sharedClassName)
             {
-                WriteShared(writer, sharedClassName, plan);
+                WriteShared(writer, activator, sharedClassName, plan);
             }
         }
     }
@@ -169,15 +175,15 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         GenericParameterEmissionPlan.WriteDeclarationLine(writer, declaration, plan.TypeParameters);
         writer.OpenBlock();
         writer.WriteLine($"private readonly {activator.SharedType} _shared;");
-        writer.WriteLine($"public {activator.ClassName}({SharedBaseTypeName} shared)");
+        writer.WriteLine($"public {activator.ClassName}({activator.ConstructorParameters})");
         writer.OpenBlock();
-        writer.WriteLine($"_shared = {activator.SharedInitializer};");
+        writer.WriteLine($"_shared = new {activator.SharedType}({activator.ConstructorArguments});");
         writer.CloseBlock();
         writer.WriteLine($"public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new {activator.ProxyType}(_shared, grainId.Key);");
         writer.CloseBlock();
     }
 
-    private static void WriteShared(SourceWriter writer, string sharedClassName, ProxyEmissionPlan plan)
+    private static void WriteShared(SourceWriter writer, ProxyActivatorEmissionPlan activator, string sharedClassName, ProxyEmissionPlan plan)
     {
         var declaration = new StringBuilder();
         declaration.Append("internal sealed class ").Append(sharedClassName);
@@ -191,7 +197,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             writer.WriteLine(field);
         }
 
-        writer.WriteLine($"public {sharedClassName}({SharedBaseTypeName} shared) : base(shared)");
+        writer.WriteLine($"public {sharedClassName}({activator.ConstructorParameters}) : base({activator.ConstructorArguments})");
         writer.OpenBlock();
         foreach (var statement in plan.SharedStatements)
         {

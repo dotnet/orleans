@@ -52,27 +52,6 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="GrainReferenceShared"/> class with the state of <paramref name="other"/>.
-        /// </summary>
-        /// <remarks>
-        /// Derived types use this constructor to add state which is shared by all grain references of a given proxy type,
-        /// such as the copiers which generated proxies use to copy method arguments.
-        /// </remarks>
-        /// <param name="other">The instance whose state is shared.</param>
-        protected GrainReferenceShared(GrainReferenceShared other)
-        {
-            ArgumentNullException.ThrowIfNull(other);
-            this.GrainType = other.GrainType;
-            this.InterfaceType = other.InterfaceType;
-            this.Runtime = other.Runtime;
-            this.InvokeMethodOptions = other.InvokeMethodOptions;
-            this.CodecProvider = other.CodecProvider;
-            this.CopyContextPool = other.CopyContextPool;
-            this.ServiceProvider = other.ServiceProvider;
-            this.InterfaceVersion = other.InterfaceVersion;
-        }
-
-        /// <summary>
         /// Gets the grain reference runtime.
         /// </summary>
         public IGrainReferenceRuntime Runtime { get; }

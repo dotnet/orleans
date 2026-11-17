@@ -37,13 +37,16 @@ public sealed class ProxyCopierResolutionTests
         var activator = types["ProxyActivator_IProxyGrain"].NormalizeWhitespace().ToFullString();
         Assert.Contains("internal sealed class ProxyActivator_IProxyGrain<T> : global::Orleans.GrainReferences.IGrainReferenceActivator", activator);
         Assert.Contains("private readonly global::OrleansCodeGen.TestProject.ProxyShared_IProxyGrain<T> _shared;", activator);
-        Assert.Contains("_shared = new global::OrleansCodeGen.TestProject.ProxyShared_IProxyGrain<T>(shared);", activator);
+        Assert.Equal(8, Assert.Single(types["ProxyActivator_IProxyGrain"].Members.OfType<ConstructorDeclarationSyntax>()).ParameterList.Parameters.Count);
+        Assert.Contains("_shared = new global::OrleansCodeGen.TestProject.ProxyShared_IProxyGrain<T>(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);", activator);
         Assert.Contains("public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new global::OrleansCodeGen.TestProject.Proxy_IProxyGrain<T>(_shared, grainId.Key);", activator);
 
         var shared = types["ProxyShared_IProxyGrain"];
         var sharedText = shared.NormalizeWhitespace().ToFullString();
         Assert.Contains("internal sealed class ProxyShared_IProxyGrain<T> : global::Orleans.Runtime.GrainReferenceShared", sharedText);
-        Assert.Contains("public ProxyShared_IProxyGrain(global::Orleans.Runtime.GrainReferenceShared shared) : base(shared)", sharedText);
+        var sharedConstructor = Assert.Single(shared.Members.OfType<ConstructorDeclarationSyntax>());
+        Assert.Equal(8, sharedConstructor.ParameterList.Parameters.Count);
+        Assert.Equal(": base(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)", sharedConstructor.Initializer!.NormalizeWhitespace().ToFullString());
         Assert.Contains("public readonly OrleansCodeGen.TestProject.Copier_Payload", sharedText);
         Assert.Contains("public readonly global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.Payload>", sharedText);
         Assert.Contains("public readonly global::Orleans.Serialization.Codecs.ArrayCopier<global::TestProject.Payload>", sharedText);
@@ -97,7 +100,7 @@ public sealed class ProxyCopierResolutionTests
         Assert.DoesNotContain("ProxyShared_IProxyGrain", types.Keys);
         var activator = types["ProxyActivator_IProxyGrain"].NormalizeWhitespace().ToFullString();
         Assert.Contains("private readonly global::Orleans.Runtime.GrainReferenceShared _shared;", activator);
-        Assert.Contains("_shared = shared;", activator);
+        Assert.Contains("_shared = new global::Orleans.Runtime.GrainReferenceShared(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);", activator);
         Assert.Contains("public Proxy_IProxyGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)", types["Proxy_IProxyGrain"].NormalizeWhitespace().ToFullString());
         Assert.Contains("config.AddInterfaceProxyActivator(typeof(OrleansCodeGen.TestProject.Proxy_IProxyGrain), typeof(OrleansCodeGen.TestProject.ProxyActivator_IProxyGrain));", metadata);
     }

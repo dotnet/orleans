@@ -249,9 +249,9 @@ namespace OrleansCodeGen.TestProject
     internal sealed class ProxyActivator_IBasicGrain : global::Orleans.GrainReferences.IGrainReferenceActivator
     {
         private readonly global::Orleans.Runtime.GrainReferenceShared _shared;
-        public ProxyActivator_IBasicGrain(global::Orleans.Runtime.GrainReferenceShared shared)
+        public ProxyActivator_IBasicGrain(global::Orleans.Runtime.GrainType arg0, global::Orleans.Runtime.GrainInterfaceType arg1, ushort arg2, global::Orleans.Runtime.IGrainReferenceRuntime arg3, global::Orleans.CodeGeneration.InvokeMethodOptions arg4, global::Orleans.Serialization.Serializers.CodecProvider arg5, global::Orleans.Serialization.Cloning.CopyContextPool arg6, global::System.IServiceProvider arg7)
         {
-            _shared = shared;
+            _shared = new global::Orleans.Runtime.GrainReferenceShared(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         }
 
         public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new global::OrleansCodeGen.TestProject.Proxy_IBasicGrain(_shared, grainId.Key);

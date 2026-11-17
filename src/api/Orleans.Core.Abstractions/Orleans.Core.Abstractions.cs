@@ -2354,8 +2354,6 @@ namespace Orleans.Runtime
 
     public partial class GrainReferenceShared
     {
-        protected GrainReferenceShared(GrainReferenceShared other) { }
-
         public GrainReferenceShared(GrainType grainType, GrainInterfaceType grainInterfaceType, ushort interfaceVersion, IGrainReferenceRuntime runtime, CodeGeneration.InvokeMethodOptions invokeMethodOptions, Orleans.Serialization.Serializers.CodecProvider codecProvider, Orleans.Serialization.Cloning.CopyContextPool copyContextPool, System.IServiceProvider serviceProvider) { }
 
         public Orleans.Serialization.Serializers.CodecProvider CodecProvider { get { throw null; } }
