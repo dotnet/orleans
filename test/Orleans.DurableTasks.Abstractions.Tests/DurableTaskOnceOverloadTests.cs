@@ -5,17 +5,17 @@ using Microsoft.CodeAnalysis.CSharp;
 using Orleans.DurableTasks;
 using Xunit;
 
-namespace Analyzers.Tests;
+namespace Orleans.DurableTasks.Abstractions.Tests;
 
 /// <summary>
 /// Tests that <c>DurableTask.Once</c> accepts synchronous effects and rejects asynchronous and durable effects at compile
 /// time, which it can't record.
 /// </summary>
-[TestCategory("BVT"), TestCategory("Analyzer")]
 [TestSuite("BVT")]
 [TestProvider("None")]
-[TestArea("Analyzer")]
-public class DurableTaskOnceOverloadTest
+[TestArea("DurableTasks")]
+[TestCategory("BVT")]
+public class DurableTaskOnceOverloadTests
 {
     private static readonly ImmutableArray<MetadataReference> References =
     [

@@ -434,6 +434,10 @@ The logger reads the running task when it logs, so one instance serves durable t
 ordinary grain methods. Logs inside a `DurableTask.Once` effect, or inside a step which completed,
 don't repeat without it, because a replay returns their recorded results without running them.
 
+The package carries analyzers which report code that a replay would run differently, as
+diagnostics ORLEANS0100 to ORLEANS0115. Each diagnostic links to a page which describes the
+hazard and its fix.
+
 ## Host responsibilities
 
 A host derives from `DurableTaskContext`, implements `ISchedulableTask` definitions
