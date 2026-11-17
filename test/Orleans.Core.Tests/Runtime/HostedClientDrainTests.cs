@@ -529,7 +529,7 @@ public class HostedClientDrainTests
                 new GrainInterfaceTypeResolver(
                     [], _root.GetRequiredService<Orleans.Serialization.TypeSystem.TypeConverter>()),
                 new GrainInterfaceTypeToGrainTypeResolver(Substitute.For<IClusterManifestProvider>()),
-                deepCopier, Clock, mapping, instruments);
+                deepCopier, _root.GetRequiredService<CopyContextPool>(), Clock, mapping, instruments);
 
             // Constructor-only transport graph. GatewayAddress == null guards the throwing factory.
             // Local callback, status, and cache-invalidation paths use the configured runtime.

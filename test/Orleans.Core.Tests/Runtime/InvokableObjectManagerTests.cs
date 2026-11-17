@@ -608,7 +608,7 @@ public class InvokableObjectManagerTests
                 runtime,
                 _services.GetRequiredService<DeepCopier>(),
                 trace,
-                _services.GetRequiredService<DeepCopier<Response>>(),
+                _services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(),
                 new InterfaceToImplementationMappingCache(),
                 _services.GetRequiredService<ILogger<InvokableObjectManager>>());
             if (registerObserver)

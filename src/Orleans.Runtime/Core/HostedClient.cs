@@ -63,7 +63,7 @@ namespace Orleans.Runtime
                 runtimeClient,
                 deepCopier,
                 messagingTrace,
-                runtimeClient.ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
+                runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(),
                 interfaceToImplementationMappingCache,
                 logger);
             this.siloMessageCenter = messageCenter;

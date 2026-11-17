@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans
@@ -23,7 +24,7 @@ namespace Orleans
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger logger;
         private readonly DeepCopier deepCopier;
-        private readonly DeepCopier<Response> _responseCopier;
+        private readonly CopyContextPool _copyContextPool;
         private readonly MessagingTrace messagingTrace;
         private readonly AdmissionGate _invocations = new();
         private readonly AdmissionGate _cancellations = new();
@@ -37,7 +38,7 @@ namespace Orleans
             IRuntimeClient runtimeClient,
             DeepCopier deepCopier,
             MessagingTrace messagingTrace,
-            DeepCopier<Response> responseCopier,
+            CopyContextPool copyContextPool,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             ILogger logger)
         {
@@ -45,7 +46,7 @@ namespace Orleans
             this.runtimeClient = runtimeClient;
             this.deepCopier = deepCopier;
             this.messagingTrace = messagingTrace;
-            _responseCopier = responseCopier;
+            _copyContextPool = copyContextPool;
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.logger = logger;
         }
@@ -382,23 +383,22 @@ namespace Orleans
                         }
 
                         var filters = _manager.GrainCallFilters;
+                        var hasFilters = filters is { Count: > 0 } || LocalObject.Target is IIncomingGrainCallFilter;
                         Response response;
-                        if (filters is { Count: > 0 } || LocalObject.Target is IIncomingGrainCallFilter)
+                        if (hasFilters)
                         {
-                            var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
+                            var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._copyContextPool);
                             await invoker.Invoke();
                             response = invoker.Response!;
                         }
                         else
                         {
-                            response = await request.Invoke();
-                            // The copier preserves the null state of its input.
-                            response = _manager._responseCopier.Copy(response)!;
+                            response = await request.Invoke(_manager._copyContextPool);
                         }
 
                         if (message.Direction != Message.Directions.OneWay)
                         {
-                            this.SendResponseAsync(message, response);
+                            this.SendResponseAsync(message, response, hasFilters);
                         }
                     }
                     catch (Exception exc)
@@ -456,7 +456,7 @@ namespace Orleans
             private void SendCanceledResponse(Message message) =>
                 _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
 
-            private void SendResponseAsync(Message message, Response resultObject)
+            private void SendResponseAsync(Message message, Response resultObject, bool copyResponse)
             {
                 if (message.IsExpired)
                 {
@@ -467,9 +467,8 @@ namespace Orleans
                 Response deepCopy;
                 try
                 {
-                    // we're expected to notify the caller if the deep copy failed.
-                    // The copier preserves the null state of its input.
-                    deepCopy = _manager.deepCopier.Copy(resultObject)!;
+                    // Filters can replace the result or retain it after returning.
+                    deepCopy = copyResponse ? _manager.deepCopier.Copy(resultObject)! : resultObject;
                 }
                 catch (Exception exc2)
                 {

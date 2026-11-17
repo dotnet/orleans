@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
-using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         private readonly IInvokable request;
         private readonly List<IIncomingGrainCallFilter> filters;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
-        private readonly DeepCopier<Response> responseCopier;
+        private readonly CopyContextPool copyContextPool;
         private readonly IGrainContext grainContext;
         private int stage;
 
@@ -30,21 +30,21 @@ namespace Orleans.Runtime
         /// <param name="request">The request.</param>
         /// <param name="filters">The invocation interceptors.</param>
         /// <param name="interfaceToImplementationMapping">The implementation map.</param>
-        /// <param name="responseCopier">The response copier.</param>
+        /// <param name="copyContextPool">The pool used to copy invocation results.</param>
         public GrainMethodInvoker(
             Message message,
             IGrainContext grainContext,
             IInvokable request,
             List<IIncomingGrainCallFilter> filters,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            DeepCopier<Response> responseCopier)
+            CopyContextPool copyContextPool)
         {
             this.message = message;
             this.request = request;
             this.grainContext = grainContext;
             this.filters = filters;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
-            this.responseCopier = responseCopier;
+            this.copyContextPool = copyContextPool;
         }
 
         public IInvokable Request => request;
@@ -124,18 +124,15 @@ namespace Orleans.Runtime
                 {
                     // Finally call the root-level invoker.
                     stage++;
-                    this.Response = await request.Invoke();
+                    // Copy before unwinding the filters so they observe an isolated result.
+                    this.Response = message.IsLocalOnly
+                        ? await request.Invoke()
+                        : await request.Invoke(copyContextPool);
 
                     // Propagate exceptions to other filters.
                     if (this.Response.Exception is { } exception)
                     {
                         ExceptionDispatchInfo.Capture(exception).Throw();
-                    }
-
-                    // A local request is passed by reference, and so is its response.
-                    if (!message.IsLocalOnly)
-                    {
-                        this.Response = this.responseCopier.Copy(this.Response);
                     }
 
                     return;

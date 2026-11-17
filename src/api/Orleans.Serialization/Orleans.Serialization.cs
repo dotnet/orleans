@@ -1353,6 +1353,8 @@ namespace Orleans.Serialization.Cloning
 
         public void Dispose() { }
 
+        public IDeepCopier<T> GetCopier<T>() { throw null; }
+
         public void RecordCopy(object original, object copy) { }
 
         public void Reset() { }
@@ -3621,6 +3623,7 @@ namespace Orleans.Serialization.Invocation
         string GetMethodName();
         object? GetTarget();
         System.Threading.Tasks.ValueTask<Response> Invoke();
+        System.Threading.Tasks.ValueTask<Response> Invoke(Cloning.CopyContextPool copyContextPool);
         void SetArgument(int index, object value);
         void SetTarget(ITargetHolder holder);
         bool TryCancel();

@@ -265,6 +265,13 @@ namespace Orleans.Serialization.Cloning
         public void Reset() => _copies.Clear();
 
         /// <summary>
+        /// Gets the copier for the declared type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The type supported by the copier.</typeparam>
+        /// <returns>The copier registered with this context's provider.</returns>
+        public IDeepCopier<T> GetCopier<T>() => _copierProvider.GetDeepCopier<T>();
+
+        /// <summary>
         /// Copies the provided value.
         /// </summary>
         /// <typeparam name="T">The value type.</typeparam>

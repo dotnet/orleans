@@ -593,6 +593,25 @@ namespace Orleans.Runtime
         public abstract ValueTask<Response> Invoke();
 
         /// <inheritdoc/>
+        public virtual async ValueTask<Response> Invoke(CopyContextPool copyContextPool)
+        {
+            var response = await Invoke();
+            using var context = copyContextPool.GetContext();
+            return context.DeepCopy(response);
+        }
+
+        internal static TResult? CopyResult<TResult>(TResult result, CopyContextPool? copyContextPool)
+        {
+            if (copyContextPool is not null)
+            {
+                using var context = copyContextPool.GetContext();
+                return context.GetCopier<TResult>().DeepCopy(result, context);
+            }
+
+            return result;
+        }
+
+        /// <inheritdoc/>
         public abstract object GetTarget();
 
         /// <inheritdoc/>
@@ -655,6 +674,9 @@ namespace Orleans.Runtime
     public abstract class Request : RequestBase
     {
         /// <inheritdoc/>
+        public sealed override ValueTask<Response> Invoke(CopyContextPool copyContextPool) => Invoke();
+
+        /// <inheritdoc/>
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
             "Performance",
             "CA1849:Call async methods when in an async method",
@@ -708,17 +730,22 @@ namespace Orleans.Runtime
     public abstract class Request<TResult> : RequestBase
     {
         /// <inheritdoc/>
-        public sealed override ValueTask<Response> Invoke()
+        public sealed override ValueTask<Response> Invoke() => InvokeCore(null);
+
+        /// <inheritdoc/>
+        public sealed override ValueTask<Response> Invoke(CopyContextPool copyContextPool) => InvokeCore(copyContextPool);
+
+        private ValueTask<Response> InvokeCore(CopyContextPool? copyContextPool)
         {
             try
             {
                 var resultTask = InvokeInner();
                 if (resultTask.IsCompleted)
                 {
-                    return new ValueTask<Response>(Response.FromResult(resultTask.Result));
+                    return new ValueTask<Response>(Response.FromResult(CopyResult(resultTask.Result, copyContextPool)));
                 }
 
-                return CompleteInvokeAsync(resultTask);
+                return new ValueTask<Response>(CompleteInvokeAsync(resultTask, copyContextPool));
             }
             catch (Exception exception)
             {
@@ -726,12 +753,13 @@ namespace Orleans.Runtime
             }
         }
 
-        private static async ValueTask<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask)
+        // Task uses a smaller async builder for this already-asynchronous path.
+        private static async Task<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask, CopyContextPool? copyContextPool)
         {
             try
             {
                 var result = await resultTask;
-                return Response.FromResult(result);
+                return Response.FromResult(CopyResult(result, copyContextPool));
             }
             catch (Exception exception)
             {
@@ -756,17 +784,22 @@ namespace Orleans.Runtime
     public abstract class TaskRequest<TResult> : RequestBase
     {
         /// <inheritdoc/>
-        public sealed override ValueTask<Response> Invoke()
+        public sealed override ValueTask<Response> Invoke() => InvokeCore(null);
+
+        /// <inheritdoc/>
+        public sealed override ValueTask<Response> Invoke(CopyContextPool copyContextPool) => InvokeCore(copyContextPool);
+
+        private ValueTask<Response> InvokeCore(CopyContextPool? copyContextPool)
         {
             try
             {
                 var resultTask = InvokeInner();
                 if (resultTask.IsCompleted)
                 {
-                    return new ValueTask<Response>(Response.FromResult(resultTask.GetAwaiter().GetResult()));
+                    return new ValueTask<Response>(Response.FromResult(CopyResult(resultTask.GetAwaiter().GetResult(), copyContextPool)));
                 }
 
-                return CompleteInvokeAsync(resultTask);
+                return new ValueTask<Response>(CompleteInvokeAsync(resultTask, copyContextPool));
             }
             catch (Exception exception)
             {
@@ -774,12 +807,12 @@ namespace Orleans.Runtime
             }
         }
 
-        private static async ValueTask<Response> CompleteInvokeAsync(Task<TResult> resultTask)
+        private static async Task<Response> CompleteInvokeAsync(Task<TResult> resultTask, CopyContextPool? copyContextPool)
         {
             try
             {
                 var result = await resultTask;
-                return Response.FromResult(result);
+                return Response.FromResult(CopyResult(result, copyContextPool));
             }
             catch (Exception exception)
             {
@@ -800,6 +833,9 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class TaskRequest : RequestBase
     {
+        /// <inheritdoc/>
+        public sealed override ValueTask<Response> Invoke(CopyContextPool copyContextPool) => Invoke();
+
         /// <inheritdoc/>
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
             "Performance",
@@ -850,6 +886,9 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class VoidRequest : RequestBase
     {
+        /// <inheritdoc/>
+        public sealed override ValueTask<Response> Invoke(CopyContextPool copyContextPool) => Invoke();
+
         /// <summary>
         /// Initializes a new instance of the <see cref="VoidRequest"/> class.
         /// </summary>
