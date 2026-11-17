@@ -464,12 +464,10 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     /// Plans the copy of a member value: shallow values are assigned, and other values are copied by a static, generated,
     /// or context-resolved copier.
     /// </summary>
-    /// <param name="copierFieldOwner">The expression which holds <paramref name="copierFields"/>, or <see langword="null"/> when they are fields of the current instance.</param>
     public MemberCopyPlan GenerateMemberCopy(
         List<GeneratedFieldDescription> copierFields,
         List<ICopierDescription>? copiers,
-        ISerializableMember member,
-        string? copierFieldOwner = null)
+        ISerializableMember member)
     {
         if (copiers is null || member.IsShallowCopyable)
             return MemberCopyPlan.Value;
@@ -494,7 +492,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         else
         {
             var instanceCopier = copierFields.OfType<CopierFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
-            copierExpression = copierFieldOwner is null ? GetCodecExpression(instanceCopier) : $"{copierFieldOwner}.{instanceCopier.FieldName}";
+            copierExpression = instanceCopier.AccessExpression ?? GetCodecExpression(instanceCopier);
         }
 
         // If the member type differs from the copier type (eg because the member is an array), cast the result.
@@ -523,6 +521,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     internal sealed class CopierFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType, bool lazyInitialization = false) : GeneratedFieldDescription(fieldType, fieldName), ICopierDescription
     {
         public ITypeSymbol UnderlyingType { get; } = underlyingType;
+        public string? AccessExpression { get; set; }
         public override bool IsInjected => false;
         public override bool LazyInitialization { get; } = lazyInitialization;
     }

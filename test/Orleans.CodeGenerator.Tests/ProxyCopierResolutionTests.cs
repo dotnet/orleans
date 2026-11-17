@@ -30,7 +30,8 @@ public sealed class ProxyCopierResolutionTests
         var text = proxy.NormalizeWhitespace().ToFullString();
         Assert.Empty(proxy.Members.OfType<FieldDeclarationSyntax>());
         Assert.Contains("public Proxy_IProxyGrain(global::OrleansCodeGen.TestProject.ProxyShared_IProxyGrain<T> arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)", text);
-        Assert.Contains("request.arg0 = ((global::OrleansCodeGen.TestProject.ProxyShared_IProxyGrain<T>)base.Shared)._copier", text);
+        Assert.Contains("private new global::OrleansCodeGen.TestProject.ProxyShared_IProxyGrain<T> Shared => (global::OrleansCodeGen.TestProject.ProxyShared_IProxyGrain<T>)base.Shared;", text);
+        Assert.Contains("request.arg0 = this.Shared._copier", text);
         Assert.DoesNotContain("CodecProvider.GetDeepCopier<", text);
 
         var activator = types["ProxyActivator_IProxyGrain"].NormalizeWhitespace().ToFullString();
@@ -57,7 +58,7 @@ public sealed class ProxyCopierResolutionTests
     [Fact]
     public async Task ProxyTypeParametersCannotShadowActivatorOrSharedTypes()
     {
-        // Other reads a copier which Send declares, so its type parameter is in scope where the proxy names the shared type.
+        // Other reads a copier from Shared_ while a method type parameter with that name is in scope.
         const string source = """
             using Orleans;
             using System.Collections.Generic;
@@ -68,15 +69,16 @@ public sealed class ProxyCopierResolutionTests
             {
                 [Id(0)] public int Value { get; set; }
             }
-            public interface IProxyGrain<ProxyShared, ProxyActivator> : IGrainWithStringKey
+            public interface IProxyGrain<ProxyShared, ProxyActivator, Shared> : IGrainWithStringKey
             {
                 ValueTask Send(ProxyShared value, ProxyActivator other, List<Payload> list);
-                ValueTask Other<ProxyShared_IProxyGrain>(ProxyShared_IProxyGrain value, List<Payload> list);
+                ValueTask Other<Shared_>(Shared_ value, List<Payload> list);
             }
             """;
         var (types, _) = await Generate(source);
         Assert.Contains("ProxyActivator_IProxyGrain", types.Keys);
         Assert.Contains("ProxyShared_IProxyGrain", types.Keys);
+        Assert.Contains("this.Shared_._copier", types["Proxy_IProxyGrain"].NormalizeWhitespace().ToFullString());
     }
 
     [Fact]

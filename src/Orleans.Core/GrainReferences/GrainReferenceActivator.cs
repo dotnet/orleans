@@ -69,37 +69,36 @@ namespace Orleans.GrainReferences
         /// <exception cref="InvalidOperationException">No suitable activator was found.</exception>
         private IGrainReferenceActivator CreateActivator(GrainType grainType, GrainInterfaceType interfaceType)
         {
+            // A serializer factory can create a reference while holding the codec provider's construction lock.
+            // Do not wait for the activator lock in that case: another thread may hold it while resolving a copier.
+            if (_serviceProvider.GetService<CodecProvider>() is { IsConstructionPending: true })
+            {
+                return CreateUncachedActivator(grainType, interfaceType);
+            }
+
             lock (_lockObj)
             {
                 if (!_activators.TryGetValue((grainType, interfaceType), out var entry))
                 {
-                    IGrainReferenceActivator? activator = null;
-                    foreach (var provider in _providers)
-                    {
-                        if (provider.TryGet(grainType, interfaceType, out activator))
-                        {
-                            break;
-                        }
-                    }
-
-                    if (activator is null)
-                    {
-                        throw new InvalidOperationException($"Unable to find an {nameof(IGrainReferenceActivatorProvider)} for grain type {grainType}");
-                    }
-
-                    // Activators can hold copiers. Like the codec provider's caches, retain only activators created
-                    // outside unpublished serializer construction graphs.
-                    if (_serviceProvider.GetService<CodecProvider>() is { IsConstructionPending: true })
-                    {
-                        return activator;
-                    }
-
-                    entry = activator;
+                    entry = CreateUncachedActivator(grainType, interfaceType);
                     _activators = new(_activators) { [(grainType, interfaceType)] = entry };
                 }
 
                 return entry;
             }
+        }
+
+        private IGrainReferenceActivator CreateUncachedActivator(GrainType grainType, GrainInterfaceType interfaceType)
+        {
+            foreach (var provider in _providers)
+            {
+                if (provider.TryGet(grainType, interfaceType, out var activator))
+                {
+                    return activator;
+                }
+            }
+
+            throw new InvalidOperationException($"Unable to find an {nameof(IGrainReferenceActivatorProvider)} for grain type {grainType}");
         }
     }
 

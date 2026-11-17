@@ -20,6 +20,7 @@ internal sealed record ProxyEmissionPlan(
     EquatableArray<string> ConstructorStatements,
     EquatableArray<ProxyMethodEmissionPlan> Methods,
     ProxyActivatorEmissionPlan? Activator,
+    string? SharedProperty,
     EquatableArray<string> SharedFields,
     EquatableArray<string> SharedStatements)
 {

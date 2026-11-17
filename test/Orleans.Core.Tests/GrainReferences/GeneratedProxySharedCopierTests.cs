@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.CodeGeneration;
+using Orleans.GrainReferences;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -104,6 +105,60 @@ public class GeneratedProxySharedCopierTests
             var reference = CreateReference(fixture, "first");
             Assert.NotSame(pending.Shared, reference.Shared);
             Assert.Same(reference.Shared, CreateReference(fixture, "second").Shared);
+        }
+    }
+
+    [Fact]
+    public async Task SerializerFactoryCanCreateReferenceWhileAnotherActivatorResolvesCopiers()
+    {
+        using var activatorEntered = new ManualResetEventSlim();
+        using var graphEntered = new ManualResetEventSlim();
+        using var resolvingCopier = new ManualResetEventSlim();
+        GrainReferenceActivator? activator = null;
+        var nestedType = GrainType.Create("nested-reference-construction");
+        using var fixture = new ReferenceConstructionFixture(configureServices: services =>
+        {
+            services.Configure<TypeManifestOptions>(options => options.AddSerializer<UnrelatedPayload>(
+                _ => throw new NotSupportedException(), _ =>
+                {
+                    graphEntered.Set();
+                    Assert.True(resolvingCopier.Wait(TimeSpan.FromSeconds(10)));
+                    activator!.CreateReference(GrainId.Create(nestedType, IdSpan.Create("nested")), ReferenceConstructionFixture.InterfaceType);
+                    return new ShallowCopier<UnrelatedPayload>();
+                }));
+            services.AddSingleton(serviceProvider => new CodecProvider(serviceProvider, serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>()));
+        });
+        var codecProvider = fixture.Services.GetRequiredService<CodecProvider>();
+        Assert.True(fixture.Provider.TryGet(ReferenceConstructionFixture.GrainType, ReferenceConstructionFixture.InterfaceType, out var referenceActivator));
+        activator = new GrainReferenceActivator(fixture.Services, [new InterleavingActivatorProvider(
+            grainType =>
+            {
+                if (grainType == ReferenceConstructionFixture.GrainType)
+                {
+                    activatorEntered.Set();
+                    Assert.True(graphEntered.Wait(TimeSpan.FromSeconds(10)));
+                    resolvingCopier.Set();
+                    codecProvider.GetDeepCopier<UnrelatedPayload>();
+                }
+
+                return referenceActivator;
+            })]);
+
+        var first = Task.Run(() => activator.CreateReference(
+            GrainId.Create(ReferenceConstructionFixture.GrainType, IdSpan.Create("first")), ReferenceConstructionFixture.InterfaceType));
+        Assert.True(activatorEntered.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        var second = Task.Run(() => codecProvider.GetDeepCopier<UnrelatedPayload>(), TestContext.Current.CancellationToken);
+
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(ReferenceConstructionFixture.GrainType, (await first).GrainId.Type);
+    }
+
+    private sealed class InterleavingActivatorProvider(Func<GrainType, IGrainReferenceActivator> create) : IGrainReferenceActivatorProvider
+    {
+        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
+        {
+            activator = create(grainType);
+            return true;
         }
     }
 
