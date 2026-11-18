@@ -124,6 +124,32 @@ public class ConnectionManagerTests
         }
     }
 
+    [Fact]
+    public async Task GetConnection_RejectsLocalSiloAtStaleAddress()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var rig = new TestRig();
+        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse("127.0.0.2"), rig.Address.Endpoint.Port), 2);
+        var acquisition = rig.Manager.GetConnection(rig.Address).AsTask();
+        var attempt = await rig.Factory.NextAttempt();
+        var (connection, context) = rig.CreateSiloConnection(localAddress: localAddress);
+        attempt.Completion.SetResult(connection);
+        await rig.PreambleHelper.Write(context.PeerTransport, new ConnectionPreamble
+        {
+            NodeIdentity = Constants.SiloDirectConnectionId,
+            NetworkProtocolVersion = NetworkProtocolVersion.Version1,
+            SiloAddress = localAddress,
+            ClusterId = connection.LocalClusterId
+        });
+
+        var error = await Record.ExceptionAsync(() => acquisition.WaitAsync(TestTimeout, cancellationToken));
+        connection.MarkMessageReceived();
+
+        Assert.Null(rig.Manager.GetElapsedSinceLastMessageReceived(rig.Address));
+        Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
+        Assert.IsType<ConnectionFailedException>(error);
+    }
+
     [Theory]
     [InlineData((int)Message.Directions.Request)]
     [InlineData((int)Message.Directions.Response)]
@@ -602,11 +628,12 @@ public class ConnectionManagerTests
         public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection(
             bool blockApplicationMessages = false,
             bool outbound = true,
-            Func<MessageTransport, MessageTransport>? wrapTransport = null)
+            Func<MessageTransport, MessageTransport>? wrapTransport = null,
+            SiloAddress? localAddress = null)
         {
             var context = new TestMessageTransport(blockDisposal: false);
             var local = Substitute.For<ILocalSiloDetails>();
-            local.SiloAddress.Returns(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12344), 1));
+            local.SiloAddress.Returns(localAddress ?? SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12344), 1));
             local.ClusterId.Returns("test-cluster");
             MessageCenter? messageCenter = null;
             if (blockApplicationMessages)
