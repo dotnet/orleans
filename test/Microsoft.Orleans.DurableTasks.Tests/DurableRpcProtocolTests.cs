@@ -139,6 +139,18 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public async Task SchedulingARequestWithoutAContextReportsTheMissingContext()
+    {
+        var shared = new DurableTaskRequestShared(Substitute.For<IGrainContextAccessor>(), Substitute.For<IGrainFactory>());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DurableTaskRequest.ScheduleRootAsync(shared, new RuntimeTestDurableTaskRequest(), TaskId.CreateRoot("root"), CancellationToken.None).AsTask());
+
+        Assert.Contains(nameof(RuntimeTestDurableTaskRequest), exception.Message, StringComparison.Ordinal);
+        Assert.Contains("has no context", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CompletionWaiterRemainsUntilRetired()
     {
         var destination = new DurableTaskSubscriber(GrainId.Create("caller", "one"), TaskId.CreateRoot("root"));
