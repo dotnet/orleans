@@ -1,0 +1,3 @@
+# Durable components read time from their injected TimeProviders and use asynchronous coordination.
+P:System.DateTime.Now;Use the component's injected TimeProvider.
+P:System.DateTime.UtcNow;Use the component's injected TimeProvider.

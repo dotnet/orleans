@@ -40,7 +40,6 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/Microsoft.Orleans.DurableTasks/Microsoft.Orleans.DurableTasks.csproj" />
     <Project Path="src/Orleans.Analyzers/Orleans.Analyzers.csproj" />
     <Project Path="src/Orleans.Analyzers.Contracts/Orleans.Analyzers.Contracts.csproj" />
     <Project Path="src/Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
@@ -49,16 +48,14 @@
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
-    <Project Path="src/Orleans.Messaging/Orleans.Messaging.csproj" />
+    <Project Path="src/Orleans.Durable/Orleans.Durable.csproj" />
     <Project Path="src/Orleans.Durable.Analyzers/Orleans.Durable.Analyzers.csproj" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
-    <Project Path="src/Orleans.Journaling/Orleans.Journaling.csproj" />
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
     <Project Path="src/Orleans.Persistence.TestKit/Orleans.Persistence.TestKit.csproj" />
     <Project Path="src/Orleans.Reminders/Orleans.Reminders.csproj" />
     <Project Path="src/Orleans.Reminders.TestKit/Orleans.Reminders.TestKit.csproj" />
     <Project Path="src/Orleans.Runtime/Orleans.Runtime.csproj" />
-    <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />
     <Project Path="src/Orleans.Sdk/Orleans.Sdk.csproj" />
     <Project Path="src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj" />
     <Project Path="src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
@@ -91,7 +88,7 @@
   </Folder>
   <Folder Name="/src/Extensions/AWS/">
     <Project Path="src/AWS/Orleans.Clustering.DynamoDB/Orleans.Clustering.DynamoDB.csproj" />
-    <Project Path="src/AWS/Orleans.Journaling.S3/Orleans.Journaling.S3.csproj" />
+    <Project Path="src/AWS/Orleans.Durable.S3/Orleans.Durable.S3.csproj" />
     <Project Path="src/AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Streaming.Kinesis/Orleans.Streaming.Kinesis.csproj" />
@@ -102,12 +99,11 @@
     <Project Path="src/Azure/Orleans.Clustering.AzureStorage/Orleans.Clustering.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Clustering.Cosmos/Orleans.Clustering.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.GrainDirectory.AzureStorage/Orleans.GrainDirectory.AzureStorage.csproj" />
-    <Project Path="src/Azure/Orleans.Journaling.AzureStorage/Orleans.Journaling.AzureStorage.csproj" />
+    <Project Path="src/Azure/Orleans.Durable.AzureStorage/Orleans.Durable.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.AzureStorage/Orleans.Persistence.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.Cosmos/Orleans.Persistence.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.AzureStorage/Orleans.Reminders.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.Cosmos/Orleans.Reminders.Cosmos.csproj" />
-    <Project Path="src/Azure/Orleans.DurableJobs.AzureStorage/Orleans.DurableJobs.AzureStorage.csproj" Id="5bbb1058-9ab2-44e9-b237-49f5b6bee151" />
     <Project Path="src/Azure/Orleans.Streaming.AzureStorage/Orleans.Streaming.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Streaming.EventHubs/Orleans.Streaming.EventHubs.csproj" />
     <Project Path="src/Azure/Orleans.Transactions.AzureStorage/Orleans.Transactions.AzureStorage.csproj" />
@@ -126,7 +122,7 @@
   </Folder>
   <Folder Name="/src/Extensions/Redis/">
     <Project Path="src/Redis/Orleans.Clustering.Redis/Orleans.Clustering.Redis.csproj" />
-    <Project Path="src/Redis/Orleans.Journaling.Redis/Orleans.Journaling.Redis.csproj" />
+    <Project Path="src/Redis/Orleans.Durable.Redis/Orleans.Durable.Redis.csproj" />
     <Project Path="src/Redis/Orleans.GrainDirectory.Redis/Orleans.GrainDirectory.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Persistence.Redis/Orleans.Persistence.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Reminders.Redis/Orleans.Reminders.Redis.csproj" />

@@ -5,7 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Messaging;
 
-internal sealed class MessagingInstruments(OrleansInstruments instruments)
+internal sealed class DurableMessagingInstruments(OrleansInstruments instruments)
 {
     private const string MillisecondsUnit = "ms";
     private const string GrainTypeTagName = "grain_type";

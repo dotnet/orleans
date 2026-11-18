@@ -134,7 +134,7 @@ public sealed class MessagingInstrumentTagTests
     public void Counters_EmitExactBoundedTags(string instrumentName, string? status)
     {
         using var factory = new TestMeterFactory();
-        var instruments = new Orleans.Messaging.MessagingInstruments(new OrleansInstruments(factory));
+        var instruments = new DurableMessagingInstruments(new OrleansInstruments(factory));
         using var probe = new MessageMetricListener(factory.Meter);
         const string grainType = "instrument-test";
         Action emit = instrumentName switch
@@ -156,7 +156,7 @@ public sealed class MessagingInstrumentTagTests
     public void Durations_RecordMillisecondsAndClampNegativeValues(string instrumentName)
     {
         using var factory = new TestMeterFactory();
-        var instruments = new Orleans.Messaging.MessagingInstruments(new OrleansInstruments(factory));
+        var instruments = new DurableMessagingInstruments(new OrleansInstruments(factory));
         using var probe = new MessageMetricListener(factory.Meter);
         const string grainType = "instrument-test";
         Action<TimeSpan> record = instrumentName == "inbox-processing-duration"
@@ -179,7 +179,7 @@ public sealed class MessagingInstrumentTagTests
     public void DepthInstruments_RecordNonZeroDeltasTaggedByGrainType()
     {
         using var factory = new TestMeterFactory();
-        var instruments = new Orleans.Messaging.MessagingInstruments(new OrleansInstruments(factory));
+        var instruments = new DurableMessagingInstruments(new OrleansInstruments(factory));
         using var probe = new MessageMetricListener(factory.Meter);
         instruments.OnInboxDepthChanged("instrument-test", 3);
         instruments.OnInboxDepthChanged("instrument-test", 0);

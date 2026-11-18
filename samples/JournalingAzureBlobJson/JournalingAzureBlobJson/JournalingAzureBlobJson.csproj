@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <OrleansDocumentationVersionException>Uses prerelease Journaling packages until their first 10.2.2 publication.</OrleansDocumentationVersionException>
+    <OrleansDocumentationVersionException>The Microsoft.Orleans.Durable packages require locally built packages until they are published.</OrleansDocumentationVersionException>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,8 +19,8 @@
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Durable" />
+    <PackageReference Include="Microsoft.Orleans.Durable.AzureStorage" />
   </ItemGroup>
 
 </Project>

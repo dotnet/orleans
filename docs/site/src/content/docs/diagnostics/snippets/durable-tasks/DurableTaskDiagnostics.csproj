@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable.Abstractions\Orleans.Durable.Abstractions.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable.Analyzers\Orleans.Durable.Analyzers.csproj"
                       OutputItemType="Analyzer"

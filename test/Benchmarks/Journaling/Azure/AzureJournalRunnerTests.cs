@@ -596,9 +596,9 @@ public class AzureJournalRunnerTests
         var build = new AzureJournalReport(new()).Build;
         Assert.Equal("Benchmarks", build.Benchmark.Name);
         Assert.Equal(typeof(AzureJournalReport).Module.ModuleVersionId, build.Benchmark.ModuleVersionId);
-        Assert.Equal("Orleans.Journaling", build.Journaling.Name);
+        Assert.Equal("Orleans.Durable", build.Journaling.Name);
         Assert.Equal(typeof(IJournalStorage).Module.ModuleVersionId, build.Journaling.ModuleVersionId);
-        Assert.Equal("Orleans.Journaling.AzureStorage", build.AzureStorage.Name);
+        Assert.Equal("Orleans.Durable.AzureStorage", build.AzureStorage.Name);
         Assert.Equal(typeof(AzureBlobJournalStorageOptions).Module.ModuleVersionId, build.AzureStorage.ModuleVersionId);
         Assert.NotEqual(Guid.Empty, build.Benchmark.ModuleVersionId);
         Assert.NotEqual(Guid.Empty, build.Journaling.ModuleVersionId);

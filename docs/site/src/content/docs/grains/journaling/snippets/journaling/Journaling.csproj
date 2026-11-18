@@ -14,8 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
-    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Durable.AzureStorage\Orleans.Durable.AzureStorage.csproj" />
   </ItemGroup>
 
 </Project>
