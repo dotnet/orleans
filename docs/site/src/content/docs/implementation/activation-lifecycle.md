@@ -97,10 +97,10 @@ Source: [`ActivationMigrationManager`](https://github.com/dotnet/orleans/blob/ma
 Migration is a mechanism, not a policy. Policies choose candidates:
 
 - explicit migration APIs can request a move;
-- the experimental activation rebalancer moves random activations to reduce resource imbalance;
+- the activation rebalancer moves random activations to reduce resource imbalance;
 - the activation repartitioner observes communication edges and moves activations to improve locality.
 
-Both cluster-wide policies are opt-in. See [placement and activation balancing](load-balancing.md) for their protocols.
+Both cluster-wide policies are opt-in. See [placement and activation balancing](load-balancing.md) for their protocols and configuration.
 
 ## Extension invariants
 

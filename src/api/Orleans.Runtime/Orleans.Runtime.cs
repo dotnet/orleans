@@ -364,10 +364,8 @@ namespace Orleans.Hosting
 {
     public static partial class ActivationRebalancerExtensions
     {
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP002")]
         public static ISiloBuilder AddActivationRebalancer(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP002")]
         public static ISiloBuilder AddActivationRebalancer<TProvider>(this ISiloBuilder builder)
             where TProvider : class, Placement.Rebalancing.IFailedSessionBackoffProvider { throw null; }
     }
