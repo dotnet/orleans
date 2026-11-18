@@ -224,7 +224,7 @@ internal sealed partial class Inbox
 /// Case identifiers follow declaration order and are part of the journal format. In JSON, each case leads with its
 /// <c>kind</c>, which <see cref="InboxCommandClassifier"/> reads to select the case.
 /// </remarks>
-[GenerateSerializer]
+[GenerateSerializer, Alias("Orleans.Messaging.InboxCommand")]
 [JsonUnion(TypeClassifier = typeof(InboxCommandClassifier))]
 internal union InboxCommand(
     InboxCommand.Accept,

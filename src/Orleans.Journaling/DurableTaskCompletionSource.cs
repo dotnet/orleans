@@ -234,6 +234,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 /// Identifies the state of a durable task completion source.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.DurableTaskCompletionSourceStatus")]
 public enum DurableTaskCompletionSourceStatus : byte
 {
     /// <summary>
@@ -262,6 +263,7 @@ public enum DurableTaskCompletionSourceStatus : byte
 /// </summary>
 /// <typeparam name="T">The type of the task result.</typeparam>
 [GenerateSerializer, Immutable]
+[Alias("Orleans.Journaling.DurableTaskCompletionSourceState`1")]
 public readonly struct DurableTaskCompletionSourceState<T>
 {
     /// <summary>

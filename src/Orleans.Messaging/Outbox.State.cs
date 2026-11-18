@@ -111,7 +111,7 @@ internal sealed partial class Outbox
 /// Case identifiers follow declaration order and are part of the journal format. In JSON, each case leads with its
 /// <c>kind</c>, which <see cref="OutboxCommandClassifier"/> reads to select the case.
 /// </remarks>
-[GenerateSerializer]
+[GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand")]
 [JsonUnion(TypeClassifier = typeof(OutboxCommandClassifier))]
 internal union OutboxCommand(
     OutboxCommand.Enqueue,

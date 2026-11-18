@@ -4,7 +4,7 @@ namespace Orleans.Messaging;
 /// The receiver's answer to an attempt to deliver a message to its inbox.
 /// </summary>
 /// <remarks>Case identifiers follow declaration order and are part of the wire format.</remarks>
-[GenerateSerializer]
+[GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult")]
 public union DeliveryResult(
     DeliveryResult.Accepted,
     DeliveryResult.Duplicate,

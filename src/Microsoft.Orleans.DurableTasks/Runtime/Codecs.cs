@@ -409,6 +409,7 @@ internal sealed class DurableTaskAbortedExceptionConverter : IConverter<DurableT
 
 /// <remarks>Orleans copies exceptions shallowly, so the surrogate, which holds only a string and an exception, is immutable.</remarks>
 [GenerateSerializer, Immutable]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskAbortedExceptionSurrogate")]
 internal readonly struct DurableTaskAbortedExceptionSurrogate(string reason, Exception? innerException)
 {
     [Id(0)]
@@ -435,6 +436,7 @@ internal sealed class DurableTaskAttemptCanceledExceptionConverter
 }
 
 [GenerateSerializer, Immutable]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskAttemptCanceledExceptionSurrogate")]
 internal readonly struct DurableTaskAttemptCanceledExceptionSurrogate(string message, DurableTaskAttemptCancellationReason reason)
 {
     [Id(0)]

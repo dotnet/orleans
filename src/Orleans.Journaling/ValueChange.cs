@@ -9,6 +9,7 @@ namespace Orleans.Journaling;
 /// intermediate values.
 /// </remarks>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.ValueChange`1")]
 public readonly record struct ValueChange<T>
 {
     /// <summary>

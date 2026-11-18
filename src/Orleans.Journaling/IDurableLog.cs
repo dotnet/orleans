@@ -273,6 +273,7 @@ public interface IDurableLogDraft<T> : IDisposable
 /// reconnects to a new activation can therefore learn that the draft's volatile content was lost unless the draft committed.
 /// </remarks>
 [GenerateSerializer, Immutable]
+[Alias("Orleans.Journaling.LogDraftId")]
 public readonly record struct LogDraftId
 {
     /// <summary>
@@ -332,6 +333,7 @@ public readonly record struct LogDraftId
 /// Identifies the kind of a <see cref="LogEvent{T}"/>.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.LogEventKind")]
 public enum LogEventKind : byte
 {
     /// <summary>
@@ -389,6 +391,7 @@ public enum LogEventKind : byte
 /// Identifies why a draft of an <see cref="IDurableLog{T}"/> closed without entries.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.LogDraftAbandonReason")]
 public enum LogDraftAbandonReason : byte
 {
     /// <summary>
@@ -433,6 +436,7 @@ public enum LogDraftAbandonReason : byte
 /// </summary>
 /// <typeparam name="T">The type of entries in the log.</typeparam>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.LogEvent`1")]
 public readonly record struct LogEvent<T>
 {
     /// <summary>

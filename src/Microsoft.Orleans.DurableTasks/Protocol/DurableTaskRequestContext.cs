@@ -95,6 +95,7 @@ internal sealed class DurableTaskPopulator<T> : IConverter<DurableTask<T>, Durab
 }
 
 [GenerateSerializer, Immutable]
+[Alias("Orleans.DurableTasks.Protocol.DurableTaskSurrogate")]
 internal readonly struct DurableTaskSurrogate
 {
 }
@@ -116,6 +117,7 @@ internal sealed class TaskIdConverter : IConverter<TaskId, TaskIdSurrogate>
 }
 
 [GenerateSerializer, Immutable]
+[Alias("Orleans.DurableTasks.Protocol.TaskIdSurrogate")]
 internal readonly struct TaskIdSurrogate(string value)
 {
     [Id(0)]

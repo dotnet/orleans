@@ -7,6 +7,7 @@ using Orleans.Serialization;
 namespace Orleans.DurableTasks.Runtime;
 
 [GenerateSerializer]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskInvocationMessage")]
 internal sealed class DurableTaskInvocationMessage
 {
     /// <summary>
@@ -48,6 +49,7 @@ internal sealed class DurableTaskInvocationMessage
 }
 
 [GenerateSerializer]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskCompletionMessage")]
 internal sealed class DurableTaskCompletionMessage
 {
     /// <summary>Gets the sender's task whose terminal result the message carries.</summary>
@@ -69,6 +71,7 @@ internal sealed class DurableTaskCompletionMessage
 }
 
 [GenerateSerializer]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskCancellationMessage")]
 internal sealed class DurableTaskCancellationMessage
 {
     /// <summary>
@@ -106,6 +109,7 @@ internal sealed class DurableTaskCancellationMessage
 /// Resumes a durable delay. The owning grain sends it to itself, scheduled for the delay's due time.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskResumeMessage")]
 internal sealed class DurableTaskResumeMessage
 {
     [Id(0)]
@@ -126,6 +130,7 @@ internal sealed class DurableTaskResumeMessage
 /// Delivers a signal's value to an invoked task, which records the first value for each signal name.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskSignalMessage")]
 internal sealed class DurableTaskSignalMessage
 {
     [Id(0)]

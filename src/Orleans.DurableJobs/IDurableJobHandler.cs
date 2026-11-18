@@ -29,6 +29,7 @@ public interface IJobRunContext
 /// Represents the execution context for a durable job.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.DurableJobs.JobRunContext")]
 internal class JobRunContext : IJobRunContext
 {
     /// <summary>

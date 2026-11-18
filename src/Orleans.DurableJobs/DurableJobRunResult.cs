@@ -7,6 +7,7 @@ namespace Orleans.DurableJobs;
 /// Represents the result of a durable job execution.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.DurableJobs.DurableJobRunResult")]
 public sealed class DurableJobRunResult
 {
     /// <summary>
