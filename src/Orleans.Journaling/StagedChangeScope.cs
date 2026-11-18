@@ -14,14 +14,22 @@ internal sealed class StagedChangeScope
 {
     private static readonly AsyncLocal<StagedChangeScope?> Current = new();
     private readonly JournalBufferWriter _writer;
+    private readonly bool _reportsEveryChange;
     private bool _staged;
 
-    private StagedChangeScope(JournalBufferWriter writer) => _writer = writer;
+    private StagedChangeScope(JournalBufferWriter writer, bool reportsEveryChange)
+    {
+        _writer = writer;
+        _reportsEveryChange = reportsEveryChange;
+    }
 
-    /// <summary>Gets whether the flow staged a change.</summary>
-    internal bool HasStagedChanges => _staged;
+    /// <summary>
+    /// Gets whether the flow may have staged a change: it staged one, or a registered state doesn't report its changes.
+    /// </summary>
+    internal bool HasStagedChanges => _staged || !_reportsEveryChange;
 
-    internal static StagedChangeScope Begin(JournalBufferWriter writer) => Current.Value = new(writer);
+    internal static StagedChangeScope Begin(JournalBufferWriter writer, bool reportsEveryChange) =>
+        Current.Value = new(writer, reportsEveryChange);
 
     internal static void OnStaged(JournalBufferWriter writer)
     {

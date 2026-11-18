@@ -40,7 +40,7 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSetCommandHandler<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsStagedChanges, IDurableSetCommandHandler<T>
 {
     private readonly IDurableSetCommandCodec<T> _codec;
     private readonly HashSet<T> _items = [];

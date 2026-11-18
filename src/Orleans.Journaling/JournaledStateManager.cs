@@ -14,6 +14,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly Lock _lock = new();
     private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _statesMap = [];
+
+    // Whether a registered state journals changes which a StagedChangeScope can't observe.
+    private bool _hasUnreportedChanges;
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
@@ -143,6 +146,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
 
             _states.Add(name, stateMachine);
+            if (stateMachine is not IReportsStagedChanges) _hasUnreportedChanges = true;
             _workQueue.Enqueue(new RegisterStateWorkItem(name));
         }
 
@@ -1105,11 +1109,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// Begins recording whether the calling asynchronous flow stages a change in this manager's states.
     /// </summary>
     /// <remarks>
-    /// Call it from the async method whose flow the scope covers; see <see cref="StagedChangeScope"/>. The built-in
-    /// durable states report a change when they are modified, and any state reports one when it commits a journal entry
-    /// outside a write. Orleans.Messaging uses a scope to tell whether a failed handler attempt staged changes.
+    /// Call it from the async method whose flow the scope covers; see <see cref="StagedChangeScope"/>. A state which
+    /// implements <see cref="IReportsStagedChanges"/> reports each change it stages. While a registered state doesn't,
+    /// every scope reports staged changes. Orleans.Messaging uses a scope to tell whether a failed handler attempt
+    /// staged changes.
     /// </remarks>
-    internal StagedChangeScope BeginStagedChangeScope() => StagedChangeScope.Begin(_journalWriter);
+    internal StagedChangeScope BeginStagedChangeScope() => StagedChangeScope.Begin(_journalWriter, !_hasUnreportedChanges);
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
@@ -1381,7 +1386,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
     [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
-    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine
+    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine, IReportsStagedChanges
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 

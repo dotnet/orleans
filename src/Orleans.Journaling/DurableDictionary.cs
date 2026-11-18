@@ -16,7 +16,7 @@ public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> wh
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue> where TKey : notnull
+internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IReportsStagedChanges, IDurableDictionaryCommandHandler<TKey, TValue> where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
     private readonly Dictionary<TKey, TValue> _items = [];

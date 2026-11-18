@@ -145,6 +145,23 @@ public partial class StateManagerTests : JournalingTestBase
             ServiceProvider.GetRequiredService<Orleans.Serialization.DeepCopier<Exception>>());
     }
 
+    [Fact]
+    public async Task StagedChangeScope_ReportsStagedChangesWhileAStateJournalsChangesItCannotObserve()
+    {
+        var sut = CreateTestSystem();
+        var manager = Assert.IsType<JournaledStateManager>(sut.Manager);
+        _ = new JournaledPersistentState<List<int>>(
+            "persistent",
+            manager,
+            new OrleansBinaryPersistentStateCommandCodec<List<int>>(CodecProvider.GetCodec<List<int>>(), SessionPool),
+            CodecProvider.GetActivator<List<int>>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        // A persistent state's object is mutated in place and serialized whole at capture, so no scope can show whether
+        // its flow staged a change; every scope reports that it may have.
+        Assert.True((await InScopeAsync(manager, static () => Task.CompletedTask)).HasStagedChanges);
+    }
+
     // A scope covers the async method which begins it, so begin it in its own method.
     private static async Task<StagedChangeScope> InScopeAsync(JournaledStateManager manager, Func<Task> action)
     {
