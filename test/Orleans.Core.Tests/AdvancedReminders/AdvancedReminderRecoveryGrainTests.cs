@@ -163,13 +163,16 @@ public class AdvancedReminderRecoveryGrainTests
     }
 
     [Theory]
-    [InlineData(false, 16, 16, false)]
-    [InlineData(true, 0, null, false)]
-    [InlineData(true, 16, 1, false)]
-    [InlineData(true, 16, 16, true)]
-    [InlineData(true, 16, null, true)]
+    [InlineData(false, false, 16, 16, false)]
+    [InlineData(false, true, 16, null, false)]
+    [InlineData(true, false, 0, null, false)]
+    [InlineData(true, false, 16, 1, false)]
+    [InlineData(true, false, 16, 16, true)]
+    [InlineData(true, false, 16, null, true)]
+    [InlineData(true, true, 0, null, false)]
+    [InlineData(true, true, 16, null, true)]
     public async Task ReconcileAsync_RepairsOverdueHandlesOnlyUnderUntilSuccess(
-        bool untilSuccess, int overdueMinutes, int? minutesSinceLastAttempt, bool dispatchExpected)
+        bool untilSuccess, bool oneShot, int overdueMinutes, int? minutesSinceLastAttempt, bool dispatchExpected)
     {
         var now = new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero);
         var timeProvider = new FakeTimeProvider(now);
@@ -180,7 +183,7 @@ public class AdvancedReminderRecoveryGrainTests
             StartAt = now.UtcDateTime.AddHours(-1),
             NextDueUtc = now.UtcDateTime.AddMinutes(-overdueMinutes),
             LastFireUtc = minutesSinceLastAttempt is { } elapsed ? now.UtcDateTime.AddMinutes(-elapsed) : null,
-            Period = TimeSpan.FromMinutes(1),
+            Period = oneShot ? TimeSpan.Zero : TimeSpan.FromMinutes(1),
             ScheduleId = "overdue-schedule",
             JobId = "overdue-job",
             JobShardId = "overdue-shard",

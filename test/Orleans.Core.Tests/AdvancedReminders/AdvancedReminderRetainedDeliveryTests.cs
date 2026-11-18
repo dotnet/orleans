@@ -168,6 +168,120 @@ public class AdvancedReminderRetainedDeliveryTests : AdvancedReminderServiceTest
     }
 
     [Theory]
+    [InlineData("interval")]
+    [InlineData("cron")]
+    public async Task Recovery_UsesRetryDeadline_AndGivesTheReplacementItsOwnGracePeriod(string kind)
+    {
+        var scenario = new Scenario(kind);
+        scenario.Callback = () =>
+        {
+            scenario.Clock.Advance(TimeSpan.FromMinutes(2));
+            return Task.FromException(new InvalidOperationException("slow callback failed"));
+        };
+
+        await scenario.DeliverAsync();
+        var retained = Assert.IsType<ReminderEntry>(await scenario.ReadAsync());
+        var retryDue = Assert.Single(scenario.Requests).DueTime;
+
+        scenario.Clock.Advance(TimeSpan.FromSeconds(5));
+        await scenario.RecoverAsync(retained);
+        Assert.Equal(retained.ScheduleId, (await scenario.ReadAsync())!.ScheduleId);
+        Assert.Single(scenario.Requests);
+
+        scenario.Clock.SetUtcNow(retryDue.AddSeconds(30));
+        await scenario.RecoverAsync(retained);
+        Assert.Single(scenario.Requests);
+
+        scenario.Clock.Advance(TimeSpan.FromSeconds(1));
+        await scenario.RecoverAsync(retained);
+        var replacement = Assert.IsType<ReminderEntry>(await scenario.ReadAsync());
+        Assert.NotEqual(retained.ScheduleId, replacement.ScheduleId);
+        Assert.Equal(retained.NextDueUtc, replacement.NextDueUtc);
+        Assert.Equal(scenario.Clock.GetUtcNow(), scenario.Requests[1].DueTime);
+
+        scenario.Clock.Advance(TimeSpan.FromSeconds(1));
+        await scenario.RecoverAsync(replacement);
+        Assert.Equal(replacement.ScheduleId, (await scenario.ReadAsync())!.ScheduleId);
+        Assert.Equal(2, scenario.Requests.Count);
+
+        await scenario.DeliverAsync(retained.ScheduleId);
+        Assert.Single(scenario.Recipient.ReceivedStatuses);
+        scenario.Callback = () => Task.CompletedTask;
+        await scenario.DeliverAsync(replacement.ScheduleId);
+        Assert.Equal(2, scenario.Recipient.ReceivedStatuses.Count);
+        Assert.Equal(Scenario.Now.UtcDateTime.AddMinutes(5), (await scenario.ReadAsync())!.NextDueUtc);
+    }
+
+    [Fact]
+    public async Task LegacyRecurringRetryRecovery_RespectsTheRetryDelayWithoutAPersistedDeadline()
+    {
+        var scenario = new Scenario("interval");
+        scenario.Callback = () =>
+        {
+            scenario.Clock.Advance(TimeSpan.FromMinutes(2));
+            return Task.FromException(new InvalidOperationException("slow callback failed"));
+        };
+        await scenario.DeliverAsync();
+        var retained = Assert.IsType<ReminderEntry>(await scenario.ReadAsync());
+        var legacy = Clone(retained, scheduleId: ReminderScheduleId.Create());
+        scenario.Table.ReplaceCurrent(legacy);
+
+        scenario.Clock.Advance(TimeSpan.FromSeconds(5));
+        await scenario.RecoverAsync(legacy);
+
+        var repaired = Assert.IsType<ReminderEntry>(await scenario.ReadAsync());
+        Assert.Equal(scenario.Clock.GetUtcNow().AddMinutes(1), scenario.Requests[1].DueTime);
+        Assert.Equal(legacy.NextDueUtc, repaired.NextDueUtc);
+        Assert.NotEqual(legacy.ScheduleId, repaired.ScheduleId);
+    }
+
+    [Fact]
+    public async Task EarlyRetryDelivery_ReschedulesWithoutRunningCallbackOrMovingItsDeadline()
+    {
+        var scenario = new Scenario("interval");
+        await scenario.DeliverAsync();
+        var retained = Assert.IsType<ReminderEntry>(await scenario.ReadAsync());
+        var retryDue = Assert.Single(scenario.Requests).DueTime;
+
+        await scenario.DeliverAsync(retained.ScheduleId);
+
+        var replacement = Assert.IsType<ReminderEntry>(await scenario.ReadAsync());
+        Assert.NotEqual(retained.ScheduleId, replacement.ScheduleId);
+        Assert.Equal(retained.NextDueUtc, replacement.NextDueUtc);
+        Assert.Equal(retryDue, scenario.Requests[1].DueTime);
+        Assert.Single(scenario.Recipient.ReceivedStatuses);
+
+        scenario.Clock.SetUtcNow(retryDue);
+        scenario.Callback = () => Task.CompletedTask;
+        await scenario.DeliverAsync(replacement.ScheduleId);
+        Assert.Equal(2, scenario.Recipient.ReceivedStatuses.Count);
+    }
+
+    [Theory]
+    [InlineData(MissedReminderAction.FireImmediately, 1)]
+    [InlineData(MissedReminderAction.Skip, 0)]
+    [InlineData(MissedReminderAction.Notify, 0)]
+    public async Task OverdueOneShotRecovery_AppliesMissedPolicy(MissedReminderAction action, int expectedCallbacks)
+    {
+        var scenario = new Scenario();
+        scenario.Callback = () => Task.CompletedTask;
+        scenario.Entry.Action = action;
+        scenario.Table.ReplaceCurrent(scenario.Entry);
+        scenario.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        await scenario.RecoverAsync(scenario.Entry);
+        var replacement = Assert.IsType<ReminderEntry>(await scenario.ReadAsync());
+        Assert.NotEqual(scenario.Entry.ScheduleId, replacement.ScheduleId);
+        Assert.Equal(scenario.Entry.NextDueUtc, replacement.NextDueUtc);
+
+        await scenario.DeliverAsync();
+        Assert.Empty(scenario.Recipient.ReceivedStatuses);
+        await scenario.DeliverAsync(replacement.ScheduleId);
+        Assert.Equal(expectedCallbacks, scenario.Recipient.ReceivedStatuses.Count);
+        Assert.Null(await scenario.ReadAsync());
+    }
+
+    [Theory]
     [InlineData("removed")]
     [InlineData("etag")]
     [InlineData("schedule")]
@@ -229,6 +343,7 @@ public class AdvancedReminderRetainedDeliveryTests : AdvancedReminderServiceTest
         Assert.Empty(pending.JobShardId);
         Assert.Equal(Scenario.Now.UtcDateTime, pending.LastFireUtc);
 
+        scenario.Clock.Advance(TimeSpan.FromSeconds(20));
         scenario.ConfigureScheduling();
         await scenario.Service.EnsureScheduledCoreAsync(
             pending.GrainId, pending.ReminderName, pending.ScheduleId, force: false, CancellationToken.None);
@@ -387,6 +502,10 @@ public class AdvancedReminderRetainedDeliveryTests : AdvancedReminderServiceTest
         public Task DeliverAsync(string? scheduleId = null, int dequeueCount = 1)
             => Service.ProcessDueReminderCoreAsync(Entry.GrainId, Entry.ReminderName,
                 scheduleId ?? Entry.ScheduleId, CancellationToken.None, dequeueCount);
+
+        public Task RecoverAsync(ReminderEntry entry)
+            => Service.EnsureScheduledCoreAsync(entry.GrainId, entry.ReminderName,
+                entry.ScheduleId, force: false, CancellationToken.None, recoverOverdue: true);
 
         public Task<ReminderEntry?> ReadAsync() => Table.ReadRow(Entry.GrainId, Entry.ReminderName);
     }

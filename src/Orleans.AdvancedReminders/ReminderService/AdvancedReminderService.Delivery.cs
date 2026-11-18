@@ -42,11 +42,12 @@ internal sealed partial class AdvancedReminderService
 
         var now = GetUtcNow();
         var due = entry.NextDueUtc ?? entry.StartAt;
-        if (due > now)
+        var deliveryDueUtc = ReminderScheduleId.GetDeliveryDueUtc(entry.ScheduleId);
+        if (due > now || deliveryDueUtc > now)
         {
             // A job can become observable before its due time after a clock adjustment.
             // Replace it with a new occurrence instead of firing the reminder early.
-            PrepareNextOccurrence(entry);
+            PrepareNextOccurrence(entry, deliveryDueUtc);
             await PersistAndScheduleCoreAsync(entry, cancellationToken);
             return new AdvancedReminderDeliveryPreparation();
         }
@@ -165,15 +166,15 @@ internal sealed partial class AdvancedReminderService
             // A callback can fail before its owner starts or rearms the next attempt.
             // Persist the replacement occurrence before completing this job so recovery
             // can restore a missing handle and stale deliveries remain fenced.
-            var deliveryDueUtc = GetUtcNow().Add(_options.MinimumReminderPeriod);
-            if (entry.Period == TimeSpan.Zero && string.IsNullOrWhiteSpace(entry.CronExpression))
+            var retryDueUtc = GetUtcNow().Add(_options.MinimumReminderPeriod);
+            if (!IsRecurring(entry))
             {
-                entry.NextDueUtc = deliveryDueUtc;
+                entry.NextDueUtc = retryDueUtc;
             }
             // Keep a recurring occurrence's logical due time until it succeeds.
             // Moving its calendar anchor would discard catch-up or drift intervals.
-            PrepareNextOccurrence(entry);
-            await PersistAndScheduleCoreAsync(entry, cancellationToken, deliveryDueUtc);
+            PrepareNextOccurrence(entry, retryDueUtc);
+            await PersistAndScheduleCoreAsync(entry, cancellationToken);
             return;
         }
 
@@ -251,16 +252,18 @@ internal sealed partial class AdvancedReminderService
         }
     }
 
+    private static bool IsRecurring(ReminderEntry entry)
+        => entry.Period > TimeSpan.Zero || !string.IsNullOrWhiteSpace(entry.CronExpression);
+
     private static bool HasFutureSchedule(ReminderEntry entry)
-        => entry.NextDueUtc is not null || entry.Period > TimeSpan.Zero || !string.IsNullOrWhiteSpace(entry.CronExpression);
+        => entry.NextDueUtc is not null || IsRecurring(entry);
 
     private bool IsRetainedFailedDelivery(ReminderEntry entry)
         => _options.DeliveryRetryPolicy.RetainsFailedDeliveries
             && entry.LastFireUtc is { } lastFireUtc
             // Successful one-shots are removed, so any persisted attempt belongs to a retry.
             // Recurring schedules advance their logical due time only after success.
-            && ((entry.Period == TimeSpan.Zero && string.IsNullOrWhiteSpace(entry.CronExpression))
-                || lastFireUtc >= (entry.NextDueUtc ?? entry.StartAt));
+            && (!IsRecurring(entry) || lastFireUtc >= (entry.NextDueUtc ?? entry.StartAt));
 
     internal static bool MatchesScheduledOccurrence(ReminderEntry entry, string? expectedScheduleId)
         => string.IsNullOrEmpty(expectedScheduleId)

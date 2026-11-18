@@ -38,25 +38,24 @@ internal sealed partial class AdvancedReminderService
             return;
         }
 
-        // The durable job can have been persisted even when persisting its handle failed.
-        // Rotate the occurrence token before every repair so that any orphaned job becomes
-        // harmless when it eventually runs instead of delivering the same occurrence twice.
-        PrepareNextOccurrence(entry);
-        entry.JobId = string.Empty;
-        entry.JobShardId = string.Empty;
-        entry.ETag = await _reminderTable.UpsertRow(entry);
-        // A retained recurring occurrence keeps its logical due time in the past.
-        // Repair must restore a delayed delivery rather than immediately retrying it.
-        DateTime? deliveryDueUtc = overdue ? now : null;
-        if (IsRetainedFailedDelivery(entry) && !overdue)
+        var deliveryDueUtc = ReminderScheduleId.GetDeliveryDueUtc(entry.ScheduleId);
+        if (deliveryDueUtc is null && IsRetainedFailedDelivery(entry))
         {
-            var retryDueUtc = GetUtcNow().Add(_options.MinimumReminderPeriod);
-            deliveryDueUtc = entry.NextDueUtc is { } nextDueUtc && nextDueUtc > retryDueUtc
-                ? nextDueUtc
-                : retryDueUtc;
+            var due = entry.NextDueUtc ?? entry.StartAt;
+            // Legacy recurring retries retained the schedule's due time. Give a replacement
+            // a full retry interval so it cannot run before the old carrier was due.
+            var retryDue = IsRecurring(entry) ? now.Add(_options.MinimumReminderPeriod) : due;
+            deliveryDueUtc = retryDue > due ? retryDue : due;
         }
 
-        await ScheduleAndPersistHandleAsync(entry, cancellationToken, deliveryDueUtc);
+        if ((overdue && deliveryDueUtc is null) || deliveryDueUtc < now)
+        {
+            deliveryDueUtc = now;
+        }
+
+        // Rotate before persisting the replacement so a previous job cannot deliver it.
+        PrepareNextOccurrence(entry, deliveryDueUtc);
+        await PersistAndScheduleCoreAsync(entry, cancellationToken);
         if (overdue)
         {
             _logger.LogWarning(
@@ -67,17 +66,20 @@ internal sealed partial class AdvancedReminderService
 
     internal static bool ShouldRecoverOverdueOccurrence(ReminderEntry entry, DateTime now, ReminderOptions options)
     {
-        if (!options.DeliveryRetryPolicy.RetainsFailedDeliveries
-            || (entry.Period <= TimeSpan.Zero && string.IsNullOrWhiteSpace(entry.CronExpression)))
+        if (!options.DeliveryRetryPolicy.RetainsFailedDeliveries || !HasFutureSchedule(entry))
         {
             return false;
         }
 
         var due = entry.NextDueUtc ?? entry.StartAt;
-        if (entry.LastFireUtc is { } lastFire && lastFire >= due)
+        if (ReminderScheduleId.GetDeliveryDueUtc(entry.ScheduleId) is { } deliveryDueUtc)
         {
-            // An attempted recurring occurrence preserves its original due time across retries.
-            // Use the last attempt to give its replacement carrier time to deliver.
+            return now - deliveryDueUtc > options.MissedReminderGracePeriod;
+        }
+
+        if (IsRecurring(entry) && entry.LastFireUtc is { } lastFire && lastFire >= due)
+        {
+            // Rows written by older versions did not capture the retry's delivery deadline.
             var sinceAttempt = now - lastFire;
             return sinceAttempt > options.MinimumReminderPeriod
                 && sinceAttempt - options.MinimumReminderPeriod > options.MissedReminderGracePeriod;
@@ -86,21 +88,19 @@ internal sealed partial class AdvancedReminderService
         return now - due > options.MissedReminderGracePeriod;
     }
 
-    private async Task PersistAndScheduleCoreAsync(ReminderEntry entry, CancellationToken cancellationToken,
-        DateTime? deliveryDueUtc = null)
+    private async Task PersistAndScheduleCoreAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
         entry.ETag = await _reminderTable.UpsertRow(entry);
         if (HasFutureSchedule(entry))
         {
-            await ScheduleAndPersistHandleAsync(entry, cancellationToken, deliveryDueUtc);
+            await ScheduleAndPersistHandleAsync(entry, cancellationToken);
         }
     }
 
-    private async Task ScheduleAndPersistHandleAsync(ReminderEntry entry, CancellationToken cancellationToken,
-        DateTime? deliveryDueUtc = null)
+    private async Task ScheduleAndPersistHandleAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var due = deliveryDueUtc ?? entry.NextDueUtc ?? entry.StartAt;
+        var due = ReminderScheduleId.GetDeliveryDueUtc(entry.ScheduleId) ?? entry.NextDueUtc ?? entry.StartAt;
         var dueTime = new DateTimeOffset(due, TimeSpan.Zero);
         var grainIdText = entry.GrainId.ToString();
         var dispatcher = GetDispatcher(entry.GrainId);
@@ -163,7 +163,7 @@ internal sealed partial class AdvancedReminderService
                     Id = entry.JobId,
                     Name = string.Concat(JobNamePrefix, entry.ReminderName),
                     ShardId = entry.JobShardId,
-                    DueTime = new DateTimeOffset(entry.NextDueUtc ?? entry.StartAt, TimeSpan.Zero),
+                    DueTime = new DateTimeOffset(ReminderScheduleId.GetDeliveryDueUtc(entry.ScheduleId) ?? entry.NextDueUtc ?? entry.StartAt, TimeSpan.Zero),
                     TargetGrainId = GetDispatcher(entry.GrainId).GetGrainId(),
                 },
                 cancellation.Token).WaitAsync(cancellation.Token);
@@ -188,9 +188,9 @@ internal sealed partial class AdvancedReminderService
         }
     }
 
-    private static void PrepareNextOccurrence(ReminderEntry entry)
+    private static void PrepareNextOccurrence(ReminderEntry entry, DateTime? deliveryDueUtc = null)
     {
-        entry.ScheduleId = ReminderScheduleId.RotateOccurrence(entry.ScheduleId);
+        entry.ScheduleId = ReminderScheduleId.RotateOccurrence(entry.ScheduleId, deliveryDueUtc);
         entry.JobId = string.Empty;
         entry.JobShardId = string.Empty;
     }

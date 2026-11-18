@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.DurableJobs;
 using Xunit;
@@ -16,9 +17,10 @@ public sealed partial class AdvancedReminderFeatureTests
     private const int RecurringRegistrationLeadSeconds = 10;
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Recurring_LostDurableJobIsRecreatedByRecovery_WithoutChangingItsAnchor(bool cron)
+    [InlineData("one-shot")]
+    [InlineData("interval")]
+    [InlineData("cron")]
+    public async Task LostDurableJobIsRecreatedByRecovery_WithoutChangingTheSchedule(string kind)
     {
         var clock = new FakeTimeProvider(TimeProvider.System.GetUtcNow());
         var gracePeriod = TimeSpan.FromMilliseconds(1);
@@ -37,7 +39,14 @@ public sealed partial class AdvancedReminderFeatureTests
         var firstDue = DateTimeOffset.FromUnixTimeSeconds(
             TimeProvider.System.GetUtcNow().ToUnixTimeSeconds() + RecurringRegistrationLeadSeconds);
         using var completion = new ReminderCompletions(name);
-        await grain.RegisterDailyReminder(name, cron, firstDue.UtcDateTime, failFirstAttempt: false);
+        if (kind == "one-shot")
+        {
+            await grain.RegisterOneShot(name, firstDue, MissedReminderAction.FireImmediately, failures: 0);
+        }
+        else
+        {
+            await grain.RegisterDailyReminder(name, kind == "cron", firstDue.UtcDateTime, failFirstAttempt: false);
+        }
         var original = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
         Assert.Equal(firstDue.UtcDateTime, original.NextDueUtc);
         Assert.True(await services.GetRequiredService<ILocalDurableJobManager>().CancelAsync(new DurableJob
@@ -62,15 +71,21 @@ public sealed partial class AdvancedReminderFeatureTests
             services.GetRequiredService<IOptions<Orleans.AdvancedReminders.ReminderOptions>>(),
             clock);
         await recovery.ReconcileAsync(force: false, cancellationToken);
-        var replacement = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
-        Assert.NotEqual(original.JobId, replacement.JobId);
         Assert.Equal(ActivityStatusCode.Ok, await completion.NextAsync());
-
-        var following = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
+        Assert.NotEqual(original.JobId, Assert.Single(completion.JobIds));
         Assert.Equal(1, await grain.GetTickCount());
-        Assert.Equal(original.StartAt, following.StartAt);
-        Assert.Equal(firstDue.UtcDateTime.AddDays(1), following.NextDueUtc);
-        await cluster.Client.GetReminderManagementGrain().DeleteAsync(grain.GetGrainId(), name);
+
+        var following = await GetEntryAsync(cluster, grain, name);
+        if (kind == "one-shot")
+        {
+            Assert.Null(following);
+        }
+        else
+        {
+            Assert.NotNull(following);
+            Assert.Equal(original.StartAt, following.StartAt);
+            Assert.Equal(firstDue.UtcDateTime.AddDays(1), following.NextDueUtc);
+        }
     }
 
     [Theory]
