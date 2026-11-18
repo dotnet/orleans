@@ -105,9 +105,7 @@ namespace DistributedTests.Server
 
             if (commonParameters.ActivationRepartitioning)
             {
-#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 siloBuilder.AddActivationRepartitioner();
-#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }
 
             _siloConfigurator.Configure(siloBuilder, configuratorParameters);

@@ -105,9 +105,7 @@ public class RuntimeGenericRegistrationTests
         var dependency = new ActivationMarker();
         var builder = new TestSiloBuilder();
         builder.Services.AddSingleton(dependency);
-#pragma warning disable ORLEANSEXP001
         builder.AddActivationRepartitioner<ConstructorInjectedToleranceRule>();
-#pragma warning restore ORLEANSEXP001
 
         using var provider = builder.Services.BuildServiceProvider();
         var concrete = provider.GetRequiredService<ConstructorInjectedToleranceRule>();

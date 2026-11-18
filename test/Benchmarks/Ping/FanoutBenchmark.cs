@@ -31,9 +31,7 @@ public class FanoutBenchmark : IDisposable
             var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
             var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
             {
-#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 siloBuilder.AddActivationRepartitioner();
-#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 siloBuilder.ConfigureLogging(l =>
                 {
                     l.AddSimpleConsole(o =>

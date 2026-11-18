@@ -77,7 +77,7 @@ Correlate client-visible results with per-silo CPU, scheduler delay, memory, gar
 
 Scale out before saturation. Base scaling decisions on correlated trends in sustained CPU, scheduler delay, tail latency, activation pressure, gateway load shedding, and application queue depth.
 
-Adding a silo expands the candidate set for later resource-optimized placement decisions. Existing active grains continue running on their current silos. New activations can use the added capacity immediately after membership converges, and grains which are collected or otherwise deactivated can use it when they reactivate. The experimental activation rebalancer can migrate eligible grains to reduce count and memory skew; the experimental activation repartitioner instead migrates eligible grains to improve call locality. See [Grain placement and migration](../grains/grain-placement.md#scale-out-and-scale-in).
+Adding a silo expands the candidate set for later resource-optimized placement decisions. Existing active grains continue running on their current silos. New activations can use the added capacity immediately after membership converges, and grains which are collected or otherwise deactivated can use it when they reactivate. The experimental activation rebalancer can migrate eligible grains to reduce count and memory skew; the activation repartitioner instead migrates eligible grains to improve call locality. See [Grain placement and migration](../grains/grain-placement.md#scale-out-and-scale-in).
 
 Account for:
 

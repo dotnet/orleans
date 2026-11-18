@@ -374,10 +374,8 @@ namespace Orleans.Hosting
 
     public static partial class ActivationRepartitioningExtensions
     {
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP001")]
         public static ISiloBuilder AddActivationRepartitioner(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP001")]
         public static ISiloBuilder AddActivationRepartitioner<TRule>(this ISiloBuilder builder)
             where TRule : class, Placement.Repartitioning.IImbalanceToleranceRule { throw null; }
     }
@@ -508,11 +506,11 @@ namespace Orleans.Hosting
 
     public static partial class SystemTextJsonSerializerExtensions
     {
-        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
-
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Serialization.SystemTextJsonGrainStorageSerializerOptions>> configureOptions) { throw null; }
 
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Serialization.SystemTextJsonGrainStorageSerializerOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
     }
 }
 

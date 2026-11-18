@@ -21,7 +21,7 @@ Placement, collection, migration, and load shedding solve different problems:
 | A silo joins | Includes it in later placement decisions after membership and compatibility information converge. Existing activations continue running on their current silos. |
 | An activation remains idle | Collects it after the configured idle period. A later call runs placement again, so the replacement activation can use newly added capacity. |
 | A silo leaves or fails | Removes its activations. Calls are routed to activations on remaining silos or cause replacement activations to be placed there. |
-| Explicit or automatic migration is requested | Moves an eligible live activation after its current work completes. Cluster-wide automatic migration is experimental and opt-in. |
+| Explicit or automatic migration is requested | Moves an eligible live activation after its current work completes. Cluster-wide automatic migration is opt-in; activation rebalancing is experimental. |
 | Enabled load shedding marks a silo overloaded | The client gateway rejects requests, stream queue flow control pauses reads at its CPU threshold, and resource-optimized placement favors non-overloaded candidates. |
 
 A hosting platform or operator controls the silo count. Orleans adapts placement and routing to the resulting membership.
@@ -123,13 +123,15 @@ Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain class from au
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="immovable_grain":::
 The attribute doesn't prevent explicit <xref:Orleans.Grain.MigrateOnIdle> calls.
 
-## Experimental automatic movement
+<a id="experimental-automatic-movement"></a>
 
-Orleans includes two opt-in experimental services:
+## Automatic movement
+
+Orleans includes two opt-in services:
 
 | Feature | Goal | Diagnostic |
 |---|---|---|
-| Activation repartitioner | Improve grain-to-grain call locality. | `ORLEANSEXP001` |
+| Activation repartitioner | Improve grain-to-grain call locality. | None |
 | Activation rebalancer | Balance activation count and memory pressure across silos. | `ORLEANSEXP002` |
 
 Enable them independently:
