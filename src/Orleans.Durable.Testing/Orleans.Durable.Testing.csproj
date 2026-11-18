@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Durable.Testing</PackageId>
+    <Title>Microsoft Orleans Durable Testing</Title>
+    <Description>Captures the recorded histories of Microsoft Orleans durable tasks and replays them against new code in tests.</Description>
+    <PackageTags>$(PackageTags) Durable DurableTasks Testing Replay Versioning</PackageTags>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
+    <!-- Validate framework assets while the first release establishes a package baseline. -->
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The replayer uses Orleans.Durable's internals, so it depends on that package's exact version. -->
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable\Orleans.Durable.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
