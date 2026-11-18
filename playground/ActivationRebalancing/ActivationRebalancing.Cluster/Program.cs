@@ -6,7 +6,6 @@ using Orleans.Configuration;
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddKeyedRedisClient("orleans-redis");
 builder.Logging.AddFilter("Orleans.Runtime.Placement.Rebalancing", LogLevel.Trace);
-#pragma warning disable ORLEANSEXP002
 builder.UseOrleans(builder => builder
     .Configure<GrainCollectionOptions>(o =>
     {
@@ -25,7 +24,6 @@ builder.UseOrleans(builder => builder
         //o.SiloNumberWeight = 0; 
     })
     .AddActivationRebalancer());
-#pragma warning restore ORLEANSEXP002
 
 builder.Services.AddHostedService<LoadDriverBackgroundService>();
 var app = builder.Build();

@@ -15,7 +15,6 @@ builder.UseOrleans(orleans =>
         o.RecoveryPeriod = TimeSpan.FromSeconds(5);
         o.AnchoringFilterEnabled = false;
     });
-#pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     orleans.AddActivationRebalancer();
     orleans.Configure<ActivationRebalancerOptions>(o =>
     {
@@ -23,7 +22,6 @@ builder.UseOrleans(orleans =>
         o.SessionCyclePeriod = TimeSpan.FromSeconds(5);
         o.CycleNumberWeight = 0.7;
     });
-#pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 });
 
 // Add services to the container.

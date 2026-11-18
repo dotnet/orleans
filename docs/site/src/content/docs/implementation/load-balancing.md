@@ -83,9 +83,11 @@ Moving an activation has a cost: dehydrate and rehydrate work, directory updates
 
 Valid activations continue running on their current silos across membership changes. A joining silo receives activations through later creation or opt-in migration. During graceful shutdown, ordinary activations on the departing silo deactivate; later calls create replacements on remaining compatible silos.
 
-## Experimental activation rebalancer
+<a id="experimental-activation-rebalancer"></a>
 
-<xref:Orleans.Hosting.ActivationRebalancerExtensions.AddActivationRebalancer*?displayProperty=nameWithType> enables the resource rebalancer and produces compiler warning **`ORLEANSEXP002`**. A worker observes cluster statistics in sessions, estimates imbalance using entropy, and asks source silos to migrate random activations toward underloaded silos. A monitor can wake or relocate the worker after failure.
+## Activation rebalancer
+
+<xref:Orleans.Hosting.ActivationRebalancerExtensions.AddActivationRebalancer*?displayProperty=nameWithType> enables the resource rebalancer. A worker observes cluster statistics in sessions, estimates imbalance using entropy, and asks source silos to migrate random activations toward underloaded silos. A monitor can wake or relocate the worker after failure.
 
 The protocol optimizes distribution of activation count and memory use. The activation repartitioner complements it by optimizing the communication graph and cross-silo hot paths.
 

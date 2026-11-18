@@ -22,13 +22,11 @@ public static class ActivationRebalancerExtensions
     /// way that it optimizes both activation count and memory usages across the silos of the cluster.
     /// <para>You can read more on activation rebalancing <see href="https://www.ledjonbehluli.com/posts/orleans_adaptive_rebalancing/">here</see></para>
     /// </remarks>
-    [Experimental("ORLEANSEXP002")]
     public static ISiloBuilder AddActivationRebalancer(this ISiloBuilder builder) =>
         builder.AddActivationRebalancer<FailedSessionBackoffProvider>();
 
     /// <inheritdoc cref="AddActivationRebalancer(ISiloBuilder)"/>.
     /// <typeparam name="TProvider">Custom backoff provider for determining next session after a failed attempt.</typeparam>
-    [Experimental("ORLEANSEXP002")]
     public static ISiloBuilder AddActivationRebalancer<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TProvider>(
         this ISiloBuilder builder)
