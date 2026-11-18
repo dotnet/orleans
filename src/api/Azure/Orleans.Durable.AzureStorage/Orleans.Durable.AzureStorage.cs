@@ -6,7 +6,7 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-namespace Orleans.Journaling
+namespace Orleans.Durable.Journaling
 {
     public sealed partial class AzureBlobJournalStorageOptions
     {
@@ -110,5 +110,19 @@ namespace Orleans.Journaling
     {
         Azure.Storage.Blobs.BlobContainerClient GetBlobContainerClient(JournalId journalId);
         System.Threading.Tasks.Task InitializeAsync(Azure.Storage.Blobs.BlobServiceClient client, System.Threading.CancellationToken cancellationToken);
+    }
+}
+
+namespace Orleans.Hosting
+{
+    public static partial class AzureStorageDurableJobsExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureBlobDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Durable.Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, System.Action<Durable.Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Durable.Journaling.AzureTableJournalStorageOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseAzureTableDurableJobs(this ISiloBuilder builder, System.Action<Durable.Journaling.AzureTableJournalStorageOptions> configure) { throw null; }
     }
 }

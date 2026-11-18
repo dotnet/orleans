@@ -6,7 +6,7 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-namespace Orleans.Journaling
+namespace Orleans.Durable.Journaling
 {
     public static partial class S3JournalStorageHostingExtensions
     {
