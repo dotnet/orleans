@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
@@ -758,6 +759,47 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
+        }
+
+        [TestSuite("BVT"), TestProvider("None"), TestCategory("BVT"), TestCategory("ActivationCollector")]
+        [Theory]
+        [InlineData(-1, 2, 60, 4)]
+        [InlineData(12, 2, 180, 5)]
+        [InlineData(5, 4, 30, 5)]
+        public async Task ShorteningKeepAliveAdvancesCollectionTicket(int initialHours, int shortenAtHours, int delayMinutes, int expectedTicketHours)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var clock = new FakeTimeProvider();
+            var start = clock.GetUtcNow().UtcDateTime;
+            var collectionAge = TimeSpan.FromHours(2);
+            var builder = new InProcessTestClusterBuilder(1);
+            builder.ConfigureSilo((_, silo) =>
+            {
+                silo.Services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.Grains, clock);
+                silo.Services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.ActivationManagement, clock);
+                silo.Services.Configure<GrainCollectionOptions>(options =>
+                {
+                    options.CollectionAge = collectionAge;
+                    options.CollectionQuantum = TimeSpan.FromMinutes(1);
+                });
+            });
+
+            await using var cluster = builder.Build();
+            await cluster.DeployAsync(cancellationToken);
+            var collector = cluster.Silos[0].ServiceProvider.GetRequiredService<ActivationCollector>();
+            var grain = cluster.Client.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            await grain.SetKeepAlive(initialHours < 0 ? Timeout.InfiniteTimeSpan : TimeSpan.FromHours(initialHours));
+            Assert.True(cluster.TryGetGrainContext(grain.GetGrainId(), out var context));
+            var activation = Assert.IsType<ActivationData>(context);
+
+            clock.Advance(collectionAge);
+            await collector.CollectStaleActivations(cancellationToken);
+            Assert.Equal(initialHours < 0 ? DateTime.MaxValue : start.AddHours(initialHours), collector.GetCollectionTicketForTesting(activation));
+
+            clock.Advance(TimeSpan.FromHours(shortenAtHours) - collectionAge);
+            await grain.SetKeepAlive(TimeSpan.FromMinutes(delayMinutes));
+
+            Assert.Equal(start.AddHours(expectedTicketHours), collector.GetCollectionTicketForTesting(activation));
         }
 
         [TestSuite("Functional")]

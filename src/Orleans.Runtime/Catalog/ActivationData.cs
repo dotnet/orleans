@@ -531,6 +531,7 @@ internal sealed partial class ActivationData :
     public void DelayDeactivation(TimeSpan timespan)
     {
         var rescheduleCollection = false;
+        DateTime? shortenedKeepAliveUntil = null;
         lock (_lock)
         {
             if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
@@ -548,13 +549,24 @@ internal sealed partial class ActivationData :
             }
             else
             {
-                KeepAliveUntil = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime + timespan;
+                var keepAliveUntil = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime + timespan;
+                if (keepAliveUntil < KeepAliveUntil)
+                {
+                    shortenedKeepAliveUntil = keepAliveUntil;
+                }
+
+                KeepAliveUntil = keepAliveUntil;
             }
         }
 
         if (rescheduleCollection)
         {
             _shared.InternalRuntime.ActivationCollector.TryRescheduleCollection(this);
+        }
+        else if (shortenedKeepAliveUntil is { } deadline)
+        {
+            // A collection pass may already have scheduled this activation at the previous deadline.
+            _shared.InternalRuntime.ActivationCollector.AdvanceCollection(this, deadline);
         }
     }
 

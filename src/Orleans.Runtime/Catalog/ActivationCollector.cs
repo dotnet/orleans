@@ -154,6 +154,18 @@ namespace Orleans.Runtime
             return TryRescheduleCollection(registration, item.CollectionAgeLimit);
         }
 
+        internal void AdvanceCollection(ICollectibleGrainContext item, DateTime keepAliveUntil)
+        {
+            if (item.IsExemptFromCollection || GetCollectionRegistration(item) is not { } registration)
+            {
+                return;
+            }
+
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var timeout = TimeSpan.FromTicks(Math.Max((keepAliveUntil - now).Ticks, item.CollectionAgeLimit.Ticks));
+            TryScheduleCollection(registration, timeout, now, throwIfExpired: false, advanceOnly: true);
+        }
+
         private bool TryRescheduleCollection(CollectionRegistration registration, TimeSpan timeout)
         {
             while (registration.TryGetScheduledTicket(out var oldTicket))
@@ -563,9 +575,9 @@ namespace Orleans.Runtime
             return (CollectionRegistration)item.GetOrSetCollectionRegistration(candidate);
         }
 
-        private bool TryScheduleCollection(CollectionRegistration registration, TimeSpan timeout, DateTime now, bool throwIfExpired)
+        private bool TryScheduleCollection(CollectionRegistration registration, TimeSpan timeout, DateTime now, bool throwIfExpired, bool advanceOnly = false)
         {
-            while (!registration.IsScheduled && !registration.IsRetired)
+            while ((advanceOnly || !registration.IsScheduled) && !registration.IsRetired)
             {
                 if (!TryMakeTicketFromTimeSpan(timeout, now, out var ticket))
                 {
@@ -578,15 +590,20 @@ namespace Orleans.Runtime
                     continue;
                 }
 
+                if (advanceOnly && registration.TryGetScheduledTicket(out var currentTicket) && currentTicket <= ticket)
+                {
+                    return false;
+                }
+
                 var bucket = GetOrCreateBucket(ticket);
-                if (registration.TrySchedule(bucket))
+                if (registration.TrySchedule(bucket, advanceOnly))
                 {
                     if (!IsExpired(ticket))
                     {
                         return true;
                     }
 
-                    registration.TryCancel();
+                    registration.TryCancel(bucket);
                     bucket.CloseForCleanup();
                 }
 
@@ -941,11 +958,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool TrySchedule(Bucket bucket)
+            public bool TrySchedule(Bucket bucket, bool advanceOnly)
             {
                 lock (_lock)
                 {
-                    if (_state is CollectionRegistrationState.Scheduled or CollectionRegistrationState.Retired)
+                    if (_state is CollectionRegistrationState.Retired
+                        || (_state is CollectionRegistrationState.Scheduled && (!advanceOnly || _bucket!.Ticket <= bucket.Ticket)))
                     {
                         return false;
                     }
@@ -953,6 +971,11 @@ namespace Orleans.Runtime
                     if (!bucket.TryAdd(this))
                     {
                         return false;
+                    }
+
+                    if (_state is CollectionRegistrationState.Scheduled)
+                    {
+                        _bucket!.TryRemove(this);
                     }
 
                     _bucket = bucket;
@@ -1001,11 +1024,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool TryCancel()
+            public bool TryCancel(Bucket? expectedBucket = null)
             {
                 lock (_lock)
                 {
-                    if (_state is CollectionRegistrationState.None or CollectionRegistrationState.Retired)
+                    if (_state is CollectionRegistrationState.None or CollectionRegistrationState.Retired
+                        || (expectedBucket is not null && !ReferenceEquals(_bucket, expectedBucket)))
                     {
                         return false;
                     }
