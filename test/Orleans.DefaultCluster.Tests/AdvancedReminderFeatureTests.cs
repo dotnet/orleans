@@ -316,7 +316,7 @@ public interface IAdvancedReminderFeatureGrain : IGrainWithGuidKey
     Task RegisterCron(string name, string expression, string? timeZoneId);
     Task RegisterAndReplaceInCallback(string name, DateTimeOffset replacementDue);
     Task RegisterIntervalUntilSecondTick(string name, int failures);
-    Task RegisterDailyReminderWithFailure(string name, bool cron, DateTime dueAtUtc);
+    Task RegisterDailyReminder(string name, bool cron, DateTime dueAtUtc, bool failFirstAttempt);
     Task<int> GetTickCount();
     Task<TimeSpan> GetLastPeriod();
 }
@@ -345,15 +345,16 @@ public sealed class AdvancedReminderFeatureGrain : Grain, IAdvancedReminderFeatu
             name, ReminderSchedule.Interval(TimeSpan.Zero, TimeSpan.FromSeconds(1)), MissedReminderAction.FireImmediately);
     }
 
-    public async Task RegisterDailyReminderWithFailure(string name, bool cron, DateTime dueAtUtc)
+    public async Task RegisterDailyReminder(string name, bool cron, DateTime dueAtUtc, bool failFirstAttempt)
     {
-        _failures = 1;
+        _failures = failFirstAttempt ? 1 : 0;
         var schedule = cron
             ? ReminderSchedule.Cron(ReminderCronBuilder.FromFields(ReminderCronSecond.At(dueAtUtc.Second),
                 ReminderCronMinute.At(dueAtUtc.Minute), ReminderCronHour.At(dueAtUtc.Hour),
                 ReminderCronDayOfMonth.Any, ReminderCronMonth.Any, ReminderCronDayOfWeek.Any).ToExpressionString(), "UTC")
             : ReminderSchedule.Interval(dueAtUtc, TimeSpan.FromDays(1));
-        await this.RegisterOrUpdateAdvancedReminder(name, schedule, MissedReminderAction.Skip);
+        await this.RegisterOrUpdateAdvancedReminder(name, schedule,
+            failFirstAttempt ? MissedReminderAction.Skip : MissedReminderAction.FireImmediately);
     }
 
     public async Task RegisterAndReplaceInCallback(string name, DateTimeOffset replacementDue)

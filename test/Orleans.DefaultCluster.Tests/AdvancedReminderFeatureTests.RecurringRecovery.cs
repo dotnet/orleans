@@ -1,7 +1,11 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
+using Orleans.DurableJobs;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 
@@ -10,6 +14,64 @@ namespace DefaultCluster.Tests;
 public sealed partial class AdvancedReminderFeatureTests
 {
     private const int RecurringRegistrationLeadSeconds = 10;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Recurring_LostDurableJobIsRecreatedByRecovery_WithoutChangingItsAnchor(bool cron)
+    {
+        var clock = new FakeTimeProvider(TimeProvider.System.GetUtcNow());
+        var gracePeriod = TimeSpan.FromMilliseconds(1);
+        await using var cluster = await CreateClusterAsync(reminderClock: clock, retryPolicy: ReminderRetryPolicy.UntilSuccess,
+            missedReminderGracePeriod: gracePeriod);
+        var grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
+        while (grain.GetGrainId().GetUniformHashCode() >= (1u << 28))
+        {
+            // Use the first group of hash ranges visited by reconciliation.
+            grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
+        }
+
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var services = cluster.GetSiloServiceProvider();
+        var name = Guid.NewGuid().ToString("N");
+        var firstDue = DateTimeOffset.FromUnixTimeSeconds(
+            TimeProvider.System.GetUtcNow().ToUnixTimeSeconds() + RecurringRegistrationLeadSeconds);
+        using var completion = new ReminderCompletions(name);
+        await grain.RegisterDailyReminder(name, cron, firstDue.UtcDateTime, failFirstAttempt: false);
+        var original = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
+        Assert.Equal(firstDue.UtcDateTime, original.NextDueUtc);
+        Assert.True(await services.GetRequiredService<ILocalDurableJobManager>().CancelAsync(new DurableJob
+        {
+            Id = original.JobId,
+            Name = $"advanced-reminder:{name}",
+            ShardId = original.JobShardId,
+            DueTime = firstDue,
+            TargetGrainId = cluster.Client.GetGrain<IAdvancedReminderDispatcherGrain>(grain.GetGrainId().ToString()).GetGrainId()
+        }, cancellationToken));
+
+        var stranded = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
+        Assert.Equal(original.JobId, stranded.JobId);
+        Assert.Equal(original.ScheduleId, stranded.ScheduleId);
+        Assert.Equal(0, await grain.GetTickCount());
+
+        clock.SetUtcNow(firstDue.Add(gracePeriod * 2));
+        var recovery = new AdvancedReminderRecoveryGrain(
+            services.GetRequiredService<Orleans.AdvancedReminders.IReminderTable>(),
+            cluster.Client,
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            services.GetRequiredService<IOptions<Orleans.AdvancedReminders.ReminderOptions>>(),
+            clock);
+        await recovery.ReconcileAsync(force: false, cancellationToken);
+        var replacement = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
+        Assert.NotEqual(original.JobId, replacement.JobId);
+        Assert.Equal(ActivityStatusCode.Ok, await completion.NextAsync());
+
+        var following = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
+        Assert.Equal(1, await grain.GetTickCount());
+        Assert.Equal(original.StartAt, following.StartAt);
+        Assert.Equal(firstDue.UtcDateTime.AddDays(1), following.NextDueUtc);
+        await cluster.Client.GetReminderManagementGrain().DeleteAsync(grain.GetGrainId(), name);
+    }
 
     [Theory]
     [InlineData(false)]
@@ -28,7 +90,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var firstDue = DateTimeOffset.FromUnixTimeSeconds(
             TimeProvider.System.GetUtcNow().ToUnixTimeSeconds() + RecurringRegistrationLeadSeconds).UtcDateTime;
         using var completion = new ReminderCompletions(name);
-        await grain.RegisterDailyReminderWithFailure(name, cron, firstDue);
+        await grain.RegisterDailyReminder(name, cron, firstDue, failFirstAttempt: true);
         var original = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
         Assert.Equal(firstDue, original.NextDueUtc);
         clock.SetUtcNow(new DateTimeOffset(firstDue, TimeSpan.Zero));

@@ -1,8 +1,10 @@
 #nullable enable
 using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -136,7 +138,8 @@ public class AdvancedReminderRecoveryGrainTests
         var recovery = new AdvancedReminderRecoveryGrain(
             reminderTable,
             grainFactory,
-            NullLogger<AdvancedReminderRecoveryGrain>.Instance);
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()));
 
         await recovery.ReconcileAsync(force, CancellationToken.None);
 
@@ -159,8 +162,14 @@ public class AdvancedReminderRecoveryGrainTests
             dispatcher.ReceivedCalls().Count(call => call.GetMethodInfo().Name == nameof(IAdvancedReminderDispatcherGrain.EnsureScheduledAsync)));
     }
 
-    [Fact]
-    public async Task ReconcileAsync_DoesNotReplacePersistedJobHandles()
+    [Theory]
+    [InlineData(false, 16, 16, false)]
+    [InlineData(true, 0, null, false)]
+    [InlineData(true, 16, 1, false)]
+    [InlineData(true, 16, 16, true)]
+    [InlineData(true, 16, null, true)]
+    public async Task ReconcileAsync_RepairsOverdueHandlesOnlyUnderUntilSuccess(
+        bool untilSuccess, int overdueMinutes, int? minutesSinceLastAttempt, bool dispatchExpected)
     {
         var now = new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero);
         var timeProvider = new FakeTimeProvider(now);
@@ -169,7 +178,8 @@ public class AdvancedReminderRecoveryGrainTests
             GrainId = GrainId.Create("test", "overdue-recovery"),
             ReminderName = "overdue",
             StartAt = now.UtcDateTime.AddHours(-1),
-            NextDueUtc = now.UtcDateTime.AddMinutes(-16),
+            NextDueUtc = now.UtcDateTime.AddMinutes(-overdueMinutes),
+            LastFireUtc = minutesSinceLastAttempt is { } elapsed ? now.UtcDateTime.AddMinutes(-elapsed) : null,
             Period = TimeSpan.FromMinutes(1),
             ScheduleId = "overdue-schedule",
             JobId = "overdue-job",
@@ -188,11 +198,15 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions
+            {
+                DeliveryRetryPolicy = untilSuccess ? ReminderRetryPolicy.UntilSuccess : ReminderRetryPolicy.Limited(3)
+            }),
             timeProvider: timeProvider);
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
-        await dispatcher.DidNotReceive().EnsureScheduledAsync(
+        await dispatcher.Received(dispatchExpected ? 1 : 0).EnsureScheduledAsync(
             overdue.GrainId,
             overdue.ReminderName,
             overdue.ScheduleId,
@@ -226,7 +240,8 @@ public class AdvancedReminderRecoveryGrainTests
         var recovery = new AdvancedReminderRecoveryGrain(
             reminderTable,
             grainFactory,
-            NullLogger<AdvancedReminderRecoveryGrain>.Instance);
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()));
 
         await recovery.ReconcileAsync(force: true, CancellationToken.None);
 
@@ -264,6 +279,7 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()),
             new FakeTimeProvider(now));
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
@@ -310,7 +326,8 @@ public class AdvancedReminderRecoveryGrainTests
         var recovery = new AdvancedReminderRecoveryGrain(
             reminderTable,
             grainFactory,
-            NullLogger<AdvancedReminderRecoveryGrain>.Instance);
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()));
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
@@ -359,6 +376,7 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()),
             timeProvider: timeProvider);
 
         var reconcileTask = recovery.ReconcileAsync(force: false, CancellationToken.None);
@@ -379,6 +397,7 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             Substitute.For<IGrainFactory>(),
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()),
             timeProvider: timeProvider);
 
         await recovery.StartAsync(force: false, CancellationToken.None);

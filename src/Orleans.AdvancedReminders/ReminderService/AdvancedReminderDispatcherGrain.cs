@@ -165,7 +165,19 @@ internal sealed class AdvancedReminderDispatcherGrain(
         string? expectedScheduleId,
         bool force,
         CancellationToken cancellationToken)
-        => _reminderService.EnsureScheduledCoreAsync(grainId, reminderName, expectedScheduleId, force, cancellationToken);
+    {
+        // Admission and repair share this owner turn. An in-flight callback must commit
+        // before recovery can replace its carrier.
+        if (!force && _activeDelivery?.Preparation.Entry is { } entry
+            && string.Equals(entry.ReminderName, reminderName, StringComparison.Ordinal)
+            && AdvancedReminderService.MatchesScheduledOccurrence(entry, expectedScheduleId))
+        {
+            return Task.CompletedTask;
+        }
+
+        return _reminderService.EnsureScheduledCoreAsync(
+            grainId, reminderName, expectedScheduleId, force, cancellationToken, recoverOverdue: true);
+    }
 
     public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {

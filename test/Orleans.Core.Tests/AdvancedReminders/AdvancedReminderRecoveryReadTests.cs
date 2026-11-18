@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
@@ -44,7 +45,8 @@ public class AdvancedReminderRecoveryReadTests
         var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
         var factory = Substitute.For<IGrainFactory>();
         factory.GetGrain<IAdvancedReminderDispatcherGrain>(Arg.Any<string>(), null).Returns(dispatcher);
-        var recovery = new AdvancedReminderRecoveryGrain(table, factory, NullLogger<AdvancedReminderRecoveryGrain>.Instance, clock);
+        var recovery = new AdvancedReminderRecoveryGrain(table, factory, NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()), clock);
         using var cancellation = new CancellationTokenSource();
 
         var scan = recovery.StartAsync(force: true, cancellation.Token);

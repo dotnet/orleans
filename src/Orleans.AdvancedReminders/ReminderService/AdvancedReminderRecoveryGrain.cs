@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
 using Orleans.Placement;
 
@@ -11,6 +12,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     IReminderTable reminderTable,
     IGrainFactory grainFactory,
     ILogger<AdvancedReminderRecoveryGrain> logger,
+    IOptions<ReminderOptions> options,
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null) : Grain, IAdvancedReminderRecoveryGrain
 {
     private const int BatchSize = 32;
@@ -23,6 +25,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     private readonly IReminderTable _reminderTable = reminderTable;
     private readonly IGrainFactory _grainFactory = grainFactory;
     private readonly ILogger<AdvancedReminderRecoveryGrain> _logger = logger;
+    private readonly ReminderOptions _options = options.Value;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private bool _started;
     private bool _forceCurrentScan;
@@ -51,6 +54,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
 
     internal async Task ReconcileAsync(bool force, CancellationToken cancellationToken)
     {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var tasks = new List<Task>(BatchSize);
         var bucketsScanned = 0;
         while (bucketsScanned < ScanBucketsPerReconciliation)
@@ -70,11 +74,10 @@ internal sealed class AdvancedReminderRecoveryGrain(
                 foreach (var entry in page.Reminders)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    // A persisted handle belongs to Durable Jobs, including while its job is
-                    // executing or retrying. Recovery only repairs incomplete registrations.
                     if (!force
                         && !string.IsNullOrEmpty(entry.JobId)
-                        && !string.IsNullOrEmpty(entry.JobShardId))
+                        && !string.IsNullOrEmpty(entry.JobShardId)
+                        && !AdvancedReminderService.ShouldRecoverOverdueOccurrence(entry, now, _options))
                     {
                         continue;
                     }

@@ -13,7 +13,8 @@ internal sealed partial class AdvancedReminderService
         string reminderName,
         string? expectedScheduleId,
         bool force,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool recoverOverdue = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var entry = await ReminderTableRead.WaitAsync(
@@ -29,7 +30,10 @@ internal sealed partial class AdvancedReminderService
             return;
         }
 
-        if (!force && !string.IsNullOrEmpty(entry.JobId) && !string.IsNullOrEmpty(entry.JobShardId))
+        var now = GetUtcNow();
+        var hasJob = !string.IsNullOrEmpty(entry.JobId) && !string.IsNullOrEmpty(entry.JobShardId);
+        var overdue = recoverOverdue && hasJob && ShouldRecoverOverdueOccurrence(entry, now, _options);
+        if (!force && hasJob && !overdue)
         {
             return;
         }
@@ -43,8 +47,8 @@ internal sealed partial class AdvancedReminderService
         entry.ETag = await _reminderTable.UpsertRow(entry);
         // A retained recurring occurrence keeps its logical due time in the past.
         // Repair must restore a delayed delivery rather than immediately retrying it.
-        DateTime? deliveryDueUtc = null;
-        if (IsRetainedFailedDelivery(entry))
+        DateTime? deliveryDueUtc = overdue ? now : null;
+        if (IsRetainedFailedDelivery(entry) && !overdue)
         {
             var retryDueUtc = GetUtcNow().Add(_options.MinimumReminderPeriod);
             deliveryDueUtc = entry.NextDueUtc is { } nextDueUtc && nextDueUtc > retryDueUtc
@@ -53,6 +57,33 @@ internal sealed partial class AdvancedReminderService
         }
 
         await ScheduleAndPersistHandleAsync(entry, cancellationToken, deliveryDueUtc);
+        if (overdue)
+        {
+            _logger.LogWarning(
+                "Rescheduled overdue reminder {ReminderName} for grain {GrainId}; its occurrence was due at {Due}.",
+                reminderName, grainId, entry.NextDueUtc ?? entry.StartAt);
+        }
+    }
+
+    internal static bool ShouldRecoverOverdueOccurrence(ReminderEntry entry, DateTime now, ReminderOptions options)
+    {
+        if (!options.DeliveryRetryPolicy.RetainsFailedDeliveries
+            || (entry.Period <= TimeSpan.Zero && string.IsNullOrWhiteSpace(entry.CronExpression)))
+        {
+            return false;
+        }
+
+        var due = entry.NextDueUtc ?? entry.StartAt;
+        if (entry.LastFireUtc is { } lastFire && lastFire >= due)
+        {
+            // An attempted recurring occurrence preserves its original due time across retries.
+            // Use the last attempt to give its replacement carrier time to deliver.
+            var sinceAttempt = now - lastFire;
+            return sinceAttempt > options.MinimumReminderPeriod
+                && sinceAttempt - options.MinimumReminderPeriod > options.MissedReminderGracePeriod;
+        }
+
+        return now - due > options.MissedReminderGracePeriod;
     }
 
     private async Task PersistAndScheduleCoreAsync(ReminderEntry entry, CancellationToken cancellationToken,
