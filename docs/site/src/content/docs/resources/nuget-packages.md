@@ -114,7 +114,7 @@ These packages don't replace the cluster membership provider.
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.EventSourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing) | Event-sourced grain base types and log-consistency abstractions. |
-| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Pre-release alpha durable journaled collections and values with experimental diagnostic `ORLEANSEXP005`; see the [Journaling overview](../grains/journaling/index.md). |
+| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Pre-release alpha durable journaled collections and values; see the [Journaling overview](../grains/journaling/index.md). |
 | [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Pre-release alpha Azure Blob and Azure Table providers for Orleans Journaling. |
 | [Microsoft.Orleans.Journaling.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) | Pre-release alpha Redis provider for Orleans Journaling. |
 | [Microsoft.Orleans.Journaling.S3](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.S3) | Pre-release alpha Amazon S3 Express One Zone provider for Orleans Journaling. |

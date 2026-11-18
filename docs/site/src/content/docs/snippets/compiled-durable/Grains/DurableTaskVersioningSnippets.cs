@@ -3,8 +3,6 @@ using Orleans.DurableTasks;
 using Orleans.DurableTasks.Diagnostics;
 using Orleans.Journaling;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace Documentation.Grains.DurableTasks.Versioning;
 
 // <durable_tasks_versioning_contracts>

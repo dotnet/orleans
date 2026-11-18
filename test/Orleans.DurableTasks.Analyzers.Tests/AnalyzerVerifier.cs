@@ -119,9 +119,7 @@ internal static partial class AnalyzerVerifier
                 LanguageNames.CSharp,
                 compilationOptions: new CSharpCompilationOptions(
                     OutputKind.DynamicallyLinkedLibrary,
-                    nullableContextOptions: NullableContextOptions.Enable,
-                    // Journaled state is experimental.
-                    specificDiagnosticOptions: [new("ORLEANSEXP005", ReportDiagnostic.Suppress)]),
+                    nullableContextOptions: NullableContextOptions.Enable),
                 parseOptions: new CSharpParseOptions(LanguageVersion.Preview),
                 metadataReferences: References))
             .AddDocument(DocumentId.CreateNewId(projectId), "Test.cs", text, filePath: "Test.cs");

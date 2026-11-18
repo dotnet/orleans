@@ -4,7 +4,6 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

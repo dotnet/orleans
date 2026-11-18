@@ -10,7 +10,7 @@ ms.topic: overview
 Orleans Journaling is an experimental persistence model that records mutations to durable values and collections in an ordered per-grain journal. When a grain activates, Orleans replays that journal to reconstruct its in-memory state. A single write can persist changes from multiple durable states owned by the grain.
 
 > [!IMPORTANT]
-> `Microsoft.Orleans.Journaling` and its storage-provider packages are pre-release alpha packages. Their APIs carry diagnostic `ORLEANSEXP005`. Evaluate them with an explicit upgrade, rollback, backup, and recovery plan because APIs and storage formats can change before stabilization.
+> `Microsoft.Orleans.Journaling` and its storage-provider packages are pre-release alpha packages. Evaluate them with an explicit upgrade, rollback, backup, and recovery plan because APIs and storage formats can change before stabilization.
 
 ## Programming model
 

@@ -7,10 +7,6 @@
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />

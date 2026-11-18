@@ -6,7 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
     <OrleansDocumentationVersionException>Uses prerelease Journaling packages until their first 10.2.2 publication.</OrleansDocumentationVersionException>
   </PropertyGroup>
 

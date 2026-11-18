@@ -9,8 +9,6 @@ ms.topic: how-to
 
 Install the pre-release [`Microsoft.Orleans.Journaling`](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) package in the silo project. Install a [journal storage provider](configuration.md#choose-a-storage-provider) and configure it before activating grains which use durable state.
 
-All Journaling APIs are experimental and carry diagnostic `ORLEANSEXP005`.
-
 ## Define a durable grain
 
 Inject <xref:Orleans.Journaling.IDurableStateManager> into an ordinary <xref:Orleans.Grain> and declare named state components during construction. The manager creates each component once and Orleans recovers the grain's state before application methods run:

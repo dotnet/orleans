@@ -8,8 +8,6 @@ using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace Documentation.Grains.DurableTasks;
 
 internal static class DurableTaskConfiguration

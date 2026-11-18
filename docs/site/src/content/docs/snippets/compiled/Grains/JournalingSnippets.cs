@@ -5,8 +5,6 @@ using Orleans.Journaling;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace Documentation.Grains.Journaling;
 
 // <volatile_journal_thresholds>

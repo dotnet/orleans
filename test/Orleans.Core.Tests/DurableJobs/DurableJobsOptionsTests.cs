@@ -12,8 +12,6 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace NonSilo.Tests.DurableJobs;
 
 [TestCategory("BVT"), TestCategory("DurableJobs")]

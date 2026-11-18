@@ -9,7 +9,7 @@ ms.topic: how-to
 
 Configure the journal storage providers selected by grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager> on every silo that hosts those grain types. Named providers give grain types and standalone journal consumers independent storage namespaces. Grain types without an explicit selection use `Default`. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
 
-The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
+The Journaling packages are pre-release alpha packages.
 
 ## Configure grain-scoped composition
 

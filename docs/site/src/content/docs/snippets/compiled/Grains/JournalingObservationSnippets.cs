@@ -7,8 +7,6 @@ using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.TestingHost;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace Documentation.Grains.Journaling.Observation;
 
 public interface IResponseGenerator

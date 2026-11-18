@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP003</NoWarn>
     <OrleansDocumentationVersionException>Named journal providers and Durable Jobs inspection require locally built packages until these APIs are published.</OrleansDocumentationVersionException>
   </PropertyGroup>
   <ItemGroup>

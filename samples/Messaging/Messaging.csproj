@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <ServerGarbageCollection>true</ServerGarbageCollection>
-    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP003</NoWarn>
     <OrleansDocumentationVersionException>Messaging and the simplified journaling APIs require locally built packages until they are published.</OrleansDocumentationVersionException>
   </PropertyGroup>
   <ItemGroup>

@@ -6,8 +6,6 @@ using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace Documentation.Grains.Messaging;
 
 internal static class MessagingConfiguration

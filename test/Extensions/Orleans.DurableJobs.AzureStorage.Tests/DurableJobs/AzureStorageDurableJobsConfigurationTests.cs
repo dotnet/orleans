@@ -10,8 +10,6 @@ using Xunit;
 
 namespace Tester.AzureUtils.DurableJobs;
 
-#pragma warning disable ORLEANSEXP005
-
 [TestCategory("Azure"), TestCategory("DurableJobs")]
 [TestSuite("BVT")]
 [TestProvider("AzureStorage")]
@@ -86,5 +84,3 @@ public class AzureStorageDurableJobsConfigurationTests
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 }
-
-#pragma warning restore ORLEANSEXP005

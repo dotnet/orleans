@@ -9,8 +9,6 @@ using Orleans.Messaging;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace Documentation.Grains.Messaging;
 
 // <messaging_operation_keys>

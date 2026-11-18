@@ -12,7 +12,6 @@
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\'))</RepositoryRoot>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Durable grain state is experimental. -->
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

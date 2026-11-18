@@ -11,10 +11,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Azure.Identity" />
   </ItemGroup>

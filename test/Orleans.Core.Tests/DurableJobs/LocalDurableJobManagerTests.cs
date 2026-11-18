@@ -1,5 +1,4 @@
 #nullable enable
-#pragma warning disable ORLEANSEXP005
 
 using System.Buffers;
 using System.Collections.Concurrent;

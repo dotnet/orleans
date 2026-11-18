@@ -9,7 +9,7 @@ ms.topic: how-to
 
 Watch streams deliver the committed changes made to a grain's journaled state. A grain exposes them to callers as <xref:System.Collections.Generic.IAsyncEnumerable`1> methods. <xref:Orleans.Journaling.IDurableLog`1> adds an append-only log whose readers resume from a sequence number, and drafts which stream volatile content, such as model output, before its durable entry exists.
 
-All Journaling APIs are experimental and carry diagnostic `ORLEANSEXP005`. Configure journaling as described in [Use durable state](durable-state.md).
+Configure journaling as described in [Use durable state](durable-state.md).
 
 ## Expose a watch from a grain
 

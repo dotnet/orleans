@@ -3,8 +3,6 @@ using Orleans;
 using Orleans.DurableTasks;
 using Orleans.Journaling;
 
-#pragma warning disable ORLEANSEXP005
-
 namespace Documentation.Grains.DurableTasks;
 
 // <durable_tasks_trip_contracts>
