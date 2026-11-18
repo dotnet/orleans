@@ -11,7 +11,7 @@ The provider stores each journal as Redis string data plus Redis hash metadata. 
 Install the package:
 
 ```shell
-dotnet add package Microsoft.Orleans.Journaling.Redis
+dotnet add package Microsoft.Orleans.Durable.Redis --prerelease
 ```
 
 Configure the silo:

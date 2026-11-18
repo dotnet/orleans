@@ -17,13 +17,13 @@ Microsoft Orleans Durable Jobs provides a distributed, scalable system for sched
 To use this package, install it via NuGet:
 
 ```shell
-dotnet add package Microsoft.Orleans.DurableJobs
+dotnet add package Microsoft.Orleans.Durable --prerelease
 ```
 
 For production scenarios with persistence, also install a storage provider:
 
 ```shell
-dotnet add package Microsoft.Orleans.DurableJobs.AzureStorage
+dotnet add package Microsoft.Orleans.Durable.AzureStorage --prerelease
 ```
 
 ### Configuration

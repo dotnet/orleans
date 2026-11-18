@@ -7,12 +7,12 @@ ms.topic: conceptual
 
 # Messaging
 
-The `Microsoft.Orleans.Messaging` package gives each grain a durable inbox and
+Messaging, in the `Microsoft.Orleans.Durable` package, gives each grain a durable inbox and
 outbox built on Orleans Journaling and Durable Jobs. A grain commits received
 messages, business changes, and outgoing messages in its own journal, so handler
 effects and pending sends survive activation loss.
 
-> `Microsoft.Orleans.Messaging` is a pre-release alpha package. Evaluate it with
+> `Microsoft.Orleans.Durable` is a pre-release alpha package. Evaluate it with
 > an explicit upgrade, rollback, backup, and recovery plan because its APIs and
 > journal formats can change before stabilization.
 

@@ -72,7 +72,7 @@ The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) c
 | [Chat Room](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) | A terminal chat application using Orleans Streams. |
 | [Stocks](https://github.com/dotnet/orleans/tree/main/samples/Stocks) | Grain timers, HTTP calls, and temporary caching. |
 
-The Azure Blob JSON sample uses the experimental `Microsoft.Orleans.Journaling` package. The Journaled Todo List uses the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model. See the [Journaling sample guide](../grains/journaling/samples.md) to run the Azure Blob and Redis durable-state samples.
+The Azure Blob JSON sample uses experimental Journaling from the `Microsoft.Orleans.Durable` package. The Journaled Todo List uses the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model. See the [Journaling sample guide](../grains/journaling/samples.md) to run the Azure Blob and Redis durable-state samples.
 
 The [Messaging recipe](../grains/messaging-recipes.md#run-the-stock-reservation-sample)
 shows how to run the stock-reservation sample against locally packed Orleans packages.

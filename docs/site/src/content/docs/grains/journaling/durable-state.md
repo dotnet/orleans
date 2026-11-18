@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Use durable state
 
-Install the pre-release [`Microsoft.Orleans.Journaling`](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) package in the silo project. Install a [journal storage provider](configuration.md#choose-a-storage-provider) and configure it before activating grains which use durable state.
+Install the pre-release `Microsoft.Orleans.Durable` package in the silo project. Install a [journal storage provider](configuration.md#choose-a-storage-provider) and configure it before activating grains which use durable state.
 
 ## Define a durable grain
 

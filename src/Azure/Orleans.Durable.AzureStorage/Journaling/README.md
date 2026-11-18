@@ -69,7 +69,7 @@ Existing `orleans-journaling-azure-blob-*` and `orleans-journaling-azure-table-*
 To use this package, install it via NuGet:
 
 ```shell
-dotnet add package Microsoft.Orleans.Journaling.AzureStorage
+dotnet add package Microsoft.Orleans.Durable.AzureStorage --prerelease
 ```
 
 ## Example - Configuring Azure Storage Journaling

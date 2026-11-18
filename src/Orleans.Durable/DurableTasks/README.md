@@ -1,10 +1,11 @@
 # Microsoft Orleans Durable Tasks
 
 > [!IMPORTANT]
-> This pre-release alpha package awaits its first NuGet publication. Its APIs and
-> persisted formats can change before stabilization.
+> Durable tasks ship in the pre-release alpha `Microsoft.Orleans.Durable` package, which
+> awaits its first NuGet publication. Their APIs and persisted formats can change before
+> stabilization.
 
-`Microsoft.Orleans.DurableTasks` executes grain interface methods which return
+The durable task runtime in `Microsoft.Orleans.Durable` executes grain interface methods which return
 `Orleans.DurableTasks.DurableTask` over Orleans Messaging. It owns the request
 protocol, runtime adapter, storage integration, code-generation mapping,
 diagnostics, cancellation propagation, completion delivery, signals, and durable delays,
@@ -288,10 +289,6 @@ if (result is DurableSignalResult.Conflict or DurableSignalResult.TaskCompleted)
   `TryWaitAsync(deadline)`, a `Race` between the wait and `DurableTask.DelayUntil`, whose
   indexed slots belong to the waiting execution's tree. The race cancels the input which
   loses and completes once both are terminal.
-
-Repository consumers which need a preview package can opt this project into
-packing with `-p:PackDurableTaskAdapter=true`. Packing validates the package's
-framework assets; its first published version establishes the compatibility baseline.
 
 ## Diagnostics
 

@@ -9,7 +9,7 @@ ms.topic: how-to
 
 Configure the journal storage providers selected by grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager> on every silo that hosts those grain types. Named providers give grain types and standalone journal consumers independent storage namespaces. Grain types without an explicit selection use `Default`. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
 
-The Journaling packages are pre-release alpha packages.
+`Microsoft.Orleans.Durable` and its storage-provider packages are pre-release alpha packages.
 
 ## Configure grain-scoped composition
 
@@ -27,10 +27,10 @@ See [Use durable state](durable-state.md) for source-backed constructor injectio
 
 | Provider | Package | Storage model | Compaction trigger | Largest append |
 | --- | --- | --- | --- | --- |
-| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget | 100 MiB |
-| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes | 2 MiB |
-| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes | Whole journal within the server's string limit (512 MB by default) |
-| Amazon S3 | `Microsoft.Orleans.Journaling.S3` | WAL object plus immutable checkpoint objects | Append part budget | 5 GB |
+| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Durable.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget | 100 MiB |
+| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Durable.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes | 2 MiB |
+| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Durable.Redis` | String journal plus hash metadata | Journal bytes | Whole journal within the server's string limit (512 MB by default) |
+| Amazon S3 | `Microsoft.Orleans.Durable.S3` | WAL object plus immutable checkpoint objects | Append part budget | 5 GB |
 
 Every provider writes each append and replacement all-or-nothing and fails a write which exceeds its limits as a whole; see [Journal storage contract](runtime-behavior.md#journal-storage-contract). Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
 

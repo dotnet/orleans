@@ -7,8 +7,9 @@
 
 This assembly defines the Orleans programming model for durable asynchronous operations under
 the `Orleans.DurableTasks` namespace. An Orleans host supplies scheduling, persistence,
-deterministic time, and durable cancellation. Task definitions and application code depend only
-on this abstractions assembly.
+deterministic time, and durable cancellation. Task definitions depend on this abstractions
+package. Grain interface projects which declare `DurableTask` methods, and clients which call
+them, also reference `Microsoft.Orleans.Durable`.
 
 ## Execution model
 

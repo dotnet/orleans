@@ -3,7 +3,7 @@
 ## Introduction
 Microsoft Orleans Journaling persists durable state changes as ordered journal data which can be replayed to recover in-memory durable collections and values.
 
-The package includes a JSON Lines-based storage format powered by System.Text.Json and uses it by default. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: Microsoft.Orleans.Journaling supplies the journal format and keyed durable-entry codecs which durable state components use to encode and recover their own operations.
+The package includes a JSON Lines-based storage format powered by System.Text.Json and uses it by default. Pair it with a Journaling storage provider such as Microsoft.Orleans.Durable.AzureStorage. The storage provider remains independent of the serialization format: Microsoft.Orleans.Durable supplies the journal format and keyed durable-entry codecs which durable state components use to encode and recover their own operations.
 
 Application code uses `IDurableStateManager` to manage the grain's durable state, declare its components, and acknowledge writes.
 `IStateMachine` defines the low-level replay and snapshot protocol for state implementations.
@@ -31,7 +31,7 @@ including the crossing append, and provider bookkeeping.
 To use this package, install it via NuGet:
 
 ```shell
-dotnet add package Microsoft.Orleans.Journaling
+dotnet add package Microsoft.Orleans.Durable --prerelease
 ```
 
 ## Example - Configuring JSON journaling

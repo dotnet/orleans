@@ -1,6 +1,6 @@
 # Microsoft Orleans S3 Journaling
 
-`Microsoft.Orleans.Journaling.S3` provides an `IJournalStorage` implementation backed by Amazon S3 Express One Zone directory buckets.
+`Microsoft.Orleans.Durable.S3` provides an `IJournalStorage` implementation backed by Amazon S3 Express One Zone directory buckets.
 
 The provider uses S3 Express append writes (`WriteOffsetBytes`) for WAL appends. For local development and tests against S3-compatible services such as SeaweedFS, set `UseS3ExpressAppend = false`, `UseConditionalDelete = false`, and `StorageClass = null` to use portable conditional writes and deletes.
 

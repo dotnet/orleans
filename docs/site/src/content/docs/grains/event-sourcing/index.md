@@ -36,9 +36,9 @@ Log-consistency providers use optimistic concurrency and protocol notifications 
 
 ## Event Sourcing and experimental Journaling
 
-`Microsoft.Orleans.EventSourcing` and `Microsoft.Orleans.Journaling` are separate packages and programming models.
+`Microsoft.Orleans.EventSourcing` and the Journaling feature of `Microsoft.Orleans.Durable` are separate packages and programming models.
 
 - Event Sourcing uses `JournaledGrain<TState, TEvent>` and log-consistency providers.
 - [Orleans Journaling](../journaling/index.md) uses <xref:Orleans.Journaling.IDurableStateManager> for durable values and collections, with <xref:Orleans.Journaling.DurableGrain> as a convenience base class.
 
-`Microsoft.Orleans.Journaling` is an alpha package. Its programming model serves applications evaluating operation-based persistence for mutable durable state. Event Sourcing serves applications which model domain changes as events and use log-consistency providers.
+Journaling ships in the alpha `Microsoft.Orleans.Durable` package. Its programming model serves applications evaluating operation-based persistence for mutable durable state. Event Sourcing serves applications which model domain changes as events and use log-consistency providers.

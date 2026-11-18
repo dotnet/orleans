@@ -10,7 +10,7 @@ Microsoft Orleans Durable Azure Storage Providers store journals in Azure Blob S
 To use this package, install it via NuGet:
 
 ```shell
-dotnet add package Microsoft.Orleans.Durable.AzureStorage
+dotnet add package Microsoft.Orleans.Durable.AzureStorage --prerelease
 ```
 
 ## Documentation

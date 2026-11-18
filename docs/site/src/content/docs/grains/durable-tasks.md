@@ -18,7 +18,7 @@ durable inbox and outbox, and over Durable Jobs, which wakes grains when delays 
 and resumes executions after their grain deactivates.
 
 > [!IMPORTANT]
-> `Microsoft.Orleans.DurableTasks` and `Microsoft.Orleans.Durable.Abstractions` are
+> `Microsoft.Orleans.Durable` and `Microsoft.Orleans.Durable.Abstractions` are
 > pre-release alpha packages awaiting their first NuGet publication. Evaluate them with an
 > explicit upgrade, rollback, backup, and recovery plan because their APIs and persisted
 > formats can change before stabilization. Projects in the Orleans repository reference

@@ -1,6 +1,6 @@
 # Microsoft Orleans Messaging
 
-`Microsoft.Orleans.Messaging` provides grain-scoped durable inboxes and outboxes
+Messaging in `Microsoft.Orleans.Durable` provides grain-scoped durable inboxes and outboxes
 built on Orleans Journaling and Durable Jobs. A grain sends a message by staging it
 in its outbox; the message persists with the grain's other journaled state and is
 delivered to the receiver's inbox, which processes it at least once and deduplicates

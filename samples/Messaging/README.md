@@ -48,9 +48,8 @@ dotnet run --project .\Messaging.csproj --configuration Release --no-restore
 ```
 
 For a feed with separate stable and alpha versions, use the stable version
-for Server/Sdk and the alpha version for DurableJobs/Messaging/
-Journaling. All transitive Orleans dependencies must come from the same source
-build. The repository's `samples/Directory.Build.targets` overrides are not part
+for Server/Sdk and the alpha version for Durable. All transitive Orleans
+dependencies must come from the same source build. The repository's `samples/Directory.Build.targets` overrides are not part
 of the copy-out unit, so passing `OrleansSamplePackageVersion` alone to the copy
 will not replace its declared versions.
 

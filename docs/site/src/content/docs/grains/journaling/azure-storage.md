@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Azure Storage providers for Journaling
 
-The pre-release [`Microsoft.Orleans.Journaling.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) package provides Azure Blob Storage and Azure Table Storage implementations.
+The pre-release `Microsoft.Orleans.Durable.AzureStorage` package provides Azure Blob Storage and Azure Table Storage implementations.
 
 Use Microsoft Entra workload identity in hosted environments and grant the silo identity only the data-plane permissions required for the selected container or table.
 

@@ -9,8 +9,8 @@ Microsoft Orleans Durable Jobs for Azure Storage persists scheduled jobs through
 To use this package, install it via NuGet along with the core package:
 
 ```shell
-dotnet add package Microsoft.Orleans.DurableJobs
-dotnet add package Microsoft.Orleans.DurableJobs.AzureStorage
+dotnet add package Microsoft.Orleans.Durable --prerelease
+dotnet add package Microsoft.Orleans.Durable.AzureStorage --prerelease
 ```
 
 ### Configuration

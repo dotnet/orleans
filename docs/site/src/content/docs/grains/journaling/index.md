@@ -10,7 +10,7 @@ ms.topic: overview
 Orleans Journaling is an experimental persistence model that records mutations to durable values and collections in an ordered per-grain journal. When a grain activates, Orleans replays that journal to reconstruct its in-memory state. A single write can persist changes from multiple durable states owned by the grain.
 
 > [!IMPORTANT]
-> `Microsoft.Orleans.Journaling` and its storage-provider packages are pre-release alpha packages. Evaluate them with an explicit upgrade, rollback, backup, and recovery plan because APIs and storage formats can change before stabilization.
+> `Microsoft.Orleans.Durable`, which contains Journaling, and its storage-provider packages are pre-release alpha packages. Evaluate them with an explicit upgrade, rollback, backup, and recovery plan because APIs and storage formats can change before stabilization.
 
 ## Programming model
 
@@ -64,7 +64,7 @@ Orleans offers two separate journal-oriented programming models:
 
 | Model | Application state model | Persistence coordination |
 | --- | --- | --- |
-| Orleans Journaling | Mutable durable values and collections composed with a grain or feature through `IDurableStateManager` | One per-grain journal managed by `Microsoft.Orleans.Journaling` |
+| Orleans Journaling | Mutable durable values and collections composed with a grain or feature through `IDurableStateManager` | One per-grain journal managed by `Microsoft.Orleans.Durable` |
 | [Orleans Event Sourcing](../event-sourcing/index.md) | Application-defined events applied to `JournaledGrain<TState, TEvent>` | Log-consistency providers confirm, persist, and synchronize events |
 
 Choose Journaling when evaluating operation-based persistence for built-in mutable state structures. Choose Event Sourcing when domain events, event history, and the supported log-consistency programming model are application requirements.

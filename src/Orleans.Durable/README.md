@@ -10,13 +10,13 @@ Microsoft Orleans Durable provides durable state, jobs, messaging, and tasks for
 | Messaging | `AddMessaging()` | `Orleans.Messaging` | [Messaging](https://github.com/dotnet/orleans/blob/main/src/Orleans.Durable/Messaging/README.md) |
 | Durable Tasks | `AddDurableTasks()` | `Orleans.DurableTasks` | [Durable Tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.Durable/DurableTasks/README.md) |
 
-Storage providers ship separately in `Microsoft.Orleans.Durable.AzureStorage`, `Microsoft.Orleans.Durable.S3`, and `Microsoft.Orleans.Durable.Redis`. Grain interfaces and clients use `Microsoft.Orleans.Durable.Abstractions` for the durable task programming model.
+Storage providers ship separately in `Microsoft.Orleans.Durable.AzureStorage`, `Microsoft.Orleans.Durable.S3`, and `Microsoft.Orleans.Durable.Redis`. `Microsoft.Orleans.Durable.Abstractions` defines the durable task programming model. Grain interface projects which declare `DurableTask` methods and clients which call them also reference `Microsoft.Orleans.Durable`, which supplies the code-generation mappings for durable task invocations and the client `AddDurableTasks()` registration.
 
 ## Getting Started
 To use this package, install it via NuGet:
 
 ```shell
-dotnet add package Microsoft.Orleans.Durable
+dotnet add package Microsoft.Orleans.Durable --prerelease
 ```
 
 ## Documentation
