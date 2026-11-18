@@ -55,7 +55,6 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 hostBuilder
                     .Configure<ActivationRepartitionerOptions>(options =>
                     {
@@ -63,7 +62,6 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
                         options.MaxRoundPeriod = TimeSpan.FromMinutes(6);
                     })
                     .AddActivationRepartitioner();
-#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }
         }
     }

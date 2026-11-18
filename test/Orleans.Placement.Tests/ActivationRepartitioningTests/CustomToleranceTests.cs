@@ -250,7 +250,6 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
         private class SiloConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
-#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 => hostBuilder
                     .Configure<SiloMessagingOptions>(o =>
                     {
@@ -271,7 +270,6 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
                     .AddActivationRepartitioner<HardLimitRule>()
                     .ConfigureLogging(logging => logging.AddFilter("Orleans.Runtime.Placement.Repartitioning", LogLevel.Trace))
                     .ConfigureServices(service => service.AddSingleton<IRepartitionerMessageFilter, TestMessageFilter>());
-#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         }
 
         private class HardLimitRule : IImbalanceToleranceRule
