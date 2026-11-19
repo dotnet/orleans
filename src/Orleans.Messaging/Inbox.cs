@@ -33,6 +33,10 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         _pump = pump;
         pump.StateManager.RegisterStateMachine(MessagingStateNames.Inbox, this);
         pump.Register(this);
+
+        // Deliveries reach only an inbox which recovers with the journal, so an activation which never resolves its
+        // inbox has no messaging extension.
+        pump.GrainContext.SetComponent<IMessagingExtension>(this);
     }
 
     private MessagingShared Shared => _pump.Shared;
@@ -101,7 +105,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             if (pending is null ? !AreCompletionsDurable : !IsDurable(pending)) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
             if (pending is not null) _pump.Signal();
 
-            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
+            Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "duplicate");
 
             // A sender whose answer was lost delivers again, so it receives the rejection which a sink first answered.
             return rejection is not null
@@ -116,7 +120,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         {
             if (message.SentAt > _admissionFloor) Emit(new InboxCommand.AdvanceAdmissionFloor(floor));
             if (_admissionFloor > _durableAdmissionFloor) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
-            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "expired");
+            Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "expired");
             LogMessageExpired(Logger, key, GrainContext.GrainId, message.SentAt, _admissionFloor);
             return DeliveryResult.Expired();
         }
@@ -132,20 +136,20 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         // Every pending message, scheduled or not, holds capacity until it completes.
         if (_messages.Count >= Options.MaxCapacity)
         {
-            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "backpressured");
+            Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "backpressured");
             return DeliveryResult.Backpressured();
         }
 
         if (_handlers.IsEmpty)
         {
-            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "handler_not_found");
+            Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "handler_not_found");
             LogHandlerNotFound(Logger, key, GrainContext.GrainId);
             return DeliveryResult.HandlerNotFound();
         }
 
         Emit(new InboxCommand.Accept(message));
         await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
-        Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
+        Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "accepted");
         LogMessageAccepted(Logger, key, GrainContext.GrainId);
         return DeliveryResult.Accepted();
     }
@@ -186,7 +190,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             || message.SentAt <= _admissionFloor.AddTicks(1));
         if (IsDuplicate(message, out _))
         {
-            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
+            Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "duplicate");
             return;
         }
 
@@ -212,7 +216,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             throw;
         }
 
-        Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
+        Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "accepted");
         LogMessageAccepted(Logger, message.Envelope.MessageId, GrainContext.GrainId);
     }
 
@@ -235,7 +239,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             if (!sink.TryAccept(message, out var result)) continue;
             if (result.Status is DeliveryStatus.Duplicate or DeliveryStatus.Backpressured)
             {
-                Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, result.Status == DeliveryStatus.Duplicate ? "duplicate" : "backpressured");
+                Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, result.Status == DeliveryStatus.Duplicate ? "duplicate" : "backpressured");
                 return result;
             }
 
@@ -266,8 +270,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 throw;
             }
 
-            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, accepted ? "accepted" : "dead_lettered");
-            Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, accepted ? "success" : "dead_lettered");
+            Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, accepted ? "accepted" : "dead_lettered");
+            Shared.Instruments.OnInboxMessageProcessed(_pump.GrainTypeTag, accepted ? "success" : "dead_lettered");
             if (!accepted) return DeliveryResult.DeadLettered(reason, result.Code);
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
             return DeliveryResult.Accepted();
@@ -385,8 +389,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         }
 
         var status = execution.DeadLetterReason is null ? "success" : "dead_lettered";
-        Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, status);
-        Shared.Instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), Shared.GrainType);
+        Shared.Instruments.OnInboxMessageProcessed(_pump.GrainTypeTag, status);
+        Shared.Instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), _pump.GrainTypeTag);
     }
 
     /// <summary>
@@ -552,7 +556,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             // A message which isn't due couldn't have been in an attempt.
             if (GetDelay(entry, now) != TimeSpan.Zero) continue;
             var status = StageInterruptedAttempt(entry, now);
-            Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, status);
+            Shared.Instruments.OnInboxMessageProcessed(_pump.GrainTypeTag, status);
             charged++;
         }
 
@@ -587,7 +591,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// <summary>Releases the reported depth once the activation's messaging state is discarded.</summary>
     internal void ReleaseDepth() => ReportDepth(-_messages.Count);
 
-    private void ReportDepth(int delta) => Shared.Instruments.OnInboxDepthChanged(Shared.GrainType, delta);
+    private void ReportDepth(int delta) => Shared.Instruments.OnInboxDepthChanged(_pump.GrainTypeTag, delta);
 
     /// <summary>Persists staged changes while <paramref name="cancellationToken"/> ends only the caller's wait.</summary>
     private ValueTask PersistForCallerAsync(CancellationToken cancellationToken)

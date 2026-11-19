@@ -381,7 +381,7 @@ public interface ISourceSinkGrain : IGrainWithGuidKey
 }
 
 /// <summary>Stores received payloads as an inbox sink.</summary>
-public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, IInboxMessageSink
+public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IInboxMessageSink
 {
     internal const string Subject = "source-sink/payload";
     internal const string Rejection = "The sink rejected the message.";
@@ -468,15 +468,4 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
             return ValueTask.CompletedTask;
         }
     }
-}
-
-public interface INoHandlerGrain : IGrainWithGuidKey
-{
-    Task PingAsync();
-}
-
-/// <summary>A messaging grain without handlers or sinks, whose inbox reports every delivery as handler-not-found.</summary>
-public sealed class NoHandlerGrain : Grain, INoHandlerGrain, IMessagingGrain
-{
-    public Task PingAsync() => Task.CompletedTask;
 }

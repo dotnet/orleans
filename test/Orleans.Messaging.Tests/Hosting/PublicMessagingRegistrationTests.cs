@@ -39,10 +39,7 @@ public sealed class PublicMessagingRegistrationTests
             }
         }
 
-        var configurator = Assert.Single(services, descriptor =>
-            descriptor.ServiceType == typeof(IConfigureGrainTypeComponents)
-            && descriptor.ImplementationType == typeof(MessagingGrainTypeConfigurator));
-        Assert.Equal(ServiceLifetime.Singleton, configurator.Lifetime);
+        Assert.Equal(ServiceLifetime.Singleton, Assert.Single(services, descriptor => descriptor.ServiceType == typeof(MessagingShared)).Lifetime);
         foreach (var contract in new[]
         {
             typeof(MessagingPump), typeof(Inbox), typeof(IInbox), typeof(IMessagingDiagnostics)
@@ -52,7 +49,7 @@ public sealed class PublicMessagingRegistrationTests
             Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
         }
 
-        // The configurator binds the messaging extension at activation; the only keyed grain extension is the durable-jobs receiver.
+        // The inbox binds the messaging extension when the activation resolves it; the only keyed grain extension is the durable-jobs receiver.
         var extension = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IGrainExtension));
         Assert.Equal(typeof(Orleans.DurableJobs.DurableJob).Assembly, Assert.IsAssignableFrom<Type>(extension.ServiceKey).Assembly);
     }

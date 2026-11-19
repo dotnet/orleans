@@ -133,7 +133,7 @@ public interface IWorkSourceTestGrain : IGrainWithGuidKey
 }
 
 /// <summary>Holds pending work in journaled state and reports it through a registered wake-up.</summary>
-public sealed class WorkSourceTestGrain : Grain, IWorkSourceTestGrain, IMessagingGrain
+public sealed class WorkSourceTestGrain : Grain, IWorkSourceTestGrain
 {
     private static readonly ConcurrentDictionary<GrainId, ActivationLog> Activations = new();
     private readonly IJournaledStateManager _manager;

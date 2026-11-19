@@ -6,7 +6,6 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Messaging.Configuration;
 using Orleans.DurableJobs;
-using Orleans.Journaling;
 using Orleans.Journaling.Json;
 
 namespace Orleans.Hosting;
@@ -20,8 +19,7 @@ public static class MessagingExtensions
     /// Adds inbox messaging support to the silo.
     /// </summary>
     /// <remarks>
-    /// Grains implementing <see cref="IMessagingGrain"/> or deriving from <see cref="DurableGrain"/>
-    /// bind their scoped messaging services during activation setup, before journal recovery.
+    /// A grain receives messages by resolving <see cref="IInbox"/> during construction or activation setup, before journal recovery.
     /// </remarks>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configureOptions">The optional action used to configure inbox and outbox behavior.</param>
@@ -36,8 +34,7 @@ public static class MessagingExtensions
     /// Adds inbox messaging services.
     /// </summary>
     /// <remarks>
-    /// Grains implementing <see cref="IMessagingGrain"/> or deriving from <see cref="DurableGrain"/>
-    /// bind their scoped messaging services during activation setup, before journal recovery.
+    /// A grain receives messages by resolving <see cref="IInbox"/> during construction or activation setup, before journal recovery.
     /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="configureOptions">The optional action used to configure inbox and outbox behavior.</param>
@@ -74,12 +71,11 @@ public static class MessagingExtensions
 
         services.ConfigureNamedOptionForLogging<DurableMessagingOptions>(Options.DefaultName);
         services.TryAddSingleton<MessagingInstruments>();
+        services.TryAddSingleton<MessagingShared>();
         services.TryAddScoped<MessagingPump>();
         services.TryAddScoped<Inbox>();
         services.Replace(ServiceDescriptor.Scoped<IInbox>(static sp => sp.GetRequiredService<Inbox>()));
         services.TryAddScoped<IMessagingDiagnostics, MessagingDiagnostics>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<Orleans.Runtime.IConfigureGrainTypeComponents, MessagingGrainTypeConfigurator>());
         return services;
     }
 

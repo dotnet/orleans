@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Messaging.Tests.Functional;
@@ -17,7 +18,7 @@ public sealed class EarlyActivationValidationTests : MessagingBehaviorTestBase
     {
         var grainType = typeof(StatelessActivationValidationTestGrain);
         var grain = Fixture.Client.GetGrain<IActivationValidationTestGrain>(Guid.NewGuid(), grainType.FullName!);
-        await AssertRejectedBeforeRecoveryAsync(grain, grainType, "one activation");
+        await AssertRejectedBeforeRecoveryAsync(grain, "one activation");
     }
 
     [Theory]
@@ -31,11 +32,26 @@ public sealed class EarlyActivationValidationTests : MessagingBehaviorTestBase
         await AssertSupportedReplayAsync(grainType);
     }
 
-    private async Task AssertRejectedBeforeRecoveryAsync(IActivationValidationTestGrain grain, Type grainType, string diagnostic)
+    [Theory]
+    [InlineData(typeof(InboxlessDurableGrain))]
+    [InlineData(typeof(InboxlessPlainGrain))]
+    public async Task Delivery_ToActivationWhichNeverResolvedItsInbox_Fails(Type grainType)
+    {
+        var grain = Fixture.Client.GetGrain<IInboxlessGrain>(Guid.NewGuid(), grainType.FullName!);
+        await grain.PingAsync();
+        var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var message = TestApplicationProtocol.CreateInbox(
+            sessions, GrainId.Create("external-test-sender", "inboxless"), "messages/record", "payload", Fixture.JobNow);
+
+        await Assert.ThrowsAsync<GrainExtensionNotInstalledException>(
+            () => grain.AsReference<IMessagingExtension>().DeliverAsync(message, TestContext.Current.CancellationToken).AsTask());
+    }
+
+    private async Task AssertRejectedBeforeRecoveryAsync(IActivationValidationTestGrain grain, string diagnostic)
     {
         var failure = await Assert.ThrowsAnyAsync<Exception>(() => grain.IncrementAsync());
         Assert.Contains(diagnostic, failure.ToString(), StringComparison.Ordinal);
-        Assert.Contains(grainType.Name, failure.ToString(), StringComparison.Ordinal);
+        Assert.Contains(grain.GetGrainId().Type.ToString(), failure.ToString(), StringComparison.Ordinal);
         var observation = Assert.Single(Fixture.ActivationProbe.Get(grain.GetGrainId()));
         Assert.False(observation.InstanceAvailableDuringConstruction);
         Assert.Equal(0, observation.Activated);

@@ -218,10 +218,6 @@ namespace Orleans.Messaging
         System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
     }
 
-    public partial interface IMessagingGrain
-    {
-    }
-
     public static partial class InboxExtensions
     {
         public static IInbox Register<T>(this IInbox inbox, MessageType<T> messageType, System.Action<T, IInboxHandlerContext> handler) { throw null; }

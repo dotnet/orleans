@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,17 +11,14 @@ using Orleans.Runtime;
 namespace Orleans.Messaging;
 
 /// <summary>
-/// Services and settings shared by every messaging activation of one grain type.
+/// Services and settings shared by every messaging activation in the silo.
 /// </summary>
-/// <remarks>
-/// <see cref="MessagingGrainTypeConfigurator"/> stores one instance as a grain-type component, so activations
-/// resolve it as an <see cref="IGrainContext"/> component instead of copying it per activation.
-/// </remarks>
 internal sealed class MessagingShared
 {
-    public MessagingShared(IServiceProvider services, GrainType grainType)
+    private readonly ConcurrentDictionary<GrainType, string> _grainTypeTags = new();
+
+    public MessagingShared(IServiceProvider services)
     {
-        GrainType = grainType.ToString();
         Options = services.GetRequiredService<IOptions<DurableMessagingOptions>>().Value;
         TimeProvider = services.GetRequiredService<TimeProvider>();
         JobTimeProvider = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
@@ -33,8 +31,6 @@ internal sealed class MessagingShared
         InboxCodec = services.GetRequiredKeyedService<IDurableValueCommandCodec<InboxCommand>>(format);
     }
 
-    /// <summary>Gets the grain type metric tag.</summary>
-    public string GrainType { get; }
 
     public DurableMessagingOptions Options { get; }
 
@@ -52,4 +48,7 @@ internal sealed class MessagingShared
     public ILogger PumpLogger { get; }
 
     public IDurableValueCommandCodec<InboxCommand> InboxCodec { get; }
+
+    /// <summary>Gets the metric tag for a grain type, shared by all of its activations.</summary>
+    public string GetGrainTypeTag(GrainType grainType) => _grainTypeTags.GetOrAdd(grainType, static type => type.ToString());
 }

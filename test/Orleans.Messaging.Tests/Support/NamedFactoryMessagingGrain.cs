@@ -39,7 +39,7 @@ public sealed class NamedFactoryMessagingProbe
         _completed.GetOrAdd(grainId, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
 }
 
-public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGrain, IMessagingGrain, IInboxHandler
+public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGrain, IInboxHandler
 {
     private readonly IJournaledStateManager _owner;
     private readonly IOutbox _outbox;

@@ -50,6 +50,7 @@ public abstract class ActivationValidationTestGrain : DurableGrain, IActivationV
     {
         _value = value;
         _observation = probe.Track(context);
+        _ = context.ActivationServices.GetRequiredService<IInbox>();
     }
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -135,3 +136,20 @@ public sealed class MetadataNonReentrantActivationValidationGrain(
     IGrainContext context, ActivationValidationProbe probe,
     [FromKeyedServices("activation-validation")] IDurableValue<int> value)
     : ActivationValidationTestGrain(context, probe, value);
+
+public interface IInboxlessGrain : IGrainWithGuidKey
+{
+    Task PingAsync();
+}
+
+/// <summary>A journaled grain which never resolves its inbox.</summary>
+public sealed class InboxlessDurableGrain : DurableGrain, IInboxlessGrain
+{
+    public Task PingAsync() => Task.CompletedTask;
+}
+
+/// <summary>A grain which uses neither journaling nor its inbox.</summary>
+public sealed class InboxlessPlainGrain : Grain, IInboxlessGrain
+{
+    public Task PingAsync() => Task.CompletedTask;
+}

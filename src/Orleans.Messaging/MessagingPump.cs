@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableJobs;
+using Orleans.Concurrency;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
@@ -31,6 +32,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 {
     internal const string JobName = "orleans.messaging.pump";
     internal static readonly TimeSpan RecheckDelay = TimeSpan.FromSeconds(1);
+
+    // The public attribute exposes the runtime's internal, sealed strategy type.
+    private static readonly Type StatelessWorkerPlacementType = new StatelessWorkerAttribute().PlacementStrategy.GetType();
     private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdown = new();
     private Inbox? _inbox;
@@ -49,12 +53,19 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     private int _wakeupEpoch;
     private int _schedulingEpoch;
 
-    public MessagingPump(IGrainContext grainContext, IJournaledStateManager stateManager, IDurableJobHandlerRegistry jobHandlers)
+    public MessagingPump(IGrainContext grainContext, IJournaledStateManager stateManager, IDurableJobHandlerRegistry jobHandlers, MessagingShared shared)
     {
+        // Messaging requires one activation per grain identity, so every activation of a stateless worker fails.
+        if (grainContext.GetComponent<PlacementStrategy>()?.GetType() == StatelessWorkerPlacementType)
+        {
+            throw new InvalidOperationException(
+                $"Messaging requires one activation per grain identity, but grain type '{grainContext.GrainId.Type}' is a stateless worker.");
+        }
+
         GrainContext = grainContext;
         StateManager = stateManager;
-        Shared = grainContext.GetComponent<MessagingShared>()
-            ?? throw new InvalidOperationException($"Messaging is not configured for grain type '{grainContext.GrainId.Type}'.");
+        Shared = shared;
+        GrainTypeTag = shared.GetGrainTypeTag(grainContext.GrainId.Type);
         jobHandlers.Register(this);
         grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.Activate, this);
 
@@ -79,6 +90,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     public IJournaledStateManager StateManager { get; }
 
     public MessagingShared Shared { get; }
+
+    /// <summary>Gets the metric tag for this activation's grain type.</summary>
+    public string GrainTypeTag { get; }
 
     /// <summary>Gets the token which is canceled when messaging stops for this activation.</summary>
     public CancellationToken ShutdownToken => _shutdown.Token;

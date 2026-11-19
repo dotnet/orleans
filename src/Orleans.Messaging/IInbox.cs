@@ -7,6 +7,10 @@ namespace Orleans.Messaging;
 /// time. <see cref="InboxExtensions"/> registers typed subject handlers.
 /// </para>
 /// <para>
+/// A grain receives messages by resolving its inbox during construction or activation setup, typically by constructor
+/// injection, so the inbox recovers with the grain's journal.
+/// </para>
+/// <para>
 /// A handler decodes the body, performs asynchronous I/O, validates local results, and checks cancellation before
 /// the first shared business or journaled mutation. From that mutation until it returns, it executes synchronously:
 /// it applies safe-to-commit business changes, stages outgoing messages through <see cref="IOutbox.Send(OutboxMessage)"/>, and calls

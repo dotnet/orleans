@@ -13,11 +13,11 @@ builder or service collection. The optional `DurableMessagingOptions` callback c
 capacity, batch sizes, retries, deduplication, and dead-letter retention; options are
 validated at startup. Register typed subjects with `AddMessageType<T>(subject)`.
 
-Messaging grains derive from `DurableGrain` or implement `IMessagingGrain`, and
-constructor-inject `IInbox`. During activation, the messaging grain-type
-configurator installs the grain's messaging extension. Stateless worker grains are
-rejected; reentrant and interleaving grains are supported, and the grain's code is
-responsible for correctness when calls interleave.
+A grain receives messages by resolving `IInbox` during construction or activation
+setup, typically by constructor injection, so the inbox recovers with the grain's
+journal. Deliveries reach the inbox through the grain's messaging extension. Stateless
+worker grains are rejected; reentrant and interleaving grains are supported, and the
+grain's code is responsible for correctness when calls interleave.
 
 ## Messages
 
