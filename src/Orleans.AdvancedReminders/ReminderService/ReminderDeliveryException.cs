@@ -1,5 +1,6 @@
 namespace Orleans.AdvancedReminders.Runtime.ReminderService;
 
+[GenerateSerializer]
 internal sealed class ReminderDeliveryException(
     GrainId grainId,
     string reminderName,

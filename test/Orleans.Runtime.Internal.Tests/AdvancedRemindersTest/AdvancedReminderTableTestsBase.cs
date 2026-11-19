@@ -148,35 +148,38 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task RemindersTable_DurableRangePagingIsBounded(bool wraps)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task RemindersTable_DurableRangePagingIsBounded(bool wraps, bool fullRing)
     {
-        const int ReminderCount = 7;
+        const int ReminderCount = 8;
         const int PageSize = 2;
-        var expected = new List<string>(ReminderCount);
         var grainIds = new SortedDictionary<uint, GrainId>();
-        while (grainIds.Count < ReminderCount + 1)
+        while (grainIds.Count < ReminderCount)
         {
             var id = MakeTestGrainReference();
-            grainIds.TryAdd(id.GetUniformHashCode(), id);
+            var hash = id.GetUniformHashCode();
+            // ADO.NET stores hashes as signed integers. Keep both bounds in the
+            // same half so the wrapping case exercises its wrapping SQL query.
+            if (hash <= int.MaxValue)
+            {
+                grainIds.TryAdd(hash, id);
+            }
         }
 
-        var orderedIds = grainIds.Values.ToArray();
-        var lowerBoundary = orderedIds[0].GetUniformHashCode();
-        var upperBoundary = orderedIds[^1].GetUniformHashCode();
-        var excluded = CreateReminder(orderedIds[0], "at-lower-boundary");
-        await remindersTable.UpsertRow(excluded);
-        if (wraps)
+        var hashes = grainIds.Keys.ToArray();
+        var begin = fullRing ? hashes[2] : wraps ? hashes[4] : hashes[0];
+        var end = fullRing || wraps ? hashes[2] : hashes[^1];
+        var expected = new List<string>(ReminderCount);
+        foreach (var (hash, grainId) in grainIds)
         {
-            expected.Add($"{excluded.GrainId}|{excluded.ReminderName}");
-        }
-
-        for (var index = 0; index < ReminderCount; index++)
-        {
-            var reminder = CreateReminder(orderedIds[index + 1], $"paged-{index}");
+            var reminder = CreateReminder(grainId, $"paged-{hash}");
             await remindersTable.UpsertRow(reminder);
-            expected.Add($"{reminder.GrainId}|{reminder.ReminderName}");
+            if (wraps ? hash > begin || hash <= end : hash > begin && hash <= end)
+            {
+                expected.Add($"{reminder.GrainId}|{reminder.ReminderName}");
+            }
         }
 
         var actual = new List<string>(ReminderCount);
@@ -184,8 +187,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         string? continuationToken = null;
         do
         {
-            var page = await remindersTable.ReadRows(
-                wraps ? 0 : lowerBoundary, wraps ? 0 : upperBoundary, PageSize, continuationToken);
+            var page = await remindersTable.ReadRows(begin, end, PageSize, continuationToken);
             Assert.InRange(page.Reminders.Count, 0, PageSize);
             actual.AddRange(page.Reminders.Select(reminder => $"{reminder.GrainId}|{reminder.ReminderName}"));
             if (page.ContinuationToken is { } nextToken)
@@ -196,7 +198,10 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
             continuationToken = page.ContinuationToken;
         } while (continuationToken is not null);
 
-        Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
+        var unpaged = await remindersTable.ReadRows(begin, end);
+        var expectedRows = expected.Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expectedRows, actual.Order(StringComparer.Ordinal));
+        Assert.Equal(expectedRows, unpaged.Reminders.Select(reminder => $"{reminder.GrainId}|{reminder.ReminderName}").Order(StringComparer.Ordinal));
     }
 
     protected async Task RemindersParallelUpsert()

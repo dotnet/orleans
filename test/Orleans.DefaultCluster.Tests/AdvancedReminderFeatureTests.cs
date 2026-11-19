@@ -55,11 +55,12 @@ public sealed partial class AdvancedReminderFeatureTests
     }
 
     [Theory]
-    [InlineData(2)]
-    [InlineData(10)]
-    public async Task OneShot_DefaultPolicy_RetriesSameOccurrenceAndCompletesAtThreeAttempts(int failures)
+    [InlineData(2, 3)]
+    [InlineData(10, 3)]
+    [InlineData(10, 1)]
+    public async Task OneShot_DefaultPolicy_RetriesSameOccurrenceAndCompletesAtThreeAttempts(int failures, int jobRetryCutoff)
     {
-        await using var cluster = await CreateClusterAsync();
+        await using var cluster = await CreateClusterAsync(jobRetryCutoff: jobRetryCutoff);
         var grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
         var name = Guid.NewGuid().ToString("N");
         using var completion = new ReminderCompletions(name);
@@ -192,7 +193,8 @@ public sealed partial class AdvancedReminderFeatureTests
         ReminderJobCancellationGate? cancellationGate = null,
         TimeProvider? reminderClock = null,
         Action<IServiceCollection>? configureServices = null,
-        TimeSpan? missedReminderGracePeriod = null)
+        TimeSpan? missedReminderGracePeriod = null,
+        int jobRetryCutoff = 3)
     {
         var builder = new InProcessTestClusterBuilder(1);
         builder.ConfigureSilo((_, silo) =>
@@ -238,7 +240,7 @@ public sealed partial class AdvancedReminderFeatureTests
                 }
             });
             silo.Configure<DurableJobsOptions>(options =>
-                options.ShouldRetry = (context, _) => context.DequeueCount < 3 ? DateTimeOffset.UtcNow : null);
+                options.ShouldRetry = (context, _) => context.DequeueCount < jobRetryCutoff ? DateTimeOffset.UtcNow : null);
         });
         var cluster = builder.Build();
         try

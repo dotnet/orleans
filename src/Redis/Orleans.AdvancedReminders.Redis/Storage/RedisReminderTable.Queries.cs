@@ -61,6 +61,7 @@ internal partial class RedisReminderTable
     {
         try
         {
+            // Use the end of the begin-hash prefix to exclude every member with that hash.
             var (_, from) = GetFilter(begin);
             var (_, to) = GetFilter(end);
             IEnumerable<RedisValue> values;

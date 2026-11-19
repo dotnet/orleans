@@ -343,6 +343,8 @@ internal sealed partial class ShardExecutor
                 {
                     if (result.TurnDispatch == DurableJobTurnDispatch.None)
                     {
+                        // Delayed polling resumes the current phase. Restarting at HandleDurableJobAsync
+                        // could reenter the owner turn while the completion effect is still running.
                         LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
                         await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
                     }

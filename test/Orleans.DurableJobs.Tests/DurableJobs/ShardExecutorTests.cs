@@ -346,8 +346,10 @@ public class ShardExecutorTests
         Assert.Equal(handlerTimedOut ? new[] { timeout } : Array.Empty<Exception>(), failures);
     }
 
-    [Fact]
-    public async Task RunShardAsync_WhenJobReturnsInProgress_UsesTimeProvider()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunShardAsync_WhenJobReturnsInProgress_UsesTimeProviderAndResumesCurrentPhase(bool ownerTurn)
     {
         var timeProvider = new TimerTrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions(maxConcurrentJobs: 10);
@@ -360,18 +362,9 @@ public class ShardExecutorTests
         var grainFactory = Substitute.For<IInternalGrainFactory>();
         var extension = Substitute.For<IDurableJobReceiverExtension>();
         extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                var currentCall = Interlocked.Increment(ref callCount);
-                if (currentCall == 1)
-                {
-                    firstCall.SetResult();
-                    return DurableJobRunResult.InProgress(TimeSpan.FromSeconds(5));
-                }
-
-                secondCall.SetResult();
-                return DurableJobRunResult.Completed;
-            });
+            .Returns(_ => ownerTurn ? DurableJobRunResult.ContinueOnOwnerTurn : Poll());
+        extension.ExecuteDurableJobTurnAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Poll());
         grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
         var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance, timeProvider);
 
@@ -385,7 +378,21 @@ public class ShardExecutorTests
 
         await secondCall.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await runTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await extension.Received(ownerTurn ? 1 : 2).HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        await extension.Received(ownerTurn ? 2 : 0).ExecuteDurableJobTurnAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
         await shard.Received(1).RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        DurableJobRunResult Poll()
+        {
+            if (Interlocked.Increment(ref callCount) == 1)
+            {
+                firstCall.SetResult();
+                return DurableJobRunResult.InProgress(TimeSpan.FromSeconds(5));
+            }
+
+            secondCall.SetResult();
+            return DurableJobRunResult.Completed;
+        }
     }
 
     [Fact]

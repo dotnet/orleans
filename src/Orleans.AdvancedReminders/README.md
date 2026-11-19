@@ -304,7 +304,7 @@ public static class ReminderPolicies
 | `ReminderRetryPolicy.Limited(attempts)` | Retry the same Durable Job occurrence and remove the registration if delivery still fails at the configured dequeue count. |
 | `ReminderRetryPolicy.UntilSuccess` | Retain the failed work and schedule delayed deliveries until success or explicit removal. |
 
-`Limited` requires a positive attempt count; zero and negative counts are rejected when constructing the policy. Its count is a Durable Jobs dequeue-count safety limit, not an exact callback-exception count. Configure the backend retry policy to allow at least as many attempts. Configuration binding accepts the strings `NoRetries`, `Limited(3)`, and `UntilSuccess` for the `DeliveryRetryPolicy` property.
+`Limited` requires a positive attempt count and measures Durable Jobs dequeues. While attempts remain after a failed callback, the reminder uses the retry time returned by Durable Jobs' `ShouldRetry`, or retries after one second if that delegate returns `null`. Configuration binding accepts the strings `NoRetries`, `Limited(3)`, and `UntilSuccess` for the `DeliveryRetryPolicy` property.
 
 For a recurring reminder, `NoRetries` advances after a failed tick, while `Limited(1)` removes the registration after its first failed delivery. Both allow the initial callback; the policy determines what happens after failure.
 
@@ -379,7 +379,9 @@ Journaled shard creation and discovery share the same local queue, including whe
 
 Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late read response is discarded and cannot resume the abandoned mutation. The next heartbeat retries a failed recovery page from the last completed page.
 
-Creating a durable job also has a one-minute timeout and honors cancellation even when the backend ignores the token. The committed definition remains pending if scheduling fails. Recovery rotates its occurrence identity before rescheduling, so a job created by an abandoned scheduling request is harmless. Recovery bounds each dispatcher repair to one minute, and the silo's shutdown token bounds the wait for the reminder provider to stop.
+The dispatcher awaits upserts and deletes inside its owner turn and uses the provider's timeout behavior. An additional timeout on the await would let the dispatcher start another operation while the previous provider task can still commit.
+
+Creating a durable job also has a one-minute timeout and honors cancellation even when the backend ignores the token. The committed definition remains pending if scheduling fails. Recovery rotates its occurrence identity before rescheduling, so a job created by an abandoned scheduling request is harmless. Recovery waits up to one minute for each dispatcher repair, and the silo's shutdown token bounds the wait for the reminder provider to stop.
 
 Reminder-table writes remain awaited until the provider finishes, preserving the dispatcher's single-writer ordering across a commit. Configure storage SDK request deadlines for those writes; stopping observation alone cannot prevent a late write from overwriting a newer registration. Callback execution uses Orleans messaging deadlines, and cancellation cannot forcibly stop application callback code.
 

@@ -26,6 +26,22 @@ public static class SiloBuilderReminderExtensions
         }
 
         services.AddDurableJobs();
+        services.AddOptions<DurableJobsOptions>().PostConfigure<IServiceProvider>(static (options, services) =>
+        {
+            var shouldRetry = options.ShouldRetry;
+            if (shouldRetry is null)
+            {
+                return; // The Durable Jobs validator reports invalid configuration.
+            }
+
+            var clock = services.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs) ?? TimeProvider.System;
+            options.ShouldRetry = (context, failure) =>
+            {
+                var due = shouldRetry(context, failure);
+                // The dispatcher reports this failure only while a limited reminder has attempts left.
+                return due ?? (failure is ReminderDeliveryException ? clock.GetUtcNow().AddSeconds(1) : null);
+            };
+        });
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IConfigurationValidator, ReminderOptionsValidator>();
         services.AddSingleton<IConfigurationValidator, AdvancedReminderJobBackendValidator>();

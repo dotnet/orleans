@@ -4,6 +4,7 @@ internal sealed class AdvancedReminderDispatcherGrain(
     AdvancedReminderService reminderService) : Grain, IAdvancedReminderDispatcherGrain
 {
     private readonly AdvancedReminderService _reminderService = reminderService;
+    // Even interleaved requests access this dictionary on the activation scheduler.
     private readonly Dictionary<Guid, DeliveryObservation> _deliveryObservations = new();
     private ActiveDelivery? _activeDelivery;
 

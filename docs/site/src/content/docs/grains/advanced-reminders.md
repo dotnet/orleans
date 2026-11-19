@@ -396,7 +396,7 @@ The grace period is configured globally for the Advanced Reminders service. Sele
 | `FireImmediately` | Invoke when processed; advance a recurring schedule or complete a one-shot. It delivers one occurrence rather than replaying every missed interval. |
 | `Notify` | Log a warning and skip the callback; advance a recurring schedule or remove a one-shot. |
 
-Reminder delivery can occur after its nominal due time and can be retried after uncertain distributed failures. Make callback effects idempotent. By default, `ReminderRetryPolicy.Limited(3)` retries the same occurrence and removes the registration if delivery still fails on its third dequeue. The Durable Jobs retry policy must permit at least as many attempts. `NoRetries` logs a callback failure and advances a recurring series; `UntilSuccess` retains the failed occurrence until delivery succeeds or the registration is explicitly removed.
+Reminder delivery can occur after its nominal due time and can be retried after uncertain distributed failures. Make callback effects idempotent. By default, `ReminderRetryPolicy.Limited(3)` retries the same occurrence and removes the registration if delivery still fails on its third dequeue. While attempts remain after a failed callback, the reminder uses the retry time returned by Durable Jobs' `ShouldRetry`, or retries after one second if that delegate returns `null`. `NoRetries` logs a callback failure and advances a recurring series. `UntilSuccess` retains the failed occurrence until delivery succeeds or the registration is explicitly removed.
 
 ### Read missed notifications
 
@@ -445,7 +445,9 @@ Configure the grace threshold and cleanup guards deliberately. The grace period 
 
 The recovery service repairs incomplete registrations in batches of 32. Missing handles are repaired regardless of due time. With `UntilSuccess`, overdue one-shot and recurring occurrences are requeued after the missed-occurrence grace period. Reconciliation leaves an active delivery in place and measures each retry or replacement's grace period from its persisted delivery deadline. Requeuing preserves the original due time and fences the earlier carrier. The caller observes registration failures, and the singleton reconciliation cursor repairs persisted rows with missing handles. A forced repair rotates the occurrence token before replacing the job, so an older job becomes a harmless no-op if it later runs.
 
-Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation; a late result cannot resume an abandoned mutation. If a recovery page fails or times out, the next heartbeat retries it from the last completed page. Each dispatcher repair has a one-minute timeout, and the silo's shutdown token bounds the wait for the reminder provider to stop.
+Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late result cannot resume an abandoned mutation. If a recovery page fails or times out, the next heartbeat retries it from the last completed page. Recovery waits up to one minute for each dispatcher repair, and the silo's shutdown token bounds the wait for the reminder provider to stop.
+
+The dispatcher awaits upserts and deletes inside its owner turn and uses the provider's timeout behavior. An additional timeout on the await would let the dispatcher start another operation while the previous provider task can still commit.
 
 Durable-job creation has a one-minute timeout and honors cancellation even when the backend ignores the token. A failed scheduling attempt leaves the committed definition pending. Recovery rotates that occurrence identity before rescheduling, fencing any job created by the abandoned request.
 
