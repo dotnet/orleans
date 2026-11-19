@@ -43,10 +43,10 @@ internal static class InboxTestAccess
         inbox.MessageState[messageId].State;
 
     public static void StageAcceptance(Inbox inbox, InboxMessage message) =>
-        Emit(inbox, new() { Kind = InboxCommandKind.Accept, Message = message });
+        Emit(inbox, new InboxCommand.Accept(message));
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "Emit")]
-    private static extern void Emit(Inbox inbox, InboxCommand command);
+    public static extern void Emit(Inbox inbox, InboxCommand command);
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_wakeupJobId")]
     public static extern ref string? WakeupJobId(MessagingPump pump);

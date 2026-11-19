@@ -381,6 +381,33 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         return rig;
     }
 
+    [Fact]
+    public async Task ReusedIdentity_NewCommandReplacesTheEarlierDeadLetter()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        var key = MessageId.Create("tenant", "orders", "1050", "reserve");
+        var message = Create(rig, key, "inventory.reserve.v1", "reused");
+        InboxCommand DeadLettered() => new InboxCommand.Complete(key, message.SentAt,
+            new InboxDeadLetter { Message = message, DeadLetteredAt = message.SentAt, Reason = "earlier failure" }, null);
+
+        await OnTurnAsync(rig.Context, () =>
+        {
+            // A handled command: acceptance replaces the earlier dead letter.
+            InboxTestAccess.Emit(rig.Inbox, DeadLettered());
+            Assert.Contains(key, rig.Inbox.DeadLetterState.Keys);
+            InboxTestAccess.Emit(rig.Inbox, new InboxCommand.Accept(message));
+            Assert.DoesNotContain(key, rig.Inbox.DeadLetterState.Keys);
+            InboxTestAccess.Emit(rig.Inbox, new InboxCommand.Complete(key, message.SentAt, null, null));
+
+            // A sink-owned command completes without an acceptance.
+            InboxTestAccess.Emit(rig.Inbox, DeadLettered());
+            InboxTestAccess.Emit(rig.Inbox, new InboxCommand.Complete(key, message.SentAt, null, null));
+            Assert.DoesNotContain(key, rig.Inbox.DeadLetterState.Keys);
+            Assert.Empty(rig.Pending);
+        });
+    }
+
     private static Rig CreateRig(IMessagingTestGrain receiver, IGrainContext context, IdentityHandler handler) =>
         new(receiver, context, Assert.IsType<MessagingTestGrain>(context.GrainInstance), handler,
             context.ActivationServices.GetRequiredService<IJournaledStateManager>(),

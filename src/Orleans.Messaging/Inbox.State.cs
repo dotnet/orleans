@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -104,9 +105,9 @@ internal sealed partial class Inbox
         Apply(command);
         var dueTime = command switch
         {
-            { Kind: InboxCommandKind.Accept, Message: { } message } => message.Envelope.DeliverAt ?? DateTimeOffset.MinValue,
-            { Kind: InboxCommandKind.Retry, State: { } state } => state.NextAttemptAt,
-            _ => (DateTimeOffset?)null
+            InboxCommand.Accept accept => accept.Message.Envelope.DeliverAt ?? DateTimeOffset.MinValue,
+            InboxCommand.Retry retry => retry.State.NextAttemptAt,
+            _ => null
         };
         if (dueTime is { } due && (_stagedWakeup is null || due < _stagedWakeup)) _stagedWakeup = due;
     }
@@ -146,18 +147,12 @@ internal sealed partial class Inbox
         // The floor and compacted history commit atomically. Keep the in-memory records until acknowledgement, so
         // an interleaving delivery still deduplicates while the snapshot's admission floor is not yet durable.
         var floor = GetAdmissionFloor(Shared.JobTimeProvider.GetUtcNow());
-        Shared.InboxCodec.WriteSet(new()
-        {
-            Kind = InboxCommandKind.Snapshot,
-            Snapshot = new()
-            {
-                Messages = _messages.Values.ToArray(),
-                Processed = _processed.Values.Where(entry => !IsAtOrBelowFloor(entry, floor)).ToArray(),
-                DeadLetters = _deadLetters.Values.ToArray(),
-                AdmissionFloor = floor,
-                StoppedCleanly = _stoppedCleanly
-            }
-        }, writer);
+        Shared.InboxCodec.WriteSet(new InboxCommand.Snapshot(
+            _messages.Values.ToArray(),
+            _processed.Values.Where(entry => !IsAtOrBelowFloor(entry, floor)).ToArray(),
+            _deadLetters.Values.ToArray(),
+            floor,
+            _stoppedCleanly), writer);
         _admissionFloor = floor;
         OnWriteCaptured(snapshot: true);
     }
@@ -166,44 +161,36 @@ internal sealed partial class Inbox
 
     private void Apply(InboxCommand command)
     {
-        if (command.Kind != InboxCommandKind.Snapshot) _stoppedCleanly = command.Kind == InboxCommandKind.CleanStop;
-        switch (command.Kind)
+        switch (command)
         {
-            case InboxCommandKind.Accept:
-                var message = command.Message ?? throw new InvalidOperationException("An accept command requires its message.");
+            case InboxCommand.Accept { Message: var message }:
                 _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = ++_lastSequence });
+                // A reused identity starts a new command, which replaces the earlier command's records.
                 _processed.Remove(message.Envelope.MessageId);
+                _deadLetters.Remove(message.Envelope.MessageId);
                 ReportDepth(1);
                 break;
-            case InboxCommandKind.Retry:
-                _messages[command.MessageId].State = command.State ?? throw new InvalidOperationException("A retry command requires its state.");
+            case InboxCommand.Retry { MessageId: var key, State: var state }:
+                _messages[key].State = state;
                 break;
-            case InboxCommandKind.Complete:
-                if (_messages.Remove(command.MessageId)) ReportDepth(-1);
+            case InboxCommand.Complete { MessageId: var key, SentAt: var sentAt, DeadLetter: var deadLetter, Rejection: var rejection }:
+                if (_messages.Remove(key)) ReportDepth(-1);
 
                 _lastCompletionSequence = ++_lastSequence;
-                _processed[command.MessageId] = new()
-                {
-                    MessageId = command.MessageId,
-                    SentAt = command.SentAt,
-                    Rejection = command.Rejection,
-                    Sequence = _lastSequence
-                };
-                if (command.DeadLetter is { } letter) _deadLetters[command.MessageId] = letter;
+                _processed[key] = new() { MessageId = key, SentAt = sentAt, Rejection = rejection, Sequence = _lastSequence };
+                if (deadLetter is not null) _deadLetters[key] = deadLetter;
+                else _deadLetters.Remove(key);
                 break;
-            case InboxCommandKind.AdvanceAdmissionFloor:
-                AdvanceAdmissionFloor(command.AdmissionFloor);
+            case InboxCommand.AdvanceAdmissionFloor { Floor: var floor }:
+                AdvanceAdmissionFloor(floor);
                 break;
-            case InboxCommandKind.RemoveDeadLetters:
-                foreach (var key in command.RemovedKeys!) _deadLetters.Remove(key);
+            case InboxCommand.RemoveDeadLetters { Keys: var keys }:
+                foreach (var key in keys) _deadLetters.Remove(key);
                 break;
-            case InboxCommandKind.CleanStop:
-            case InboxCommandKind.Resume:
+            case InboxCommand.CleanStop or InboxCommand.Resume:
                 break;
-            case InboxCommandKind.Snapshot:
-                var snapshot = command.Snapshot ?? throw new InvalidOperationException("A snapshot command requires its state.");
+            case InboxCommand.Snapshot snapshot:
                 AdvanceAdmissionFloor(snapshot.AdmissionFloor);
-                _stoppedCleanly = snapshot.StoppedCleanly;
                 var previousCount = _messages.Count;
                 _messages.Clear();
                 _processed.Clear();
@@ -212,18 +199,18 @@ internal sealed partial class Inbox
 
                 ReportDepth(_messages.Count - previousCount);
 
-                foreach (var processed in snapshot.Processed)
-                {
-                    _processed.Add(processed.MessageId, processed);
-                }
-
+                foreach (var processed in snapshot.Processed) _processed.Add(processed.MessageId, processed);
                 foreach (var restored in snapshot.DeadLetters) _deadLetters.Add(restored.Message.Envelope.MessageId, restored);
                 break;
-            default:
-                throw new NotSupportedException($"Inbox command '{command.Kind}' is not supported.");
         }
-    }
 
+        _stoppedCleanly = command switch
+        {
+            InboxCommand.Snapshot snapshot => snapshot.StoppedCleanly,
+            InboxCommand.CleanStop => true,
+            _ => false
+        };
+    }
     private void AdvanceAdmissionFloor(DateTimeOffset floor)
     {
         if (floor < _admissionFloor) throw new InvalidOperationException("The inbox admission floor cannot move backward.");
@@ -232,45 +219,144 @@ internal sealed partial class Inbox
 
 }
 
-internal enum InboxCommandKind
+/// <summary>A change to the inbox's journaled state.</summary>
+/// <remarks>
+/// Case identifiers follow declaration order and are part of the journal format. In JSON, each case leads with its
+/// <c>kind</c>, which <see cref="InboxCommandClassifier"/> reads to select the case.
+/// </remarks>
+[GenerateSerializer]
+[JsonUnion(TypeClassifier = typeof(InboxCommandClassifier))]
+internal union InboxCommand(
+    InboxCommand.Accept,
+    InboxCommand.Retry,
+    InboxCommand.Complete,
+    InboxCommand.RemoveDeadLetters,
+    InboxCommand.Snapshot,
+    InboxCommand.AdvanceAdmissionFloor,
+    InboxCommand.CleanStop,
+    InboxCommand.Resume)
 {
-    Accept = 1,
-    Retry = 2,
-    Complete = 3,
-    RemoveDeadLetters = 4,
-    Snapshot = 6,
-    AdvanceAdmissionFloor = 7,
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Accept")]
+    internal sealed class Accept(InboxMessage message)
+    {
+        [Id(0)] public InboxMessage Message { get; } = message;
 
-    // An activation stopped with no handler attempt interrupted, so recovery charges no attempt.
-    CleanStop = 9,
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "accept";
+    }
 
-    // A recovered activation consumed a clean stop, so a later unclean stop is charged.
-    Resume = 10
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Retry")]
+    internal sealed class Retry(MessageId messageId, InboxMessageState state)
+    {
+        [Id(0)] public MessageId MessageId { get; } = messageId;
+        [Id(1)] public InboxMessageState State { get; } = state;
+
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "retry";
+    }
+
+    /// <summary>Records a message's processed outcome, replacing any earlier record and dead letter of it.</summary>
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Complete")]
+    internal sealed class Complete(MessageId messageId, DateTimeOffset sentAt, InboxDeadLetter? deadLetter, InboxRejection? rejection)
+    {
+        [Id(0)] public MessageId MessageId { get; } = messageId;
+        [Id(1)] public DateTimeOffset SentAt { get; } = sentAt;
+        [Id(2)] public InboxDeadLetter? DeadLetter { get; } = deadLetter;
+        [Id(3)] public InboxRejection? Rejection { get; } = rejection;
+
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "complete";
+    }
+
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.RemoveDeadLetters")]
+    internal sealed class RemoveDeadLetters(MessageId[] keys)
+    {
+        [Id(0)] public MessageId[] Keys { get; } = keys;
+
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "removeDeadLetters";
+    }
+
+    /// <summary>Replaces the inbox's state.</summary>
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Snapshot")]
+    internal sealed class Snapshot(InboxEntry[] messages, InboxProcessedEntry[] processed, InboxDeadLetter[] deadLetters, DateTimeOffset admissionFloor, bool stoppedCleanly)
+    {
+        [Id(0)] public InboxEntry[] Messages { get; } = messages;
+        [Id(1)] public InboxProcessedEntry[] Processed { get; } = processed;
+        [Id(2)] public InboxDeadLetter[] DeadLetters { get; } = deadLetters;
+        [Id(3)] public DateTimeOffset AdmissionFloor { get; } = admissionFloor;
+        [Id(4)] public bool StoppedCleanly { get; } = stoppedCleanly;
+
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "snapshot";
+    }
+
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.AdvanceAdmissionFloor")]
+    internal sealed class AdvanceAdmissionFloor(DateTimeOffset floor)
+    {
+        [Id(0)] public DateTimeOffset Floor { get; } = floor;
+
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "advanceAdmissionFloor";
+    }
+
+    /// <summary>Records that an activation stopped with no handler attempt interrupted, so recovery charges none.</summary>
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.CleanStop")]
+    internal sealed class CleanStop
+    {
+        public static CleanStop Instance { get; } = new();
+
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "cleanStop";
+    }
+
+    /// <summary>Records that a recovered activation consumed a clean stop, so a later unclean stop is charged.</summary>
+    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Resume")]
+    internal sealed class Resume
+    {
+        public static Resume Instance { get; } = new();
+
+        [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
+        public string Kind => "resume";
+    }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.InboxCommand")]
-internal sealed class InboxCommand
+/// <summary>Selects an <see cref="InboxCommand"/> case from the <c>kind</c> which each JSON case leads with.</summary>
+internal sealed class InboxCommandClassifier : JsonTypeClassifierFactory
 {
-    [Id(0)] public InboxCommandKind Kind { get; init; }
-    [Id(1)] public InboxMessage? Message { get; init; }
-    [Id(2)] public MessageId MessageId { get; init; }
-    [Id(3)] public InboxMessageState? State { get; init; }
-    [Id(5)] public InboxDeadLetter? DeadLetter { get; init; }
-    [Id(6)] public MessageId[]? RemovedKeys { get; init; }
-    [Id(7)] public InboxSnapshot? Snapshot { get; init; }
-    [Id(8)] public InboxRejection? Rejection { get; init; }
-    [Id(9)] public DateTimeOffset SentAt { get; init; }
-    [Id(10)] public DateTimeOffset AdmissionFloor { get; init; }
-}
+    public override bool CanClassify(JsonTypeClassifierContext context) => context.DeclaringType == typeof(InboxCommand);
 
-[GenerateSerializer, Alias("Orleans.Messaging.InboxSnapshot")]
-internal sealed class InboxSnapshot
-{
-    [Id(0)] public InboxEntry[] Messages { get; init; } = [];
-    [Id(1)] public InboxProcessedEntry[] Processed { get; init; } = [];
-    [Id(2)] public InboxDeadLetter[] DeadLetters { get; init; } = [];
-    [Id(3)] public DateTimeOffset AdmissionFloor { get; init; } = DateTimeOffset.MinValue;
-    [Id(4)] public bool StoppedCleanly { get; init; }
+    public override JsonTypeClassifier CreateJsonClassifier(JsonTypeClassifierContext context, JsonSerializerOptions options) => Classify;
+
+    private static Type? Classify(ref Utf8JsonReader reader)
+    {
+        var lookahead = reader;
+        if (lookahead.TokenType != JsonTokenType.StartObject) return null;
+        while (lookahead.Read() && lookahead.TokenType == JsonTokenType.PropertyName)
+        {
+            var isKind = lookahead.ValueTextEquals("kind"u8);
+            lookahead.Read();
+            if (isKind)
+            {
+                return lookahead.GetString() switch
+                {
+                    "accept" => typeof(InboxCommand.Accept),
+                    "retry" => typeof(InboxCommand.Retry),
+                    "complete" => typeof(InboxCommand.Complete),
+                    "removeDeadLetters" => typeof(InboxCommand.RemoveDeadLetters),
+                    "snapshot" => typeof(InboxCommand.Snapshot),
+                    "advanceAdmissionFloor" => typeof(InboxCommand.AdvanceAdmissionFloor),
+                    "cleanStop" => typeof(InboxCommand.CleanStop),
+                    "resume" => typeof(InboxCommand.Resume),
+                    _ => null
+                };
+            }
+
+            lookahead.Skip();
+        }
+
+        return null;
+    }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxProcessedEntry")]
@@ -301,5 +387,4 @@ internal sealed class InboxEntry
 }
 
 [JsonSerializable(typeof(InboxCommand))]
-[JsonSerializable(typeof(InboxSnapshot))]
 internal sealed partial class InboxJsonContext : JsonSerializerContext;

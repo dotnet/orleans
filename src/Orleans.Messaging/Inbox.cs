@@ -114,7 +114,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         var floor = GetAdmissionFloor(receiverTime);
         if (message.SentAt <= floor)
         {
-            if (message.SentAt > _admissionFloor) Emit(new() { Kind = InboxCommandKind.AdvanceAdmissionFloor, AdmissionFloor = floor });
+            if (message.SentAt > _admissionFloor) Emit(new InboxCommand.AdvanceAdmissionFloor(floor));
             if (_admissionFloor > _durableAdmissionFloor) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "expired");
             LogMessageExpired(Logger, key, GrainContext.GrainId, message.SentAt, _admissionFloor);
@@ -143,7 +143,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             return DeliveryResult.HandlerNotFound();
         }
 
-        Emit(new() { Kind = InboxCommandKind.Accept, Message = message });
+        Emit(new InboxCommand.Accept(message));
         await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
         Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
         LogMessageAccepted(Logger, key, GrainContext.GrainId);
@@ -203,7 +203,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
         try
         {
-            Emit(new() { Kind = InboxCommandKind.Accept, Message = message });
+            Emit(new InboxCommand.Accept(message));
         }
         catch (Exception exception)
         {
@@ -410,17 +410,12 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         }
 
         var retryAt = MessagingTime.AddClamped(now, MessagingTime.GetBackoff(Options.RetryInitialInterval, attempts));
-        Emit(new()
+        Emit(new InboxCommand.Retry(entry.Message.Envelope.MessageId, new()
         {
-            Kind = InboxCommandKind.Retry,
-            MessageId = entry.Message.Envelope.MessageId,
-            State = new()
-            {
-                AttemptCount = attempts,
-                NextAttemptAt = retryAt < expirationTime ? retryAt : expirationTime,
-                ExpirationTime = expirationTime
-            }
-        });
+            AttemptCount = attempts,
+            NextAttemptAt = retryAt < expirationTime ? retryAt : expirationTime,
+            ExpirationTime = expirationTime
+        }));
         return "retry";
     }
 
@@ -428,14 +423,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         _messages.TryGetValue(entry.Message.Envelope.MessageId, out var current) && ReferenceEquals(current, entry);
 
     private void StageCompletion(InboxMessage message, InboxDeadLetter? deadLetter, InboxRejection? rejection = null) =>
-        Emit(new()
-        {
-            Kind = InboxCommandKind.Complete,
-            MessageId = message.Envelope.MessageId,
-            SentAt = message.SentAt,
-            DeadLetter = deadLetter,
-            Rejection = rejection
-        });
+        Emit(new InboxCommand.Complete(message.Envelope.MessageId, message.SentAt, deadLetter, rejection));
 
     private void StageDeadLetter(InboxMessage message, string reason, int attemptCount)
     {
@@ -461,11 +449,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             return false;
         }
 
-        Emit(new()
-        {
-            Kind = InboxCommandKind.RemoveDeadLetters,
-            RemovedKeys = _deadLetters.Keys.Where(key => !retained.ContainsKey(key)).ToArray()
-        });
+        Emit(new InboxCommand.RemoveDeadLetters(_deadLetters.Keys.Where(key => !retained.ContainsKey(key)).ToArray()));
         return true;
     }
 
@@ -473,7 +457,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (!_deadLetters.ContainsKey(messageId)) return false;
-        Emit(new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [messageId] });
+        Emit(new InboxCommand.RemoveDeadLetters([messageId]));
         return true;
     }
 
@@ -557,7 +541,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         if (_stoppedCleanly)
         {
             // Consume the marker, so a later unclean stop of this activation is charged.
-            Emit(new() { Kind = InboxCommandKind.Resume });
+            Emit(InboxCommand.Resume.Instance);
             return true;
         }
 
@@ -591,7 +575,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         if (!_recovered || _pump.IsFailed || _stoppedCleanly || _messages.Count == 0) return;
         try
         {
-            Emit(new() { Kind = InboxCommandKind.CleanStop });
+            Emit(InboxCommand.CleanStop.Instance);
             await _pump.StateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
         }
         catch (Exception exception)

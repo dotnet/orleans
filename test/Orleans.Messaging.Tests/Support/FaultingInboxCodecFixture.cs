@@ -22,7 +22,7 @@ public sealed class FaultingInboxCodecFixture : MessagingClusterFixture
     {
         public void WriteSet(InboxCommand value, JournalStreamWriter writer)
         {
-            var snapshot = value.Kind == InboxCommandKind.Snapshot;
+            var snapshot = value is InboxCommand.Snapshot;
             if (snapshot == owner.FailOnSnapshot && owner.NextFailure is { } failure)
             {
                 owner.NextFailure = null;

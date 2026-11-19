@@ -21,29 +21,31 @@ public sealed class MessagingCommandSerializationTests
     {
         var command = CreateInboxCommands()[index];
         var json = JsonSerializer.Serialize(command, InboxJsonContext.Default.InboxCommand);
-        var fromJson = JsonSerializer.Deserialize(json, InboxJsonContext.Default.InboxCommand)!;
+        var fromJson = JsonSerializer.Deserialize(json, InboxJsonContext.Default.InboxCommand);
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = services.GetRequiredService<Serializer<InboxCommand>>();
         var fromBinary = serializer.Deserialize(serializer.SerializeToArray(command));
 
-        Assert.Equal(command.Kind, fromJson.Kind);
+        Assert.StartsWith("{\"kind\":", json, StringComparison.Ordinal);
+        Assert.Equal(command.Value!.GetType(), fromJson.Value!.GetType());
+        Assert.Equal(command.Value.GetType(), fromBinary.Value!.GetType());
         Assert.DoesNotContain("\"ProcessedAt\"", json, StringComparison.Ordinal);
         Assert.Equal(json, JsonSerializer.Serialize(fromJson, InboxJsonContext.Default.InboxCommand));
-        Assert.Equal(json, JsonSerializer.Serialize(fromBinary!, InboxJsonContext.Default.InboxCommand));
+        Assert.Equal(json, JsonSerializer.Serialize(fromBinary, InboxJsonContext.Default.InboxCommand));
     }
 
     [Fact]
     public void DeliverAt_RoundTripsThroughJsonAndOrleansSerializationAndIsOmittedWhenUnset()
     {
         var deliverAt = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.FromHours(2));
-        var scheduled = new InboxCommand { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", deliverAt) };
-        var immediate = new InboxCommand { Kind = InboxCommandKind.Accept, Message = InboxMessage("immediate") };
+        InboxCommand scheduled = new InboxCommand.Accept(InboxMessage("scheduled", deliverAt));
+        InboxCommand immediate = new InboxCommand.Accept(InboxMessage("immediate"));
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = services.GetRequiredService<Serializer<InboxCommand>>();
 
         var json = JsonSerializer.Serialize(scheduled, InboxJsonContext.Default.InboxCommand);
-        var fromJson = JsonSerializer.Deserialize(json, InboxJsonContext.Default.InboxCommand)!.Message!.Value.Envelope.DeliverAt;
-        var fromBinary = serializer.Deserialize(serializer.SerializeToArray(scheduled))!.Message!.Value.Envelope.DeliverAt;
+        var fromJson = ((InboxCommand.Accept)JsonSerializer.Deserialize(json, InboxJsonContext.Default.InboxCommand).Value!).Message.Envelope.DeliverAt;
+        var fromBinary = ((InboxCommand.Accept)serializer.Deserialize(serializer.SerializeToArray(scheduled)).Value!).Message.Envelope.DeliverAt;
         var immediateJson = JsonSerializer.Serialize(immediate, InboxJsonContext.Default.InboxCommand);
 
         Assert.Contains("\"DeliverAt\":", json, StringComparison.Ordinal);
@@ -52,8 +54,8 @@ public sealed class MessagingCommandSerializationTests
         Assert.Equal(deliverAt, fromBinary);
         Assert.Equal(deliverAt.Offset, fromBinary!.Value.Offset);
         Assert.DoesNotContain("DeliverAt", immediateJson, StringComparison.Ordinal);
-        Assert.Null(JsonSerializer.Deserialize(immediateJson, InboxJsonContext.Default.InboxCommand)!.Message!.Value.Envelope.DeliverAt);
-        Assert.Null(serializer.Deserialize(serializer.SerializeToArray(immediate))!.Message!.Value.Envelope.DeliverAt);
+        Assert.Null(((InboxCommand.Accept)JsonSerializer.Deserialize(immediateJson, InboxJsonContext.Default.InboxCommand).Value!).Message.Envelope.DeliverAt);
+        Assert.Null(((InboxCommand.Accept)serializer.Deserialize(serializer.SerializeToArray(immediate)).Value!).Message.Envelope.DeliverAt);
     }
 
     private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), SentAt = Now };
@@ -73,28 +75,26 @@ public sealed class MessagingCommandSerializationTests
         var rejection = new InboxRejection { Reason = "failed" };
         return
         [
-            new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
-            new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
-            new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now } },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now, DeadLetter = deadLetter },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now, DeadLetter = deadLetter, Rejection = rejection },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now.AddHours(1) },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now.AddHours(1), Rejection = rejection },
-            new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [MessageId.Create("orders", "dead")] },
-            new()
-            {
-                Kind = InboxCommandKind.Snapshot,
-                Snapshot = new()
-                {
-                    Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
-                    Processed =
-                    [
-                        new() { MessageId = MessageId.Create("orders", "done"), SentAt = Now },
-                        new() { MessageId = MessageId.Create("orders", "dead"), SentAt = Now, Rejection = rejection }
-                    ],
-                    DeadLetters = [deadLetter]
-                }
-            }
+            new InboxCommand.Accept(InboxMessage("accept")),
+            new InboxCommand.Accept(InboxMessage("scheduled", Now)),
+            new InboxCommand.Retry(MessageId.Create("orders", "retry"), new() { AttemptCount = 2, NextAttemptAt = Now }),
+            new InboxCommand.Complete(MessageId.Create("orders", "done"), Now, deadLetter, null),
+            new InboxCommand.Complete(MessageId.Create("orders", "dead"), Now, deadLetter, rejection),
+            new InboxCommand.Complete(MessageId.Create("orders", "done"), Now.AddHours(1), null, null),
+            new InboxCommand.Complete(MessageId.Create("orders", "dead"), Now.AddHours(1), null, rejection),
+            new InboxCommand.RemoveDeadLetters([MessageId.Create("orders", "dead")]),
+            new InboxCommand.AdvanceAdmissionFloor(Now),
+            InboxCommand.CleanStop.Instance,
+            InboxCommand.Resume.Instance,
+            new InboxCommand.Snapshot(
+                [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
+                [
+                    new() { MessageId = MessageId.Create("orders", "done"), SentAt = Now },
+                    new() { MessageId = MessageId.Create("orders", "dead"), SentAt = Now, Rejection = rejection }
+                ],
+                [deadLetter],
+                Now,
+                stoppedCleanly: true)
         ];
     }
 }
