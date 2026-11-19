@@ -23,6 +23,7 @@ public class ReminderCronDailyTransitionTests
             ("America/Santiago", 2025, 4, 5), ("America/Santiago", 2025, 9, 6),
             ("Asia/Beirut", 2025, 3, 30), ("Asia/Beirut", 2025, 10, 26),
             ("Pacific/Apia", 2011, 12, 30),
+            ("Test/YearBoundary", 2011, 12, 31),
         ];
         foreach (var transition in transitions)
             foreach (var hour in new[] { 0, 1, 2, 3, 12, 23 })

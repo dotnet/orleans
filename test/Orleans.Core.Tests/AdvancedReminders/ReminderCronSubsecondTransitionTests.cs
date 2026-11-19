@@ -28,9 +28,9 @@ public class ReminderCronSubsecondTransitionTests
     }
 
     [Fact]
-    public void ApiaDateLineTransition_RemovesTwentyFourLocalHours()
+    public void SkippedDateFixture_RemovesTwentyFourLocalHours()
     {
-        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific/Apia");
+        var zone = ReminderCronTestTimeZones.Resolve("Test/SkippedDate");
         var transition = new DateTime(2011, 12, 30, 10, 0, 0, DateTimeKind.Utc);
         Assert.Equal(new DateTime(2011, 12, 29, 23, 59, 59), TimeZoneInfo.ConvertTimeFromUtc(transition.AddSeconds(-1), zone));
         Assert.Equal(new DateTime(2011, 12, 31, 0, 0, 0), TimeZoneInfo.ConvertTimeFromUtc(transition, zone));

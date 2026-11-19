@@ -48,7 +48,7 @@ public static class ReminderCronAllocationTestCases
             yield return Case("30 2 * * *", "Africa/Casablanca", "2025-04-06T01:00:00Z", "2025-04-06T02:00:00Z");
             yield return Case("30 1 * * *", "Test/TwoHourSeason", "2025-03-30T00:00:00Z", "2025-03-30T01:00:00Z");
             yield return Case("30 2 * * *", "Test/TwoHourSeason", "2025-10-26T00:00:00Z", "2025-10-26T00:30:00Z");
-            yield return Case("0 0 * * *", "Pacific/Apia", "2011-12-30T09:00:00Z", "2011-12-30T10:00:00Z");
+            yield return Case("0 0 * * *", "Test/SkippedDate", "2011-12-30T09:00:00Z", "2011-12-30T10:00:00Z");
         }
     }
 

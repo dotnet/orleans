@@ -55,8 +55,20 @@ internal sealed class CronTimeZoneCalendar(TimeZoneInfo zone)
             var standard = zone.BaseUtcOffset + rule.BaseUtcOffsetDelta;
             AddOffset(standard.Ticks);
             AddOffset((standard + rule.DaylightDelta).Ticks);
-            localBoundaries.Add(rule.DateStart.Date.Ticks);
-            localBoundaries.Add(rule.DateEnd.Date.Ticks + TimeSpan.TicksPerDay);
+            var startDate = rule.DateStart.Date.Ticks;
+            var afterEndDate = rule.DateEnd.Date.Ticks + TimeSpan.TicksPerDay;
+            localBoundaries.Add(startDate);
+            localBoundaries.Add(afterEndDate);
+            // TimeZoneInfo can apply rule boundaries at UTC instants, including
+            // annual offset changes at UTC midnight in system time zones.
+            AddUtcBoundary(rule.DateStart.Ticks);
+            AddUtcBoundary(rule.DateEnd.Ticks);
+            AddUtcBoundary(afterEndDate);
+            if (rule.DateEnd.Kind == DateTimeKind.Utc)
+            {
+                AddUtcBoundary(rule.DateEnd.Ticks + 1);
+            }
+
             for (var year = Math.Max(1, date.Year - 1); year <= Math.Min(9999, date.Year + 1); year++)
             {
                 localBoundaries.Add(TransitionTicks(year, rule.DaylightTransitionStart));
@@ -72,11 +84,7 @@ internal sealed class CronTimeZoneCalendar(TimeZoneInfo zone)
         {
             foreach (var offset in offsets)
             {
-                var utc = local - offset;
-                if (utc > utcStart && utc < utcEnd)
-                {
-                    boundaries.Add(utc);
-                }
+                AddUtcBoundary(local - offset);
             }
         }
 
@@ -103,6 +111,14 @@ internal sealed class CronTimeZoneCalendar(TimeZoneInfo zone)
         }
 
         return [.. result];
+
+        void AddUtcBoundary(long utc)
+        {
+            if (utc > utcStart && utc < utcEnd)
+            {
+                boundaries.Add(utc);
+            }
+        }
 
         void AddOffset(long offset)
         {

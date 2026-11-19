@@ -38,7 +38,7 @@ public class ReminderCronTransitionTests
     [Fact]
     public void SkippedCalendarDate_CatchesUpAtFirstValidInstant()
     {
-        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific/Apia");
+        var zone = ReminderCronTestTimeZones.Resolve("Test/SkippedDate");
         var expression = ReminderCronExpression.Parse("0 9 30 12 *");
         Assert.Equal(new DateTime(2011, 12, 30, 10, 0, 0, DateTimeKind.Utc),
             expression.GetNextOccurrence(new DateTime(2011, 12, 29, 20, 0, 0, DateTimeKind.Utc), zone));
