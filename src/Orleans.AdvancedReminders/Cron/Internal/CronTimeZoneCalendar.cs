@@ -69,14 +69,24 @@ internal sealed class CronTimeZoneCalendar(TimeZoneInfo zone)
                 AddUtcBoundary(rule.DateEnd.Ticks + 1);
             }
 
+            var daylightStart = rule.DaylightTransitionStart;
+            var daylightEnd = rule.DaylightTransitionEnd;
             for (var year = Math.Max(1, date.Year - 1); year <= Math.Min(9999, date.Year + 1); year++)
             {
-                localBoundaries.Add(TransitionTicks(year, rule.DaylightTransitionStart));
-                var end = TransitionTicks(year, rule.DaylightTransitionEnd);
-                localBoundaries.Add(end);
-                // TZif rules can describe an inclusive millisecond, whereas Windows rules
-                // describe the first instant of the new offset. Include both boundaries.
-                localBoundaries.Add(end + TimeSpan.TicksPerMillisecond);
+                // Absolute-offset rules can omit recurring daylight transitions.
+                if (daylightStart != default)
+                {
+                    localBoundaries.Add(TransitionTicks(year, daylightStart));
+                }
+
+                if (daylightEnd != default)
+                {
+                    var end = TransitionTicks(year, daylightEnd);
+                    localBoundaries.Add(end);
+                    // TZif rules can describe an inclusive millisecond, whereas Windows rules
+                    // describe the first instant of the new offset. Include both boundaries.
+                    localBoundaries.Add(end + TimeSpan.TicksPerMillisecond);
+                }
             }
         }
 
