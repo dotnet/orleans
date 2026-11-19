@@ -23,7 +23,7 @@ public readonly struct InboxMessage
     /// <see cref="Envelope.DeliverAt"/> is later. It retains each processed record for <c>DeduplicationWindow</c> after
     /// the send time it accepted. A delivery of a tracked message receives its recorded outcome, whatever its send time.
     /// Before removing records, the inbox journals an admission floor, which only advances. It answers a message it
-    /// doesn't track with <see cref="DeliveryStatus.Expired"/>, staging nothing for it, when the message's send time is
+    /// doesn't track with <see cref="DeliveryResult.Expired"/>, staging nothing for it, when the message's send time is
     /// at or below that floor.
     /// </para>
     /// <para>
@@ -36,7 +36,7 @@ public readonly struct InboxMessage
     /// The inbox never accepts a delivered send time later than its own clock plus <c>DeduplicationWindow</c>. It rejects
     /// such a delivery of an untracked message above the admission floor with an <see cref="ArgumentOutOfRangeException"/>,
     /// staging nothing, so the sender retries it within its retry budget. A tracked message still receives its recorded
-    /// outcome, and an untracked message at or below the floor still receives <see cref="DeliveryStatus.Expired"/>.
+    /// outcome, and an untracked message at or below the floor still receives <see cref="DeliveryResult.Expired"/>.
     /// A message a grain sends to itself uses its clock, or the first time above the admission floor after a backward
     /// clock jump. Every processed record therefore becomes eligible for removal within twice the window of the
     /// receiver's clock, or just after the floor when a self-send follows a backward jump.

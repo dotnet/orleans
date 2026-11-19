@@ -24,8 +24,8 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
-        Assert.Equal(DeliveryStatus.Accepted,
-            (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(70, "committed")))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(
+            await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(70, "committed"))));
         _ = await Fixture.WaitForEffectCountAsync(receiver, 1);
         var pump = Fixture.GetPump(receiver);
         Assert.NotNull(await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.WakeupJobId(pump)));
@@ -55,8 +55,8 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         _ = await receiver.GetSnapshotAsync();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var deliverAt = JobClock.GetUtcNow() + Delay;
-        Assert.Equal(DeliveryStatus.Accepted,
-            (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(80, "outage")), deliverAt))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(
+            await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(80, "outage")), deliverAt)));
         await Fixture.CollectAsync(Fixture.GetGrainContext(receiver));
 
         // Durable Jobs gives up on other jobs after 5 failed runs; the pump job keeps retrying through a longer outage.
@@ -100,7 +100,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         var now = JobClock.GetUtcNow();
         using (var held = Fixture.HandlerProbe.Arm(grainId, HeldRoute))
         {
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(81, "first"), HeldRoute))).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(81, "first"), HeldRoute)));
             await WaitForBarrierAsync(receiver, held);
 
             // The live loop performs due work, so the wake-up is crash insurance due within RecheckDelay, and later
@@ -108,7 +108,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
             var jobs = Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId);
             Assert.Equal(scheduled + 1, jobs.Count);
             Assert.Equal(now + MessagingPump.RecheckDelay, jobs[^1].DueTime);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(82, "second")))).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(82, "second"))));
             Assert.Equal(scheduled + 1, Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId).Count);
         }
 
@@ -148,7 +148,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Empty((await Fixture.OnGrainAsync(receiver, () => Fixture.GetSnapshot(receiver))).Effects);
 
         acknowledgement.Release();
-        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await delivery);
         await ReactivateAsync(receiver);
         Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
         await AssertWakeupAtAsync(receiver, deliverAt);
@@ -176,7 +176,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Equal(0, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
 
         scheduling.Continue();
-        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await delivery);
         Assert.Equal(2, Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, receiver.GetGrainId()));
         Assert.Equal(deliverAt, Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, receiver.GetGrainId())).DueTime);
         await AssertWakeupAtAsync(receiver, deliverAt);
@@ -193,7 +193,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         var deliverAt = JobClock.GetUtcNow() + Delay;
         var envelope = Schedule(CreateEnvelope(receiver, NewMessage(1, "scheduled")), deliverAt);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
 
         // The acceptance is durable, but wake-ups before the due time leave the message pending and reschedule for it.
         await AssertWakeupAtAsync(receiver, deliverAt);
@@ -201,7 +201,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         var pending = await receiver.GetSnapshotAsync();
         Assert.Equal(1, pending.InboxCount);
         Assert.Empty(pending.Effects);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
 
         JobClock.Advance(Delay - TimeSpan.FromTicks(1));
         await AssertWakeupAtAsync(receiver, deliverAt);
@@ -216,7 +216,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
 
         // Late and duplicate wake-ups and redeliveries after completion change nothing.
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
@@ -229,12 +229,12 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         var later = JobClock.GetUtcNow() + Delay;
         var earlier = JobClock.GetUtcNow() + TimeSpan.FromMinutes(1);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(20, "later")), later))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(20, "later")), later)));
         var laterJob = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId));
         Assert.Equal(later, laterJob.DueTime);
 
         // The later wake-up does not cover a message due first, so its acceptance schedules an earlier one.
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(21, "earlier")), earlier))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(21, "earlier")), earlier)));
         var jobs = Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId);
         Assert.Equal(2, jobs.Count);
         Assert.Equal(earlier, jobs[1].DueTime);
@@ -248,7 +248,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunDuplicatePumpAsync(receiver)).Status);
 
         // Work due later than the earliest wake-up schedules nothing further.
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(22, "last")), later + Delay))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(22, "last")), later + Delay)));
         Assert.Equal(2, Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId).Count);
         await AssertWakeupAtAsync(receiver, later);
     }
@@ -267,7 +267,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
 
         var deliverAt = JobClock.GetUtcNow() + Delay;
         var envelope = Schedule(CreateEnvelope(receiver, NewMessage(2, "recovered")), deliverAt);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
 
         await ReactivateAsync(receiver);
 
@@ -279,19 +279,19 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
             () => InboxTestAccess.GetPendingMessages(inbox)[envelope.Envelope.MessageId].Message.Envelope.DeliverAt);
         Assert.Equal(deliverAt, recoveredDeliverAt);
         await AssertWakeupAtAsync(receiver, deliverAt);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
 
         // The recovered scheduled message counts toward MaxCapacity (2).
         var second = CreateEnvelope(receiver, NewMessage(4, "second"));
         using (var held = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), HeldRoute))
         {
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(3, "held"), HeldRoute))).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(3, "held"), HeldRoute)));
             await WaitForBarrierAsync(receiver, held);
-            Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, second)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await DeliverAsync(receiver, second));
         }
 
         Assert.Equal("held", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, second)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, second));
         var unscheduled = await Fixture.WaitForEffectCountAsync(receiver, 2);
         Assert.DoesNotContain(unscheduled.Effects, effect => effect.Value == "recovered");
 
@@ -314,27 +314,27 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         for (var sequence = 10; sequence < 12; sequence++)
         {
             var scheduled = Schedule(CreateEnvelope(receiver, NewMessage(sequence, $"scheduled-{sequence}")), deliverAt);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, scheduled)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, scheduled));
         }
 
         var laterScheduled = Schedule(CreateEnvelope(receiver, NewMessage(12, "scheduled-12")), deliverAt);
         var unscheduled = CreateEnvelope(receiver, NewMessage(20, "unscheduled"));
         var past = Schedule(CreateEnvelope(receiver, NewMessage(21, "past")), DateTimeOffset.MinValue);
-        Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, laterScheduled)).Status);
-        Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, unscheduled)).Status);
-        Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, past)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await DeliverAsync(receiver, laterScheduled));
+        DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await DeliverAsync(receiver, unscheduled));
+        DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await DeliverAsync(receiver, past));
         Assert.Equal(2, (await receiver.GetSnapshotAsync()).InboxCount);
 
         JobClock.Advance(Delay);
         _ = await Fixture.RunPumpAsync(receiver);
         Assert.Equal(0, (await Fixture.WaitForEffectCountAsync(receiver, 2)).InboxCount);
 
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, laterScheduled)).Status);
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, unscheduled)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, laterScheduled));
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, unscheduled));
         laterScheduled = laterScheduled with { SentAt = JobClock.GetUtcNow() };
         unscheduled = unscheduled with { SentAt = JobClock.GetUtcNow() };
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, laterScheduled)).Status);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, unscheduled)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, laterScheduled));
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, unscheduled));
         var all = await Fixture.WaitForEffectCountAsync(receiver, 4);
         Assert.All(all.Effects, static effect => Assert.Equal(1, effect.Count));
     }
@@ -346,10 +346,10 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         var deliverAt = JobClock.GetUtcNow() + Delay;
         var envelope = Schedule(CreateEnvelope(receiver, NewMessage(30, "identity")), deliverAt);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate,
-            (await DeliverAsync(receiver, Schedule(envelope, deliverAt.ToOffset(TimeSpan.FromHours(-7))))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(
+            await DeliverAsync(receiver, Schedule(envelope, deliverAt.ToOffset(TimeSpan.FromHours(-7)))));
         await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, Schedule(envelope, deliverAt + TimeSpan.FromSeconds(1))));
         await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, Schedule(envelope, null)));
         Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
@@ -362,7 +362,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
 
         // Completed IDs are deduplicated regardless of content.
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, Schedule(envelope, deliverAt + Delay))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, Schedule(envelope, deliverAt + Delay)));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
@@ -373,7 +373,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         var before = await receiver.GetSnapshotAsync();
         var deliverAt = JobClock.GetUtcNow() + Delay;
         var envelope = Schedule(CreateEnvelope(receiver, NewMessage(50, "collected")), deliverAt);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await AssertWakeupAtAsync(receiver, deliverAt);
 
         // Work which is due later does not keep the activation alive; the durable wake-up reactivates it.

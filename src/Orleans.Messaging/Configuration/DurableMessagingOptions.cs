@@ -29,7 +29,7 @@ public class DurableMessagingOptions
 
     /// <summary>
     /// Gets or sets the maximum number of pending inbox messages.
-    /// When this limit is reached, new deliveries return <c>DeliveryResult.Backpressured()</c>.
+    /// When this limit is reached, new deliveries return <see cref="DeliveryResult.Backpressured"/>.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -56,8 +56,8 @@ public class DurableMessagingOptions
 
     /// <summary>
     /// Gets or sets how long after a message's send time the receiving inbox retains its processed record and admits
-    /// deliveries of it. A tracked processed message is answered with <c>DeliveryResult.Duplicate()</c>, or, when an
-    /// inbox sink rejected it on delivery, with the same <c>DeliveryResult.DeadLettered</c> reason and code.
+    /// deliveries of it. A tracked processed message is answered with <see cref="DeliveryResult.Duplicate"/>, or, when an
+    /// inbox sink rejected it on delivery, with the same <see cref="DeliveryResult.DeadLettered"/> reason and code.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -68,7 +68,7 @@ public class DurableMessagingOptions
     /// The inbox advances a journaled admission floor to its current clock minus this window; the floor only advances
     /// and survives recovery and migration. Pending messages stay until they are processed. A processed record becomes
     /// eligible for removal once its <see cref="InboxMessage.SentAt"/> is at or below the durable floor. A message the
-    /// inbox doesn't track whose send time is at or below the floor receives <see cref="DeliveryStatus.Expired"/>,
+    /// inbox doesn't track whose send time is at or below the floor receives <see cref="DeliveryResult.Expired"/>,
     /// including after a backward clock jump. The inbox never accepts a delivered send time later than its clock plus
     /// this window: it rejects such a delivery without staging anything when the message is untracked and above the
     /// admission floor. A grain's messages to itself use its clock, or the first time above the floor after a backward
@@ -92,7 +92,7 @@ public class DurableMessagingOptions
     /// <remarks>
     /// <para>
     /// The outbox doubles this interval after each failed delivery attempt, including when the target inbox returns
-    /// <c>DeliveryResult.Backpressured()</c>, up to 64 times this interval. The inbox applies the same backoff after a
+    /// <see cref="DeliveryResult.Backpressured"/>, up to 64 times this interval. The inbox applies the same backoff after a
     /// handler fails.
     /// </para>
     /// <para>
@@ -136,12 +136,12 @@ public class DurableMessagingOptions
     /// <para>
     /// The outbox journals the message's <see cref="InboxMessage.SentAt"/> when it stages the send; retries,
     /// backpressure, and recovery keep it. The timeout follows the Durable Jobs clock; a jump can end retries early or
-    /// prolong them. A timeout or <see cref="DeliveryStatus.Expired"/> leaves the receiver's earlier delivery outcome
+    /// prolong them. A timeout or <see cref="DeliveryResult.Expired"/> leaves the receiver's earlier delivery outcome
     /// unknown. A source's <see cref="IOutboxMessageSource.OnRetired"/> stages application responses atomically with
-    /// retirement; see <see cref="OutboxMessageRetirementStatus.DeadLettered"/>.
+    /// retirement; see <see cref="OutboxMessageRetirement.DeadLettered"/>.
     /// </para>
     /// <para>
-    /// The outbox logs each <c>DeliveryResult.HandlerNotFound()</c> answer as an error.
+    /// The outbox logs each <see cref="DeliveryResult.HandlerNotFound"/> answer as an error.
     /// </para>
     /// </remarks>
     /// <value>

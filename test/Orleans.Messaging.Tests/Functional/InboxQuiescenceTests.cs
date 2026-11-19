@@ -18,7 +18,7 @@ public sealed class InboxQuiescenceTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/delete-ack");
         var first = CreateEnvelope(receiver, NewMessage(160, "first"), "messages/delete-ack");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, first));
         await handler.WaitUntilEnteredAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
@@ -28,7 +28,7 @@ public sealed class InboxQuiescenceTests : MessagingBehaviorTestBase
         var secondDelivery = DeliverAsync(receiver, second);
 
         handler.Release();
-        Assert.Equal(DeliveryStatus.Accepted, (await secondDelivery).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await secondDelivery);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 2);
         Assert.Equal(2, completed.ProcessedMessageCount);
         Assert.False(grain.DeactivationFailure.Task.IsCompleted);
@@ -78,7 +78,7 @@ public sealed class InboxQuiescenceTests : MessagingBehaviorTestBase
         Assert.Empty(fresh.Effects);
         Assert.Equal(0, fresh.OutboxCount);
         var envelope = CreateEnvelope(receiver, NewMessage(191, "new-state"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var after = await Fixture.WaitForEffectCountAsync(receiver, 1);
         _ = await receiver.GetSnapshotAsync();
         Assert.Equal(fresh.ActivationId, after.ActivationId);

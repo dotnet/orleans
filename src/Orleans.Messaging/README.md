@@ -112,8 +112,8 @@ construction or activation setup, before journal recovery.
   returns `false` for a message that isn't the source's. A source withdraws a pending
   message with `IOutbox.Withdraw(messageId)`, staged in the same journal write that
   releases its payload. When the message retires, `OnRetired` reports an
-  `OutboxMessageRetirement` whose `Status` is `Delivered`, `Rejected` (with the
-  receiver's reason and code), or `DeadLettered` (with the outbox's reason). After the
+  `OutboxMessageRetirement`: `Delivered`, `Rejected` (with the receiver's reason and
+  code), or `DeadLettered` (with the outbox's reason). After the
   send, a source that throws, returns an invalid message, or no longer provides the
   message dead-letters that entry alone, with `OnRetired` in the same journal write; an
   exception during `Send` propagates without staging anything. A recovered entry that
@@ -126,7 +126,7 @@ construction or activation setup, before journal recovery.
 - `IInbox.Register(IInboxMessageSink)` adds a sink. After validation and
   deduplication, the inbox offers each message, including self-sent and scheduled
   messages, to the sinks in order. The first sink whose `TryAccept` returns `true`
-  reports the `DeliveryResult`:
+  reports the `DeliveryResult` case:
   - `Accepted`: the sink staged the message in its own state. The inbox journals
     only the processed record in the same write and returns `Accepted` once it is
     durable.
@@ -136,7 +136,7 @@ construction or activation setup, before journal recovery.
   - `DeadLettered`: the sink rejects the message with a reason and an optional
     application-defined `Code`. This is the only permanent rejection.
 
-  A sink that throws or reports another status leaves the outcome unknown: the inbox
+  A sink that throws or reports another case leaves the outcome unknown: the inbox
   stages nothing and fails the delivery, so the sender retries it.
 
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
@@ -154,7 +154,7 @@ construction or activation setup, before journal recovery.
 
 `IMessagingExtension.DeliverAsync` delivers a message to a grain's inbox. Accepted inbox
 messages are processed only after the receiver's journal write completes. Each
-receiver returns a `DeliveryResult`:
+receiver returns one `DeliveryResult` case:
 
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.

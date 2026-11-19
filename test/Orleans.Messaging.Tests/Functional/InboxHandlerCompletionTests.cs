@@ -53,7 +53,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         await processed;
         Assert.Equal(1, calls);
         Assert.Equal(1, Fixture.Metrics.GetCount(counter, "dead_lettered"));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
         Assert.Equal(1, calls);
         await AssertHealthyAsync(rig);
         await DeactivateAsync(rig);
@@ -65,7 +65,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         Assert.Empty(recovered.Effects);
         Assert.Equal(0, recovered.InboxCount);
         Assert.Equal(1, recovered.ProcessedMessageCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
         var recoveredContext = Fixture.GetGrainContext(rig.Receiver);
         await OnTurnAsync(recoveredContext, async () =>
         {
@@ -85,7 +85,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
             await recoveredContext.ActivationServices.GetRequiredService<IJournaledStateManager>().WriteStateAsync();
             Assert.Empty(diagnostics.InboxDeadLetters);
         });
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
     }
 
     [Collection(MessagingClusterCollection.Name)]
@@ -107,7 +107,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
             var retried = Fixture.Metrics.WaitForCountAsync(counter, 1, "retry");
 
             // The first attempt ends without an outcome, which fails its activation; recovery charges it.
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, input)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, input));
             await failed.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
             await receiver.GetSnapshotAsync();
             await retried;
@@ -117,7 +117,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
 
             var terminated = Fixture.Metrics.WaitForCountAsync(counter, 1, "dead_lettered");
             Fixture.Clock.Advance(TimeSpan.FromHours(1));
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, input));
             await terminated;
             var snapshot = await receiver.GetSnapshotAsync();
             Assert.Equal(2, handler.Attempts);
@@ -130,7 +130,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
             Assert.Equal(2, deadLetter.AttemptCount);
             Assert.Equal(1, Fixture.Metrics.GetCount(counter, "retry"));
             Assert.Equal(1, Fixture.Metrics.GetCount(counter, "dead_lettered"));
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, input));
             Assert.Equal(2, handler.Attempts);
         }
 
@@ -260,7 +260,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         }
         else
         {
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
             Assert.Empty(rig.Effects);
             Assert.Empty(rig.Outbox);
             await AssertHealthyAsync(rig);
@@ -296,7 +296,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Equal(1, recovered.OutboxCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
     }
 
     [Fact]
@@ -388,7 +388,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         }
 
         AssertSuccess(rig, input, outputCount: 1);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
         await AssertHealthyAsync(rig);
         await DeactivateAsync(rig);
         var replay = await rig.Receiver.GetSnapshotAsync();
@@ -507,7 +507,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         await OnTurnAsync(rig.Context, () =>
             rig.Grain.HandlerOverride = second);
         var two = CreateEnvelope(rig.Receiver, NewMessage(502, "next"), "async/next");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, two)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, two));
         await WaitAsync(second.Entered.Task);
         second.Release.TrySetResult();
         var snapshot = await Fixture.WaitForEffectCountAsync(rig.Receiver, 2);
@@ -610,7 +610,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     private async Task<InboxMessage> DeliverAsync(Rig rig)
     {
         var input = CreateEnvelope(rig.Receiver, NewMessage(501, "async-handler"), "async/handler");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, input)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, input));
         await WaitAsync(rig.Handler.Entered.Task);
         return input;
     }

@@ -55,9 +55,9 @@ public sealed class InboxEnvelopeValidationTests : MessagingBehaviorTestBase
         var template = CreateEnvelope(receiver, NewMessage(187, "explicit-identity"));
         var envelope = TestApplicationProtocol.With(template, Sessions,
             messageId: MessageId.Parse("tenant/test/command/explicit", null));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
     }
 
     private static Task OnTurnAsync(IGrainContext context, Action action)

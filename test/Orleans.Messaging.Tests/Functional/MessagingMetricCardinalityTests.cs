@@ -23,7 +23,7 @@ public sealed class MessagingMetricCardinalityTests : MessagingBehaviorTestBase
         // The pump runs alongside grain calls, so holding the handler keeps the accepted message pending.
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/metric-pending");
         var envelope = CreateEnvelope(receiver, NewMessage(451, "duplicate-receipts"), "messages/metric-pending");
-        Assert.Equal(DeliveryStatus.Accepted, (await StartDelivery()).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await StartDelivery());
         await handler.WaitUntilEnteredAsync();
         Assert.NotEmpty(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, receiver.GetGrainId()));
         var pending = Fixture.GetSnapshot(receiver);
@@ -33,14 +33,14 @@ public sealed class MessagingMetricCardinalityTests : MessagingBehaviorTestBase
         using var probe = new MessageMetricListener(services.GetRequiredService<OrleansInstruments>().Meter);
         var grainType = receiver.GetGrainId().Type.ToString();
 
-        Assert.Equal(DeliveryStatus.Duplicate, (await StartDelivery()).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await StartDelivery());
         Assert.Single(probe.Read("inbox-messages-received")).AssertCounter(grainType, "duplicate");
         handler.Release();
         var processed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(0, processed.InboxCount);
         Assert.Equal(1, processed.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(processed.Effects).Count);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
         var receipts = probe.Read("inbox-messages-received");
         Assert.Equal(2, receipts.Length);
         Assert.All(receipts, receipt => receipt.AssertCounter(grainType, "duplicate"));
@@ -77,12 +77,12 @@ public sealed class MessagingMetricCardinalityTests : MessagingBehaviorTestBase
             var unknown = $"unknown/{Guid.NewGuid():N}";
             routes.Add(unknown);
             var rejected = CreateEnvelope(missingHandler, NewMessage(index, "unknown"), unknown);
-            Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(missingHandler, rejected)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.HandlerNotFound>(await DeliverAsync(missingHandler, rejected));
             Assert.Equal(unknown, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), rejected).Route);
             var valid = $"messages/cardinality/{Guid.NewGuid():N}";
             routes.Add(valid);
             var accepted = CreateEnvelope(receiver, NewMessage(index, "accepted"), valid);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, accepted)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, accepted));
             Assert.Equal(valid, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), accepted).Route);
             await Fixture.WaitForEffectCountAsync(receiver, index + 1);
         }

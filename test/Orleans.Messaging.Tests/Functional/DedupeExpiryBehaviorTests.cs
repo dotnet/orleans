@@ -26,22 +26,22 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         var original = new TestMessage(TestApplicationProtocol.NewMessageId(), 15, "expires");
         var first = CreateEnvelope(receiver, original);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, first));
         await fixture.WaitForEffectCountAsync(receiver, 1);
         await WaitForIdleInboxAsync(receiver);
         fixture.Clock.Advance(TimeSpan.FromMinutes(10) - TimeSpan.FromTicks(1));
 
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, first)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, first));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
 
         fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, first)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, first));
         var state = await receiver.GetSnapshotAsync();
 
         Assert.Equal(1, state.Effects.Single(effect => effect.LogicalId == original.LogicalId).Count);
         fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
         await receiver.RetryWriteStateAsync();
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, first)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, first));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
@@ -53,7 +53,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
             receiver,
             new TestMessage(TestApplicationProtocol.NewMessageId(), 16, "failed-expiry-replacement"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await fixture.WaitForEffectCountAsync(receiver, 1);
         await WaitForIdleInboxAsync(receiver);
         fixture.Clock.Advance(TimeSpan.FromMinutes(10));
@@ -80,7 +80,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
 
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
         var retried = await receiver.GetSnapshotAsync();
         Assert.Equal(1, Assert.Single(retried.Effects).Count);
     }

@@ -109,8 +109,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             // A sender whose answer was lost delivers again, so it receives the rejection which a sink first answered.
             return rejection is not null
-                ? DeliveryResult.DeadLettered(rejection.Reason, rejection.Code)
-                : DeliveryResult.Duplicate();
+                ? new DeliveryResult.DeadLettered(rejection.Reason, rejection.Code)
+                : DeliveryResult.Duplicate.Instance;
         }
 
         // Retained identities precede expiration: a lost acknowledgement may belong to pending or completed work.
@@ -122,14 +122,14 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             if (_admissionFloor > _durableAdmissionFloor) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
             Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "expired");
             LogMessageExpired(Logger, key, GrainContext.GrainId, message.SentAt, _admissionFloor);
-            return DeliveryResult.Expired();
+            return DeliveryResult.Expired.Instance;
         }
 
         // Sink-owned messages never occupy inbox capacity and need no handler. A sink's duplicate can still be staged,
         // so every outcome except backpressure is reported once the write is durable.
         if (StageSinkAcceptance(message) is { } sinkResult)
         {
-            if (sinkResult.Status != DeliveryStatus.Backpressured) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
+            if (sinkResult is not DeliveryResult.Backpressured) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
             return sinkResult;
         }
 
@@ -137,21 +137,21 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         if (_messages.Count >= Options.MaxCapacity)
         {
             Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "backpressured");
-            return DeliveryResult.Backpressured();
+            return DeliveryResult.Backpressured.Instance;
         }
 
         if (_handlers.IsEmpty)
         {
             Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "handler_not_found");
             LogHandlerNotFound(Logger, key, GrainContext.GrainId);
-            return DeliveryResult.HandlerNotFound();
+            return DeliveryResult.HandlerNotFound.Instance;
         }
 
         Emit(new InboxCommand.Accept(message));
         await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
         Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, "accepted");
         LogMessageAccepted(Logger, key, GrainContext.GrainId);
-        return DeliveryResult.Accepted();
+        return DeliveryResult.Accepted.Instance;
     }
 
     /// <summary>
@@ -174,7 +174,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The inbox holds a different pending command with the same ID, or an inbox sink backpressured the message or
-    /// reported an unsupported status.
+    /// reported an unsupported result.
     /// </exception>
     internal void StageLocal(InboxMessage message)
     {
@@ -196,7 +196,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
         if (StageSinkAcceptance(message) is { } sinkResult)
         {
-            if (sinkResult.Status == DeliveryStatus.Backpressured)
+            if (sinkResult is DeliveryResult.Backpressured)
             {
                 throw new InvalidOperationException(
                     $"An inbox message sink backpressured message '{message.Envelope.MessageId}', which the grain sent to itself.");
@@ -228,38 +228,42 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// An accepted message journals only its processed record, in the write which commits the sink's staged changes.
     /// A duplicate or backpressured message stages nothing. A sink which rejects the message stages nothing itself, so
     /// the inbox records the rejection as the message's processed outcome. A sink exception, or an unsupported
-    /// status, leaves the outcome unknown: it propagates to the caller with nothing staged, so the sender retries.
+    /// result, leaves the outcome unknown: it propagates to the caller with nothing staged, so the sender retries.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">A sink reported an unsupported delivery status.</exception>
+    /// <exception cref="InvalidOperationException">A sink reported an unsupported delivery result.</exception>
     private DeliveryResult? StageSinkAcceptance(InboxMessage message)
     {
         var key = message.Envelope.MessageId;
         foreach (var sink in _sinks)
         {
             if (!sink.TryAccept(message, out var result)) continue;
-            if (result.Status is DeliveryStatus.Duplicate or DeliveryStatus.Backpressured)
+            DeliveryResult.DeadLettered? rejection = null;
+            switch (result)
             {
-                Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, result.Status == DeliveryStatus.Duplicate ? "duplicate" : "backpressured");
-                return result;
+                case DeliveryResult.Duplicate or DeliveryResult.Backpressured:
+                    Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, result is DeliveryResult.Duplicate ? "duplicate" : "backpressured");
+                    return result;
+                case DeliveryResult.DeadLettered deadLettered:
+                    rejection = deadLettered;
+                    break;
+                case DeliveryResult.Accepted:
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"The inbox message sink reported the unsupported delivery result '{result.Value?.GetType().Name ?? "none"}'.");
             }
 
-            if (result.Status is not (DeliveryStatus.Accepted or DeliveryStatus.DeadLettered))
-            {
-                throw new InvalidOperationException($"The inbox message sink reported the unsupported delivery status '{result.Status}'.");
-            }
-
-            var accepted = result.Status == DeliveryStatus.Accepted;
-            var reason = result.Message ?? "The inbox message sink rejected the message.";
+            var accepted = rejection is null;
             try
             {
-                if (accepted)
+                if (rejection is null)
                 {
                     StageCompletion(message, deadLetter: null);
                 }
                 else
                 {
-                    LogSinkRejected(Logger, key, GrainContext.GrainId, reason, result.Code);
-                    StageCompletion(message, deadLetter: null, new() { Reason = reason, Code = result.Code });
+                    LogSinkRejected(Logger, key, GrainContext.GrainId, rejection.Reason, rejection.Code);
+                    StageCompletion(message, deadLetter: null, new() { Reason = rejection.Reason, Code = rejection.Code });
                 }
             }
             catch (Exception exception)
@@ -272,9 +276,9 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             Shared.Instruments.OnInboxMessageReceived(_pump.GrainTypeTag, accepted ? "accepted" : "dead_lettered");
             Shared.Instruments.OnInboxMessageProcessed(_pump.GrainTypeTag, accepted ? "success" : "dead_lettered");
-            if (!accepted) return DeliveryResult.DeadLettered(reason, result.Code);
+            if (rejection is not null) return rejection;
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
-            return DeliveryResult.Accepted();
+            return DeliveryResult.Accepted.Instance;
         }
 
         return null;

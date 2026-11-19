@@ -22,13 +22,13 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1042", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = TestApplicationProtocol.With(original, Sessions, sender: GrainId.Create("forwarder", "second"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, original));
         await WaitAsync(handler.Entered.Task);
         var writes = Writes(rig);
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, rig.Context.GrainId);
         byte[] storedPayload = null!;
         await OnTurnAsync(rig.Context, () => storedPayload = Assert.Single(rig.Pending).Value.Message.Envelope.Payload);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(rig, repeated)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverOnTurnAsync(rig, repeated));
         await OnTurnAsync(rig.Context, () =>
         {
             Assert.True(rig.Inbox.MessageState.TryGetValue(key, out var entry));
@@ -69,7 +69,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
             GrainId.Create("forwarder", "other"));
         var conflict = difference == "body" ? replacement : TestApplicationProtocol.With(original, Sessions,
             sender: TestApplicationProtocol.Sender(Sessions, replacement.Envelope), subject: conflictingSubject);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, original));
         await WaitAsync(handler.Entered.Task);
         var writes = Writes(rig);
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, rig.Context.GrainId);
@@ -96,7 +96,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
             await rig.Manager.WriteStateAsync(CancellationToken.None);
         });
         Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(rig, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverOnTurnAsync(rig, original));
         handler.Release.TrySetResult();
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         Assert.Equal(1, handler.Calls);
@@ -116,7 +116,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
             GrainId.Create("forwarder", "new-owner")) with
         { SentAt = original.SentAt };
         handler.Release.TrySetResult();
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, original));
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         await Fixture.WaitForInboxCountAsync(rig.Receiver, 0);
         var prior = rig.Context;
@@ -129,7 +129,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         }
         var writes = Writes(rig);
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, rig.Context.GrainId);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, repeated)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, repeated));
         var completed = await rig.Receiver.GetSnapshotAsync();
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);
@@ -149,9 +149,9 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         for (var index = 0; index < keys.Length; index++)
         {
             var command = Create(rig, keys[index], "inventory.command.v1", $"command-{index}");
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, command)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, command));
             await Fixture.WaitForEffectCountAsync(rig.Receiver, index + 1);
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, command)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, command));
         }
         var completed = await rig.Receiver.GetSnapshotAsync();
         Assert.Equal(3, completed.Effects.Count);
@@ -173,16 +173,16 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1049", "reserve");
         var one = Create(first, key, "inventory.reserve.v1", "first-receiver");
         var two = Create(second, key, "inventory.reserve.v1", "second-receiver");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(first.Receiver, one)).Status);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(second.Receiver, two)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(first.Receiver, one));
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(second.Receiver, two));
         var firstOutcome = await Fixture.WaitForEffectCountAsync(first.Receiver, 1);
         var secondOutcome = await Fixture.WaitForEffectCountAsync(second.Receiver, 1);
         Assert.Equal(key, Assert.Single(firstOutcome.Effects).LogicalId);
         Assert.Equal(key, Assert.Single(secondOutcome.Effects).LogicalId);
         Assert.Equal(1, firstOutcome.ProcessedMessageCount);
         Assert.Equal(1, secondOutcome.ProcessedMessageCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(first.Receiver, one)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(second.Receiver, two)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(first.Receiver, one));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(second.Receiver, two));
         Assert.Equal(1, firstHandler.Calls);
         Assert.Equal(1, secondHandler.Calls);
     }
@@ -194,7 +194,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         using var handler = rig.Handler;
         var key = MessageId.Create("tenant", "orders", "1046", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, original));
         await WaitAsync(handler.Entered.Task);
         await OnTurnAsync(rig.Context, () =>
         {
@@ -218,7 +218,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
             sender: GrainId.Create("forwarder", "after-replay"));
         var conflict = Create(recovered, key, "inventory.reserve.v1", "changed",
             GrainId.Create("forwarder", "after-replay"));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(recovered, repeated)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverOnTurnAsync(recovered, repeated));
         await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverOnTurnAsync(recovered, conflict));
         Assert.Equal(TestApplicationProtocol.Sender(Sessions, original.Envelope), TestApplicationProtocol.Sender(Sessions, Assert.Single(recovered.Pending).Value.Message.Envelope));
         Assert.Empty(recovered.Processed);
@@ -237,7 +237,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1048", "invalid-command");
         var body = new TestMessage(key, 611, "poison", ThrowDuringPreparation: true);
         var original = CreateEnvelope(receiver, body);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, original));
         var deadLetter = Assert.Single((await Fixture.WaitForDeadLetterCountAsync(receiver, 1)).InboxDeadLetters);
         Assert.Equal(key, deadLetter.MessageId);
         var old = Fixture.GetGrainContext(receiver);
@@ -247,14 +247,14 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         Assert.Equal(key, Assert.Single(recovered.InboxDeadLetters).MessageId);
         var duplicate = TestApplicationProtocol.With(original, Sessions,
             sender: GrainId.Create("forwarder", "deadletter"), subject: "another.subject.v1");
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, duplicate)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, duplicate));
         Assert.True(await receiver.RemoveInboxDeadLetterAsync(key));
         Assert.False(await receiver.RemoveInboxDeadLetterAsync(key));
         var current = Fixture.GetGrainContext(receiver);
         await receiver.RequestDeactivationAsync();
         await WaitAsync(current.Deactivated);
         Assert.Empty((await receiver.GetSnapshotAsync()).InboxDeadLetters);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, duplicate)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, duplicate));
     }
 
     [Theory]
@@ -269,14 +269,14 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var raw = TestApplicationProtocol.With(envelope, Sessions, removeSubject: true, removeSender: removeSender);
         var bytes = envelope.Envelope.Payload.ToArray();
         handler.Release.TrySetResult();
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverOnTurnAsync(rig, raw)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverOnTurnAsync(rig, raw));
         var completed = await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);
         Assert.Null(raw.Envelope.Subject);
         if (removeSender) Assert.DoesNotContain("sender", Assert.IsType<Dictionary<string, byte[]>>(raw.Envelope.Headers));
         Assert.Equal(bytes, raw.Envelope.Payload.ToArray());
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(rig, raw)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverOnTurnAsync(rig, raw));
         Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
     }
 
@@ -339,11 +339,11 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
             _ => "inventory.reserve.v1"
         };
         var envelope = Create(rig, key, subject, "maximum");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, envelope));
         var completed = await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, envelope));
     }
 
     [Fact]
@@ -357,13 +357,13 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var repeated = Create(rig, key, "inventory.reserve.v2", "changed",
             GrainId.Create("forwarder", "new")) with
         { SentAt = original.SentAt };
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, original));
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         await Fixture.WaitForInboxCountAsync(rig.Receiver, 0);
         Fixture.Clock.Advance(TimeSpan.FromMinutes(10) - TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, repeated)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, repeated));
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, repeated)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, repeated));
         var completed = await rig.Receiver.GetSnapshotAsync();
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);

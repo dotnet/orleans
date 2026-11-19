@@ -23,7 +23,7 @@ public sealed class InboxStateEncodingTests : MessagingBehaviorTestBase
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IOutbox>();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/complete-codec-fault");
         var envelope = CreateEnvelope(receiver, NewMessage(204, "complete-codec-fault"), "messages/complete-codec-fault");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
@@ -57,7 +57,7 @@ public sealed class InboxStateEncodingTests : MessagingBehaviorTestBase
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/error-codec-fault");
         var message = NewMessage(205, "error-codec-fault") with { ThrowOnceDuringPreparation = true };
         var envelope = CreateEnvelope(receiver, message, "messages/error-codec-fault");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
@@ -128,7 +128,7 @@ public sealed class InboxStateEncodingTests : MessagingBehaviorTestBase
             Assert.Equal(0, current.ProcessedMessageCount);
         }
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
     }
 }

@@ -151,7 +151,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
         IMessagingExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
         Task<DeliveryResult> initial = null!;
         await OnTurnAsync(context, () => initial = extension.DeliverAsync(seed, TestContext.Current.CancellationToken).AsTask());
-        Assert.Equal(DeliveryStatus.Accepted, (await initial).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await initial);
         await handler.WaitUntilEnteredAsync();
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
         var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
@@ -166,7 +166,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
         Assert.Equal(2, grain.GetSnapshotForTest().InboxCount);
         storage.Release();
         await preceding;
-        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await delivery);
         Assert.Equal(1, grain.Captures[0].InboxCount);
         Assert.Equal(2, grain.Captures[1].InboxCount);
         Assert.Equal(2, grain.GetSnapshotForTest().InboxCount);
@@ -190,7 +190,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
         storage.Release();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, completed.ProcessedMessageCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(rejected.ActivationId, recovered.ActivationId);
         Assert.Equal(0, recovered.InboxCount);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
     }
 
@@ -246,7 +246,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
         var route = "messages/" + routeSuffix;
         var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var envelope = CreateEnvelope(receiver, NewMessage(109, routeSuffix) with { ForwardTo = GrainId.Create("output", routeSuffix) }, route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IOutbox>();
         var preparation = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route + "/application-preparation");

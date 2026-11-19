@@ -32,9 +32,9 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         var failed = fixture.GetGrainContext(receiver);
 
         // The poison's attempt fails its activation, and recovery charges it; the message keeps the only slot.
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, poison)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, poison));
         await failed.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, rejected)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await DeliverAsync(receiver, rejected));
         var full = await receiver.GetSnapshotAsync();
         Assert.Equal(1, full.InboxCount);
         Assert.Empty(full.Effects);
@@ -50,15 +50,15 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         // The retry runs after its window closes and fails again; the recovery which charges it dead-letters the message.
         fixture.Clock.Advance(TimeSpan.FromHours(2));
         failed = fixture.GetGrainContext(receiver);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, poison)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, poison));
         await failed.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, rejected)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, rejected));
         var deadLettered = await receiver.GetSnapshotAsync();
         Assert.Equal(0, deadLettered.InboxCount);
         Assert.Equal(2, Assert.Single(deadLettered.InboxDeadLetters).AttemptCount);
         rejected = rejected with { SentAt = fixture.JobNow };
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, rejected)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, rejected));
         var recovered = await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal("accepted-after-capacity", Assert.Single(recovered.Effects).Value);
         Assert.Equal(2, Assert.Single(recovered.InboxDeadLetters).AttemptCount);

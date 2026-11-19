@@ -31,7 +31,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var messageId = envelope.Envelope.MessageId;
         var start = JobClock.GetUtcNow();
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var state = await RecoverChargedAttemptAsync(receiver, failed, messageId);
         Assert.Equal(1, state.AttemptCount);
         Assert.Equal(start + RetryDelay, state.NextAttemptAt);
@@ -62,7 +62,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var messageId = envelope.Envelope.MessageId;
         var now = JobClock.GetUtcNow();
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var state = await RecoverChargedAttemptAsync(receiver, failed, messageId);
         Assert.Equal(1, state.AttemptCount);
         Assert.Equal(now + RetryDelay, state.NextAttemptAt);
@@ -84,7 +84,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
 
         // Spurious wake-ups with no work complete immediately and change nothing.
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
@@ -98,7 +98,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var messageId = envelope.Envelope.MessageId;
         var start = JobClock.GetUtcNow();
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         _ = await RunFailedAttemptsAsync(receiver, failed, messageId, start, failedAttempts: 6);
 
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
@@ -106,7 +106,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(0, completed.InboxCount);
         Assert.Empty(completed.InboxDeadLetters);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
     }
 
     /// <summary>
@@ -154,7 +154,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var messageId = envelope.Envelope.MessageId;
         var start = JobClock.GetUtcNow();
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
 
         // Backoff doubles per attempt, and the last attempt runs when InboxRetryTimeout elapses after the first failure.
         failed = await RunFailedAttemptsAsync(receiver, failed, messageId, start, failedAttempts: 7);
@@ -170,12 +170,12 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         Assert.Equal(8, deadLetter.AttemptCount);
         Assert.Equal(0, deadLettered.InboxCount);
         Assert.Empty(deadLettered.Effects);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
 
         await receiver.RequestDeactivationAsync();
         var recovered = await receiver.GetSnapshotAsync();
         Assert.Equal(deadLetter, Assert.Single(recovered.InboxDeadLetters));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var envelope = CreateEnvelope(receiver, NewMessage(194, "awaits-handler"), "messages/awaits-handler");
         using (var barrier = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/awaits-handler"))
         {
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
             await WaitForBarrierAsync(receiver, barrier);
             await receiver.ConfigureHandlerAsync(false);
 
@@ -217,7 +217,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(withoutHandler.ActivationId, completed.ActivationId);
         Assert.Equal("awaits-handler", Assert.Single(completed.Effects).Value);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         // Later work schedules its own wake-up.
         var attempts = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, target);
         var envelope = CreateEnvelope(receiver, NewMessage(195, "later-work"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         Assert.Equal(attempts + 1, Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, target));
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
     }

@@ -36,7 +36,7 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
 
         barrier.Release();
         var result = await delivery;
-        Assert.Equal(DeliveryStatus.Accepted, result.Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(result);
         EndpointSnapshot completed;
         try
         {
@@ -66,8 +66,8 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         var second = DeliverAsync(receiver, envelope);
 
         // The pending acceptance is durable, so the duplicate is answered without waiting for the handler.
-        Assert.Equal(DeliveryStatus.Accepted, first.Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await second).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(first);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await second);
         Assert.Equal(1, Fixture.GetSnapshot(receiver).InboxCount);
 
         barrier.Release();
@@ -97,7 +97,7 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
 
         write.Release();
         await request;
-        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await delivery);
         Assert.Equal("interleaved", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 2)).Effects, static effect => effect.Value == "interleaved").Value);
     }
     [Fact]
@@ -110,17 +110,17 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
 
         // The first write accepts the message and the second records its completion.
         var barrier = Fixture.Storage.BlockWrite(journalId, matchingWrite: 2);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await barrier.WaitUntilEnteredAsync();
 
         // Whenever the duplicate is answered, the completion it depends on must already be durable.
         var duplicate = DeliverAsync(receiver, envelope).ContinueWith(
-            task => (task.Result.Status, Writes: Fixture.Storage.GetSuccessfulWriteCount(journalId)),
+            task => (task.Result, Writes: Fixture.Storage.GetSuccessfulWriteCount(journalId)),
             TaskScheduler.Default);
 
         barrier.Release();
-        var (status, writes) = await duplicate;
-        Assert.Equal(DeliveryStatus.Duplicate, status);
+        var (result, writes) = await duplicate;
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(result);
         Assert.True(writes >= 2, $"The duplicate was answered after {writes} durable writes, before its completion was durable.");
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
@@ -131,13 +131,13 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
         var envelope = CreateEnvelope(receiver, NewMessage(13, "reactivation"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var before = await Fixture.WaitForEffectCountAsync(receiver, 1);
         await receiver.RequestDeactivationAsync();
         var after = await receiver.GetSnapshotAsync();
 
         Assert.NotEqual(before.ActivationId, after.ActivationId);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
@@ -150,7 +150,7 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         const string route = "messages/sent-time-retention";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var message = CreateEnvelope(receiver, NewMessage(32, "retained-command"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, message));
         await handler.WaitUntilEnteredAsync();
         if (completed)
         {
@@ -165,9 +165,9 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         Fixture.Clock.Advance(TimeSpan.FromMinutes(1));
 
         // A re-send is the same message, so its record keeps the time the inbox accepted.
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = Fixture.JobNow })).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message with { SentAt = Fixture.JobNow }));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) }));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(message.SentAt, await Fixture.OnGrainAsync(receiver, () => completed
             ? InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)
@@ -187,8 +187,8 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         var other = TestApplicationProtocol.With(original, Sessions,
             sender: GrainId.Create("other-sender", "same-message-id"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, other)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, original));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, other));
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);
@@ -196,8 +196,8 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         var previous = Fixture.GetGrainContext(receiver);
         await receiver.RequestDeactivationAsync();
         await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, original)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, other)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, original));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, other));
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(completed.ActivationId, recovered.ActivationId);
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
@@ -218,8 +218,8 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         foreach (var message in messages)
         {
             var envelope = CreateEnvelope(receiver, message);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
+            DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
         }
 
         var state = await Fixture.WaitForEffectCountAsync(receiver, 3);
@@ -235,13 +235,13 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         var first = CreateEnvelope(receiver, NewMessage(21, "first"), "messages/sequential");
         var second = CreateEnvelope(receiver, NewMessage(22, "second"), "messages/sequential");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, first));
         await WaitForBarrierAsync(receiver, barrier);
         var secondDelivery = DeliverAsync(receiver, second);
         Assert.False(secondDelivery.IsCompleted);
 
         barrier.Release();
-        Assert.Equal(DeliveryStatus.Accepted, (await secondDelivery).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await secondDelivery);
         EndpointSnapshot state;
         try
         {

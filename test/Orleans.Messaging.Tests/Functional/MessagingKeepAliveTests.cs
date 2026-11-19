@@ -17,7 +17,7 @@ public sealed class MessagingKeepAliveTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), HeldRoute);
         var envelope = CreateEnvelope(receiver, NewMessage(1, "held"), HeldRoute);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var context = Fixture.GetGrainContext(receiver);
 

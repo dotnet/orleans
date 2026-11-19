@@ -19,7 +19,7 @@ public sealed class InboxLifecycleBehaviorTests : MessagingBehaviorTestBase
         var shutdown = Fixture.GetPump(receiver).ShutdownToken;
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/teardown-active", observeCancellation: false);
         var envelope = CreateEnvelope(receiver, NewMessage(95, "active-handler"), "messages/teardown-active");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = shutdown.Register(stopping.SetResult);
@@ -48,7 +48,7 @@ public sealed class InboxLifecycleBehaviorTests : MessagingBehaviorTestBase
         // Deactivation cancels any handler the original activation starts, leaving the message to recovery.
         using (Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/queued"))
         {
-            Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await receiver.AcceptAndDeactivateAsync(envelope));
             await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         }
 

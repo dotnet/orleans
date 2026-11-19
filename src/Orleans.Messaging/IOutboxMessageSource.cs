@@ -30,7 +30,7 @@ namespace Orleans.Messaging;
 /// A source which can't provide a pending message after its send, for example because its stored payload no longer
 /// decodes, throws from <see cref="TryGetMessage"/>; an invalid message is handled the same way. The outbox then
 /// dead-letters that entry alone, without delivering it, and calls <see cref="OnRetired"/> with
-/// <see cref="OutboxMessageRetirementStatus.DeadLettered"/>; the grain's messaging and its other messages are
+/// <see cref="OutboxMessageRetirement.DeadLettered"/>; the grain's messaging and its other messages are
 /// unaffected. A recovered entry which no registered source provides is dead-lettered the same way, without an owner to
 /// notify. Because no valid message exists, the dead letter's message carries only its <see cref="Envelope.MessageId"/>,
 /// with an empty payload and a default <see cref="OutboxMessage.ReceiverId"/>, and its reason records the failure.
@@ -59,7 +59,7 @@ public interface IOutboxMessageSource
     /// including one with a different <see cref="Envelope.MessageId"/> or addressed to the sending grain, or
     /// <see langword="false"/> from the source which owns the entry dead-letters the entry with its failure as the
     /// reason, counting the failed materialization as a delivery attempt, and the outbox then calls
-    /// <see cref="OnRetired"/> with <see cref="OutboxMessageRetirementStatus.DeadLettered"/>.
+    /// <see cref="OnRetired"/> with <see cref="OutboxMessageRetirement.DeadLettered"/>.
     /// </remarks>
     bool TryGetMessage(MessageId messageId, out OutboxMessage message);
 
@@ -73,8 +73,8 @@ public interface IOutboxMessageSource
     /// when the retirement write has not committed, starting from the source's recovered journaled state.
     /// Make any effects outside that journal write idempotent across repeated calls.
     /// Stage a durable application outcome or follow-up work here for
-    /// <see cref="OutboxMessageRetirementStatus.DeadLettered"/> and
-    /// <see cref="OutboxMessageRetirementStatus.Rejected"/>, so recovery preserves the application's response even
+    /// <see cref="OutboxMessageRetirement.DeadLettered"/> and
+    /// <see cref="OutboxMessageRetirement.Rejected"/>, so recovery preserves the application's response even
     /// after diagnostic dead letters are compacted. A dead-lettered send can have been accepted by an earlier attempt;
     /// reconcile that uncertain outcome using application-level idempotency.
     /// </para>
@@ -90,61 +90,42 @@ public interface IOutboxMessageSource
 
 /// <summary>Describes how an outbox message retired.</summary>
 /// <remarks>The outbox creates retirements; sources read them in <see cref="IOutboxMessageSource.OnRetired"/>.</remarks>
-public readonly struct OutboxMessageRetirement
-{
-    /// <summary>Gets how the message retired.</summary>
-    public OutboxMessageRetirementStatus Status { get; init; }
-
-    /// <summary>
-    /// Gets the dead letter's reason for a message which the receiver rejected or the outbox dead-lettered, such as the
-    /// rejection which the receiver reported; <see langword="null"/> for a delivered message.
-    /// </summary>
-    public string? Reason { get; init; }
-
-    /// <summary>
-    /// Gets the application-defined code which the receiver's inbox message sink reported with a rejection, as
-    /// <see cref="DeliveryResult.Code"/>; <see langword="null"/> when the receiver reported none or the message didn't
-    /// retire as <see cref="OutboxMessageRetirementStatus.Rejected"/>.
-    /// </summary>
-    public string? Code { get; init; }
-
-    /// <summary>Creates a retirement of a message which the receiver durably accepted or reported as a duplicate.</summary>
-    public static OutboxMessageRetirement Delivered() => new() { Status = OutboxMessageRetirementStatus.Delivered };
-
-    /// <summary>Creates a retirement of a message which the outbox dead-lettered for <paramref name="reason"/>.</summary>
-    /// <param name="reason">The dead letter's reason.</param>
-    public static OutboxMessageRetirement DeadLettered(string reason) => new()
-    {
-        Status = OutboxMessageRetirementStatus.DeadLettered,
-        Reason = reason
-    };
-
-    /// <summary>Creates a retirement of a message which the receiver dead-lettered for <paramref name="reason"/>.</summary>
-    /// <param name="reason">The reason which the receiver reported.</param>
-    /// <param name="code">The application-defined code which the receiver reported, if any.</param>
-    public static OutboxMessageRetirement Rejected(string reason, string? code = null) => new()
-    {
-        Status = OutboxMessageRetirementStatus.Rejected,
-        Reason = reason,
-        Code = code
-    };
-}
-
-/// <summary>Describes how an outbox message retired.</summary>
-public enum OutboxMessageRetirementStatus
+public union OutboxMessageRetirement(
+    OutboxMessageRetirement.Delivered,
+    OutboxMessageRetirement.DeadLettered,
+    OutboxMessageRetirement.Rejected)
 {
     /// <summary>The receiver durably accepted the message, or reported it as a duplicate.</summary>
-    Delivered = 1,
+    public sealed class Delivered
+    {
+        /// <summary>Gets the shared retirement.</summary>
+        public static Delivered Instance { get; } = new();
+    }
 
     /// <summary>
     /// The outbox dead-lettered the message: its delivery attempts didn't succeed before its retry limits elapsed, or its
-    /// source failed to provide it, or the receiver answered <see cref="DeliveryStatus.Expired"/>. The receiver's
+    /// source failed to provide it, or the receiver answered <see cref="DeliveryResult.Expired"/>. The receiver's
     /// earlier delivery outcome is unknown: an earlier attempt can have been durably accepted.
     /// </summary>
-    DeadLettered = 2,
+    /// <param name="reason">The dead letter's reason.</param>
+    public sealed class DeadLettered(string reason)
+    {
+        /// <summary>Gets the dead letter's reason.</summary>
+        public string Reason { get; } = reason;
+    }
 
-    /// <summary>
-    /// The receiver durably rejected the message, with the reason and code which it reported.
-    /// </summary>
-    Rejected = 3
+    /// <summary>The receiver durably rejected the message, with the reason and code which it reported.</summary>
+    /// <param name="reason">The reason which the receiver reported.</param>
+    /// <param name="code">The application-defined code which the receiver reported, if any.</param>
+    public sealed class Rejected(string reason, string? code = null)
+    {
+        /// <summary>Gets the reason which the receiver reported.</summary>
+        public string Reason { get; } = reason;
+
+        /// <summary>
+        /// Gets the application-defined code which the receiver's inbox message sink reported with the rejection, as
+        /// <see cref="DeliveryResult.DeadLettered.Code"/>; <see langword="null"/> when the receiver reported none.
+        /// </summary>
+        public string? Code { get; } = code;
+    }
 }

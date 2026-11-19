@@ -35,7 +35,7 @@ public interface IOutbox
     /// for the same journal write, applying the inbox identity rules, so a completed ID is a duplicate and a different
     /// pending command with the ID conflicts. The inbox admits such a message regardless of its capacity and of handler
     /// registration, and the send fails when an <see cref="IInboxMessageSink"/> reports
-    /// <see cref="DeliveryStatus.Backpressured"/> for it.
+    /// <see cref="DeliveryResult.Backpressured"/> for it.
     /// </remarks>
     /// <exception cref="ArgumentException">The envelope has an unset identity, invalid subject or destination, or exceeds identity/subject limits.</exception>
     /// <exception cref="InvalidOperationException">
@@ -58,8 +58,8 @@ public interface IOutbox
     /// pending ID again coalesces with the pending message. A message which a source addresses to
     /// the sending grain is rejected; send it through <see cref="Send(OutboxMessage)"/>, which stages it in the grain's
     /// own inbox.
-    /// A retry timeout or <see cref="DeliveryStatus.Expired"/> reports
-    /// <see cref="OutboxMessageRetirementStatus.DeadLettered"/> to the source; the receiver's earlier outcome is unknown,
+    /// A retry timeout or <see cref="DeliveryResult.Expired"/> reports
+    /// <see cref="OutboxMessageRetirement.DeadLettered"/> to the source; the receiver's earlier outcome is unknown,
     /// so the application reconciles it before starting a new send.
     /// </remarks>
     /// <exception cref="ArgumentException">

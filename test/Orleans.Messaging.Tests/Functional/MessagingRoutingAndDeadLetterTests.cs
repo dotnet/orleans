@@ -28,7 +28,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
                     $"dead-letter-{sequence}",
                     ThrowDuringPreparation: true));
             messageIds.Add(envelope.Envelope.MessageId);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
             await Fixture.SnapshotProbe.WaitAsync(
                 receiver.GetGrainId(),
                 snapshot => snapshot.InboxDeadLetters.Any(entry => entry.MessageId == envelope.Envelope.MessageId));
@@ -52,7 +52,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
                 "expired-dead-letter",
                 ThrowDuringPreparation: true));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var before = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Fixture.Clock.Advance(TimeSpan.FromHours(2));
@@ -71,7 +71,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
         var receiver = NewGrain();
         var malformed = CreateEnvelope(receiver, "wrong-body", "typed");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, malformed)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, malformed));
 
         // Each attempt fails its activation, so with this fixture's zero InboxRetryTimeout the second recovery
         // dead-letters the message.
@@ -83,7 +83,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
         Assert.Equal(2, deadLetter.AttemptCount);
 
         var valid = CreateEnvelope(receiver, NewMessage(41, "valid-after-poison"), "typed");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, valid)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, valid));
         var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal("valid-after-poison", Assert.Single(recovered.Effects).Value);
         Assert.Single(recovered.InboxDeadLetters);
@@ -94,7 +94,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
     {
         var receiver = NewGrain();
         var malformed = CreateEnvelope(receiver, "wrong-body", "typed");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, malformed)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, malformed));
         _ = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.True(await receiver.RemoveInboxDeadLetterAsync(
@@ -117,8 +117,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
 
         var result = await DeliverAsync(receiver, envelope);
 
-        Assert.Equal(DeliveryStatus.HandlerNotFound, result.Status);
-        Assert.Equal("No inbox handler is registered.", result.Message);
+        DeliveryResultAssert.IsCase<DeliveryResult.HandlerNotFound>(result);
         var state = await receiver.GetSnapshotAsync();
         Assert.Equal(0, state.InboxCount);
         Assert.Empty(state.Effects);
@@ -134,16 +133,16 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
             NewMessage(74, "wrong-receiver"));
 
         Assert.Null(typeof(InboxMessage).GetProperty("ReceiverId"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var first = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(envelope.Envelope.MessageId, Assert.Single(first.Effects).LogicalId);
         Assert.Equal(1, Assert.Single(first.Effects).Count);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(declaredReceiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(declaredReceiver, envelope));
         var delivered = await Fixture.WaitForEffectCountAsync(declaredReceiver, 1);
         Assert.Equal(envelope.Envelope.MessageId, Assert.Single(delivered.Effects).LogicalId);
         Assert.Equal(1, Assert.Single(delivered.Effects).Count);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(declaredReceiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(declaredReceiver, envelope));
         Assert.Equal(1, (await receiver.GetSnapshotAsync()).ProcessedMessageCount);
         Assert.Equal(1, (await declaredReceiver.GetSnapshotAsync()).ProcessedMessageCount);
     }

@@ -30,7 +30,7 @@ public sealed class InboxJournalRecoveryTests : MessagingBehaviorTestBase
         Assert.NotSame(oldManager, Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<IJournaledStateManager>());
         Assert.Equal(0, recovered.InboxCount);
         Assert.Empty(recovered.Effects);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
     }
 
@@ -62,7 +62,7 @@ public sealed class InboxJournalRecoveryTests : MessagingBehaviorTestBase
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var envelope = CreateEnvelope(receiver, NewMessage(57, "inbox-completion-retry"), route);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         handler.Release();
@@ -123,8 +123,8 @@ public sealed class InboxJournalRecoveryTests : MessagingBehaviorTestBase
         Assert.IsType<IOException>(failure.InnerException);
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
-        var status = (await DeliverAsync(receiver, envelope)).Status;
-        Assert.True(status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate, status.ToString());
+        var result = await DeliverAsync(receiver, envelope);
+        Assert.True(result is DeliveryResult.Accepted or DeliveryResult.Duplicate, result.ToString());
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
     }

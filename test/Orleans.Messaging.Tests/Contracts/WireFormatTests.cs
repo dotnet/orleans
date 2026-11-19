@@ -27,12 +27,12 @@ public sealed class WireFormatTests : IDisposable
         { "Envelope.Full", "202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E0" },
         { "InboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E021800094DA86132DDF088100D088C310000000E0E0" },
         { "OutboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E021202060697CAED241117265636569766572E0E021605D5ABF1541057231E0E0E0" },
-        { "DeliveryResult.Accepted", "20080305C101C101E0" },
-        { "DeliveryResult.Duplicate", "20080309C101C101E0" },
-        { "DeliveryResult.Backpressured", "2008030DC101C101E0" },
-        { "DeliveryResult.HandlerNotFound", "20080311413F4E6F20696E626F782068616E646C657220697320726567697374657265642EC101E0" },
-        { "DeliveryResult.DeadLettered", "2008031541196F7574206F662073746F636B41196F72646572732F73746F636BE0" },
-        { "DeliveryResult.Expired", "2008031941D3546865206D657373616765207761732073656E74206265666F72652074686520726563656976657227732064656475706C69636174696F6E2077696E646F773B20697473206561726C6965722064656C6976657279206F7574636F6D6520697320756E6B6E6F776E2EC101E0" },
+        { "DeliveryResult.Accepted", "2020E0E0" },
+        { "DeliveryResult.Duplicate", "2021E0E0" },
+        { "DeliveryResult.Backpressured", "2022E0E0" },
+        { "DeliveryResult.HandlerNotFound", "2023E0E0" },
+        { "DeliveryResult.DeadLettered", "202440196F7574206F662073746F636B41196F72646572732F73746F636BE0E0" },
+        { "DeliveryResult.Expired", "2025E0E0" },
     };
 
     [Theory]
@@ -55,12 +55,12 @@ public sealed class WireFormatTests : IDisposable
                     Assert.Equal(e.ReceiverId, a.ReceiverId);
                 });
                 break;
-            case "DeliveryResult.Accepted": Check(DeliveryResult.Accepted(), hex); break;
-            case "DeliveryResult.Duplicate": Check(DeliveryResult.Duplicate(), hex); break;
-            case "DeliveryResult.Backpressured": Check(DeliveryResult.Backpressured(), hex); break;
-            case "DeliveryResult.HandlerNotFound": Check(DeliveryResult.HandlerNotFound(), hex); break;
-            case "DeliveryResult.DeadLettered": Check(DeliveryResult.DeadLettered("out of stock", "orders/stock"), hex); break;
-            case "DeliveryResult.Expired": Check(DeliveryResult.Expired(), hex); break;
+            case "DeliveryResult.Accepted": Check<DeliveryResult>(DeliveryResult.Accepted.Instance, hex, AssertDeliveryResult); break;
+            case "DeliveryResult.Duplicate": Check<DeliveryResult>(DeliveryResult.Duplicate.Instance, hex, AssertDeliveryResult); break;
+            case "DeliveryResult.Backpressured": Check<DeliveryResult>(DeliveryResult.Backpressured.Instance, hex, AssertDeliveryResult); break;
+            case "DeliveryResult.HandlerNotFound": Check<DeliveryResult>(DeliveryResult.HandlerNotFound.Instance, hex, AssertDeliveryResult); break;
+            case "DeliveryResult.DeadLettered": Check<DeliveryResult>(new DeliveryResult.DeadLettered("out of stock", "orders/stock"), hex, AssertDeliveryResult); break;
+            case "DeliveryResult.Expired": Check<DeliveryResult>(DeliveryResult.Expired.Instance, hex, AssertDeliveryResult); break;
             default: throw new ArgumentOutOfRangeException(nameof(name), name, null);
         }
     }
@@ -84,6 +84,17 @@ public sealed class WireFormatTests : IDisposable
         var decoded = serializer.Deserialize(Convert.FromHexString(hex));
         if (assertEqual is null) Assert.Equal(value, decoded);
         else assertEqual(value, decoded!);
+    }
+
+    private static void AssertDeliveryResult(DeliveryResult expected, DeliveryResult actual)
+    {
+        Assert.Equal(expected.Value!.GetType(), actual.Value!.GetType());
+        if (expected.Value is DeliveryResult.DeadLettered deadLettered)
+        {
+            var decoded = (DeliveryResult.DeadLettered)actual.Value;
+            Assert.Equal(deadLettered.Reason, decoded.Reason);
+            Assert.Equal(deadLettered.Code, decoded.Code);
+        }
     }
 
     private static void AssertInboxMessage(InboxMessage expected, InboxMessage actual)

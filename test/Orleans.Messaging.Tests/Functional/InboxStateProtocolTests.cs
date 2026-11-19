@@ -19,7 +19,7 @@ public sealed class InboxStateProtocolTests : MessagingBehaviorTestBase
         const string route = "messages/local-preparation";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var envelope = CreateEnvelope(receiver, NewMessage(201, "local"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
@@ -54,7 +54,7 @@ public sealed class InboxStateProtocolTests : MessagingBehaviorTestBase
         const string route = "messages/no-earlier-write";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var envelope = CreateEnvelope(receiver, NewMessage(203, "no-earlier-write"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);

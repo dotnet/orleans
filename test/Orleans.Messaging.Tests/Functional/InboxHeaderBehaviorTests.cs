@@ -38,20 +38,20 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         Assert.False(delivery.IsCompleted);
         Assert.False(handler.Entered.Task.IsCompleted);
         storage.Release();
-        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await delivery);
         await WaitAsync(handler.Entered.Task);
         Assert.Equal(payload, handler.Message.Envelope.Payload.ToArray());
         handler.Release.TrySetResult();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(message.Envelope.MessageId, Assert.Single(completed.Effects).LogicalId);
         Assert.Equal(1, completed.ProcessedMessageCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message));
         await receiver.RequestDeactivationAsync();
         await WaitAsync(context.Deactivated);
         var replayed = await receiver.GetSnapshotAsync();
         Assert.NotEqual(completed.ActivationId, replayed.ActivationId);
         Assert.Equal(1, Assert.Single(replayed.Effects).Count);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message));
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         var changed = Raw(key, [1, 2, 3], "changed") with { SentAt = original.SentAt };
         using var handler = new RawHandler(context);
         await OnTurnAsync(context, () => grain.HandlerOverride = handler);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, original));
         await WaitAsync(handler.Entered.Task);
         var pending = context.ActivationServices.GetRequiredService<Inbox>();
         Envelope first = default;
@@ -76,7 +76,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         await OnTurnAsync(context, async () =>
         {
             IMessagingExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
-            Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(changed)).Status);
+            DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await extension.DeliverAsync(changed));
             var retained = Assert.Single(pending.Messages()).Envelope;
             Assert.Same(first.Payload, retained.Payload);
             Assert.Same(first.Headers, retained.Headers);
@@ -111,7 +111,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
 
         // Each failed attempt fails its activation, and the next activation recovers the message and charges the attempt.
         var retry = Fixture.Metrics.WaitForCountAsync("orleans-messaging-inbox-messages-processed", 1, "retry");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, message));
         await WaitAsync(previous.Deactivated);
         _ = await receiver.GetSnapshotAsync();
         await retry;
@@ -132,7 +132,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
 
         // The retry runs once its window has closed and fails again, so the next recovery dead-letters the message.
         Fixture.Clock.Advance(TimeSpan.FromHours(1));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message));
         await WaitAsync(current.Deactivated);
         _ = await receiver.GetSnapshotAsync();
         current = Fixture.GetGrainContext(receiver);
@@ -165,7 +165,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
             Assert.True(metadata.TryGetValue("future.number", out var number));
             Assert.Equal(8675309, new Serializer<int>(Sessions).Deserialize(number));
         });
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, Raw(key, []))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, Raw(key, [])));
     }
 
     [Theory]

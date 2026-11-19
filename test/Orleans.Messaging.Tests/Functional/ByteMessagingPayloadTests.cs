@@ -22,7 +22,7 @@ public sealed class ByteMessagingPayloadTests : MessagingBehaviorTestBase
         var expected = envelope.Envelope.Payload.ToArray();
         using var handler = new PayloadProbe(expected);
         await OnTurnAsync(context, () => grain.HandlerOverride = handler);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.NotSame(envelope.Envelope.Payload, handler.Payload);
         envelope.Envelope.Payload[0] ^= 0xff;
@@ -33,12 +33,12 @@ public sealed class ByteMessagingPayloadTests : MessagingBehaviorTestBase
         await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
             snapshot => snapshot.InboxCount == 0 && snapshot.ProcessedMessageCount == 1);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
         await receiver.RequestDeactivationAsync();
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(expected, envelope.Envelope.Payload.ToArray());
         _ = await receiver.GetSnapshotAsync();
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, envelope));
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class ByteMessagingPayloadTests : MessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var envelope = CreateEnvelope(receiver, NewMessage(301, "rejected-bytes"));
         var expected = envelope.Envelope.Payload.ToArray();
-        Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.HandlerNotFound>(await DeliverAsync(receiver, envelope));
         var rejected = await receiver.GetSnapshotAsync();
         Assert.Equal(0, rejected.InboxCount);
         Assert.Equal(0, rejected.ProcessedMessageCount);

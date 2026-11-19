@@ -94,7 +94,7 @@ public sealed class JournaledTestOutboxBehaviorTests : MessagingBehaviorTestBase
             NewMessage(97, "duplicate-output") with { ForwardTo = target },
             "messages/duplicate-output");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var completed = await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
             static snapshot => snapshot.InboxCount == 0 && (snapshot.Effects.Count > 0 || snapshot.InboxDeadLetters.Count > 0));
 

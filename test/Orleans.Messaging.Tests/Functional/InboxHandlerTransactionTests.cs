@@ -32,7 +32,7 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         var receiverState = await Fixture.WaitForEffectCountAsync(receiver, 1);
         var output = Fixture.GetStagedOutput(receiver);
 
-        Assert.Equal(DeliveryStatus.Accepted, result.Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(result);
         var effect = Assert.Single(receiverState.Effects);
         Assert.Equal(new MessageEffect(logicalId, 1, 7, "atomic"), effect);
         Assert.Equal(0, receiverState.InboxCount);
@@ -51,7 +51,7 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         Assert.Equal(outgoing.Envelope.MessageId, Assert.Single(Fixture.GetStagedOutput(receiver)).Envelope.MessageId);
 
         var duplicate = await DeliverAsync(receiver, envelope);
-        Assert.Equal(DeliveryStatus.Duplicate, duplicate.Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(duplicate);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
         Assert.Single(Fixture.GetStagedOutput(receiver));
     }
@@ -70,7 +70,7 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
 
         // Each failed attempt fails its activation without staging anything. With this fixture's zero
         // InboxRetryTimeout, the first recovery starts the retry window and the second dead-letters the message.
-        Assert.Equal(DeliveryStatus.Accepted, accepted.Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(accepted);
         Assert.Empty(state.Effects);
         Assert.Equal(0, state.InboxCount);
         Assert.Equal(0, state.OutboxCount);
@@ -95,7 +95,7 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<MessagingTestGrain>(oldContext.GrainInstance);
         var envelope = CreateEnvelope(receiver, NewMessage(10, "premature-commit") with { CommitDuringHandling = true });
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal("premature-commit", Assert.Single(completed.Effects).Value);
@@ -113,7 +113,7 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/completion-failure");
         var envelope = CreateEnvelope(receiver, NewMessage(78, "completion-failure"), "messages/completion-failure");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<MessagingTestGrain>(oldContext.GrainInstance);
@@ -141,7 +141,7 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         const string route = "messages/charge-write-failure";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var envelope = CreateEnvelope(receiver, NewMessage(79, "charge-write-failure") with { ThrowDuringPreparation = true }, route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
 

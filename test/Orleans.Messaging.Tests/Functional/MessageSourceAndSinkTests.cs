@@ -34,14 +34,14 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var message = NewInboxMessage("deduplicated", NewPayload());
         var extension = receiver.AsReference<IMessagingExtension>();
 
-        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await extension.DeliverAsync(message, Token));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await extension.DeliverAsync(message, Token));
         Assert.Equal(1, Probe.For(receiver).SinkOffers);
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, await OnGrainAsync(receiver, context => Inbox(context).Count));
 
         fixture.Clock.Advance(MessageSourceAndSinkFixture.DeduplicationWindow);
-        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await extension.DeliverAsync(message, Token));
         Assert.Equal(1, Probe.For(receiver).SinkOffers);
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, Probe.For(receiver).Handled);
@@ -63,9 +63,9 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         var result = await extension.DeliverAsync(message, Token);
 
-        Assert.Equal(DeliveryStatus.DeadLettered, result.Status);
-        Assert.Equal(reason, result.Message);
-        Assert.Equal(code, result.Code);
+        var rejection = DeliveryResultAssert.IsCase<DeliveryResult.DeadLettered>(result);
+        Assert.Equal(reason, rejection.Reason);
+        Assert.Equal(code, rejection.Code);
         var grainType = receiver.GetGrainId().Type.ToString();
         Assert.Single(metrics.Read("inbox-messages-received")).AssertCounter(grainType, "dead_lettered");
         Assert.Single(metrics.Read("inbox-messages-processed")).AssertCounter(grainType, "dead_lettered");
@@ -99,15 +99,15 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         static void AssertRejected(DeliveryResult duplicate)
         {
-            Assert.Equal(DeliveryStatus.DeadLettered, duplicate.Status);
-            Assert.Equal(reason, duplicate.Message);
-            Assert.Equal(code, duplicate.Code);
+            var rejection = DeliveryResultAssert.IsCase<DeliveryResult.DeadLettered>(duplicate);
+            Assert.Equal(reason, rejection.Reason);
+            Assert.Equal(code, rejection.Code);
         }
     }
 
     [Theory]
     [InlineData(SinkMode.Throw, SourceSinkGrain.SinkFailure)]
-    [InlineData(SinkMode.UnsupportedStatus, "The inbox message sink reported the unsupported delivery status 'HandlerNotFound'.")]
+    [InlineData(SinkMode.UnsupportedResult, "The inbox message sink reported the unsupported delivery result 'HandlerNotFound'.")]
     public async Task SinkFailure_FailsTheDeliveryWithoutStagingAndTheRetryIsAccepted(SinkMode mode, string error)
     {
         var receiver = NewGrain();
@@ -129,7 +129,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(0, Storage.CountPayloadOccurrences(Journal(receiver), payload));
 
         Probe.For(receiver).Mode = SinkMode.Accept;
-        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await extension.DeliverAsync(message, Token));
         Assert.Equal(2, Probe.For(receiver).SinkOffers);
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
@@ -144,7 +144,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var message = NewInboxMessage("backpressured", payload);
         var extension = receiver.AsReference<IMessagingExtension>();
 
-        Assert.Equal(DeliveryStatus.Backpressured, (await extension.DeliverAsync(message, Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await extension.DeliverAsync(message, Token));
         var (count, letters) = await OnGrainAsync(receiver, context => (
             Inbox(context).Count,
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().InboxDeadLetters));
@@ -153,7 +153,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(0, Storage.CountPayloadOccurrences(Journal(receiver), payload));
 
         Probe.For(receiver).Mode = SinkMode.Accept;
-        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await extension.DeliverAsync(message, Token));
         Assert.Equal(2, Probe.For(receiver).SinkOffers);
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, Probe.For(receiver).Handled);
@@ -167,7 +167,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var payload = NewPayload();
         var scheduled = NewInboxMessage("scheduled", payload, DateTimeOffset.UtcNow.AddDays(1));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(scheduled, Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await extension.DeliverAsync(scheduled, Token));
 
         var (state, count) = await OnGrainAsync(receiver, context => (Grain(context).GetState(), Inbox(context).Count));
         Assert.Equal(payload, state.Received[scheduled.Envelope.MessageId.ToString()]);
@@ -184,11 +184,11 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Probe.For(receiver).Mode = SinkMode.Decline;
 
         var scheduled = NewInboxMessage("scheduled", NewPayload(), DateTimeOffset.UtcNow.AddDays(1));
-        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(scheduled, Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await extension.DeliverAsync(scheduled, Token));
         Assert.Equal(1, await OnGrainAsync(receiver, context => Inbox(context).Count));
 
         var declinedPayload = NewPayload();
-        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(NewInboxMessage("declined", declinedPayload), Token)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await extension.DeliverAsync(NewInboxMessage("declined", declinedPayload), Token));
         await WaitUntilAsync(receiver, _ => Probe.For(receiver).Handled == 1);
         Assert.Equal(2, Probe.For(receiver).SinkOffers);
         Assert.Equal(0, Probe.For(receiver).SinkAcceptances);
@@ -331,7 +331,7 @@ public enum SinkMode
     Throw,
     DeadLetter,
     Backpressure,
-    UnsupportedStatus
+    UnsupportedResult
 }
 
 /// <summary>How the source fails to provide a message which it stores.</summary>
@@ -435,25 +435,25 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IInboxMessageSink
             case SinkMode.Throw:
                 throw new InvalidOperationException(SinkFailure);
             case SinkMode.DeadLetter:
-                result = DeliveryResult.DeadLettered(Rejection, RejectionCode);
+                result = new DeliveryResult.DeadLettered(Rejection, RejectionCode);
                 return true;
             case SinkMode.Backpressure:
-                result = DeliveryResult.Backpressured();
+                result = DeliveryResult.Backpressured.Instance;
                 return true;
-            case SinkMode.UnsupportedStatus:
-                result = DeliveryResult.HandlerNotFound();
+            case SinkMode.UnsupportedResult:
+                result = DeliveryResult.HandlerNotFound.Instance;
                 return true;
         }
 
         if (_received.ContainsKey(key))
         {
-            result = DeliveryResult.Duplicate();
+            result = DeliveryResult.Duplicate.Instance;
             return true;
         }
 
         _received[key] = message.Envelope.Payload;
         _probe.OnSinkAccepted();
-        result = DeliveryResult.Accepted();
+        result = DeliveryResult.Accepted.Instance;
         return true;
     }
 

@@ -40,42 +40,79 @@ namespace Orleans.Messaging
         public required string Reason { get { throw null; } init { } }
     }
 
+    [System.Runtime.CompilerServices.Union]
     [GenerateSerializer]
-    [Alias("Orleans.Messaging.DeliveryResult")]
-    public readonly partial struct DeliveryResult
+    public partial struct DeliveryResult : System.Runtime.CompilerServices.IUnion
     {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        [Id(2)]
-        public string? Code { get { throw null; } init { } }
+        private object _dummy;
+        private int _dummyPrimitive;
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public DeliveryResult(Accepted value) { }
 
-        [Id(1)]
-        public string? Message { get { throw null; } init { } }
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public DeliveryResult(Backpressured value) { }
 
-        [Id(0)]
-        public DeliveryStatus Status { get { throw null; } init { } }
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public DeliveryResult(DeadLettered value) { }
 
-        public static DeliveryResult Accepted() { throw null; }
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public DeliveryResult(Duplicate value) { }
 
-        public static DeliveryResult Backpressured() { throw null; }
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public DeliveryResult(Expired value) { }
 
-        public static DeliveryResult DeadLettered(string reason, string? code = null) { throw null; }
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public DeliveryResult(HandlerNotFound value) { }
 
-        public static DeliveryResult Duplicate() { throw null; }
+        public object? Value { get { throw null; } }
 
-        public static DeliveryResult Expired() { throw null; }
+        [GenerateSerializer]
+        [Alias("Orleans.Messaging.DeliveryResult.Accepted")]
+        public sealed partial class Accepted
+        {
+            public static Accepted Instance { get { throw null; } }
+        }
 
-        public static DeliveryResult HandlerNotFound() { throw null; }
-    }
+        [GenerateSerializer]
+        [Alias("Orleans.Messaging.DeliveryResult.Backpressured")]
+        public sealed partial class Backpressured
+        {
+            public static Backpressured Instance { get { throw null; } }
+        }
 
-    public enum DeliveryStatus
-    {
-        Accepted = 1,
-        Duplicate = 2,
-        Backpressured = 3,
-        HandlerNotFound = 4,
-        DeadLettered = 5,
-        Expired = 6
+        [GenerateSerializer]
+        [Alias("Orleans.Messaging.DeliveryResult.DeadLettered")]
+        public sealed partial class DeadLettered
+        {
+            public DeadLettered(string reason, string? code = null) { }
+
+            [Id(1)]
+            public string? Code { get { throw null; } }
+
+            [Id(0)]
+            public string Reason { get { throw null; } }
+        }
+
+        [GenerateSerializer]
+        [Alias("Orleans.Messaging.DeliveryResult.Duplicate")]
+        public sealed partial class Duplicate
+        {
+            public static Duplicate Instance { get { throw null; } }
+        }
+
+        [GenerateSerializer]
+        [Alias("Orleans.Messaging.DeliveryResult.Expired")]
+        public sealed partial class Expired
+        {
+            public static Expired Instance { get { throw null; } }
+        }
+
+        [GenerateSerializer]
+        [Alias("Orleans.Messaging.DeliveryResult.HandlerNotFound")]
+        public sealed partial class HandlerNotFound
+        {
+            public static HandlerNotFound Instance { get { throw null; } }
+        }
     }
 
     [GenerateSerializer]
@@ -345,28 +382,42 @@ namespace Orleans.Messaging
         public readonly InboxMessage ToInboxMessage(System.DateTimeOffset sentAt) { throw null; }
     }
 
-    public readonly partial struct OutboxMessageRetirement
+    [System.Runtime.CompilerServices.Union]
+    public partial struct OutboxMessageRetirement : System.Runtime.CompilerServices.IUnion
     {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public string? Code { get { throw null; } init { } }
+        private object _dummy;
+        private int _dummyPrimitive;
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public OutboxMessageRetirement(DeadLettered value) { }
 
-        public string? Reason { get { throw null; } init { } }
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public OutboxMessageRetirement(Delivered value) { }
 
-        public OutboxMessageRetirementStatus Status { get { throw null; } init { } }
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public OutboxMessageRetirement(Rejected value) { }
 
-        public static OutboxMessageRetirement DeadLettered(string reason) { throw null; }
+        public object? Value { get { throw null; } }
 
-        public static OutboxMessageRetirement Delivered() { throw null; }
+        public sealed partial class DeadLettered
+        {
+            public DeadLettered(string reason) { }
 
-        public static OutboxMessageRetirement Rejected(string reason, string? code = null) { throw null; }
-    }
+            public string Reason { get { throw null; } }
+        }
 
-    public enum OutboxMessageRetirementStatus
-    {
-        Delivered = 1,
-        DeadLettered = 2,
-        Rejected = 3
+        public sealed partial class Delivered
+        {
+            public static Delivered Instance { get { throw null; } }
+        }
+
+        public sealed partial class Rejected
+        {
+            public Rejected(string reason, string? code = null) { }
+
+            public string? Code { get { throw null; } }
+
+            public string Reason { get { throw null; } }
+        }
     }
 }
 
@@ -519,6 +570,16 @@ namespace OrleansCodeGen.Orleans.Messaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_DeliveryResult : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeliveryResult>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_DeliveryResult(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Messaging.DeliveryResult DeepCopy(global::Orleans.Messaging.DeliveryResult original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Envelope : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.Envelope>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Envelope(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.Envelope> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -595,5 +656,156 @@ namespace OrleansCodeGen.Orleans.Messaging
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
 
         public override bool TryCancel() { throw null; }
+    }
+}
+
+namespace OrleansCodeGen.Orleans.Messaging.DeliveryResult
+{
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Accepted : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeliveryResult.Accepted>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeliveryResult.Accepted instance) { }
+
+        public global::Orleans.Messaging.DeliveryResult.Accepted ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeliveryResult.Accepted instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeliveryResult.Accepted value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Backpressured : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeliveryResult.Backpressured>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeliveryResult.Backpressured instance) { }
+
+        public global::Orleans.Messaging.DeliveryResult.Backpressured ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeliveryResult.Backpressured instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeliveryResult.Backpressured value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DeadLettered : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeliveryResult.DeadLettered>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DeadLettered(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.DeliveryResult.DeadLettered> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeliveryResult.DeadLettered instance) { }
+
+        public global::Orleans.Messaging.DeliveryResult.DeadLettered ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeliveryResult.DeadLettered instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeliveryResult.DeadLettered value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Duplicate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeliveryResult.Duplicate>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeliveryResult.Duplicate instance) { }
+
+        public global::Orleans.Messaging.DeliveryResult.Duplicate ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeliveryResult.Duplicate instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeliveryResult.Duplicate value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Expired : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeliveryResult.Expired>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeliveryResult.Expired instance) { }
+
+        public global::Orleans.Messaging.DeliveryResult.Expired ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeliveryResult.Expired instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeliveryResult.Expired value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_HandlerNotFound : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeliveryResult.HandlerNotFound>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeliveryResult.HandlerNotFound instance) { }
+
+        public global::Orleans.Messaging.DeliveryResult.HandlerNotFound ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeliveryResult.HandlerNotFound instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeliveryResult.HandlerNotFound value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Accepted : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeliveryResult.Accepted>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public global::Orleans.Messaging.DeliveryResult.Accepted DeepCopy(global::Orleans.Messaging.DeliveryResult.Accepted original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Backpressured : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeliveryResult.Backpressured>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public global::Orleans.Messaging.DeliveryResult.Backpressured DeepCopy(global::Orleans.Messaging.DeliveryResult.Backpressured original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_DeadLettered : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeliveryResult.DeadLettered>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_DeadLettered(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.DeliveryResult.DeadLettered> _activator) { }
+
+        public global::Orleans.Messaging.DeliveryResult.DeadLettered DeepCopy(global::Orleans.Messaging.DeliveryResult.DeadLettered original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Duplicate : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeliveryResult.Duplicate>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public global::Orleans.Messaging.DeliveryResult.Duplicate DeepCopy(global::Orleans.Messaging.DeliveryResult.Duplicate original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Expired : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeliveryResult.Expired>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public global::Orleans.Messaging.DeliveryResult.Expired DeepCopy(global::Orleans.Messaging.DeliveryResult.Expired original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_HandlerNotFound : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeliveryResult.HandlerNotFound>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public global::Orleans.Messaging.DeliveryResult.HandlerNotFound DeepCopy(global::Orleans.Messaging.DeliveryResult.HandlerNotFound original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 }

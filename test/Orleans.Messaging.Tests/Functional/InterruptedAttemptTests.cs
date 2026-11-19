@@ -23,7 +23,7 @@ public sealed class InterruptedAttemptTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
         var envelope = CreateEnvelope(receiver, NewMessage(170, "stage-then-throw") with { ThrowAfterStaging = true });
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
 
         // The first recovery charges the interrupted attempt and starts the retry window; the rerun fails the same way,
         // and the next recovery dead-letters the message because the window has elapsed. No staged effect commits.
@@ -46,7 +46,7 @@ public sealed class InterruptedAttemptTests : MessagingBehaviorTestBase
         // A scheduled message stays pending without an attempt, so the deactivation interrupts none.
         var envelope = CreateEnvelope(receiver, NewMessage(172, "graceful"));
         envelope = envelope with { Envelope = envelope.Envelope with { DeliverAt = Fixture.JobNow + TimeSpan.FromMinutes(1) } };
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await receiver.ConfigureHandlerAsync(false);
         await receiver.RequestDeactivationAsync();
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);

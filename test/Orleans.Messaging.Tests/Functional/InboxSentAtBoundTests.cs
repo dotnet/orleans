@@ -39,13 +39,13 @@ public sealed class InboxSentAtBoundTests() : MessagingBehaviorTestBase(new Sent
         Assert.Equal(0, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetPendingMessages(inbox).Count));
         Assert.Equal(0, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedCount(inbox)));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, message));
         await Fixture.WaitForInboxCountAsync(receiver, 0);
         await receiver.RetryWriteStateAsync();
         writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
 
         // A recorded identity is answered from its record, whatever the delivery's send time.
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = bound.AddTicks(1) })).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message with { SentAt = bound.AddTicks(1) }));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(bound, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
@@ -60,7 +60,7 @@ public sealed class InboxSentAtBoundTests() : MessagingBehaviorTestBase(new Sent
         const string route = "messages/sent-time-rollback";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var message = CreateEnvelope(receiver, NewMessage(2, "rolled-back"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, message));
         await WaitForBarrierAsync(receiver, handler);
         if (completed)
         {
@@ -75,9 +75,9 @@ public sealed class InboxSentAtBoundTests() : MessagingBehaviorTestBase(new Sent
         JobClock.Advance(-(Window + TimeSpan.FromTicks(1)));
         Assert.True(message.SentAt > Fixture.JobNow + Window);
 
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(1) })).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) }));
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(1) }));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(message.SentAt, await Fixture.OnGrainAsync(receiver, () => completed
             ? InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)
@@ -94,7 +94,7 @@ public sealed class InboxSentAtBoundTests() : MessagingBehaviorTestBase(new Sent
         var receiver = NewGrain();
         var floor = Fixture.JobNow - Window;
         var advancing = CreateEnvelope(receiver, NewMessage(3, "advances-floor")) with { SentAt = floor };
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, advancing)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, advancing));
         var inbox = Fixture.GetInbox(receiver);
         Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
 
@@ -102,7 +102,7 @@ public sealed class InboxSentAtBoundTests() : MessagingBehaviorTestBase(new Sent
         var untracked = CreateEnvelope(receiver, NewMessage(4, "at-floor")) with { SentAt = floor };
         Assert.True(untracked.SentAt > Fixture.JobNow + Window);
 
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, untracked)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, untracked));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DeliverAsync(receiver, untracked with { SentAt = floor.AddTicks(1) }));
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
     }
