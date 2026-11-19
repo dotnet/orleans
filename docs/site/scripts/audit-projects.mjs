@@ -46,5 +46,5 @@ if (result.issues.length > 0) {
 }
 
 console.log(
-  `Documentation project audit passed: ${result.projects.length} projects (${result.docsProjects} docs, ${result.sampleProjects} samples), ${result.solutionEntries} exact solution entries, ${result.orleansPackageReferences} evaluated Orleans package references at ${policy.orleansPackageVersion}, all targeting ${policy.targetFramework}.`,
+  `Documentation project audit passed: ${result.projects.length} projects (${result.docsProjects} docs, ${result.sampleProjects} samples), ${result.solutionEntries} exact solution entries, ${result.orleansPackageReferences} evaluated Orleans package references at ${policy.orleansPackageVersion}, each targeting ${policy.targetFramework}, or ${policy.exceptionTargetFramework} with a framework exception.`,
 );

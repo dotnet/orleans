@@ -4,7 +4,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.18.0" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />

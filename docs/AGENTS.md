@@ -11,7 +11,10 @@ These rules apply recursively to documentation, snippets, and samples under
 - Keep snippets minimal, current, and self-contained, including declarations
   required by the displayed region.
 - Compile every affected snippet project. Don't publish pseudo-code as if it were a copyable example.
-- Documentation and snippet projects target `net10.0`.
+- Documentation and snippet projects target `net10.0`. A project which documents
+  packages that target only `net11.0` targets exactly `net11.0` and explains why in
+  `OrleansDocumentationTargetFrameworkException`. Snippets for those packages live in
+  `snippets/compiled-durable/` and compile in its `DurableDocumentationSnippets.csproj`.
 - Every `Microsoft.Orleans.*` package reference must use the approved version `10.2.2`. Keep the Orleans package family aligned and centralize versions where the project structure supports it.
 - Use an older Orleans package only for a narrow migration example whose purpose
   requires that version. Keep it under `migration` and document the reason in

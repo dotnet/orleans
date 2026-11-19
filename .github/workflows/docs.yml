@@ -103,8 +103,12 @@ jobs:
           ./docs/site/src/content/docs/validate-snippets.ps1 -PolicyOnly
           ./samples/Validate-Samples.ps1 -NoBuild
 
-      - name: Build and test documentation projects
-        run: dotnet test --solution docs/Docs.slnx --configuration Release --framework net10.0 -bl:docs-projects.binlog --minimum-expected-tests 1 --max-parallel-test-modules 1
+      - name: Build documentation projects
+        # Each project builds for its own target framework, including projects which target only net11.0.
+        run: dotnet build docs/Docs.slnx --configuration Release -bl:docs-projects-build.binlog
+
+      - name: Test documentation projects
+        run: dotnet test --solution docs/Docs.slnx --configuration Release --framework net10.0 --no-build -bl:docs-projects.binlog --minimum-expected-tests 1 --max-parallel-test-modules 1
 
       - name: Build samples against local Orleans packages
         shell: pwsh
@@ -120,6 +124,7 @@ jobs:
         with:
           name: documentation-build-binlogs
           path: |
+            docs-projects-build.binlog
             docs-projects.binlog
             Artifacts/Samples/Release/samples.binlog
           if-no-files-found: ignore

@@ -8,18 +8,30 @@
 
   <Import Project="$(MSBuildToolsPath)\NuGet.targets" />
 
-  <Target Name="Build">
-    <MSBuild Projects="@(ApiProject)"
+  <!-- Each API surface comes from net10.0, or from net11.0 for a project which targets only newer frameworks. -->
+  <Target Name="SelectApiFramework">
+    <MSBuild Projects="@(ApiProject)" Targets="GetTargetFrameworks" BuildInParallel="true">
+      <Output TaskParameter="TargetOutputs" ItemName="_ApiProjectFrameworks" />
+    </MSBuild>
+    <ItemGroup>
+      <_ApiProjectFrameworks ApiTargetFramework="net10.0" Condition="$([System.String]::Copy(';%(TargetFrameworks);').Contains(';net10.0;'))" />
+      <_ApiProjectFrameworks ApiTargetFramework="net11.0" Condition="'%(_ApiProjectFrameworks.ApiTargetFramework)' == ''" />
+      <ApiBuildProject Include="@(_ApiProjectFrameworks->'%(MSBuildSourceProjectFile)')"
+                       AdditionalProperties="TargetFramework=%(_ApiProjectFrameworks.ApiTargetFramework)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="Build" DependsOnTargets="SelectApiFramework">
+    <MSBuild Projects="@(ApiBuildProject)"
              Targets="Build"
-             Properties="TargetFramework=net10.0"
              BuildInParallel="true" />
   </Target>
 
   <!-- Generate only after the entire build succeeds, using its completed assemblies and references. -->
   <Target Name="GenerateApi" DependsOnTargets="Build">
-    <MSBuild Projects="@(ApiProject)"
+    <MSBuild Projects="@(ApiBuildProject)"
              Targets="GenAPIGenerateReferenceAssemblySource"
-             Properties="TargetFramework=net10.0;BuildProjectReferences=false"
+             Properties="BuildProjectReferences=false"
              BuildInParallel="true" />
   </Target>
 </Project>

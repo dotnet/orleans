@@ -81,14 +81,17 @@ The source audit reports a rule ID, file, line, and remediation. It enforces:
 `npm run build` and `npm run validate` discover every project under `docs/` and
 `samples/`, require exact membership in `docs/Docs.slnx` and
 `samples/Samples.slnx`, evaluate an exact `net10.0` target, and require every
-Orleans package reference to resolve to `10.2.2`. Historical package versions are
+Orleans package reference to resolve to `10.2.2`. A project which documents packages
+that target only `net11.0` targets exactly `net11.0` and states why in a meaningful
+`OrleansDocumentationTargetFrameworkException` property. Historical package versions are
 accepted only in a migration project with a used, meaningful
 `OrleansDocumentationVersionException` property. A sample awaiting publication
 may use a prerelease of `10.2.2` with the same property and a specific reason. To
 build and test the documentation projects locally, run:
 
 ```powershell
-dotnet test --solution ../Docs.slnx --configuration Release --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1
+dotnet build ../Docs.slnx --configuration Release
+dotnet test --solution ../Docs.slnx --configuration Release --framework net10.0 --no-build --minimum-expected-tests 1 --max-parallel-test-modules 1
 ```
 
 Build samples through `samples/Build-Samples.ps1`, which packs the current Orleans
@@ -110,7 +113,8 @@ Every packable Orleans source package must be documented or have a reasoned entr
 in `src/data/package-inventory-exclusions.json`.
 Fix `PROJECT001`-`PROJECT003` by adding or removing documentation projects in
 `docs/Docs.slnx` and sample projects in `samples/Samples.slnx` until filesystem
-discovery matches exactly. Fix `PROJECT004` by targeting only `net10.0`, and fix
+discovery matches exactly. Fix `PROJECT004` by targeting only `net10.0`, or only
+`net11.0` with a meaningful `OrleansDocumentationTargetFrameworkException`, and fix
 `PROJECT005` by updating the effective Orleans package version to `10.2.2`.
 `PROJECT006` identifies an invalid, vague, or stale version exception. Fix
 `SNIPPET001`/`SNIPPET002` in the reported snippet project before rebuilding.
@@ -153,9 +157,9 @@ Generate API data before previewing API pages or running a complete local build:
 npm run api:generate
 ```
 
-GitHub Actions generates API data on demand, builds `docs/Docs.slnx` with a
-diagnostic binlog, builds the complete site, and deploys `dist` to GitHub Pages
-from `main`.
+GitHub Actions generates API data on demand, builds `docs/Docs.slnx` for each
+project's target framework with a diagnostic binlog, tests its test projects,
+builds the complete site, and deploys `dist` to GitHub Pages from `main`.
 Pull requests receive a downloadable site artifact but never receive deployment
 permissions.
 
