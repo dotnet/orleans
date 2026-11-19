@@ -890,12 +890,8 @@ namespace Orleans.Streams
                 return false;
             }
 
-            // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
-            if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false }))
-            {
-                return false;
-            }
-
+            // Pending registrations retain their own cache cursors, so other streams can
+            // keep reading until the cache's normal back pressure limits are reached.
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             TagList? tags = null;
 
