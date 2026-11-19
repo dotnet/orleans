@@ -188,16 +188,25 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         ThrowIfFollowUpBlocked();
         var next = new EffectRecord
         {
-            Identity = followUp, Request = followUpRequest, ProviderKey = newKey, Policy = policy,
-            Status = EffectStatus.Pending, NextActionAt = now, NextAction = "dispatch",
-            ResolutionOwner = effect.ResolutionOwner, RelatedEffectKey = effect.ProviderKey, Authorization = authorization,
+            Identity = followUp,
+            Request = followUpRequest,
+            ProviderKey = newKey,
+            Policy = policy,
+            Status = EffectStatus.Pending,
+            NextActionAt = now,
+            NextAction = "dispatch",
+            ResolutionOwner = effect.ResolutionOwner,
+            RelatedEffectKey = effect.ProviderKey,
+            Authorization = authorization,
             OnSuccessPolicy = nextPolicy
         };
         // The original retains uncertainty and its evidence. Authorization transfers the next business action, rather
         // than inventing a provider outcome. Cancellation prevents another dispatch under the original identity.
         _effects[effect.ProviderKey] = effect with
         {
-            CancellationRequested = true, FollowUpEffectKey = newKey, Revision = effect.Revision + 1,
+            CancellationRequested = true,
+            FollowUpEffectKey = newKey,
+            Revision = effect.Revision + 1,
             CancellationReason = $"follow-up authorized: {authorization}",
             NextAction = effect.IsCompleted ? "completed" : "lookup-original-after-authorized-follow-up"
         };
@@ -240,9 +249,11 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             {
                 await SaveAsync(effect with
                 {
-                    Status = EffectStatus.Blocked, NextAction = "operator-upgrade-or-change-policy",
+                    Status = EffectStatus.Blocked,
+                    NextAction = "operator-upgrade-or-change-policy",
                     Evidence = "Stored execution policy is unsupported; dispatch is blocked.",
-                    NextActionAt = _clock.GetUtcNow() + TimeSpan.FromMinutes(1), Revision = effect.Revision + 1
+                    NextActionAt = _clock.GetUtcNow() + TimeSpan.FromMinutes(1),
+                    Revision = effect.Revision + 1
                 });
                 return;
             }
@@ -264,8 +275,10 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             var attempt = new EffectAttempt(Guid.NewGuid(), now, "Attempt may begin; absence of a response is uncertain.");
             var marked = effect with
             {
-                Status = EffectStatus.Attempting, MayHaveApplied = true,
-                Attempts = [.. effect.Attempts, attempt], Revision = effect.Revision + 1,
+                Status = EffectStatus.Attempting,
+                MayHaveApplied = true,
+                Attempts = [.. effect.Attempts, attempt],
+                Revision = effect.Revision + 1,
                 NextActionAt = now + effect.Policy.AttemptTimeout + effect.Policy.Backoff,
                 NextAction = effect.Policy.Execution is EffectExecution.RetrySafe ? "retry-same-key-or-lookup" : "lookup-or-operator-decision"
             };
@@ -284,8 +297,10 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
                 await SaveAsync(effect.MayHaveApplied
                     ? withheld with
                     {
-                        Status = EffectStatus.Reconciling, Evidence = withheldAttempts[^1].Evidence,
-                        Revision = withheld.Revision + 1, NextAction = "provider-lookup-or-operator-decision"
+                        Status = EffectStatus.Reconciling,
+                        Evidence = withheldAttempts[^1].Evidence,
+                        Revision = withheld.Revision + 1,
+                        NextAction = "provider-lookup-or-operator-decision"
                     }
                     : Complete(withheld, ProviderOutcome.ProvenNoEffect, withheldAttempts[^1].Evidence));
                 return;
@@ -318,7 +333,8 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
                 {
                     Status = result.Outcome is ProviderOutcome.ProvenNoEffect && !effect.MayHaveApplied ? EffectStatus.Pending : EffectStatus.Reconciling,
                     MayHaveApplied = result.Outcome is not ProviderOutcome.ProvenNoEffect || effect.MayHaveApplied,
-                    Evidence = result.Evidence, NextActionAt = _clock.GetUtcNow() + marked.Policy.Backoff,
+                    Evidence = result.Evidence,
+                    NextActionAt = _clock.GetUtcNow() + marked.Policy.Backoff,
                     Revision = marked.Revision + 1
                 };
             await SaveAsync(next);
@@ -334,7 +350,8 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         // Schedule the next action before issuing the query, so an unavailable provider leaves a responsible owner.
         var checking = effect with
         {
-            Status = EffectStatus.Reconciling, Revision = effect.Revision + 1,
+            Status = EffectStatus.Reconciling,
+            Revision = effect.Revision + 1,
             Evidence = effect.Status is EffectStatus.Attempting ? "Interrupted after attempt marker; dispatch may have occurred." : effect.Evidence,
             NextActionAt = _clock.GetUtcNow() + effect.Policy.RecheckInterval,
             NextAction = "provider-lookup-or-operator-decision"
@@ -364,7 +381,8 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         await SaveAsync(result.Outcome is ProviderOutcome.Unknown
             ? checking with
             {
-                Evidence = result.Evidence, Revision = checking.Revision + 1,
+                Evidence = result.Evidence,
+                Revision = checking.Revision + 1,
                 NextActionAt = _clock.GetUtcNow() + effect.Policy.RecheckInterval
             }
             : Complete(checking, result.Outcome, $"provider lookup: {result.Evidence}"));
@@ -382,9 +400,15 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             await ArmAsync(now);
             outgoing = new()
             {
-                Identity = identity, Request = request, ProviderKey = key, Policy = policy,
-                Status = EffectStatus.Pending, NextActionAt = now, NextAction = "dispatch",
-                ResolutionOwner = next.ResolutionOwner, RelatedEffectKey = next.ProviderKey,
+                Identity = identity,
+                Request = request,
+                ProviderKey = key,
+                Policy = policy,
+                Status = EffectStatus.Pending,
+                NextActionAt = now,
+                NextAction = "dispatch",
+                ResolutionOwner = next.ResolutionOwner,
+                RelatedEffectKey = next.ProviderKey,
                 Authorization = "original request on-success intent"
             };
             next = next with { NextEffectKey = key };
@@ -429,7 +453,9 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
     private async Task ArmAsync(DateTimeOffset due) =>
         _ = await _jobs.ScheduleJobAsync(new()
         {
-            Target = this.GetGrainId(), JobName = ExternalEffectHosting.WakeupJobName, DueTime = due
+            Target = this.GetGrainId(),
+            JobName = ExternalEffectHosting.WakeupJobName,
+            DueTime = due
         }, CancellationToken.None);
 
     private static bool CanDispatch(EffectRecord effect, DateTimeOffset now) =>
@@ -452,7 +478,9 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
                 _ => throw new ArgumentOutOfRangeException(nameof(outcome))
             },
             MayHaveApplied = outcome is ProviderOutcome.Applied,
-            Evidence = evidence, Revision = effect.Revision + 1, NextAction = "completed",
+            Evidence = evidence,
+            Revision = effect.Revision + 1,
+            NextAction = "completed",
             BusinessState = outcome switch
             {
                 ProviderOutcome.Applied when effect.Request.Kind is EffectKind.PaymentAuthorization => "authorized;ready-to-fulfill",

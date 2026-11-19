@@ -492,8 +492,11 @@ public sealed class ExternalEffectTests : IAsyncLifetime
         var jobs = services.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
         var job = new DurableJob
         {
-            Id = "wakeup", Name = ExternalEffectHosting.WakeupJobName, DueTime = DateTimeOffset.UtcNow,
-            TargetGrainId = Owner.GetGrainId(), ShardId = "shard"
+            Id = "wakeup",
+            Name = ExternalEffectHosting.WakeupJobName,
+            DueTime = DateTimeOffset.UtcNow,
+            TargetGrainId = Owner.GetGrainId(),
+            ShardId = "shard"
         };
         var next = jobs.ShouldRetry(new EffectJobContext(job, 100), new IOException("storage unavailable"));
         Assert.NotNull(next);
