@@ -6,7 +6,7 @@
     <PackageTags>$(PackageTags) Messaging Inbox Outbox</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
