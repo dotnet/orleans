@@ -13,8 +13,8 @@ namespace Orleans.Messaging;
 /// </summary>
 /// <remarks>
 /// A single loop runs on the activation scheduler and services the inbox whenever it is signaled.
-/// One durable job keeps waking the grain while the inbox or a registered <see cref="IInboxWorkSource"/> holds work
-/// which the activation can perform; inbox messages wait for a handler without a wake-up.
+/// One durable job keeps waking the grain while the inbox holds work which the activation can perform, or a callback
+/// registered with <see cref="IInbox.RegisterWakeup"/> reports work; inbox messages wait for a handler without a wake-up.
 /// Work staged with an earlier due time than the current wake-up schedules an earlier one, and the job which a newer,
 /// earlier wake-up supersedes completes when it runs.
 /// Wake-ups may be early, late, or duplicated: every pass derives the work to perform from current state.
@@ -154,7 +154,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
-        // A running job keeps rescheduling itself until the inbox and every work source are empty.
+        // A running job keeps rescheduling itself until the inbox and every registered wake-up report no work.
         var jobId = context.Job.Id;
         if (_wakeupJobId is null)
         {

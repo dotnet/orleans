@@ -43,7 +43,7 @@ internal sealed partial class Inbox
     // Whether every processed record which deduplication relies on is durable.
     private bool AreCompletionsDurable => _lastCompletionSequence <= _durableSequence;
 
-    // Every journal write prepares every state, so a write which makes a message or a work source's work pending ensures
+    // Every journal write prepares every state, so a write which makes a message or registered work pending ensures
     // its wake-up before it can become durable. After messaging fails, in-memory state may hold changes which must not
     // commit, such as a failed handler's, so every later write fails and recovery starts from the journal.
     ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken)
@@ -55,7 +55,7 @@ internal sealed partial class Inbox
         }
 
         var dueTime = _stagedWakeup;
-        if (GetWorkSourceDelay() is { } delay)
+        if (GetRegisteredWakeupDelay() is { } delay)
         {
             var workDueTime = MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), delay);
             if (dueTime is null || workDueTime < dueTime) dueTime = workDueTime;

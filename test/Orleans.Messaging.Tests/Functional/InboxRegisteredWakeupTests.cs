@@ -9,12 +9,12 @@ using Xunit;
 namespace Orleans.Messaging.Tests.Functional;
 
 /// <summary>
-/// The inbox's durable wake-up reactivates a grain while a registered <see cref="IInboxWorkSource"/> holds work.
+/// The inbox's durable wake-up reactivates a grain while a callback registered with <see cref="IInbox.RegisterWakeup"/> reports work.
 /// </summary>
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("Messaging")]
-public sealed class InboxWorkSourceTests() : MessagingBehaviorTestBase(receiverOnly: false)
+public sealed class InboxRegisteredWakeupTests() : MessagingBehaviorTestBase(receiverOnly: false)
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -132,8 +132,8 @@ public interface IWorkSourceTestGrain : IGrainWithGuidKey
     Task DeactivateAsync();
 }
 
-/// <summary>Holds pending work in journaled state and reports it as an inbox work source.</summary>
-public sealed class WorkSourceTestGrain : Grain, IWorkSourceTestGrain, IMessagingGrain, IInboxWorkSource
+/// <summary>Holds pending work in journaled state and reports it through a registered wake-up.</summary>
+public sealed class WorkSourceTestGrain : Grain, IWorkSourceTestGrain, IMessagingGrain
 {
     private static readonly ConcurrentDictionary<GrainId, ActivationLog> Activations = new();
     private readonly IJournaledStateManager _manager;
@@ -152,7 +152,7 @@ public sealed class WorkSourceTestGrain : Grain, IWorkSourceTestGrain, IMessagin
         _pending = pending;
         _wakeupDelayTicks = wakeupDelayTicks;
         _touches = touches;
-        inbox.Register(this);
+        inbox.RegisterWakeup(GetWakeupDelay);
     }
 
     /// <summary>Completes once the grain has activated at least <paramref name="expected"/> times.</summary>
@@ -214,7 +214,7 @@ public sealed class WorkSourceTestGrain : Grain, IWorkSourceTestGrain, IMessagin
         return Task.CompletedTask;
     }
 
-    TimeSpan? IInboxWorkSource.GetWakeupDelay() =>
+    private TimeSpan? GetWakeupDelay() =>
         _pending.Value > 0 ? TimeSpan.FromTicks(_wakeupDelayTicks.Value) : null;
 
     private sealed class ActivationLog

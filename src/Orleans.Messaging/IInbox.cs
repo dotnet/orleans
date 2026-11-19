@@ -30,12 +30,27 @@ public interface IInbox
     /// </remarks>
     IInbox Register(IInboxMessageSink sink);
 
-    /// <summary>Registers a source of durable work which the inbox's wake-up keeps reactivating the grain for.</summary>
-    /// <param name="source">The work source.</param>
+    /// <summary>
+    /// Registers a callback which reports durable work held outside the inbox, such as messages which an
+    /// <see cref="IInboxMessageSink"/> accepted, so the messaging wake-up reactivates the grain while that work remains.
+    /// </summary>
+    /// <param name="getWakeupDelay">
+    /// Returns <see langword="null"/> when no work is pending; otherwise, the longest acceptable delay before a
+    /// deactivated grain is reactivated to resume the work. A delay of <see cref="System.TimeSpan.Zero"/> or less requests
+    /// a prompt wake-up.
+    /// </param>
     /// <returns>This inbox.</returns>
     /// <remarks>
-    /// See <see cref="IInboxWorkSource"/>. Register work sources during construction or activation setup, before the
-    /// grain activates.
+    /// <para>
+    /// The callback runs synchronously on the activation scheduler before each journal write and on each wake-up. A write
+    /// which leaves work pending schedules the wake-up before it is stored, so a deactivation or crash can't strand the
+    /// work. Each wake-up reschedules after the shortest reported delay, and wake-ups end once no callback reports work
+    /// and no messages are pending. Wake-ups may be early, late, or duplicated.
+    /// </para>
+    /// <para>
+    /// Hold the work in journaled state of the grain's journal and resume it when the grain activates. Register the
+    /// callback during construction or activation setup, before the grain activates.
+    /// </para>
     /// </remarks>
-    IInbox Register(IInboxWorkSource source);
+    IInbox RegisterWakeup(System.Func<System.TimeSpan?> getWakeupDelay);
 }

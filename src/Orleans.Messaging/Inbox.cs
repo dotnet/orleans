@@ -26,7 +26,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private readonly MessagingPump _pump;
     private readonly InboxDispatcher _handlers = new([]);
     private readonly List<IInboxMessageSink> _sinks = [];
-    private readonly List<IInboxWorkSource> _workSources = [];
+    private readonly List<Func<TimeSpan?>> _wakeupSources = [];
 
     public Inbox(MessagingPump pump)
     {
@@ -65,10 +65,10 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         return this;
     }
 
-    public IInbox Register(IInboxWorkSource source)
+    public IInbox RegisterWakeup(Func<TimeSpan?> getWakeupDelay)
     {
-        ArgumentNullException.ThrowIfNull(source);
-        _workSources.Add(source);
+        ArgumentNullException.ThrowIfNull(getWakeupDelay);
+        _wakeupSources.Add(getWakeupDelay);
         return this;
     }
 
@@ -462,14 +462,14 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     }
 
     /// <summary>
-    /// Returns the delay until the next message or work source is due, or <see langword="null"/> when neither the inbox
-    /// nor any work source holds work which this activation can perform. Messages wait without a wake-up until a handler
+    /// Returns the delay until the next message or registered wake-up is due, or <see langword="null"/> when neither the inbox
+    /// nor any wake-up callback reports work which this activation can perform. Messages wait without a wake-up until a handler
     /// is registered.
     /// </summary>
     /// <param name="jobNow">The current Durable Jobs time, which the caller uses to schedule the wake-up.</param>
     internal TimeSpan? GetNextWakeupDelay(DateTimeOffset jobNow)
     {
-        var next = GetWorkSourceDelay();
+        var next = GetRegisteredWakeupDelay();
         if (_messages.Count == 0 || _handlers.IsEmpty || next <= TimeSpan.Zero) return next;
         foreach (var entry in _messages.Values)
         {
@@ -483,14 +483,14 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         return next;
     }
 
-    // Work sources may report any non-positive delay to request a prompt wake-up; it is normalized to zero so that due
+    // Callbacks may report any non-positive delay to request a prompt wake-up; it is normalized to zero so that due
     // times derived from it stay representable.
-    private TimeSpan? GetWorkSourceDelay()
+    private TimeSpan? GetRegisteredWakeupDelay()
     {
         TimeSpan? next = null;
-        foreach (var source in _workSources)
+        foreach (var getWakeupDelay in _wakeupSources)
         {
-            if (source.GetWakeupDelay() is not { } delay) continue;
+            if (getWakeupDelay() is not { } delay) continue;
             if (delay <= TimeSpan.Zero) return TimeSpan.Zero;
             if (next is null || delay < next) next = delay;
         }

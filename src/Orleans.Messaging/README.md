@@ -143,12 +143,12 @@ construction or activation setup, before journal recovery.
   sink honors their `DeliverAt`. Declined messages follow the handler path once
   `DeliverAt` passes. Retained completion records deduplicate before a sink runs;
   the durable admission floor expires an untracked message's old send time.
-- `IInbox.Register(IInboxWorkSource)` adds a work source: a component, such as a
-  sink, that holds durable work in the grain's journal. `GetWakeupDelay` returns how
-  soon a deactivated grain must wake to resume that work, or `null` when none is
-  pending. Every journal write that leaves work pending schedules the messaging
-  wake-up before it is stored, and the wake-up reactivates the grain until the work
-  clears. The source's owner resumes its work on activation.
+- `IInbox.RegisterWakeup(getWakeupDelay)` adds a callback for a component, such as a
+  sink, that holds durable work in the grain's journal. It returns how soon a
+  deactivated grain must wake to resume that work, or `null` when none is pending.
+  Every journal write that leaves work pending schedules the messaging wake-up before
+  it is stored, and the wake-up reactivates the grain until the work clears. The
+  component resumes its work on activation.
 
 ## Delivery and processing
 
@@ -220,8 +220,8 @@ original `SentAt` for retries of the same logical send.
 Dead-letter retention limits control diagnostic history. The application-owned
 outcome and follow-up work have the lifetime the application gives them.
 Each activation runs one messaging pump on its scheduler, processing inbox batches.
-One durable job per grain wakes the pump while the inbox or a registered work source
-holds work. Journaled state determines which messages are due, so each wake-up
+One durable job per grain wakes the pump while the inbox or a registered wake-up
+callback holds work. Journaled state determines which messages are due, so each wake-up
 processes exactly the ready work. A live activation processes due work as soon as it is
 durable; the job covers a failed activation, so work that is already due resumes within
 about a second of recovery. The job retries indefinitely with backoff while activation
