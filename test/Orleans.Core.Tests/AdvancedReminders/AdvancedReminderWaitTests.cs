@@ -43,6 +43,16 @@ public class AdvancedReminderWaitTests : AdvancedReminderServiceTestBase
         => await CheckReadAsync(operation, cancel: true, alreadyCanceled);
 
     [Fact]
+    public async Task CanceledObservation_WithReleasedToken_ReportsCancellation()
+    {
+        var table = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        var dispatcher = new AdvancedReminderDispatcherGrain(CreateService(table));
+        var token = new CancellationToken(canceled: true);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => dispatcher.ObserveDeliveryAsync(Guid.NewGuid(), token));
+    }
+
+    [Fact]
     public async Task CanceledDefinitionWrite_RemainsAwaitedUntilTheProviderFinishes()
     {
         var clock = new FakeTimeProvider();

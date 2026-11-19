@@ -117,6 +117,7 @@ internal sealed class AdvancedReminderDispatcherGrain(
 
     public async Task ObserveDeliveryAsync(Guid deliveryToken, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var observation = _deliveryObservations[deliveryToken];
         var failure = await observation.Completion.WaitAsync(cancellationToken);
         if (observation.SameOccurrence && failure is not null)

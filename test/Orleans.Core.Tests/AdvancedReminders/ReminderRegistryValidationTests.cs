@@ -258,6 +258,22 @@ public class ReminderRegistryValidationTests
         Assert.Same(reminder, result);
     }
 
+    [Fact]
+    public async Task Unregister_OnlyDelegatesForTheHandleOwner()
+    {
+        var service = Substitute.For<AdvancedReminderServiceInterface>();
+        var registry = CreateRegistry(reminderService: service);
+        var owner = GrainId.Create("test", "owner");
+        var reminder = new Orleans.AdvancedReminders.ReminderEntry { GrainId = owner, ReminderName = "r" }.ToIGrainReminder();
+
+        await Assert.ThrowsAsync<ArgumentException>("reminder", async () =>
+            await registry.UnregisterReminder(GrainId.Create("test", "other"), reminder));
+        await service.DidNotReceive().UnregisterReminder(Arg.Any<IGrainReminder>());
+
+        await registry.UnregisterReminder(owner, reminder);
+        await service.Received(1).UnregisterReminder(reminder);
+    }
+
     private static ReminderRegistry CreateRegistry(
         AdvancedReminderOptions? options = null,
         AdvancedReminderServiceInterface? reminderService = null,

@@ -373,6 +373,8 @@ The dispatcher uses an interleaving Durable Jobs handler and awaits an ordinary 
 
 Replacing or unregistering a reminder commits its definition change before attempting to cancel the previous durable job. This includes administrative mutations and changed attribute declarations. This cleanup is best-effort and waits at most five seconds, including when the job backend ignores request cancellation. A failed or timed-out cleanup is logged; it does not undo the committed change or prevent subsequent dispatcher requests. Any stale occurrence remains fenced by the persisted schedule identity.
 
+The grain-scoped registry accepts an unregister handle only from the grain that owns the reminder. Administrative removal uses the reminder management API.
+
 Journaled shard creation and discovery share the same local queue, including when discovery overlaps the first enqueue. Durable Jobs routes cancellation to the current shard owner and records removal there. An already-started attempt may finish. See [Durable Jobs shard discovery and cancellation](../Orleans.DurableJobs/README.md#shard-discovery-and-lookahead).
 
 Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late read response is discarded and cannot resume the abandoned mutation. A failed recovery page leaves its hash range incomplete so the next heartbeat retries that range.

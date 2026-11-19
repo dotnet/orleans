@@ -27,6 +27,11 @@ internal sealed class ReminderRegistry(
     public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
     {
         ArgumentNullException.ThrowIfNull(reminder);
+        if (reminder is ReminderData data && data.GrainId != callingGrainId)
+        {
+            throw new ArgumentException("The reminder belongs to another grain.", nameof(reminder));
+        }
+
         return GetReminderService().UnregisterReminder(reminder);
     }
 
