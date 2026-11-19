@@ -417,6 +417,28 @@ public sealed class ExternalEffectTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SlowMarkerAcknowledgementRechecksSafetyDeadlineBeforeDispatch()
+    {
+        var accepted = await Owner.SubmitAsync(_identity, Payment);
+        await Owner.ChangePolicyAsync(_identity, accepted.Revision, accepted.Policy with
+        {
+            IdempotencySafetyDeadline = _clock.GetUtcNow() + TimeSpan.FromMinutes(1)
+        }, "provider retention contract");
+        var gate = _storage.HoldNextAcknowledgement(OwnerJournal);
+        var attempt = Owner.RunDueAsync();
+        await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        gate.Release.SetResult();
+        await attempt;
+
+        var result = (await Owner.GetAsync(_identity))!;
+        Assert.Equal(EffectStatus.Failed, result.Status);
+        Assert.False(result.MayHaveApplied);
+        Assert.Equal(ProviderOutcome.ProvenNoEffect, Assert.Single(result.Attempts).Outcome);
+        Assert.Empty((await Provider.GetSnapshotAsync()).DispatchKeys);
+    }
+
+    [Fact]
     public async Task RefundIsASeparatelyAuthorizedEffectAndPreservesOriginalReceiptIntent()
     {
         var accepted = await Owner.SubmitAsync(_identity, Payment with { OnSuccess = Email });
@@ -574,8 +596,15 @@ internal sealed class EffectFaultStorage : IJournalStorageProvider, IJournalStor
 {
     public VolatileJournalStorageProvider Inner { get; } = WorkflowTests.CreateStorage();
     private readonly ConcurrentDictionary<string, bool> _failures = new();
+    private readonly ConcurrentDictionary<string, EffectWriteGate> _holds = new();
 
     public void FailNext(JournalId journal, bool afterCommit = false) => _failures[journal.Value] = afterCommit;
+    public EffectWriteGate HoldNextAcknowledgement(JournalId journal)
+    {
+        var gate = new EffectWriteGate();
+        _holds[journal.Value] = gate;
+        return gate;
+    }
     public IJournalStorage CreateStorage(JournalId journalId) => new FaultStorage(this, journalId, Inner.CreateStorage(journalId));
     public IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, CancellationToken cancellationToken = default) =>
         Inner.ListAsync(options, cancellationToken);
@@ -610,10 +639,23 @@ internal sealed class EffectFaultStorage : IJournalStorageProvider, IJournalStor
                 await inner.AppendAsync(value, cancellationToken);
             }
 
+            if (owner._holds.TryRemove(id.Value, out var gate))
+            {
+                gate.Entered.SetResult();
+                await gate.Release.Task.WaitAsync(cancellationToken);
+            }
+
             if (fail)
             {
                 throw new IOException("Injected acknowledgement loss after journal publication.");
             }
+
         }
     }
+}
+
+internal sealed class EffectWriteGate
+{
+    public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

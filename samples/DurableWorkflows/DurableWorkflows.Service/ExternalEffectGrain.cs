@@ -276,6 +276,21 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
                 return;
             }
 
+            if (!FitsSafetyWindow(marked.Policy, _clock.GetUtcNow()))
+            {
+                var withheldAttempts = marked.Attempts.ToArray();
+                withheldAttempts[^1] = attempt with { Outcome = ProviderOutcome.ProvenNoEffect, Evidence = "Deadline elapsed while acknowledging the attempt marker; dispatch was withheld." };
+                var withheld = marked with { Attempts = withheldAttempts };
+                await SaveAsync(effect.MayHaveApplied
+                    ? withheld with
+                    {
+                        Status = EffectStatus.Reconciling, Evidence = withheldAttempts[^1].Evidence,
+                        Revision = withheld.Revision + 1, NextAction = "provider-lookup-or-operator-decision"
+                    }
+                    : Complete(withheld, ProviderOutcome.ProvenNoEffect, withheldAttempts[^1].Evidence));
+                return;
+            }
+
             cancellation.CancelAfter(effect.Policy.AttemptTimeout);
             ProviderResult result;
             try
@@ -419,8 +434,11 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
 
     private static bool CanDispatch(EffectRecord effect, DateTimeOffset now) =>
         effect.Attempts.Length < effect.Policy.MaxAttempts
-        && now + effect.Policy.AttemptTimeout < effect.Policy.Deadline
-        && (effect.Policy.Execution is not EffectExecution.RetrySafe || now + effect.Policy.AttemptTimeout < effect.Policy.IdempotencySafetyDeadline);
+        && FitsSafetyWindow(effect.Policy, now);
+
+    private static bool FitsSafetyWindow(EffectPolicy policy, DateTimeOffset now) =>
+        now + policy.AttemptTimeout < policy.Deadline
+        && (policy.Execution is not EffectExecution.RetrySafe || now + policy.AttemptTimeout < policy.IdempotencySafetyDeadline);
 
     private static EffectRecord Complete(EffectRecord effect, ProviderOutcome outcome, string evidence) =>
         effect with
@@ -499,7 +517,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
     }
 
     private static bool Supported(EffectPolicy policy, EffectKind kind) =>
-        policy.Version == 1 && Enum.IsDefined(policy.Execution) && policy.MaxAttempts > 0
+        policy.Version == 1 && Enum.IsDefined(kind) && Enum.IsDefined(policy.Execution) && policy.MaxAttempts > 0
         && policy.Backoff > TimeSpan.Zero && policy.AttemptTimeout > TimeSpan.Zero && policy.RecheckInterval > TimeSpan.Zero
         && policy.AttemptTimeout.TotalMilliseconds <= uint.MaxValue - 1
         && (kind is not EffectKind.Email || policy.Execution is EffectExecution.ReconcileOnInterruption);
