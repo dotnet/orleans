@@ -21,12 +21,12 @@ public readonly struct DeliveryResult
     public string? Message { get; init; }
 
     /// <summary>
-    /// Gets the code which identifies why the receiver dead-lettered the message: an application-defined code from an
+    /// Gets the code which identifies why the receiver rejected the message: an application-defined code from an
     /// inbox message sink, such as <c>"orders/duplicate-order"</c>;
     /// <see langword="null"/> when the receiver reported none.
     /// </summary>
     /// <remarks>
-    /// Messaging carries the code to the inbox dead letter and to the sender's
+    /// Messaging carries the code to the receiver's processed record and to the sender's
     /// <see cref="OutboxMessageRetirement.Code"/> without interpreting it.
     /// </remarks>
     [Id(2)]
@@ -57,7 +57,7 @@ public readonly struct DeliveryResult
     };
 
     /// <summary>
-    /// Creates a result indicating the message was dead-lettered.
+    /// Creates a result indicating the receiver rejected the message permanently.
     /// </summary>
     /// <param name="reason">The diagnostic reason.</param>
     /// <param name="code">The application-defined code which identifies the rejection, if any.</param>
