@@ -27,9 +27,9 @@ public sealed partial class AdvancedReminderFeatureTests
         await using var cluster = await CreateClusterAsync(reminderClock: clock, retryPolicy: ReminderRetryPolicy.UntilSuccess,
             missedReminderGracePeriod: gracePeriod);
         var grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
-        while (grain.GetGrainId().GetUniformHashCode() >= (1u << 28))
+        while (grain.GetGrainId().GetUniformHashCode() < 0xF0000000)
         {
-            // Use the first group of hash ranges visited by reconciliation.
+            // The old bucket scan reached this part of the ring on its last heartbeat.
             grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
         }
 

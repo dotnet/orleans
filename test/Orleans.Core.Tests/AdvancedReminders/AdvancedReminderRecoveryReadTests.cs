@@ -20,7 +20,7 @@ public class AdvancedReminderRecoveryReadTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task StalledPageRead_ReleasesRecovery_AndRetriesIncompleteRange(bool cancel, bool continuationPage)
+    public async Task StalledPageRead_ReleasesRecovery_AndRetriesIncompletePage(bool cancel, bool continuationPage)
     {
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 27, 10, 0, 0, TimeSpan.Zero));
         var table = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
@@ -77,8 +77,8 @@ public class AdvancedReminderRecoveryReadTests
             var retriedRange = reads[continuationPage ? 2 : 1];
             Assert.Equal(interruptedRange.Begin, retriedRange.Begin);
             Assert.Equal(interruptedRange.End, retriedRange.End);
-            Assert.Null(retriedRange.Token);
-            Assert.Equal(AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation, retryReads);
+            Assert.Equal(interruptedRange.Token, retriedRange.Token);
+            Assert.Equal(1, retryReads);
             await dispatcher.Received(1).EnsureScheduledAsync(
                 retryEntry.GrainId, retryEntry.ReminderName, retryEntry.ScheduleId, force: true, Arg.Any<CancellationToken>());
             Assert.Single(dispatcher.ReceivedCalls());

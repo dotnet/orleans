@@ -17,9 +17,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
 {
     private const int BatchSize = 32;
     internal const int RecoveryPageSize = 256;
-    private const int ScanBucketCount = 4_096;
-    internal const int ScanBucketsPerReconciliation = 256;
-    private const ulong ScanBucketWidth = (ulong)uint.MaxValue / ScanBucketCount + 1;
+    internal const int MaxPagesPerReconciliation = 256;
     internal static readonly TimeSpan ReconciliationPeriod = TimeSpan.FromMinutes(1);
     internal static readonly TimeSpan ReconciliationEntryTimeout = TimeSpan.FromMinutes(1);
     private readonly IReminderTable _reminderTable = reminderTable;
@@ -29,7 +27,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private bool _started;
     private bool _forceCurrentScan;
-    private int _nextScanBucket;
+    private string? _scanContinuationToken;
     private DateTimeOffset _nextReconciliationUtc;
 
     public async Task StartAsync(bool force, CancellationToken cancellationToken)
@@ -56,50 +54,40 @@ internal sealed class AdvancedReminderRecoveryGrain(
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var tasks = new List<Task>(BatchSize);
-        var bucketsScanned = 0;
-        while (bucketsScanned < ScanBucketsPerReconciliation)
+        for (var pagesScanned = 0; pagesScanned < MaxPagesPerReconciliation; pagesScanned++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var bucket = _nextScanBucket;
-            var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
-            var end = (uint)(((ulong)bucket + 1) * ScanBucketWidth - 1);
-            string? continuationToken = null;
-            do
+            // Equal bounds traverse the full hash ring. The provider cursor keeps the scan
+            // bounded by populated pages and lets the next heartbeat resume an incomplete pass.
+            var page = await ReminderTableRead.WaitAsync(
+                _reminderTable.ReadRows(0, 0, RecoveryPageSize, _scanContinuationToken), _timeProvider, cancellationToken);
+            foreach (var entry in page.Reminders)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                // A stuck provider must not retain the recovery grain or its scan
-                // cursor forever. Retry this incomplete range on the next heartbeat.
-                var page = await ReminderTableRead.WaitAsync(
-                    _reminderTable.ReadRows(begin, end, RecoveryPageSize, continuationToken), _timeProvider, cancellationToken);
-                foreach (var entry in page.Reminders)
+                if (!force
+                    && !string.IsNullOrEmpty(entry.JobId)
+                    && !string.IsNullOrEmpty(entry.JobShardId)
+                    && !AdvancedReminderService.ShouldRecoverOverdueOccurrence(entry, now, _options))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!force
-                        && !string.IsNullOrEmpty(entry.JobId)
-                        && !string.IsNullOrEmpty(entry.JobShardId)
-                        && !AdvancedReminderService.ShouldRecoverOverdueOccurrence(entry, now, _options))
-                    {
-                        continue;
-                    }
-
-                    tasks.Add(ReconcileEntryAsync(entry, force, cancellationToken));
-                    await FlushTasksIfFullAsync(tasks);
+                    continue;
                 }
 
-                continuationToken = page.ContinuationToken;
-            } while (continuationToken is not null);
+                tasks.Add(ReconcileEntryAsync(entry, force, cancellationToken));
+                await FlushTasksIfFullAsync(tasks);
+            }
 
-            bucketsScanned++;
-            _nextScanBucket = (_nextScanBucket + 1) % ScanBucketCount;
-            if (_nextScanBucket == 0)
+            if (tasks.Count > 0)
+            {
+                await Task.WhenAll(tasks);
+                tasks.Clear();
+            }
+
+            _scanContinuationToken = page.ContinuationToken;
+            if (_scanContinuationToken is null)
             {
                 _forceCurrentScan = false;
+                break;
             }
-        }
-
-        if (tasks.Count > 0)
-        {
-            await Task.WhenAll(tasks);
         }
     }
 

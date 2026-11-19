@@ -85,7 +85,7 @@ public class AdvancedReminderRecoveryGrainTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ReconcileAsync_ScansInBoundedRangesAndDispatchesOnlyRequiredRows(bool force)
+    public async Task ReconcileAsync_ScansTheRingInBoundedPagesAndDispatchesOnlyRequiredRows(bool force)
     {
         const int reminderCount = AdvancedReminderRecoveryGrain.RecoveryPageSize * 2 + 1;
         var entries = Enumerable.Range(0, reminderCount)
@@ -104,25 +104,10 @@ public class AdvancedReminderRecoveryGrainTests
             .ToArray();
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         var readCount = 0;
-        uint? pagedBegin = null;
-        uint? pagedEnd = null;
-        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(call =>
+        reminderTable.ReadRows(0, 0, AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(call =>
         {
             Interlocked.Increment(ref readCount);
-            var begin = call.ArgAt<uint>(0);
-            var end = call.ArgAt<uint>(1);
             var continuationToken = call.ArgAt<string?>(3);
-            if (pagedBegin is null)
-            {
-                pagedBegin = begin;
-                pagedEnd = end;
-            }
-
-            if (begin != pagedBegin || end != pagedEnd)
-            {
-                return new ReminderTableData();
-            }
-
             var offset = continuationToken is null
                 ? 0
                 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
@@ -144,13 +129,8 @@ public class AdvancedReminderRecoveryGrainTests
         await recovery.ReconcileAsync(force, CancellationToken.None);
 
         await reminderTable.DidNotReceive().StartAsync(Arg.Any<CancellationToken>());
-        Assert.Equal(AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation + 2, readCount);
+        Assert.Equal(3, readCount);
         await reminderTable.DidNotReceive().ReadRows((uint)0, (uint)0);
-        await reminderTable.Received().ReadRows(
-            Arg.Any<uint>(),
-            Arg.Any<uint>(),
-            AdvancedReminderRecoveryGrain.RecoveryPageSize,
-            Arg.Any<string?>());
         await dispatcher.Received(1).EnsureScheduledAsync(
             entries[0].GrainId,
             entries[0].ReminderName,
@@ -160,6 +140,50 @@ public class AdvancedReminderRecoveryGrainTests
         Assert.Equal(
             force ? reminderCount : 1,
             dispatcher.ReceivedCalls().Count(call => call.GetMethodInfo().Name == nameof(IAdvancedReminderDispatcherGrain.EnsureScheduledAsync)));
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_ResumesAtTheNextPageAfterTheHeartbeatBudget()
+    {
+        const int budget = AdvancedReminderRecoveryGrain.MaxPagesPerReconciliation;
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "after-page-budget"),
+            ReminderName = "after-page-budget",
+            StartAt = DateTime.UtcNow.AddMinutes(1),
+            Period = TimeSpan.FromMinutes(1),
+            ScheduleId = "missing-handle",
+        };
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        var tokens = new List<string?>();
+        reminderTable.ReadRows(0, 0, AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(call =>
+        {
+            var token = call.ArgAt<string?>(3);
+            tokens.Add(token);
+            var index = token is null ? 0 : int.Parse(token, CultureInfo.InvariantCulture);
+            return index == budget
+                ? new ReminderTableData([entry])
+                : new ReminderTableData([], (index + 1).ToString(CultureInfo.InvariantCulture));
+        });
+        var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(Arg.Any<string>(), null).Returns(dispatcher);
+        var recovery = new AdvancedReminderRecoveryGrain(reminderTable, grainFactory,
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance, Options.Create(new Orleans.AdvancedReminders.ReminderOptions()));
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await recovery.ReconcileAsync(force: false, cancellationToken);
+        Assert.Equal(budget, tokens.Count);
+        Assert.Empty(dispatcher.ReceivedCalls());
+
+        await recovery.ReconcileAsync(force: false, cancellationToken);
+        Assert.Equal(budget + 1, tokens.Count);
+        Assert.Equal(budget.ToString(CultureInfo.InvariantCulture), tokens[^1]);
+        await dispatcher.Received(1).EnsureScheduledAsync(
+            entry.GrainId, entry.ReminderName, entry.ScheduleId, force: false, Arg.Any<CancellationToken>());
+
+        await recovery.ReconcileAsync(force: false, cancellationToken);
+        Assert.Null(tokens[budget + 1]);
     }
 
     [Theory]
@@ -312,8 +336,8 @@ public class AdvancedReminderRecoveryGrainTests
         var readCount = 0;
         reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(_ =>
             Interlocked.Increment(ref readCount) == 1
-                ? new ReminderTableData([failedEntry, successfulEntry])
-                : new ReminderTableData());
+                ? new ReminderTableData([failedEntry], "following-page")
+                : new ReminderTableData([successfulEntry]));
         var failedDispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
         failedDispatcher.EnsureScheduledAsync(
                 Arg.Any<GrainId>(),
@@ -334,7 +358,7 @@ public class AdvancedReminderRecoveryGrainTests
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
-        Assert.Equal(256, readCount);
+        Assert.Equal(2, readCount);
         await successfulDispatcher.Received(1).EnsureScheduledAsync(
             successfulEntry.GrainId,
             successfulEntry.ReminderName,
@@ -358,7 +382,7 @@ public class AdvancedReminderRecoveryGrainTests
         var readCount = 0;
         reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(_ =>
             Interlocked.Increment(ref readCount) == 1
-                ? new ReminderTableData([entry])
+                ? new ReminderTableData([entry], "following-page")
                 : new ReminderTableData());
         var dispatchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
@@ -387,7 +411,7 @@ public class AdvancedReminderRecoveryGrainTests
         timeProvider.Advance(AdvancedReminderRecoveryGrain.ReconciliationEntryTimeout);
         await reconcileTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        Assert.Equal(256, readCount);
+        Assert.Equal(2, readCount);
     }
 
     [Fact]
@@ -405,15 +429,11 @@ public class AdvancedReminderRecoveryGrainTests
 
         await recovery.StartAsync(force: false, CancellationToken.None);
         await recovery.StartAsync(force: false, CancellationToken.None);
-        Assert.Equal(256, reminderTable.ReceivedCalls().Count(call => call.GetMethodInfo().Name == nameof(Orleans.AdvancedReminders.IReminderTable.ReadRows)));
+        await reminderTable.Received(1).ReadRows(0, 0, AdvancedReminderRecoveryGrain.RecoveryPageSize, null);
 
         timeProvider.Advance(AdvancedReminderRecoveryGrain.ReconciliationPeriod);
         await recovery.StartAsync(force: false, CancellationToken.None);
 
-        Assert.Equal(512, reminderTable.ReceivedCalls().Count(call => call.GetMethodInfo().Name == nameof(Orleans.AdvancedReminders.IReminderTable.ReadRows)));
-        var rangeReads = reminderTable.ReceivedCalls()
-            .Where(call => call.GetMethodInfo().Name == nameof(Orleans.AdvancedReminders.IReminderTable.ReadRows))
-            .ToArray();
-        Assert.NotEqual(rangeReads[0].GetArguments()[0], rangeReads[AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation].GetArguments()[0]);
+        await reminderTable.Received(2).ReadRows(0, 0, AdvancedReminderRecoveryGrain.RecoveryPageSize, null);
     }
 }

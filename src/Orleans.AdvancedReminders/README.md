@@ -367,7 +367,7 @@ In-memory range reads keep up to one page of candidates, even when one grain has
 
 ## Delivery and recovery
 
-Definitions record the schedule, missed policy, next due time, and occurrence identity. Durable Jobs holds the scheduled delivery. Far-future occurrences are scheduled immediately; recurring schedules expand one occurrence at a time. Recovery repairs incomplete job handles through bounded reminder-table pages. With `UntilSuccess`, it also replaces overdue one-shot and recurring deliveries after the missed-occurrence grace period, even when a handle is still recorded. An active callback retains its occurrence. A retained retry or replacement has its own persisted delivery deadline, and recovery gives it the full grace period from that deadline. Replacement fences the old job while preserving the logical due time, schedule anchor, and missed-occurrence policy.
+Definitions record the schedule, missed policy, next due time, and occurrence identity. Durable Jobs holds the scheduled delivery. Far-future occurrences are scheduled immediately; recurring schedules expand one occurrence at a time. Recovery repairs incomplete job handles through bounded reminder-table pages across the full hash ring. Each heartbeat processes at most 256 pages and resumes from the last completed page if more remain. With `UntilSuccess`, it also replaces overdue one-shot and recurring deliveries after the missed-occurrence grace period, even when a handle is still recorded. An active callback retains its occurrence. A retained retry or replacement has its own persisted delivery deadline, and recovery gives it the full grace period from that deadline. Replacement fences the old job while preserving the logical due time, schedule anchor, and missed-occurrence policy.
 
 The dispatcher uses an interleaving Durable Jobs handler and awaits an ordinary dispatcher turn to prepare each delivery and admit one callback at a time for its recipient. The callback is awaited outside that normal turn, allowing independent recipient turns to update or unregister reminders without waiting on their own queued callback. A normal completion turn rechecks the original ETag and schedule identity so an old occurrence cannot overwrite its replacement. Each attempt chooses its admission token before preparation, so cancellation or a lost preparation reply can release only that attempt without advancing its occurrence. Cancellation observed before callback dispatch prevents that callback from starting. Neither successful scheduling nor a passing cron query promises exact wall-clock callback execution during outages or load.
 
@@ -377,7 +377,7 @@ The grain-scoped registry accepts an unregister handle only from the grain that 
 
 Journaled shard creation and discovery share the same local queue, including when discovery overlaps the first enqueue. Durable Jobs routes cancellation to the current shard owner and records removal there. An already-started attempt may finish. See [Durable Jobs shard discovery and cancellation](../Orleans.DurableJobs/README.md#shard-discovery-and-lookahead).
 
-Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late read response is discarded and cannot resume the abandoned mutation. A failed recovery page leaves its hash range incomplete so the next heartbeat retries that range.
+Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late read response is discarded and cannot resume the abandoned mutation. The next heartbeat retries a failed recovery page from the last completed page.
 
 Creating a durable job also has a one-minute timeout and honors cancellation even when the backend ignores the token. The committed definition remains pending if scheduling fails. Recovery rotates its occurrence identity before rescheduling, so a job created by an abandoned scheduling request is harmless. Recovery bounds each dispatcher repair to one minute, and the silo's shutdown token bounds the wait for the reminder provider to stop.
 
@@ -385,7 +385,7 @@ Reminder-table writes remain awaited until the provider finishes, preserving the
 
 ## Performance verification
 
-These local Release measurements used .NET 10 on an Apple M2 Pro with 30,000 synthetic in-memory registrations. The provider and management queries requested 64 rows. The recovery fixture had healthy job handles and used the default 256-row pages. Results compare the baseline and optimized builds using the median of five paired runs with alternating build order and tracing disabled.
+These local Release measurements used .NET 10 on an Apple M2 Pro with 30,000 synthetic in-memory registrations. The provider and management queries requested 64 rows. The historical bucket-based recovery fixture had healthy job handles and used 256-row pages. Results compare the baseline and optimized builds using the median of five paired runs with alternating build order and tracing disabled.
 
 | Scenario | Time per operation | Allocated bytes per operation |
 | --- | ---: | ---: |
