@@ -16,12 +16,11 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurableValueCommandHandler<T>
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private T? _value;
     private bool _isDirty;
-    private JournalStreamWriter _writer;
 
     public DurableValue(
         [ServiceKey] string key,
@@ -55,11 +54,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
 
     private void OnValuePersisted() => OnPersisted?.Invoke();
 
-    public void OnModified()
-    {
-        _isDirty = true;
-        _writer.MarkModified();
-    }
+    public void OnModified() => _isDirty = true;
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -69,7 +64,6 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        _writer = writer;
         _value = default;
         _isDirty = false;
     }

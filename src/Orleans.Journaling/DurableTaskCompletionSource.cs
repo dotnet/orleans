@@ -42,7 +42,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IDurableTaskCompletionSourceCommandHandler<T>
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -52,7 +52,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private DurableTaskCompletionSourceStatus _status;
     private T? _value;
     private Exception? _exception;
-    private JournalStreamWriter _writer;
 
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
@@ -92,7 +91,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
         var copy = _copier.Copy(value);
         _status = DurableTaskCompletionSourceStatus.Completed;
-        _writer.MarkModified();
         _value = copy;
         return true;
     }
@@ -106,7 +104,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
         var copy = _exceptionCopier.Copy(exception);
         _status = DurableTaskCompletionSourceStatus.Faulted;
-        _writer.MarkModified();
         _exception = copy;
         return true;
     }
@@ -119,7 +116,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
 
         _status = DurableTaskCompletionSourceStatus.Canceled;
-        _writer.MarkModified();
         return true;
     }
 
@@ -160,7 +156,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        _writer = writer;
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;
         _exception = null;

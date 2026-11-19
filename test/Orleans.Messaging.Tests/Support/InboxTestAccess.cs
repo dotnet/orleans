@@ -4,6 +4,8 @@ namespace Orleans.Messaging.Tests.Support;
 
 internal static class InboxTestAccess
 {
+    /// <summary>The dead-letter reason which recovery records for a message whose charged attempts exhaust its retry window.</summary>
+    public const string InterruptedAttemptReason = "The activation stopped without recording the outcome of an attempt.";
 
     public static IEnumerable<InboxMessage> Messages(this Inbox inbox) => inbox.MessageState.Values.Select(static entry => entry.Message);
 

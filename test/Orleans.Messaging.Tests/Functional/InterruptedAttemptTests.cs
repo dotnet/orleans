@@ -5,8 +5,8 @@ using Xunit;
 namespace Orleans.Messaging.Tests.Functional;
 
 /// <summary>
-/// An activation which stops without recording an attempt's outcome, because a handler failed after staging changes or
-/// the silo crashed, has its due messages charged one attempt at recovery, so backoff and InboxRetryTimeout bound every
+/// An activation which stops without recording an attempt's outcome, because a handler ended without an outcome or the
+/// silo crashed, has its due messages charged one attempt at recovery, so backoff and InboxRetryTimeout bound every
 /// failure path. This fixture's InboxRetryTimeout is zero.
 /// </summary>
 [Collection(MessagingClusterCollection.Name)]
@@ -15,7 +15,7 @@ namespace Orleans.Messaging.Tests.Functional;
 [TestArea("Messaging")]
 public sealed class InterruptedAttemptTests : MessagingBehaviorTestBase
 {
-    private const string InterruptedReason = "The activation stopped without recording the outcome of an attempt.";
+    private const string InterruptedReason = InboxTestAccess.InterruptedAttemptReason;
 
     [Fact]
     public async Task HandlerWhichAlwaysFailsAfterStaging_IsDeadLetteredOnceItsRetryWindowElapses()
@@ -37,48 +37,22 @@ public sealed class InterruptedAttemptTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task FailureOnAGrainWithUnreportableState_IsDeadLetteredOnceItsRetryWindowElapses()
-    {
-        const string processed = "orleans-messaging-inbox-messages-processed";
-        var receiver = Fixture.Client.GetGrain<IPersistentStateMessagingGrain>(Guid.NewGuid());
-        _ = await receiver.GetSnapshotAsync();
-        var deadLettered = Fixture.Metrics.WaitForCountAsync(processed, Fixture.Metrics.GetCount(processed, "dead_lettered") + 1, "dead_lettered");
-        var envelope = TestApplicationProtocol.CreateInbox(
-            Sessions, GrainId.Create("external-test-sender", "persistent"), "messages/record", NewMessage(171, "unreportable"), Fixture.JobNow);
-
-        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AsReference<IMessagingExtension>()
-            .DeliverAsync(envelope, TestContext.Current.CancellationToken)).Status);
-
-        // The grain's persistent state can't report changes, so each failure discards in-memory state through recovery.
-        // The charges still bound the retries: the second recovery dead-letters the message before activation completes,
-        // so the snapshot reads the committed outcome.
-        await deadLettered;
-        var snapshot = await receiver.GetSnapshotAsync();
-
-        Assert.Equal([InterruptedReason], snapshot.DeadLetterReasons);
-        Assert.Equal([2], snapshot.DeadLetterAttempts);
-        Assert.Equal(2, snapshot.Handled);
-        Assert.Equal(0, snapshot.InboxCount);
-    }
-
-    [Fact]
     public async Task GracefulDeactivationWithPendingMessages_ChargesNoAttempt()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
-        var envelope = CreateEnvelope(receiver, NewMessage(172, "graceful"), "messages/graceful");
-        using (var barrier = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/graceful"))
-        {
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
-            await WaitForBarrierAsync(receiver, barrier);
-            await receiver.ConfigureHandlerAsync(false);
 
-            // Deactivation cancels the in-flight attempt and journals a clean stop.
-            await receiver.RequestDeactivationAsync();
-            await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        }
+        // A scheduled message stays pending without an attempt, so the deactivation interrupts none.
+        var envelope = CreateEnvelope(receiver, NewMessage(172, "graceful"));
+        envelope = envelope with { Envelope = envelope.Envelope with { DeliverAt = Fixture.JobNow + TimeSpan.FromMinutes(1) } };
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        await receiver.ConfigureHandlerAsync(false);
+        await receiver.RequestDeactivationAsync();
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
+        // The message is due when the grain recovers, so only the journaled clean stop keeps recovery from charging it.
+        Fixture.Clock.Advance(TimeSpan.FromMinutes(2));
         _ = await receiver.GetSnapshotAsync();
         var inbox = Fixture.GetInbox(receiver);
         var state = await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, envelope.Envelope.MessageId));
