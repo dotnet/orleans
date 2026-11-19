@@ -283,10 +283,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         {
                             try
                             {
-                                for (var prepared = false; !prepared;)
+                                // Preparation serves every caller coalesced into this write, so only shutdown cancels it.
+                                while (!TryPrepareStates(_shutdownCancellation.Token, out var preparation))
                                 {
-                                    // Preparation serves every caller coalesced into this write, so only shutdown cancels it.
-                                    await PrepareStates(ref prepared, _shutdownCancellation.Token).ConfigureAwait(true);
+                                    await preparation.ConfigureAwait(true);
                                 }
 
                                 _shutdownCancellation.Token.ThrowIfCancellationRequested();
@@ -622,26 +622,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
-    // Completes when every state is synchronously ready; otherwise returns the first incomplete preparation.
-    private ValueTask PrepareStates(ref bool prepared, CancellationToken cancellationToken)
+    /// <summary>
+    /// Prepares every state in one synchronous pass, or returns the first preparation which hasn't completed.
+    /// </summary>
+    /// <remarks>
+    /// Capture follows a complete synchronous pass without yielding. Other turns can stage changes while an incomplete
+    /// preparation is awaited, so the caller then prepares every state again; a state whose prerequisites are in place
+    /// completes synchronously, so the passes converge.
+    /// </remarks>
+    private bool TryPrepareStates(CancellationToken cancellationToken, out ValueTask preparation)
     {
-        prepared = true;
         lock (_lock)
         {
             foreach (var state in _states.Values)
             {
-                var preparation = state.PrepareWriteAsync(cancellationToken);
-                if (!preparation.IsCompletedSuccessfully)
-                {
-                    prepared = false;
-                    return preparation;
-                }
-
+                preparation = state.PrepareWriteAsync(cancellationToken);
+                if (!preparation.IsCompletedSuccessfully) return false;
                 preparation.GetAwaiter().GetResult();
             }
         }
 
-        return ValueTask.CompletedTask;
+        preparation = default;
+        return true;
     }
 
     private void Fence(Exception exception)
