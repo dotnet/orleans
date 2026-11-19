@@ -20,6 +20,7 @@ public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
             ? Task.FromCanceled<IStreamQueueCheckpointer<string>>(cancellationToken)
             : Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
 }
+
 /// <summary>
 /// NoOpCheckpointer is used in EventDataGeneratorStreamProvider ecosystem to replace the default Checkpointer which requires a back end storage. In EventHubDataGeneratorStreamProvider,
 /// it is generating EventData on the fly when receiver pull messages from the queue, which means it doesn't support recoverable stream, hence check pointing won't bring much value there.
