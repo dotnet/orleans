@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.AdvancedReminders.AzureStorage;
@@ -48,9 +49,16 @@ public class AzureTableReminderStorageOptionsValidator : AzureStorageOperationOp
             throw new OrleansConfigurationException($"Configuration for {nameof(AzureTableReminderStorageOptions)} {Name} is invalid. {nameof(Options.BlobServiceClient)} is not configured.");
         }
 
-        if (string.IsNullOrWhiteSpace(Options.JobContainerName))
+        try
         {
-            throw new OrleansConfigurationException($"Configuration for {nameof(AzureTableReminderStorageOptions)} {Name} is invalid. {nameof(Options.JobContainerName)} is not valid.");
+            ArgumentNullException.ThrowIfNull(Options.JobContainerName);
+            // Every service ID contributes a suffix of the same length and character set.
+            var scopedName = AzureStorageReminderServiceCollectionExtensions.GetServiceScopedContainerName(Options.JobContainerName, string.Empty);
+            AzureBlobUtils.ValidateContainerName(scopedName);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new OrleansConfigurationException($"Configuration for {nameof(AzureTableReminderStorageOptions)} {Name} is invalid. {nameof(Options.JobContainerName)} must produce a valid Azure Blob container name.", exception);
         }
     }
 }

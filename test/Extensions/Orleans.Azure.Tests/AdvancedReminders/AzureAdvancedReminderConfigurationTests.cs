@@ -180,20 +180,42 @@ public class AzureAdvancedReminderConfigurationTests
         Assert.Contains(nameof(options.BlobServiceClient), exception.Message);
     }
 
-    [Fact]
-    public void StorageOptionsValidator_RequiresJobContainerName()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    [InlineData("---")]
+    [InlineData("InvalidName")]
+    [InlineData("invalid_name")]
+    [InlineData("invalid--name")]
+    public void StorageOptionsValidator_RejectsInvalidServiceScopedContainerName(string? jobContainerName)
     {
         var options = new AzureTableReminderStorageOptions
         {
             TableServiceClient = new TableServiceClient("UseDevelopmentStorage=true"),
             BlobServiceClient = new BlobServiceClient(new Uri("https://example.blob.core.windows.net")),
-            JobContainerName = " ",
+            JobContainerName = jobContainerName!,
         };
         var validator = new AzureTableReminderStorageOptionsValidator(options, Options.DefaultName);
 
         var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
 
         Assert.Contains(nameof(options.JobContainerName), exception.Message);
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("advanced-jobs---")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_suffix-after-truncation")]
+    public void StorageOptionsValidator_AcceptsValidServiceScopedContainerName(string jobContainerName)
+    {
+        var options = new AzureTableReminderStorageOptions
+        {
+            TableServiceClient = new TableServiceClient("UseDevelopmentStorage=true"),
+            BlobServiceClient = new BlobServiceClient(new Uri("https://example.blob.core.windows.net")),
+            JobContainerName = jobContainerName,
+        };
+
+        new AzureTableReminderStorageOptionsValidator(options, Options.DefaultName).ValidateConfiguration();
     }
 
     [Fact]

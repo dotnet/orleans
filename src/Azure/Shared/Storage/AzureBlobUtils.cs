@@ -6,6 +6,8 @@ using System.Text.RegularExpressions;
 namespace Orleans.Persistence.AzureStorage
 #elif ORLEANS_STREAMING
 namespace Orleans.Streaming.AzureStorage
+#elif ADVANCED_REMINDERS_AZURE
+namespace Orleans.AdvancedReminders.AzureStorage
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
