@@ -1867,7 +1867,14 @@ internal sealed partial class ActivationData :
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
-        ActivationTimeoutEvents.EmitScheduled(this, cancellationToken, cts.Token);
+        try
+        {
+            ActivationTimeoutEvents.EmitScheduled(this, cancellationToken, cts.Token);
+        }
+        catch (Exception exception)
+        {
+            LogActivationTimeoutDiagnosticFailed(_shared.Logger, exception, this);
+        }
         ScheduleOperation(new Command.Activate(requestContext, cts, metrics));
     }
 
@@ -2720,6 +2727,9 @@ internal sealed partial class ActivationData :
             public TaskCompletionSource<bool>? DeactivationTask;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Activation timeout diagnostic callback failed for {Activation}.")]
+    private static partial void LogActivationTimeoutDiagnosticFailed(ILogger logger, Exception exception, ActivationData activation);
 
     private abstract class Command(CancellationTokenSource cts) : IDisposable
     {

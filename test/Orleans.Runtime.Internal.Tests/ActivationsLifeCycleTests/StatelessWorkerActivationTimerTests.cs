@@ -69,6 +69,76 @@ public sealed class StatelessWorkerActivationTimerTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ThrowingTimeoutDiagnosticsDoNotInterruptActivation(bool throwFromPredicate)
+    {
+        await using var fixture = new Fixture();
+        await fixture.InitializeAsync();
+        using var listener = new ThrowingTimeoutListener(throwFromPredicate);
+        var grain = fixture.GrainFactory.GetGrain<IStatelessWorkerSingleActivationGrain>(Guid.NewGuid().GetHashCode());
+        var token = TestContext.Current.CancellationToken;
+        await grain.DoWork().WaitAsync(TimeSpan.FromSeconds(10), token);
+        await grain.DoWork().WaitAsync(TimeSpan.FromSeconds(10), token);
+        Assert.True(listener.Failures > 0);
+        Assert.Equal(1, fixture.HostedCluster.Silos[0].ServiceProvider
+            .GetRequiredService<StatelessWorkerSingleActivationTracker>().Current);
+        if (!throwFromPredicate)
+        {
+            var scheduled = Assert.IsType<ActivationTimeoutEvents.Scheduled>(listener.Payload);
+            Assert.Throws<ObjectDisposedException>(() => scheduled.TimeoutToken.WaitHandle);
+        }
+    }
+
+    private sealed class ThrowingTimeoutListener : IObserver<System.Diagnostics.DiagnosticListener>,
+        IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly bool _throwFromPredicate;
+        private readonly List<IDisposable> _subscriptions = [];
+        private readonly IDisposable _allListeners;
+        private int _failures;
+        public int Failures => Volatile.Read(ref _failures);
+        public object? Payload { get; private set; }
+
+        public ThrowingTimeoutListener(bool throwFromPredicate)
+        {
+            _throwFromPredicate = throwFromPredicate;
+            _allListeners = System.Diagnostics.DiagnosticListener.AllListeners.Subscribe(this);
+        }
+
+        public void OnNext(System.Diagnostics.DiagnosticListener listener)
+        {
+            if (listener.Name == ActivationTimeoutEvents.ListenerName)
+            {
+                _subscriptions.Add(listener.Subscribe(this, _ =>
+                {
+                    if (_throwFromPredicate)
+                    {
+                        Interlocked.Increment(ref _failures);
+                        throw new InvalidOperationException("Diagnostic predicate failed.");
+                    }
+                    return true;
+                }));
+            }
+        }
+
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            Payload = value.Value;
+            Interlocked.Increment(ref _failures);
+            throw new InvalidOperationException("Diagnostic observer failed.");
+        }
+
+        public void OnCompleted() { }
+        public void OnError(Exception error) { }
+        public void Dispose()
+        {
+            _allListeners.Dispose();
+            foreach (var subscription in _subscriptions) subscription.Dispose();
+        }
+    }
+
     [Fact]
     public async Task ActivationTimeoutCancelsTheCallbackAndAwaitsItsCompletion()
     {
