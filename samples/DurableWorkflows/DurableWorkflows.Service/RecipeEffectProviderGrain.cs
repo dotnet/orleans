@@ -26,6 +26,13 @@ public sealed class RecipeEffectProviderGrain : DurableGrain, IRecipeEffectProvi
     {
         _keys.Add(key);
         _attempts.Add(attemptId);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_behavior.Value is RecipeProviderBehavior.UnavailableBeforeApply)
+        {
+            await WriteStateAsync(CancellationToken.None);
+            throw new IOException("Provider connection ended before an authoritative outcome was received.");
+        }
+
         var repeatable = request.Kind is not EffectKind.Email;
         if (repeatable && _results.TryGetValue(key, out var existing))
         {

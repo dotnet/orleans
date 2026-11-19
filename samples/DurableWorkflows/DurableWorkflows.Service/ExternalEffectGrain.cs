@@ -1,7 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Durable.Jobs;
 using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 using Orleans.Durable.Tasks;
+using Orleans.Serialization;
 
 namespace DurableWorkflows;
 
@@ -11,13 +14,19 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
     private readonly ILocalDurableJobManager _jobs;
     private readonly TimeProvider _clock;
     private readonly IOptionsMonitor<ExternalEffectOptions> _options;
+    private readonly IOutbox _outbox;
+    private readonly MessageType<EffectRecord> _outcomes;
     private readonly Dictionary<string, CancellationTokenSource> _active = [];
 
-    public ExternalEffectGrain(ILocalDurableJobManager jobs, TimeProvider clock, IOptionsMonitor<ExternalEffectOptions> options)
+    public ExternalEffectGrain(ILocalDurableJobManager jobs,
+        [FromKeyedServices(ExternalEffectOptions.ClockName)] TimeProvider clock, IOptionsMonitor<ExternalEffectOptions> options,
+        IOutbox outbox, Serializer serializer)
     {
         _jobs = jobs;
         _clock = clock;
         _options = options;
+        _outbox = outbox;
+        _outcomes = new("external-effect-outcome", serializer);
         _effects = StateManager.GetOrAddDictionary<string, EffectRecord>("external-effects");
     }
 
@@ -66,24 +75,28 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
 
     public async Task<EffectRecord?> GetAsync(EffectIdentity identity)
     {
-        // A concurrent cancellation/resolution may have staged changes while a provider call is outstanding.
+        // Capture before the write: an interleaved decision after its capture belongs to a later acknowledgement.
+        var result = _effects.TryGetValue(Key(identity), out var effect) ? effect : null;
         await WriteStateAsync();
-        return _effects.TryGetValue(Key(identity), out var effect) ? effect : null;
+        return result;
     }
 
-    public async Task RunDueAsync()
+    public Task RunDueAsync() => RunDueCoreAsync(CancellationToken.None);
+
+    private async Task RunDueCoreAsync(CancellationToken attemptCancellationToken)
     {
         foreach (var key in _effects.Keys.ToArray())
         {
             var effect = _effects[key];
             if (!effect.IsCompleted && effect.NextActionAt <= _clock.GetUtcNow() && !_active.ContainsKey(key))
             {
-                await AdvanceAsync(effect);
+                attemptCancellationToken.ThrowIfCancellationRequested();
+                await AdvanceAsync(effect, attemptCancellationToken);
             }
         }
     }
 
-    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken) => RunDueAsync();
+    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken) => RunDueCoreAsync(attemptCancellationToken);
 
     public async Task<EffectRecord> CancelAsync(EffectIdentity identity, string reason)
     {
@@ -98,19 +111,20 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         var next = effect with
         {
             CancellationRequested = true,
+            CancellationReason = reason,
             Status = effect.MayHaveApplied ? EffectStatus.Reconciling : EffectStatus.Canceled,
             Evidence = reason,
             NextAction = effect.MayHaveApplied ? "lookup-or-operator-decision" : "completed",
             NextActionAt = _clock.GetUtcNow(),
             Revision = effect.Revision + 1
         };
-        await SaveAsync(next);
+        var saved = await SaveAsync(next);
         if (_active.TryGetValue(effect.ProviderKey, out var attempt))
         {
             attempt.Cancel();
         }
 
-        return _effects[effect.ProviderKey];
+        return saved;
     }
 
     public async Task<EffectRecord> ResolveAsync(EffectIdentity identity, long expectedRevision, ProviderOutcome outcome, string evidence)
@@ -125,20 +139,22 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
 
         // A decision closes dispatch for this identity. A deliberate resend is a separately authorized effect.
         var next = Complete(effect, outcome, $"operator: {evidence}");
-        await SaveAsync(next);
+        var saved = await SaveAsync(next);
         if (_active.TryGetValue(effect.ProviderKey, out var attempt))
         {
             attempt.Cancel();
         }
 
-        return _effects[effect.ProviderKey];
+        return saved;
     }
 
-    public async Task<EffectRecord> AuthorizeFollowUpAsync(EffectIdentity original, EffectIdentity followUp, string authorization)
+    public async Task<EffectRecord> AuthorizeFollowUpAsync(EffectIdentity original, EffectIdentity followUp, string authorization, EffectRequest? request = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(authorization);
         ValidateIdentity(followUp);
         var effect = Required(original);
+        var followUpRequest = request ?? effect.Request;
+        ValidateRequest(followUpRequest);
         var newKey = Key(followUp);
         if (newKey == effect.ProviderKey)
         {
@@ -147,7 +163,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
 
         if (effect.FollowUpEffectKey is { } recorded)
         {
-            if (recorded != newKey || _effects[recorded].Authorization != authorization)
+            if (recorded != newKey || _effects[recorded].Authorization != authorization || _effects[recorded].Request != followUpRequest)
             {
                 throw new InvalidOperationException("The original already has a different authorized follow-up.");
             }
@@ -158,8 +174,13 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
 
         ThrowIfFollowUpBlocked();
         var now = _clock.GetUtcNow();
-        var policy = _options.CurrentValue.Capture(effect.Request.Kind, now);
-        ValidatePolicy(policy, effect.Request.Kind, now);
+        var policy = _options.CurrentValue.Capture(followUpRequest.Kind, now);
+        ValidatePolicy(policy, followUpRequest.Kind, now);
+        var nextPolicy = followUpRequest.OnSuccess is { } nextRequest ? _options.CurrentValue.Capture(nextRequest.Kind, now) : null;
+        if (nextPolicy is not null)
+        {
+            ValidatePolicy(nextPolicy, followUpRequest.OnSuccess!.Kind, now);
+        }
         await ArmAsync(now);
         // A due job can interleave with scheduling. An attempt which became active, or which already recorded a newer
         // revision, still owns the original's outcome, so authorization waits until that attempt settles.
@@ -167,16 +188,17 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         ThrowIfFollowUpBlocked();
         var next = new EffectRecord
         {
-            Identity = followUp, Request = effect.Request, ProviderKey = newKey, Policy = policy,
+            Identity = followUp, Request = followUpRequest, ProviderKey = newKey, Policy = policy,
             Status = EffectStatus.Pending, NextActionAt = now, NextAction = "dispatch",
             ResolutionOwner = effect.ResolutionOwner, RelatedEffectKey = effect.ProviderKey, Authorization = authorization,
-            OnSuccessPolicy = effect.Request.OnSuccess is { } nextRequest ? _options.CurrentValue.Capture(nextRequest.Kind, now) : null
+            OnSuccessPolicy = nextPolicy
         };
         // The original retains uncertainty and its evidence. Authorization transfers the next business action, rather
         // than inventing a provider outcome. Cancellation prevents another dispatch under the original identity.
         _effects[effect.ProviderKey] = effect with
         {
             CancellationRequested = true, FollowUpEffectKey = newKey, Revision = effect.Revision + 1,
+            CancellationReason = $"follow-up authorized: {authorization}",
             NextAction = effect.IsCompleted ? "completed" : "lookup-original-after-authorized-follow-up"
         };
         _effects[newKey] = next;
@@ -204,14 +226,13 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         }
 
         var next = effect with { Policy = policy, Evidence = $"policy authorized: {authorization}", Revision = effect.Revision + 1 };
-        await SaveAsync(next);
-        return _effects[effect.ProviderKey];
+        return await SaveAsync(next);
     }
 
-    private async Task AdvanceAsync(EffectRecord effect)
+    private async Task AdvanceAsync(EffectRecord effect, CancellationToken attemptCancellationToken)
     {
         var key = effect.ProviderKey;
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(attemptCancellationToken);
         _active.Add(key, cancellation);
         try
         {
@@ -260,7 +281,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             try
             {
                 result = await Provider(marked).DispatchAsync(key, marked.Request, attempt.Id, cancellation.Token)
-                    .WaitAsync(effect.Policy.AttemptTimeout);
+                    .WaitAsync(effect.Policy.AttemptTimeout, cancellation.Token);
             }
             catch (Exception exception)
             {
@@ -274,14 +295,14 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             }
 
             var evidence = marked.Attempts.ToArray();
-            evidence[^1] = attempt with { Evidence = result.Evidence };
+            evidence[^1] = attempt with { Evidence = result.Evidence, Outcome = result.Outcome };
             marked = marked with { Attempts = evidence };
             var next = result.Outcome is ProviderOutcome.Applied or ProviderOutcome.Rejected
                 ? Complete(marked, result.Outcome, result.Evidence)
                 : marked with
                 {
-                    Status = result.Outcome is ProviderOutcome.ProvenNoEffect ? EffectStatus.Pending : EffectStatus.Reconciling,
-                    MayHaveApplied = result.Outcome is not ProviderOutcome.ProvenNoEffect,
+                    Status = result.Outcome is ProviderOutcome.ProvenNoEffect && !effect.MayHaveApplied ? EffectStatus.Pending : EffectStatus.Reconciling,
+                    MayHaveApplied = result.Outcome is not ProviderOutcome.ProvenNoEffect || effect.MayHaveApplied,
                     Evidence = result.Evidence, NextActionAt = _clock.GetUtcNow() + marked.Policy.Backoff,
                     Revision = marked.Revision + 1
                 };
@@ -334,7 +355,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             : Complete(checking, result.Outcome, $"provider lookup: {result.Evidence}"));
     }
 
-    private async Task SaveAsync(EffectRecord next)
+    private async Task<EffectRecord> SaveAsync(EffectRecord next)
     {
         EffectRecord? outgoing = null;
         if (next.Status is EffectStatus.Succeeded && next.Request.OnSuccess is { } request)
@@ -351,7 +372,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
                 ResolutionOwner = next.ResolutionOwner, RelatedEffectKey = next.ProviderKey,
                 Authorization = "original request on-success intent"
             };
-            next = next with { FollowUpEffectKey = key };
+            next = next with { NextEffectKey = key };
         }
 
         if (!next.IsCompleted)
@@ -363,7 +384,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         if (_effects.TryGetValue(next.ProviderKey, out var current) && current.Revision >= next.Revision)
         {
             await WriteStateAsync();
-            return;
+            return current;
         }
 
         if (outgoing is not null)
@@ -372,18 +393,28 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             {
                 throw new InvalidOperationException("The on-success operation identity is already in use.");
             }
+        }
 
+        if (next.IsCompleted)
+        {
+            _outbox.Send(_outcomes, MessageId.Create(next.ProviderKey, "outcome"),
+                GrainFactory.GetGrain<IEffectOrderGrain>(this.GetPrimaryKeyString()), next);
+        }
+
+        if (outgoing is not null)
+        {
             _effects[outgoing.ProviderKey] = outgoing;
         }
 
         _effects[next.ProviderKey] = next;
         await WriteStateAsync();
+        return next;
     }
 
     private async Task ArmAsync(DateTimeOffset due) =>
         _ = await _jobs.ScheduleJobAsync(new()
         {
-            Target = this.GetGrainId(), JobName = "external-effect-next-action", DueTime = due
+            Target = this.GetGrainId(), JobName = ExternalEffectHosting.WakeupJobName, DueTime = due
         }, CancellationToken.None);
 
     private static bool CanDispatch(EffectRecord effect, DateTimeOffset now) =>
@@ -407,6 +438,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
             BusinessState = outcome switch
             {
                 ProviderOutcome.Applied when effect.Request.Kind is EffectKind.PaymentAuthorization => "authorized;ready-to-fulfill",
+                ProviderOutcome.Applied when effect.Request.Kind is EffectKind.PaymentRefund => "refunded",
                 ProviderOutcome.Applied => "email-accepted",
                 ProviderOutcome.Rejected => "business-rejected",
                 _ => "confirmed-no-effect"
@@ -433,6 +465,11 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         ArgumentException.ThrowIfNullOrWhiteSpace(identity.ExecutionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(identity.OperationId);
         ArgumentOutOfRangeException.ThrowIfNegative(identity.Occurrence);
+        if (identity.OperationId.EndsWith("/on-success", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The /on-success operation suffix is reserved for the original request's outgoing intent.", nameof(identity));
+        }
+
         if (identity.Incarnation == Guid.Empty)
         {
             throw new ArgumentException("An effect requires the durable run incarnation.", nameof(identity));
@@ -445,7 +482,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         ArgumentException.ThrowIfNullOrWhiteSpace(request.ProviderAccount);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Destination);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Content);
-        if (!Enum.IsDefined(request.Kind) || (request.Kind is EffectKind.PaymentAuthorization && request.Amount <= 0))
+        if (!Enum.IsDefined(request.Kind) || (request.Kind is EffectKind.PaymentAuthorization or EffectKind.PaymentRefund && request.Amount <= 0))
         {
             throw new ArgumentException("Select an effect kind and a positive payment amount.", nameof(request));
         }
@@ -464,6 +501,7 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
     private static bool Supported(EffectPolicy policy, EffectKind kind) =>
         policy.Version == 1 && Enum.IsDefined(policy.Execution) && policy.MaxAttempts > 0
         && policy.Backoff > TimeSpan.Zero && policy.AttemptTimeout > TimeSpan.Zero && policy.RecheckInterval > TimeSpan.Zero
+        && policy.AttemptTimeout.TotalMilliseconds <= uint.MaxValue - 1
         && (kind is not EffectKind.Email || policy.Execution is EffectExecution.ReconcileOnInterruption);
 
     private static void ValidatePolicy(EffectPolicy policy, EffectKind kind, DateTimeOffset now)
@@ -473,6 +511,28 @@ public sealed class ExternalEffectGrain : DurableGrain, IExternalEffectGrain, ID
         {
             throw new ArgumentException("Unsupported or expired effect policy.", nameof(policy));
         }
+    }
+}
+
+public sealed class EffectOrderGrain : DurableGrain, IEffectOrderGrain
+{
+    private readonly IDurableDictionary<string, EffectRecord> _outcomes;
+
+    public EffectOrderGrain(IInbox inbox, Serializer serializer)
+    {
+        _outcomes = StateManager.GetOrAddDictionary<string, EffectRecord>("effect-outcomes");
+        inbox.Register(new MessageType<EffectRecord>("external-effect-outcome", serializer), (effect, context) =>
+        {
+            _outcomes[effect.ProviderKey] = effect;
+            context.Complete();
+        });
+    }
+
+    public async Task<Dictionary<string, EffectRecord>> GetOutcomesAsync()
+    {
+        var result = new Dictionary<string, EffectRecord>(_outcomes);
+        await WriteStateAsync();
+        return result;
     }
 }
 

@@ -10,6 +10,7 @@ It demonstrates:
 - cooperative cancellation with a persisted reason and inline compensation in a shielded child (`.Shielded()`);
 - an order saga which settles concurrent steps with `WhenAllCompleted` and compensates exactly the steps which succeeded;
 - idempotent effects keyed by operation ID;
+- [payment and email effect protocols](ExternalEffects.md) with provider keys, durable retry policy, reconciliation, and authorized follow-ups;
 - recovery of an in-progress approval workflow on another service replica;
 - observation of retained results by root ID.
 

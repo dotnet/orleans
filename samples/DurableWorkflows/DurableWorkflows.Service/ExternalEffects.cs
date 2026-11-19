@@ -20,7 +20,7 @@ public sealed record EffectIdentity(
         JsonSerializer.Serialize(new[] { owner, ExecutionId, Incarnation.ToString("N"), OperationId, Occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture) }))));
 }
 
-public enum EffectKind { PaymentAuthorization, IdempotentEmail, Email }
+public enum EffectKind { PaymentAuthorization, IdempotentEmail, Email, PaymentRefund }
 public enum EffectExecution { RetrySafe, ReconcileOnInterruption }
 public enum EffectStatus { Pending, Attempting, Reconciling, Blocked, Succeeded, Rejected, Failed, Canceled }
 public enum ProviderOutcome { Applied, Rejected, ProvenNoEffect, Unknown }
@@ -49,6 +49,7 @@ public sealed record EffectPolicy(
 // Changing these defaults affects newly accepted effects. Existing records carry their effective policy.
 public sealed class ExternalEffectOptions
 {
+    public const string ClockName = "external-effects";
     public int MaxAttempts { get; set; } = 3;
     public TimeSpan Backoff { get; set; } = TimeSpan.FromSeconds(5);
     public TimeSpan AttemptTimeout { get; set; } = TimeSpan.FromSeconds(10);
@@ -65,7 +66,8 @@ public sealed class ExternalEffectOptions
 public sealed record EffectAttempt(
     [property: Id(0)] Guid Id,
     [property: Id(1)] DateTimeOffset Started,
-    [property: Id(2)] string Evidence);
+    [property: Id(2)] string Evidence,
+    [property: Id(3)] ProviderOutcome? Outcome = null);
 
 [GenerateSerializer]
 public sealed record EffectRecord
@@ -88,6 +90,8 @@ public sealed record EffectRecord
     [Id(15)] public string BusinessState { get; init; } = "awaiting-effect";
     [Id(16)] public string? FollowUpEffectKey { get; init; }
     [Id(17)] public EffectPolicy? OnSuccessPolicy { get; init; }
+    [Id(18)] public string? NextEffectKey { get; init; }
+    [Id(19)] public string? CancellationReason { get; init; }
 
     public bool IsCompleted => Status is EffectStatus.Succeeded or EffectStatus.Rejected or EffectStatus.Failed or EffectStatus.Canceled;
 }
@@ -102,7 +106,7 @@ public interface IExternalEffectGrain : IGrainWithStringKey
     Task RunDueAsync();
     [AlwaysInterleave] Task<EffectRecord> CancelAsync(EffectIdentity identity, string reason);
     [AlwaysInterleave] Task<EffectRecord> ResolveAsync(EffectIdentity identity, long expectedRevision, ProviderOutcome outcome, string evidence);
-    Task<EffectRecord> AuthorizeFollowUpAsync(EffectIdentity original, EffectIdentity followUp, string authorization);
+    Task<EffectRecord> AuthorizeFollowUpAsync(EffectIdentity original, EffectIdentity followUp, string authorization, EffectRequest? request = null);
     Task<EffectRecord> ChangePolicyAsync(EffectIdentity identity, long expectedRevision, EffectPolicy policy, string authorization);
 }
 
@@ -118,7 +122,7 @@ public interface IRecipeEffectProviderGrain : IGrainWithStringKey
     [AlwaysInterleave] Task ReleaseResponseAsync();
 }
 
-public enum RecipeProviderBehavior { Apply, Reject, ProveNoEffect, LoseResponseAfterApply, LookupUnavailable }
+public enum RecipeProviderBehavior { Apply, Reject, ProveNoEffect, LoseResponseAfterApply, LookupUnavailable, UnavailableBeforeApply }
 
 [GenerateSerializer]
 public sealed record RecipeProviderSnapshot(
@@ -129,4 +133,9 @@ public sealed record RecipeProviderSnapshot(
 public interface IExternalEffectWorkflowGrain : IGrainWithStringKey
 {
     DurableTask<EffectRecord> RunAsync(EffectRequest request);
+}
+
+public interface IEffectOrderGrain : IGrainWithStringKey
+{
+    Task<Dictionary<string, EffectRecord>> GetOutcomesAsync();
 }

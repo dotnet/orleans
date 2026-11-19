@@ -3,7 +3,7 @@ namespace DurableWorkflows;
 public sealed record EffectSubmission(EffectIdentity Identity, EffectRequest Request);
 public sealed record EffectCancellation(EffectIdentity Identity, string Reason);
 public sealed record EffectResolution(EffectIdentity Identity, long ExpectedRevision, ProviderOutcome Outcome, string Evidence);
-public sealed record EffectFollowUp(EffectIdentity Original, EffectIdentity FollowUp, string Authorization);
+public sealed record EffectFollowUp(EffectIdentity Original, EffectIdentity FollowUp, string Authorization, EffectRequest? Request = null);
 
 public static class ExternalEffectEndpoints
 {
@@ -26,7 +26,7 @@ public static class ExternalEffectEndpoints
                 .ResolveAsync(request.Identity, request.ExpectedRevision, request.Outcome, request.Evidence)));
         effects.MapPost("/follow-up", (string owner, EffectFollowUp request, IClusterClient client) =>
             ExecuteAsync(() => client.GetGrain<IExternalEffectGrain>(owner)
-                .AuthorizeFollowUpAsync(request.Original, request.FollowUp, request.Authorization)));
+                .AuthorizeFollowUpAsync(request.Original, request.FollowUp, request.Authorization, request.Request)));
 
         if (app.Environment.IsDevelopment())
         {

@@ -10,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddKeyedRedisClient("clustering");
 builder.AddAzureBlobServiceClient("durable-state");
 builder.Services.AddOptions<ExternalEffectOptions>().Bind(builder.Configuration.GetSection("ExternalEffects"));
+builder.Services.AddExternalEffectRecipes();
 builder.Services.AddHealthChecks()
     .AddCheck("self", static () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), ["live"]);
 
