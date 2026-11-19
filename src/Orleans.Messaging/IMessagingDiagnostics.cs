@@ -13,7 +13,7 @@ public interface IMessagingDiagnostics
     /// <summary>
     /// Gets messages which failed during inbox processing.
     /// </summary>
-    IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters { get; }
+    IReadOnlyList<DeadLetter> InboxDeadLetters { get; }
 
     /// <summary>
     /// Stages removal of an inbox dead letter.
@@ -27,11 +27,10 @@ public interface IMessagingDiagnostics
 }
 
 /// <summary>
-/// Describes a dead-lettered durable message.
+/// Describes a message which the inbox dead-lettered.
 /// </summary>
-/// <typeparam name="TMessage">The incoming or outgoing message type.</typeparam>
-[GenerateSerializer, Alias("Orleans.Messaging.DeadLetter`1")]
-public sealed class DeadLetter<TMessage>
+[GenerateSerializer, Alias("Orleans.Messaging.DeadLetter")]
+public sealed class DeadLetter
 {
     /// <summary>
     /// Gets the message.
@@ -42,7 +41,7 @@ public sealed class DeadLetter<TMessage>
     /// buffers.
     /// </remarks>
     [Id(0)]
-    public required TMessage Message { get; init; }
+    public required InboxMessage Message { get; init; }
 
     /// <summary>
     /// Gets when the message was dead-lettered.
@@ -61,25 +60,17 @@ public sealed class DeadLetter<TMessage>
     /// </summary>
     [Id(3)]
     public int AttemptCount { get; init; }
-
-    /// <summary>
-    /// Gets the application-defined code which an inbox message sink reported when it dead-lettered the message, or
-    /// <see langword="null"/>.
-    /// </summary>
-    [Id(4)]
-    public string? Code { get; init; }
 }
 
 internal sealed class MessagingDiagnostics(Inbox inbox) : IMessagingDiagnostics
 {
-    public IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters =>
-        inbox.DeadLetterState.Values.Select(static entry => new DeadLetter<InboxMessage>
+    public IReadOnlyList<DeadLetter> InboxDeadLetters =>
+        inbox.DeadLetterState.Values.Select(static entry => new DeadLetter
         {
             Message = entry.Message,
             DeadLetteredAt = entry.DeadLetteredAt,
             Reason = entry.Reason,
-            AttemptCount = entry.AttemptCount,
-            Code = entry.Code
+            AttemptCount = entry.AttemptCount
         }).ToList();
 
     public bool RemoveInboxDeadLetter(MessageId messageId) => inbox.RemoveDeadLetter(messageId);

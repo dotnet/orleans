@@ -167,8 +167,8 @@ receiver returns a `DeliveryResult`:
   duplicate of a message that a sink rejected receives that rejection instead.
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages.
 - `HandlerNotFound`: the receiver has no registered handlers.
-- `DeadLettered`: the receiver durably rejected the message and moved it to its
-  dead letters, with a reason and an optional `Code`.
+- `DeadLettered`: an inbox sink durably rejected the message, with a reason and an
+  optional `Code`.
 - `Expired`: the message was sent before the receiver's deduplication window and
   the receiver retains no outcome for it. This attempt stages no message effects;
   an earlier attempt can have been accepted, so the delivery outcome is unknown.
@@ -255,4 +255,4 @@ The `Microsoft.Orleans` meter publishes counters for received and processed mess
 tagged by grain type and status, a histogram for processing duration, and the
 `orleans-messaging-inbox-depth` up-down counter for pending work. A message an inbox
 sink accepts counts as received `accepted` and processed `success`; one which the
-sink dead-letters counts as received and processed `dead_lettered`.
+sink rejects counts as received and processed `dead_lettered`.

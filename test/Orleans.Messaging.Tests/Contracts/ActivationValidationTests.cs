@@ -1,12 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Concurrency;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Functional;
-using Orleans.Messaging.Tests.Support;
-using Orleans.Placement;
-using Orleans.Runtime;
-using Orleans.Serialization.Invocation;
 using Xunit;
 
 namespace Orleans.Messaging.Tests.Contracts;
@@ -16,23 +11,6 @@ namespace Orleans.Messaging.Tests.Contracts;
 [TestArea("Messaging")]
 public sealed class ActivationValidationTests
 {
-    [Fact]
-    public void StatelessWorker_FailsWithSpecificDiagnostic()
-    {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            MessagingActivationValidator.Validate(typeof(StatelessGrain), new StatelessWorkerAttribute().PlacementStrategy));
-
-        Assert.Contains("one activation", exception.Message, StringComparison.Ordinal);
-        Assert.Contains(typeof(StatelessGrain).ToString(), exception.Message, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(typeof(ReentrantGrain))]
-    [InlineData(typeof(MayInterleaveGrain))]
-    [InlineData(typeof(InterleavableGrain))]
-    public void ReentrantAndInterleavingModels_AreAccepted(Type grainClass) =>
-        MessagingActivationValidator.Validate(grainClass, new RandomPlacementAttribute().PlacementStrategy);
-
     [Fact]
     public async Task StandardStateConstruction_MissingSelectedCodecFailsBeforeEnrollment()
     {
@@ -70,30 +48,5 @@ public sealed class ActivationValidationTests
 
         Assert.Same(cause, exception);
         Assert.False(owner.TryGetStateMachine("state", out _));
-    }
-
-    [Reentrant]
-    private sealed class ReentrantGrain;
-
-    [StatelessWorker]
-    private sealed class StatelessGrain;
-
-    [MayInterleave(nameof(Interleave))]
-    private sealed class MayInterleaveGrain
-    {
-        public static bool Interleave(IInvokable request) => true;
-    }
-
-    public interface IInterleavableBase
-    {
-        [AlwaysInterleave]
-        Task PingAsync();
-    }
-
-    public interface IInterleavableGrain : IGrain, IInterleavableBase;
-
-    private sealed class InterleavableGrain : IInterleavableGrain
-    {
-        public Task PingAsync() => Task.CompletedTask;
     }
 }

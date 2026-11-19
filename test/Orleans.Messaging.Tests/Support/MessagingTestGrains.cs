@@ -437,7 +437,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             [],
             InboxTestAccess.GetProcessedCount(_inboxState));
 
-    private DeadLetterSnapshot ToSnapshot(DeadLetter<InboxMessage> deadLetter) =>
+    private DeadLetterSnapshot ToSnapshot(DeadLetter deadLetter) =>
         new(
             deadLetter.Message.Envelope.MessageId,
             TestApplicationProtocol.Read(_sessions, deadLetter.Message).Route,

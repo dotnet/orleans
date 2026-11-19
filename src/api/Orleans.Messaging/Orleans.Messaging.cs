@@ -24,20 +24,17 @@ namespace Orleans.Hosting
 namespace Orleans.Messaging
 {
     [GenerateSerializer]
-    [Alias("Orleans.Messaging.DeadLetter`1")]
-    public sealed partial class DeadLetter<TMessage>
+    [Alias("Orleans.Messaging.DeadLetter")]
+    public sealed partial class DeadLetter
     {
         [Id(3)]
         public int AttemptCount { get { throw null; } init { } }
-
-        [Id(4)]
-        public string? Code { get { throw null; } init { } }
 
         [Id(1)]
         public System.DateTimeOffset DeadLetteredAt { get { throw null; } init { } }
 
         [Id(0)]
-        public required TMessage Message { get { throw null; } init { } }
+        public required InboxMessage Message { get { throw null; } init { } }
 
         [Id(2)]
         public required string Reason { get { throw null; } init { } }
@@ -213,7 +210,7 @@ namespace Orleans.Messaging
 
     public partial interface IMessagingDiagnostics
     {
-        System.Collections.Generic.IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters { get; }
+        System.Collections.Generic.IReadOnlyList<DeadLetter> InboxDeadLetters { get; }
 
         bool RemoveInboxDeadLetter(MessageId messageId);
     }
@@ -413,18 +410,18 @@ namespace OrleansCodeGen.Orleans.Messaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_DeadLetter<TMessage> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeadLetter<TMessage>>, global::Orleans.Serialization.Codecs.IFieldCodec
+    public sealed partial class Codec_DeadLetter : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.DeadLetter>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
-        public Codec_DeadLetter(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.DeadLetter<TMessage>> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Codec_DeadLetter(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.DeadLetter> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeadLetter<TMessage> instance) { }
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.DeadLetter instance) { }
 
-        public global::Orleans.Messaging.DeadLetter<TMessage> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+        public global::Orleans.Messaging.DeadLetter ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
 
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeadLetter<TMessage> instance)
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.DeadLetter instance)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeadLetter<TMessage> value)
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.DeadLetter value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -521,11 +518,11 @@ namespace OrleansCodeGen.Orleans.Messaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_DeadLetter<TMessage> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeadLetter<TMessage>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    public sealed partial class Copier_DeadLetter : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.DeadLetter>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
-        public Copier_DeadLetter(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.DeadLetter<TMessage>> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Copier_DeadLetter(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.DeadLetter> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
-        public global::Orleans.Messaging.DeadLetter<TMessage> DeepCopy(global::Orleans.Messaging.DeadLetter<TMessage> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+        public global::Orleans.Messaging.DeadLetter DeepCopy(global::Orleans.Messaging.DeadLetter original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

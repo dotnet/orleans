@@ -78,13 +78,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public IJournaledStateManager StateManager { get; }
 
-    /// <summary>
-    /// Begins recording whether the calling asynchronous flow stages a change, or returns <see langword="null"/> when a
-    /// replacement state manager can't record it.
-    /// </summary>
+    /// <summary>Begins recording whether the calling asynchronous flow stages a change.</summary>
     /// <remarks>Call it from the async method whose flow the scope covers.</remarks>
-    public StagedChangeScope? BeginStagedChangeScope() =>
-        StateManager is JournaledStateManager manager ? manager.BeginStagedChangeScope() : null;
+    public StagedChangeScope BeginStagedChangeScope() => ((JournaledStateManager)StateManager).BeginStagedChangeScope();
 
     public MessagingShared Shared { get; }
 

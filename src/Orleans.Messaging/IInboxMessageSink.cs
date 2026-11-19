@@ -56,10 +56,9 @@ public interface IInboxMessageSink
     /// later. A message the grain sends to itself can't wait for a retry, so this status fails that send.
     /// </description></item>
     /// <item><description>
-    /// <see cref="DeliveryStatus.DeadLettered"/>: the sink rejects the message and stages nothing. The inbox
-    /// dead-letters it with its payload and the result's reason and <see cref="DeliveryResult.Code"/>, records it as
-    /// processed, and returns the reason and code to the sender. The processed record keeps the reason and code, so a
-    /// duplicate of the message, such as a retry whose first answer was lost, receives the same rejection.
+    /// <see cref="DeliveryStatus.DeadLettered"/>: the sink rejects the message and stages nothing. The inbox records
+    /// the message as processed with the result's reason and <see cref="DeliveryResult.Code"/>, and returns them to
+    /// the sender. A duplicate of the message, such as a retry whose first answer was lost, receives the same rejection.
     /// </description></item>
     /// </list>
     /// <para>

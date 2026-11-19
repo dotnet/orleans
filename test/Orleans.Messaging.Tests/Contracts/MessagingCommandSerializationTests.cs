@@ -75,7 +75,7 @@ public sealed class MessagingCommandSerializationTests
         [
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
-            new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
+            new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now } },
             new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now, DeadLetter = deadLetter },
             new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now, DeadLetter = deadLetter, Rejection = rejection },
             new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now.AddHours(1) },

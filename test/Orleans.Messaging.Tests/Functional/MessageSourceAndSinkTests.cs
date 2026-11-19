@@ -49,7 +49,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     }
 
     [Fact]
-    public async Task SinkRejection_DeadLettersTheMessageAndAnswersItsDuplicatesWithTheSameRejection()
+    public async Task SinkRejection_RecordsTheRejectionAndAnswersItsDuplicatesWithIt()
     {
         const string reason = SourceSinkGrain.Rejection;
         const string code = SourceSinkGrain.RejectionCode;
@@ -75,19 +75,12 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().InboxDeadLetters));
         Assert.Empty(state.Received);
         Assert.Equal(0, count);
-        var letter = Assert.Single(letters);
-        Assert.Equal(payload, letter.Message.Envelope.Payload);
-        Assert.Equal(reason, letter.Reason);
-        Assert.Equal(code, letter.Code);
-        Assert.Equal(1, letter.AttemptCount);
-        Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
+        // The sender holds the rejected message, so the receiver keeps only the rejection.
+        Assert.Empty(letters);
+        Assert.Equal(0, Storage.CountPayloadOccurrences(Journal(receiver), payload));
 
-        // A duplicate receives the rejection from the processed record, which outlives the dead letter, without
-        // reaching the sink.
+        // A duplicate receives the rejection from the processed record without reaching the sink.
         Probe.For(receiver).Mode = SinkMode.Accept;
-        AssertRejected(await extension.DeliverAsync(message, Token));
-        Assert.True(await OnGrainAsync(receiver, context =>
-            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().RemoveInboxDeadLetter(message.Envelope.MessageId)));
         AssertRejected(await extension.DeliverAsync(message, Token));
         Assert.Equal(1, Probe.For(receiver).SinkOffers);
         Assert.Equal(0, Probe.For(receiver).SinkAcceptances);
@@ -99,8 +92,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(1, Probe.For(receiver).SinkOffers);
         Assert.Equal(0, Probe.For(receiver).SinkAcceptances);
 
-        // Removing the diagnostic dead letter does not erase the durable receiver decision.
-        AssertRejected(await extension.DeliverAsync(message, Token));
+        // The rejection survives recovery.
         await receiver.DeactivateAsync();
         AssertRejected(await extension.DeliverAsync(message, Token));
         Assert.Equal(1, Probe.For(receiver).SinkOffers);

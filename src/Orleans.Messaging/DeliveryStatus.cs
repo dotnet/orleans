@@ -31,7 +31,7 @@ public enum DeliveryStatus
     HandlerNotFound = 4,
 
     /// <summary>
-    /// The receiver rejected the message permanently and moved it to its dead-letter store.
+    /// The receiver rejected the message permanently, with a reason and an optional <see cref="DeliveryResult.Code"/>.
     /// </summary>
     /// <remarks>
     /// A redelivery while its processed record is retained receives the same result.

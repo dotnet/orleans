@@ -9,7 +9,7 @@ internal static class EnvelopeValidation
     internal const int MaxSubjectBytes = 256;
     private static readonly UTF8Encoding Utf8 = new(false, true);
 
-    // External admission and recovery validate generated values before publishing shared mutations.
+    // Inbox admission validates each delivered envelope before staging any change.
     public static void Validate(Envelope envelope)
     {
         ValidateMessageId(envelope.MessageId);

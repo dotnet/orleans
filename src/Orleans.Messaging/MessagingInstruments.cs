@@ -16,8 +16,6 @@ internal sealed class MessagingInstruments(OrleansInstruments instruments)
     private readonly Histogram<double> _inboxProcessingDuration = instruments.Meter.CreateHistogram<double>("orleans-messaging-inbox-processing-duration", MillisecondsUnit);
     private readonly UpDownCounter<long> _inboxDepth = instruments.Meter.CreateUpDownCounter<long>("orleans-messaging-inbox-depth");
 
-    internal static MessagingInstruments CreateForDirectConstruction() => new(new OrleansInstruments(new DirectMeterFactory()));
-
     internal void OnInboxDepthChanged(string grainType, int delta) => AddDepth(_inboxDepth, grainType, delta);
 
     private static void AddDepth(UpDownCounter<long> counter, string grainType, int delta)
@@ -53,12 +51,4 @@ internal sealed class MessagingInstruments(OrleansInstruments instruments)
         }
     }
 
-    private sealed class DirectMeterFactory : IMeterFactory
-    {
-        public Meter Create(MeterOptions options) => new(options);
-
-        public void Dispose()
-        {
-        }
-    }
 }

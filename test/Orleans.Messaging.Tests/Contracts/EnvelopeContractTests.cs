@@ -210,16 +210,16 @@ public sealed class EnvelopeContractTests
     public void PublicDeadLetterRoundTripsThroughOrleansSerialization()
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var letter = new DeadLetter<InboxMessage>
+        var letter = new DeadLetter
         {
             Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" }, SentAt = SentAt },
             DeadLetteredAt = DateTimeOffset.UnixEpoch,
             Reason = "failure",
             AttemptCount = 3
         };
-        var serializer = services.GetRequiredService<Serializer<DeadLetter<InboxMessage>>>();
+        var serializer = services.GetRequiredService<Serializer<DeadLetter>>();
 
-        var result = Assert.IsType<DeadLetter<InboxMessage>>(serializer.Deserialize(serializer.SerializeToArray(letter)));
+        var result = Assert.IsType<DeadLetter>(serializer.Deserialize(serializer.SerializeToArray(letter)));
 
         Assert.Equal(letter.Message.Envelope.MessageId, result.Message.Envelope.MessageId);
         Assert.Equal(new byte[] { 1, 2 }, result.Message.Envelope.Payload);

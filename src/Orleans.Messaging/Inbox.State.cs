@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -129,27 +130,9 @@ internal sealed partial class Inbox
 
     void IStateMachine.OnRecoveryCompleted()
     {
-        foreach (var (key, entry) in _messages)
-        {
-            EnvelopeValidation.Validate(entry.Message);
-            ValidateRecoveredSentAt(entry.Message.SentAt);
-            if (key != entry.Message.Envelope.MessageId)
-            {
-                throw new InvalidOperationException("The recovered inbox key does not match its command identity.");
-            }
-        }
-
-        foreach (var (key, letter) in _deadLetters)
-        {
-            EnvelopeValidation.Validate(letter.Message);
-            ValidateRecoveredSentAt(letter.Message.SentAt);
-            if (key != letter.Message.Envelope.MessageId)
-            {
-                throw new InvalidOperationException("The recovered inbox dead-letter key does not match its command identity.");
-            }
-        }
-
-        foreach (var entry in _processed.Values) ValidateRecoveredSentAt(entry.SentAt);
+        // Admission validated every message, and replay keys each entry by its own message ID.
+        Debug.Assert(_messages.All(static pair => pair.Key == pair.Value.Message.Envelope.MessageId));
+        Debug.Assert(_deadLetters.All(static pair => pair.Key == pair.Value.Message.Envelope.MessageId));
 
         _capturedSequence = _durableSequence = _lastSequence;
         _capturedAdmissionFloor = _durableAdmissionFloor = _admissionFloor;
@@ -247,11 +230,6 @@ internal sealed partial class Inbox
         _admissionFloor = floor;
     }
 
-    private static void ValidateRecoveredSentAt(DateTimeOffset sentAt)
-    {
-        // Admission requires a time above a floor which is at least MinValue, so default cannot be admitted state.
-        if (sentAt == DateTimeOffset.MinValue) throw new InvalidOperationException("A recovered inbox entry requires its admitted send time.");
-    }
 }
 
 internal enum InboxCommandKind

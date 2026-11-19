@@ -64,7 +64,6 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1 && InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 1);
         var state = await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, messageId));
         Assert.Equal(now + RetryDelay, state.NextAttemptAt);
-        Assert.Contains("Injected handler preparation failure", state.LastError);
 
         // Wake-ups before the retry is due must not run the handler.
         var early = await Fixture.RunPumpAsync(receiver);
