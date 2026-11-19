@@ -15,26 +15,33 @@ for the runnable application, its host configuration, and its failure scenarios.
 
 ## Run your first order
 
-Use the .NET SDK selected by the repository's `global.json`, the Aspire CLI, and a
+Use the .NET SDK selected by the repository's `global.json` and a
 running Docker-compatible container runtime. The sample targets `net10.0`. Its AppHost
 provides two service replicas, Redis for cluster membership, and Azurite Blob Storage
-for journals and durable jobs. The emulator keeps its data across AppHost runs.
-These local resources provide the environment; running the sample requires no Azure
-account.
+for journals and durable jobs. Keep Redis and Azurite running throughout the exercise
+while stopping individual service replicas. These local resources provide the
+environment; running the sample requires no Azure account.
+
+Use a trusted HTTPS development certificate for browser and PowerShell requests.
+If needed, run `dotnet dev-certs https --trust` before launching the AppHost.
 
 The Durable packages are pre-release alpha packages. Until they are published, build
 from the repository root using the existing local-package pipeline:
 
 ```powershell
-.\samples\Build-Samples.ps1 -Configuration Debug -DisableSharedCompilation
+.\samples\Build-Samples.ps1 -Configuration Release -DisableSharedCompilation
 ```
 
 The script packs the repository's Orleans sources and builds the samples against that
 exact generated version. Keep those build outputs for this run:
 
 ```powershell
-aspire run --apphost .\samples\DurableWorkflows\DurableWorkflows.AppHost\DurableWorkflows.AppHost.csproj --no-build
+dotnet run --project .\samples\DurableWorkflows\DurableWorkflows.AppHost\DurableWorkflows.AppHost.csproj `
+    --configuration Release --no-build --no-restore
 ```
+
+This launches the Aspire AppHost using the Release outputs and the locally packed
+packages from the preceding build.
 
 Open the `service` endpoint in the Aspire dashboard. In another PowerShell window, set
 `$service` to that endpoint and submit an order:
@@ -186,7 +193,7 @@ rebuilding or restoring against published packages:
 
 ```powershell
 dotnet test --project .\samples\DurableWorkflows\DurableWorkflows.Tests\DurableWorkflows.Tests.csproj `
-    --framework net10.0 --configuration Debug --no-build --no-restore `
+    --framework net10.0 --configuration Release --no-build --no-restore `
     --filter-method "*InProgressWorkflowRecoversOnAnotherSiloAfterReplicaTermination*" `
     --minimum-expected-tests 1
 ```
