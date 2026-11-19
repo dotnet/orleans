@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddKeyedRedisClient("clustering");
 builder.AddAzureBlobServiceClient("durable-state");
+builder.Services.AddOptions<ExternalEffectOptions>().Bind(builder.Configuration.GetSection("ExternalEffects"));
 builder.Services.AddHealthChecks()
     .AddCheck("self", static () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), ["live"]);
 
@@ -37,5 +38,6 @@ app.MapHealthChecks("/alive", new HealthCheckOptions
 });
 
 app.MapDurableWorkflowEndpoints();
+app.MapExternalEffectEndpoints();
 
 await app.RunAsync();
