@@ -1,6 +1,12 @@
 {
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
   "packages": {
+    "Microsoft.Orleans.AdvancedReminders": "The Advanced Reminders package is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.AdvancedReminders.AdoNet": "The ADO.NET Advanced Reminders provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.AdvancedReminders.AzureStorage": "The Azure Storage Advanced Reminders provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.AdvancedReminders.Cosmos": "The Cosmos DB Advanced Reminders provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.AdvancedReminders.DynamoDB": "The DynamoDB Advanced Reminders provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.AdvancedReminders.Redis": "The Redis Advanced Reminders provider is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Dashboard.AdvancedReminders": "The optional Dashboard integration is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Durable": "The consolidated durable state, jobs, messaging, and tasks package is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Durable.Abstractions": "The durable task abstractions package is awaiting its first NuGet publication.",
