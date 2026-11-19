@@ -1867,6 +1867,7 @@ internal sealed partial class ActivationData :
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
+        ActivationTimeoutEvents.EmitScheduled(this, cancellationToken, cts.Token);
         ScheduleOperation(new Command.Activate(requestContext, cts, metrics));
     }
 
