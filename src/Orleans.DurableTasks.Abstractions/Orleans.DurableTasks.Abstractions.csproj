@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Durable Task Abstractions</Title>
     <Description>Programming model abstractions for durable asynchronous operations in Microsoft Orleans.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
@@ -28,7 +28,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <!-- Supplies the [Alias] attributes which give persisted types stable wire names. -->
     <ProjectReference Include="..\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj"

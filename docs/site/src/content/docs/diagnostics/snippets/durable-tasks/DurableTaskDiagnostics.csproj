@@ -7,7 +7,8 @@
   -->
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
+    <OrleansDocumentationTargetFrameworkException>Compiles the examples for Orleans.DurableTasks.Abstractions, which targets only net11.0.</OrleansDocumentationTargetFrameworkException>
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\'))</RepositoryRoot>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Durable grain state is experimental. -->
