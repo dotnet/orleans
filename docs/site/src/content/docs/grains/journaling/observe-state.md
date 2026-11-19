@@ -15,9 +15,9 @@ Configure journaling as described in [Use durable state](durable-state.md).
 
 This grain records a conversation in a durable log and streams each response through a draft:
 
-:::code language="csharp" source="../../snippets/compiled/Grains/JournalingObservationSnippets.cs" id="conversation_grain_interface":::
+:::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingObservationSnippets.cs" id="conversation_grain_interface":::
 
-:::code language="csharp" source="../../snippets/compiled/Grains/JournalingObservationSnippets.cs" id="conversation_grain":::
+:::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingObservationSnippets.cs" id="conversation_grain":::
 
 Orleans enumerates a grain's `IAsyncEnumerable<T>` result through interleaving calls, so watches keep delivering while `Ask` streams a response. Enumerate a watch in the owning activation's execution context, as grain methods do. `End` seals the log, which ends every watch of it.
 
@@ -84,7 +84,7 @@ Each <xref:Orleans.Journaling.LogDraftId> includes an identifier for the log ins
 
 This client renders committed history and in-progress drafts and tracks its resume position:
 
-:::code language="csharp" source="../../snippets/compiled/Grains/JournalingObservationSnippets.cs" id="conversation_client":::
+:::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingObservationSnippets.cs" id="conversation_client":::
 
 ## Failure and shutdown
 
@@ -96,6 +96,6 @@ Deleting the grain's journal delivers the default value to value watches, or `Re
 
 Test grains which use durable state against real journaled state managers. An <xref:Orleans.TestingHost.InProcessTestCluster> configured with volatile journal storage keeps journals in silo memory, and <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> exercises recovery in a new activation. Configure the journal format as production silos do, or, as this test does, with reflection-based JSON metadata:
 
-:::code language="csharp" source="../../snippets/compiled/Grains/JournalingObservationSnippets.cs" id="journaling_test_cluster":::
+:::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingObservationSnippets.cs" id="journaling_test_cluster":::
 
 Host code which takes an `IDurableLog<T>` in a test grain to test it the same way. A hand-written `IDurableLog<T>` substitute doesn't reproduce durability, drafts, or read streams.

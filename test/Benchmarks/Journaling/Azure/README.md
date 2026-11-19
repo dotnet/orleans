@@ -55,14 +55,14 @@ reports. Account-info permission or tier mismatches fail before resource creatio
 Run commands from the repository root with the SDK selected by `global.json`.
 
 ```powershell
-dotnet build test\Benchmarks\Benchmarks.csproj -c Release -f net10.0
+dotnet build test\Benchmarks\Benchmarks.csproj -c Release -f net11.0
 
 # In a separate terminal, start an installed Azurite on its default loopback ports.
 azurite --skipApiVersionCheck --location .\.azurite-journal-bench
 
 # In the benchmark terminal:
 $run = Join-Path $env:TEMP ('journal-bench-' + [guid]::NewGuid().ToString('N'))
-dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 --no-build -- `
+dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net11.0 --no-build -- `
   Journaling.Azure --backend AzuriteBlob --workload DurableAppend --output $run
 ```
 
@@ -77,7 +77,7 @@ Exercise the two implementations and five operations with metadata enabled:
 foreach ($backend in 'AzuriteBlob', 'AzuriteTable') {
   foreach ($workload in 'DurableAppend', 'CheckpointReplace', 'RecoveryReplay', 'CatalogBounded', 'CatalogUnbounded') {
     $run = Join-Path $env:TEMP ("$backend-$workload-" + [guid]::NewGuid().ToString('N'))
-    dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 --no-build -- `
+    dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net11.0 --no-build -- `
       Journaling.Azure --backend $backend --workload $workload --operations 3 --concurrency 2 `
       --due-journals 3 --future-journals 8 --metadata true --output $run
     if ($LASTEXITCODE -ne 0) { throw "Benchmark failed; inspect $run.json and console output." }
@@ -95,7 +95,7 @@ Each invocation selects one backend and workload. For example:
 
 ```powershell
 $run = Join-Path $env:TEMP ('standard-append-' + [guid]::NewGuid().ToString('N'))
-dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 --no-build -- `
+dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net11.0 --no-build -- `
   Journaling.Azure --backend StandardBlob --allow-azure true --workload DurableAppend `
   --operations 100 --concurrency 8 --payload-bytes 1024 --batch-size 8 `
   --history-batches 16 --checkpoint-bytes 65536 --metadata true --output $run
@@ -263,7 +263,7 @@ multi-runtime or isolated-process comparisons.
 
 ```powershell
 # Correctness-only smoke uses the already built assembly in process.
-dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 --no-build -- `
+dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net11.0 --no-build -- `
   Journaling.Azure.Bdn --filter '*AzureJournalBenchmarks*' --job Dry --inProcess `
   --noOverwrite --artifacts "$env:TEMP\journal-bdn-smoke" > "$env:TEMP\journal-bdn-smoke.log" 2>&1
 ```
@@ -277,7 +277,7 @@ $env:JOURNAL_BENCHMARK_BLOB_ENDPOINT = 'https://yourstandardaccount.blob.core.wi
 $env:JOURNAL_BENCHMARK_ALLOW_AZURE = 'true'
 $env:JOURNAL_BENCHMARK_BDN_BACKENDS = 'StandardBlob'
 $env:JOURNAL_BENCHMARK_BDN_PAYLOAD_BYTES = '256,4096'
-dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 --no-build -- `
+dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net11.0 --no-build -- `
   Journaling.Azure.Bdn --filter '*AzureJournalBenchmarks*DurableAppend*' --buildTimeout 600 `
   --noOverwrite --artifacts "$env:TEMP\journal-bdn-standard" > "$env:TEMP\journal-bdn-standard.log" 2>&1
 ```

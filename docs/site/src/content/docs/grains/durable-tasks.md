@@ -19,7 +19,8 @@ and resumes executions after their grain deactivates.
 
 > [!IMPORTANT]
 > `Microsoft.Orleans.Durable` and `Microsoft.Orleans.Durable.Abstractions` are
-> pre-release alpha packages awaiting their first NuGet publication. Evaluate them with an
+> pre-release alpha packages which target .NET 11 (`net11.0`) and await their first NuGet
+> publication. Evaluate them with an
 > explicit upgrade, rollback, backup, and recovery plan because their APIs and persisted
 > formats can change before stabilization. Projects in the Orleans repository reference
 > them as source projects.

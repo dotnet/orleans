@@ -9,7 +9,6 @@
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.6.5" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageVersion Include="MessagePack" Version="3.1.11" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Durable" Version="10.2.2-rc.2.alpha.1" />

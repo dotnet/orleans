@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Journaling;
 using Orleans.Persistence;
 using Orleans.Storage;
 using Xunit;
@@ -13,15 +12,6 @@ namespace Tester.Redis;
 [TestCategory("BVT")]
 public sealed class ProviderArgumentValidationTests
 {
-    [Fact]
-    public void AddRedisJournalStorage_NullBuilder_Throws()
-    {
-        var exception = Assert.Throws<ArgumentNullException>(
-            () => RedisJournalStorageHostingExtensions.AddRedisJournalStorage(null!));
-
-        Assert.Equal("builder", exception.ParamName);
-    }
-
     [Fact]
     public async Task RedisStorageOptions_DefaultCreateMultiplexer_NullOptions_Throws()
     {

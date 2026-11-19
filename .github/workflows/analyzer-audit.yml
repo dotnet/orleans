@@ -242,7 +242,7 @@ jobs:
           "matrix=$matrix" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
 
   native-aot-smoke:
-    name: NativeAOT ${{ matrix.scenario }} smoke (${{ matrix.runtime }}, net10.0)
+    name: NativeAOT ${{ matrix.scenario }} smoke (${{ matrix.runtime }})
     needs: native-aot-smoke-matrix
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30

@@ -1,7 +1,7 @@
 # Microsoft Orleans Durable
 
 ## Introduction
-Microsoft Orleans Durable provides durable state, jobs, messaging, and tasks for Orleans grains. Each feature is registered independently on the silo builder:
+Microsoft Orleans Durable provides durable state, jobs, messaging, and tasks for Orleans grains on .NET 11 (`net11.0`). Each feature is registered independently on the silo builder:
 
 | Feature | Registration | Namespace | Guide |
 |---|---|---|---|

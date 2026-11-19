@@ -13,7 +13,7 @@ Install the pre-release `Microsoft.Orleans.Durable` package in the silo project.
 
 Inject <xref:Orleans.Journaling.IDurableStateManager> into an ordinary <xref:Orleans.Grain> and declare named state components during construction. The manager creates each component once and Orleans recovers the grain's state before application methods run:
 
-:::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="composed_shopping_cart":::
+:::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingSnippets.cs" id="composed_shopping_cart":::
 
 The standard manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>, before resolution returns. Declare durable state components during construction or synchronous activation setup. Recovery at <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> finishes before <xref:Orleans.Grain.OnActivateAsync*> and request processing. The same composition works with an application-owned grain base class.
 
@@ -70,11 +70,11 @@ Declare all state components during construction or synchronous activation setup
 
 A reusable feature can own durable state independently of the grain's constructor and base class. Select the grain implementation once per grain type using <xref:Orleans.Metadata.GrainClassMap> in an <xref:Orleans.Runtime.IConfigureGrainTypeComponents> implementation, then register a shared setup action. This example selects the existing shopping-cart interface and records an activation count:
 
-:::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="journaled_feature":::
+:::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingSnippets.cs" id="journaled_feature":::
 
 Register the feature as scoped and the configurator as singleton:
 
-:::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="journaled_feature_registration":::
+:::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingSnippets.cs" id="journaled_feature_registration":::
 
 The synchronous action resolves the feature from <xref:Orleans.Runtime.IGrainContext.ActivationServices> and enrolls its lifecycle participant. Resolving the feature's dependencies constructs the standard state manager if needed, and that manager enrolls itself before resolution returns. A setup action can be the first place an activation resolves its manager or state. The feature uses a stage after `SetupState` and before <xref:Orleans.Runtime.GrainLifecycleStage.Activate> so it increments recovered state before application activation begins.
 

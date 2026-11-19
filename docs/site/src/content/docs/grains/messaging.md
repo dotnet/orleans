@@ -12,7 +12,8 @@ outbox built on Orleans Journaling and Durable Jobs. A grain commits received
 messages, business changes, and outgoing messages in its own journal, so handler
 effects and pending sends survive activation loss.
 
-> `Microsoft.Orleans.Durable` is a pre-release alpha package. Evaluate it with
+> `Microsoft.Orleans.Durable` is a pre-release alpha package which targets .NET 11
+> (`net11.0`). Evaluate it with
 > an explicit upgrade, rollback, backup, and recovery plan because its APIs and
 > journal formats can change before stabilization.
 

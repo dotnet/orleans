@@ -7,9 +7,7 @@ using Benchmarks.Ping;
 using Benchmarks.Placement;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
-#if NET11_0_OR_GREATER
 using Benchmarks.Messaging;
-#endif
 
 namespace Benchmarks;
 
@@ -372,7 +370,6 @@ internal class Program
                 Environment.ExitCode = 1;
             }
         },
-#if NET11_0_OR_GREATER
         ["Messaging.Sequential"] = args =>
         {
             var summaries = BenchmarkSwitcher.FromTypes([typeof(SequentialMessagingBenchmark)]).Run(args).ToArray();
@@ -381,7 +378,6 @@ internal class Program
                 Environment.ExitCode = 1;
             }
         },
-#endif
         ["suite"] = args =>
         {
             _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);

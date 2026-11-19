@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Durable.Redis</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Orleans.Redis.Tests" />
+    <InternalsVisibleTo Include="Orleans.Durable.Redis.Tests" />
   </ItemGroup>
 
   <ItemGroup>

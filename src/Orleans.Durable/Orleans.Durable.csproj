@@ -29,7 +29,6 @@
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.IntegrationTests" />
     <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.Tests" />
-    <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.Durable.AzureStorage" />
     <InternalsVisibleTo Include="Orleans.Durable.Redis" />
     <InternalsVisibleTo Include="Orleans.Durable.S3" />
@@ -38,7 +37,6 @@
     <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
     <InternalsVisibleTo Include="Orleans.Messaging.Tests" />
-    <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
   </ItemGroup>
 
   <ItemGroup>

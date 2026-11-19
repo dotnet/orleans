@@ -2,7 +2,9 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Configuration;
 using Orleans.Serialization.Invocation;
+using Orleans.TestingHost;
 using Tester.DurableJobs;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -13,13 +15,30 @@ namespace DefaultCluster.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("Runtime")]
-public class InMemoryDurableJobsTests : HostedTestClusterEnsureDefaultStarted
+public class InMemoryDurableJobsTests : IClassFixture<InMemoryDurableJobsTests.Fixture>
 {
     private readonly DurableJobTestsRunner _runner;
 
-    public InMemoryDurableJobsTests(DefaultClusterFixture fixture) : base(fixture)
+    public InMemoryDurableJobsTests(Fixture fixture)
     {
-        _runner = new DurableJobTestsRunner(this.GrainFactory);
+        _runner = new DurableJobTestsRunner(fixture.GrainFactory);
+    }
+
+    public sealed class Fixture : BaseTestClusterFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) =>
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+
+        private sealed class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder) =>
+                hostBuilder
+                    .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
+                    .UseInMemoryReminderService()
+                    .UseInMemoryDurableJobs()
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore");
+        }
     }
 
     [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]

@@ -7,7 +7,6 @@
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
-    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />

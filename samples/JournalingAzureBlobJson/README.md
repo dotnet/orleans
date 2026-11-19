@@ -25,7 +25,7 @@ state names so journals written by the keyed-injection version remain readable.
 
 ## Run the sample
 
-Install the .NET 10 SDK, the Aspire CLI, and a Docker-compatible container runtime.
+Install the .NET 11 SDK, the Aspire CLI, and a Docker-compatible container runtime.
 From this directory, run:
 
 ```powershell

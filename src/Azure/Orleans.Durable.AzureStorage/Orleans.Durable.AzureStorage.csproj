@@ -5,7 +5,7 @@
     <Title>Microsoft Orleans Durable Azure Storage Providers</Title>
     <Description>Azure Blob Storage and Azure Table Storage providers for Microsoft Orleans journaling and durable jobs.</Description>
     <PackageTags>$(PackageTags) Durable Journaling Jobs Azure Storage</PackageTags>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>

@@ -87,7 +87,7 @@ Use reminders for recurring durable callbacks. Grain timers are activation-scope
 | `Microsoft.Orleans.Durable.Redis` | Pre-release alpha Redis journal storage provider. Awaiting first NuGet publication. |
 | `Microsoft.Orleans.Durable.S3` | Pre-release alpha Amazon S3 Express One Zone journal storage provider. Awaiting first NuGet publication. |
 
-Use durable jobs for scheduled one-time work. Messaging composes Durable Jobs with Journaling for recoverable, at-least-once grain messages. Each feature registers independently on the silo builder.
+Use durable jobs for scheduled one-time work. Messaging composes Durable Jobs with Journaling for recoverable, at-least-once grain messages. Each feature registers independently on the silo builder. These packages target .NET 11 (`net11.0`).
 
 ## Streams and broadcast channels
 
