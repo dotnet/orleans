@@ -8,9 +8,9 @@ using Xunit;
 namespace Orleans.Messaging.Tests.Functional;
 
 /// <summary>
-/// Pins the order in which the inbox evaluates a delivery's send time: the future bound applies only to a time the
-/// inbox would store, a recorded identity is answered from its record, and an untracked identity at or below the
-/// durable admission floor expires.
+/// Pins how the inbox evaluates a delivery's send time: the future bound applies only to an untracked identity which
+/// it would admit, a recorded identity is answered from its record, and an untracked identity at or below the durable
+/// admission floor expires.
 /// </summary>
 [Collection(MessagingClusterCollection.Name)]
 [TestSuite("BVT")]
@@ -44,8 +44,8 @@ public sealed class InboxSentAtBoundTests() : MessagingBehaviorTestBase(new Sent
         await receiver.RetryWriteStateAsync();
         writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
 
-        // A recorded identity may not extend its retention beyond the bound either.
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DeliverAsync(receiver, message with { SentAt = bound.AddTicks(1) }));
+        // A recorded identity is answered from its record, whatever the delivery's send time.
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = bound.AddTicks(1) })).Status);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(bound, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)));
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
@@ -77,9 +77,7 @@ public sealed class InboxSentAtBoundTests() : MessagingBehaviorTestBase(new Sent
 
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(1) }));
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(1) })).Status);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(message.SentAt, await Fixture.OnGrainAsync(receiver, () => completed
             ? InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)

@@ -71,7 +71,7 @@ public class DurableMessagingOptions
     /// inbox doesn't track whose send time is at or below the floor receives <see cref="DeliveryStatus.Expired"/>,
     /// including after a backward clock jump. The inbox never accepts a delivered send time later than its clock plus
     /// this window: it rejects such a delivery without staging anything when the message is untracked and above the
-    /// admission floor, or the time would extend its record. A grain's messages to itself use its clock, or the first time above the floor after a backward
+    /// admission floor. A grain's messages to itself use its clock, or the first time above the floor after a backward
     /// clock jump. Every processed record therefore becomes eligible for removal within twice this window of the
     /// receiver's clock, or just after the floor when a self-send follows a backward jump.
     /// </para>

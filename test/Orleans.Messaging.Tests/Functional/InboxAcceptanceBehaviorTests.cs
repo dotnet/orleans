@@ -141,28 +141,10 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
-    [Fact]
-    public async Task KnownSentAt_OlderAndEqualResendsDoNotWriteOrShortenRetention()
-    {
-        var receiver = NewGrain();
-        var message = CreateEnvelope(receiver, NewMessage(31, "same-command"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
-        await Fixture.WaitForInboxCountAsync(receiver, 0);
-        await receiver.RetryWriteStateAsync();
-        var journal = JournalId.FromGrainId(receiver.GetGrainId());
-        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-        var inbox = Fixture.GetInbox(receiver);
-        Assert.Equal(message.SentAt, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)));
-        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task NewerSentAt_PendingAndProcessedResendsWaitForRetentionDurability(bool completed)
+    public async Task ResendsWithAnySentAt_AreDuplicatesWhichKeepTheAcceptedSentAt(bool completed)
     {
         var receiver = NewGrain();
         const string route = "messages/sent-time-retention";
@@ -177,39 +159,26 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         }
 
         await receiver.RetryWriteStateAsync();
-        var beforeResends = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
-        Assert.Equal(beforeResends, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
-        Fixture.Clock.Advance(TimeSpan.FromMinutes(1));
-        var newer = message with { SentAt = Fixture.JobNow };
-        var inbox = Fixture.GetInbox(receiver);
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var inbox = Fixture.GetInbox(receiver);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
-        using var acknowledgement = Fixture.Storage.BlockAcknowledgement(journal);
-        var updating = DeliverAsync(receiver, newer);
-        await acknowledgement.WaitUntilEnteredAsync();
-        Assert.False(updating.IsCompleted);
-        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
-        Assert.Equal(newer.SentAt, await Fixture.OnGrainAsync(receiver, () => completed
+        Fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // A re-send is the same message, so its record keeps the time the inbox accepted.
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = Fixture.JobNow })).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(message.SentAt, await Fixture.OnGrainAsync(receiver, () => completed
             ? InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)
             : InboxTestAccess.GetPendingMessages(inbox)[message.Envelope.MessageId].Message.SentAt));
-        var olderReply = await Fixture.OnGrainAsync(receiver, () => inbox.DeliverAsync(message, TestContext.Current.CancellationToken).AsTask());
-        Assert.False(olderReply.IsCompleted);
-        acknowledgement.Release();
-        Assert.Equal(DeliveryStatus.Duplicate, (await updating).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await olderReply).Status);
-        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
 
         handler.Release();
         await Fixture.WaitForInboxCountAsync(receiver, 0);
         var state = await receiver.GetSnapshotAsync();
-        Assert.Equal("retained-command", Assert.Single(state.Effects).Value);
         Assert.Equal(1, Assert.Single(state.Effects).Count);
-        Assert.Equal(1, state.ProcessedMessageCount);
-        Assert.Equal(newer.SentAt, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)));
+        Assert.Equal(message.SentAt, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)));
     }
-
     [Fact]
     public async Task SameMessageIdFromDistinctSenders_DeduplicatesOneReceiverCommand()
     {

@@ -183,16 +183,15 @@ reuses it. `OutboxRetryTimeout`, six hours by default, bounds delivery attempts
 after that time, including while the receiver is backpressured.
 
 The inbox retains each processed record for `DeduplicationWindow`, seven days by
-default, after the latest observed `SentAt`, and then makes it eligible for removal. Before removing records,
+default, after its accepted `SentAt`, and then makes it eligible for removal. Before removing records,
 the inbox journals an admission floor: its clock minus `DeduplicationWindow`, which
 only advances. Pending and processed records determine known outcomes first. A
 message the inbox no longer tracks whose `SentAt` is at or below the floor receives
 `Expired` before any sink or handler runs. Recovery preserves the floor.
 The inbox never accepts a delivered `SentAt` later than its clock plus
-`DeduplicationWindow`. It rejects such a delivery with `ArgumentOutOfRangeException`,
-staging nothing, when the message is untracked and above the admission floor, or the
-time would extend its record, so the sender retries it within its retry budget. A
-tracked message with an equal or earlier `SentAt` still receives its recorded
+`DeduplicationWindow`. It rejects such a delivery of an untracked message above the
+admission floor with `ArgumentOutOfRangeException`, staging nothing, so the sender
+retries it within its retry budget. A tracked message still receives its recorded
 outcome, including after the receiver's clock steps backward, and an untracked
 message at or below the floor still receives `Expired`. A grain's messages to itself
 use its clock, or the first time above the floor after a backward clock jump.
@@ -200,8 +199,6 @@ Pending messages stay until they are processed, and completed records become eli
 for removal within twice the window of the receiver's clock, or just after the floor
 when a self-send follows a backward jump.
 
-A later `SentAt` extends a tracked pending or completed record. The receiver
-persists that update before returning `Duplicate` or the original durable rejection.
 
 A forward clock jump can expire undelivered work early; a backward jump can delay
 cleanup and prolong retries. The journaled floor keeps removed messages expired in
@@ -244,7 +241,7 @@ other journaled state. After the grain's state is deleted, it starts empty and
 continues working.
 
 Completed message IDs become eligible for removal after `DeduplicationWindow`
-from their latest observed `SentAt`. Acknowledged snapshots and recovery reclaim
+from their accepted `SentAt`. Acknowledged snapshots and recovery reclaim
 eligible records once the admission floor covers their send time. Dead letters are
 retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters`.
 

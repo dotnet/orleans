@@ -15,7 +15,7 @@ internal sealed partial class Inbox
     private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
     private JournalStreamWriter _writer;
 
-    // Forgetting an identity requires a durable floor which excludes its latest observed send time.
+    // Forgetting an identity requires a durable floor which excludes its send time.
     private DateTimeOffset _admissionFloor = DateTimeOffset.MinValue;
     private DateTimeOffset _capturedAdmissionFloor = DateTimeOffset.MinValue;
     private DateTimeOffset _durableAdmissionFloor = DateTimeOffset.MinValue;
@@ -105,7 +105,6 @@ internal sealed partial class Inbox
         {
             { Kind: InboxCommandKind.Accept, Message: { } message } => message.Envelope.DeliverAt ?? DateTimeOffset.MinValue,
             { Kind: InboxCommandKind.Retry, State: { } state } => state.NextAttemptAt,
-            { Kind: InboxCommandKind.ExtendSentAt, MessageId: var key } when _messages.TryGetValue(key, out var pending) => GetDueTime(pending),
             _ => (DateTimeOffset?)null
         };
         if (dueTime is { } due && (_stagedWakeup is null || due < _stagedWakeup)) _stagedWakeup = due;
@@ -212,18 +211,6 @@ internal sealed partial class Inbox
             case InboxCommandKind.AdvanceAdmissionFloor:
                 AdvanceAdmissionFloor(command.AdmissionFloor);
                 break;
-            case InboxCommandKind.ExtendSentAt:
-                // Pending entries are present in every snapshot; processed extensions use completion upserts.
-                if (!_messages.TryGetValue(command.MessageId, out var pending))
-                {
-                    throw new InvalidOperationException("An ExtendSentAt command requires its pending entry.");
-                }
-                if (command.SentAt > pending.Message.SentAt)
-                {
-                    pending.Message = pending.Message with { SentAt = command.SentAt };
-                    pending.Sequence = ++_lastSequence;
-                }
-                break;
             case InboxCommandKind.RemoveDeadLetters:
                 foreach (var key in command.RemovedKeys!) _deadLetters.Remove(key);
                 break;
@@ -275,7 +262,6 @@ internal enum InboxCommandKind
     RemoveDeadLetters = 4,
     Snapshot = 6,
     AdvanceAdmissionFloor = 7,
-    ExtendSentAt = 8,
 
     // An activation stopped with no handler attempt interrupted, so recovery charges no attempt.
     CleanStop = 9,
@@ -330,7 +316,7 @@ internal sealed class InboxRejection
 [GenerateSerializer, Alias("Orleans.Messaging.InboxEntry")]
 internal sealed class InboxEntry
 {
-    [Id(0)] public required InboxMessage Message { get; set; }
+    [Id(0)] public required InboxMessage Message { get; init; }
     [Id(1)] public required InboxMessageState State { get; set; }
     [field: NonSerialized]
     [JsonIgnore] public long Sequence { get; set; }

@@ -80,27 +80,22 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
         var key = message.Envelope.MessageId;
         var receiverTime = Shared.JobTimeProvider.GetUtcNow();
-        if (message.SentAt > MessagingTime.AddClamped(receiverTime, Options.DeduplicationWindow))
+        // Recorded outcomes and expiration decisions survive clock rollback, so only a time the inbox would admit is bounded.
+        if (message.SentAt > MessagingTime.AddClamped(receiverTime, Options.DeduplicationWindow)
+            && !_processed.ContainsKey(key)
+            && !_messages.ContainsKey(key)
+            && message.SentAt > GetAdmissionFloor(receiverTime))
         {
-            // Recorded outcomes and expiration decisions survive clock rollback. Bound only a time we would store.
-            var wouldStoreTime = _processed.TryGetValue(key, out var processed)
-                ? message.SentAt > processed.SentAt
-                : _messages.TryGetValue(key, out var pending)
-                    ? message.SentAt > pending.Message.SentAt
-                    : message.SentAt > GetAdmissionFloor(receiverTime);
-            if (wouldStoreTime)
-            {
-                LogSentAtTooFarAhead(Logger, key, GrainContext.GrainId, message.SentAt, receiverTime);
-                throw new ArgumentOutOfRangeException(nameof(message), message.SentAt,
-                    "SentAt must not be later than the receiver's clock plus DeduplicationWindow.");
-            }
+            LogSentAtTooFarAhead(Logger, key, GrainContext.GrainId, message.SentAt, receiverTime);
+            throw new ArgumentOutOfRangeException(nameof(message), message.SentAt,
+                "SentAt must not be later than the receiver's clock plus DeduplicationWindow.");
         }
 
         // Delivery is a grain call, so the activation is servicing requests.
         _pump.EnsureStarted();
         try
         {
-            if (TryStageDuplicate(message, out var pending))
+            if (IsDuplicate(message, out var pending))
             {
                 var rejection = pending is null ? _processed[key].Rejection : null;
                 // The sender may retire its copy once this returns, so the acceptance or the processed record must be
@@ -210,7 +205,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         }
         Debug.Assert(message.SentAt <= MessagingTime.AddClamped(now, Options.DeduplicationWindow)
             || message.SentAt <= _admissionFloor.AddTicks(1));
-        if (TryStageDuplicate(message, out _))
+        if (IsDuplicate(message, out _))
         {
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
             return;
@@ -303,16 +298,15 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     }
 
     /// <summary>
-    /// Recognizes a retained or pending identity and stages any extension of its observed send time.
+    /// Recognizes a retained or pending identity, which keeps its recorded send time whatever the delivery's send time.
     /// </summary>
     /// <param name="message">The received message.</param>
     /// <param name="pending">The pending entry, or <see langword="null"/> when the message was completed or is new.</param>
-    private bool TryStageDuplicate(InboxMessage message, out InboxEntry? pending)
+    private bool IsDuplicate(InboxMessage message, out InboxEntry? pending)
     {
         var key = message.Envelope.MessageId;
-        if (_processed.TryGetValue(key, out var processed))
+        if (_processed.ContainsKey(key))
         {
-            ExtendSentAt(message, processed.SentAt);
             pending = null;
             return true;
         }
@@ -325,36 +319,10 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                     $"The inbox already contains a different command with message ID '{key}'.");
             }
 
-            ExtendSentAt(message, pending.Message.SentAt);
             return true;
         }
 
         return false;
-    }
-
-    private void ExtendSentAt(InboxMessage message, DateTimeOffset recordedSentAt)
-    {
-        if (message.SentAt <= recordedSentAt) return;
-        var key = message.Envelope.MessageId;
-        try
-        {
-            if (_processed.TryGetValue(key, out var processed))
-            {
-                // An in-flight snapshot can omit the old record, so replay needs the complete decision, not a delta.
-                StageCompletion(message, deadLetter: null, rejection: processed.Rejection);
-            }
-            else
-            {
-                Debug.Assert(_messages.ContainsKey(key));
-                Emit(new() { Kind = InboxCommandKind.ExtendSentAt, MessageId = key, SentAt = message.SentAt });
-            }
-        }
-        catch (Exception exception)
-        {
-            LogStagingFailed(Logger, exception);
-            _pump.Fail(exception, "Inbox retention update failed.");
-            throw;
-        }
     }
 
     /// <summary>
