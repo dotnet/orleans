@@ -1,7 +1,20 @@
 # Microsoft Orleans Durable
 
 ## Introduction
-Microsoft Orleans Durable provides durable state, jobs, messaging, and tasks for Orleans grains on .NET 11 (`net11.0`). Each feature is registered independently on the silo builder:
+Microsoft Orleans Durable runs recoverable business operations on Orleans grains on .NET 11 (`net11.0`). Submit an order under an application-owned identity, reserve inventory, charge payment, and ship; reconnect to the same operation when the response is lost, and continue unfinished work after an activation or silo is lost.
+
+Start with [Run a durable order workflow](https://github.com/dotnet/orleans/blob/main/docs/site/src/content/docs/grains/durable-tasks-onboarding.md) and the runnable [DurableWorkflows sample](https://github.com/dotnet/orleans/tree/main/samples/DurableWorkflows). The guide connects packages and host registration to durable acceptance, retained results, compensation, cancellation, and recovery. The sample's Aspire AppHost supplies two service replicas, Redis membership, and Azurite Blob journals and jobs.
+
+The operation builds on four cooperating layers:
+
+- **Journaling** commits each grain's state together with its task, inbox, and outbox changes.
+- **Durable Jobs** provides persistent wake-ups for pending executions and due delays.
+- **Messaging** transfers durable work and results between grains.
+- **Durable Tasks** records recoverable workflow progress and business outcomes.
+
+### Feature reference
+
+Each feature is registered independently on the silo builder; `AddDurableTasks()` includes Messaging:
 
 | Feature | Registration | Namespace | Guide |
 |---|---|---|---|

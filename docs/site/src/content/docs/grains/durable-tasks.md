@@ -25,7 +25,9 @@ and resumes executions after their grain deactivates.
 > formats can change before stabilization. Projects in the Orleans repository reference
 > them as source projects.
 
-This page describes the programming model and its guarantees. Continue with:
+Start with [Run a durable order workflow](durable-tasks-onboarding.md) for a runnable
+path from submission through recovery and business outcomes. This page describes the
+programming model and its guarantees. Continue with:
 
 - [Task identity and references](durable-tasks-identity.md) for how task IDs are
   constructed, which changes keep them stable, and how to address a task from elsewhere.
