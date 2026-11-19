@@ -225,7 +225,11 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// <summary>
     /// Clears all queue state.
     /// </summary>
-    public void Clear()
+    public void Clear() => Reset(isComplete: false);
+
+    internal void Retire() => Reset(isComplete: true);
+
+    private void Reset(bool isComplete)
     {
         lock (_syncLock)
         {
@@ -235,7 +239,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             _jobsIdToBucket.Clear();
             _buckets.Clear();
             Volatile.Write(ref _jobCount, 0);
-            _isComplete = false;
+            _isComplete = isComplete;
             if (wakeCheckRequired)
             {
                 SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);

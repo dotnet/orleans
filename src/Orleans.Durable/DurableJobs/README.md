@@ -305,6 +305,12 @@ increase sweep frequency and reduce the wait for newly inserted or newly eligibl
 The public `JobShardManager.AssignJobShardsAsync` method collects the same ordered discovery
 stream into its full-result list.
 
+When a journal write fails, the shard stops dequeuing jobs and rejects further
+mutations. After execution drains, the provider releases ownership so discovery
+can replay the journal and execute the remaining persisted jobs. Cleanup deletes
+a journal only after accepted mutations finish and the durable job count is
+known to be zero.
+
 ## Shutdown lifecycle
 
 Scheduling, cancellation requests, and activation use the shared

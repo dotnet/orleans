@@ -66,6 +66,8 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
 
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _jobQueue;
 
+    internal void RetireExecution() => _jobQueue.Retire();
+
     public DurableJob? TryScheduleJob(ScheduleJobRequest request)
     {
         if (IsAddingCompleted)

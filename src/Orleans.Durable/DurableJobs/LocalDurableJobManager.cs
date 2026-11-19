@@ -702,6 +702,10 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             {
                 // Execution cancellation leaves ownership cleanup with this runner.
             }
+            catch (Exception exception) when (!_cts.IsCancellationRequested && shard is JournaledJobShard { ExecutionRetired: true })
+            {
+                LogRetiredShardExecutionFailed(_logger, exception, shard.Id);
+            }
         }
         finally
         {

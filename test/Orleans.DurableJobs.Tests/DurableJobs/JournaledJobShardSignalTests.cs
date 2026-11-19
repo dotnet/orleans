@@ -6,6 +6,7 @@ using Microsoft.Extensions.Time.Testing;
 using Orleans.Durable.Jobs;
 using Orleans.Durable.Journaling;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Xunit;
 
 namespace Tester.DurableJobs;
@@ -43,6 +44,74 @@ public partial class JournaledJobShardManagerTests
         Assert.True(test.Shard.IsAddingCompleted);
         Assert.Equal(2, test.Storage.AppendCount);
         Assert.Equal(Enumerable.Range(0, 4).Select(index => $"job-{index}"), await test.ReadPersistedJobNamesAsync());
+    }
+
+    [Fact]
+    public async Task FailedWrite_ReleasesWaitingReaderAndReplaysPersistedJobOnRediscovery()
+    {
+        await using var test = await SignalTest.CreateAsync();
+        var job = Assert.IsType<DurableJob>(await test.Schedule(0));
+        await using var reader = test.Shard.ConsumeDurableJobsAsync().GetAsyncEnumerator(test.Token);
+        Assert.True(await reader.MoveNextAsync());
+        var dequeued = reader.Current;
+        Assert.Equal(job.Id, dequeued.Job.Id);
+        var waiting = reader.MoveNextAsync().AsTask();
+        Assert.False(waiting.IsCompleted);
+
+        var conflict = test.GateNextAppend(new InconsistentStateException("The journal changed before removal committed."));
+        var removal = test.Shard.RemoveJobAsync(job.Id, test.Token);
+        await conflict.Started.Task.WaitAsync(test.Token);
+        conflict.Release.SetResult();
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => removal);
+        Assert.False(await waiting.WaitAsync(test.Token));
+        Assert.Equal(DurableJobMutationResult.JobNotFound, await test.Shard.TryStartAttemptAsync(dequeued, test.Token));
+        Assert.Null(await test.Schedule(1));
+        Assert.Equal(DurableJobMutationResult.OwnershipLost, await test.Shard.RemoveJobAsync(job.Id, test.Token));
+        Assert.Equal([job.Name], await test.ReadPersistedJobNamesAsync());
+
+        await test.Manager.UnregisterShardAsync(test.Shard, test.Token);
+        await test.AssertRediscoveredJobCanCompleteAsync(job);
+    }
+
+    [Fact]
+    public async Task FailedRemovalOfLastJob_PreservesItsJournalForRediscovery()
+    {
+        await using var test = await SignalTest.CreateAsync();
+        var job = Assert.IsType<DurableJob>(await test.Schedule(0));
+        await test.Shard.MarkAsCompleteAsync(test.Token);
+        await using var reader = test.Shard.ConsumeDurableJobsAsync().GetAsyncEnumerator(test.Token);
+        Assert.True(await reader.MoveNextAsync());
+
+        var failedWrite = test.GateNextAppend(new IOException("The removal could not be written."));
+        var removal = test.Shard.RemoveJobAsync(job.Id, test.Token);
+        await failedWrite.Started.Task.WaitAsync(test.Token);
+        Assert.False(await reader.MoveNextAsync());
+        var cleanup = test.Manager.UnregisterShardAsync(test.Shard, test.Token);
+        Assert.False(cleanup.IsCompleted);
+        failedWrite.Release.SetResult();
+
+        await Assert.ThrowsAsync<IOException>(() => removal);
+        await cleanup.WaitAsync(test.Token);
+        await test.AssertRediscoveredJobCanCompleteAsync(job);
+    }
+
+    [Fact]
+    public async Task Unregistration_ReleasesRemainingJobsAfterAMutationFinishesWriting()
+    {
+        await using var test = await SignalTest.CreateAsync();
+        var first = Assert.IsType<DurableJob>(await test.Schedule(0));
+        var second = Assert.IsType<DurableJob>(await test.Schedule(1));
+        var write = test.GateNextAppend();
+        var removal = test.Shard.RemoveJobAsync(first.Id, test.Token);
+        await write.Started.Task.WaitAsync(test.Token);
+        var cleanup = test.Manager.UnregisterShardAsync(test.Shard, test.Token);
+        Assert.False(cleanup.IsCompleted);
+        write.Release.SetResult();
+
+        Assert.Equal(DurableJobMutationResult.Applied, await removal);
+        await cleanup.WaitAsync(test.Token);
+        await test.AssertRediscoveredJobCanCompleteAsync(second);
     }
 
     [Fact]
@@ -246,10 +315,11 @@ public partial class JournaledJobShardManagerTests
         }
     }
 
-    private sealed class AppendGate
+    private sealed class AppendGate(Exception? failure)
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Exception? Failure { get; } = failure;
     }
 
     private sealed class SignalTest : IAsyncDisposable
@@ -267,6 +337,7 @@ public partial class JournaledJobShardManagerTests
         public CancellationToken Token => _timeout.Token;
         public CountingJournalStorageProvider Storage { get; }
         public ServiceProvider Services { get; }
+        public JournaledJobShardManager Manager { get; private set; } = null!;
         public JournaledJobShard Shard { get; private set; } = null!;
 
         public static async Task<SignalTest> CreateAsync(SignalTimeProvider? clock = null)
@@ -275,12 +346,12 @@ public partial class JournaledJobShardManagerTests
             var membership = new TestClusterMembershipService();
             var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5090), 0);
             membership.SetSiloStatus(silo, SiloStatus.Active);
-            var manager = CreateManager(test.Services, membership, silo, new DurableJobsOptions
+            test.Manager = CreateManager(test.Services, membership, silo, new DurableJobsOptions
             {
                 ShardBatchLingerDelay = clock is null ? TimeSpan.Zero : TimeSpan.FromSeconds(1)
             });
             var start = (clock?.GetUtcNow() ?? DateTimeOffset.UtcNow).AddMinutes(-1);
-            test.Shard = Assert.IsType<JournaledJobShard>(await manager.CreateShardAsync(
+            test.Shard = Assert.IsType<JournaledJobShard>(await test.Manager.CreateShardAsync(
                 start, start.AddHours(1), new Dictionary<string, string>(), test.Token));
             return test;
         }
@@ -293,9 +364,9 @@ public partial class JournaledJobShardManagerTests
                 DueTime = Shard.StartTime.AddSeconds(index + 1)
             }, cancellationToken ?? Token);
 
-        public AppendGate GateNextAppend()
+        public AppendGate GateNextAppend(Exception? failure = null)
         {
-            var gate = new AppendGate();
+            var gate = new AppendGate(failure);
             lock (_writes)
             {
                 _writes.Enqueue(gate);
@@ -315,6 +386,24 @@ public partial class JournaledJobShardManagerTests
             return state.CaptureSnapshot().Jobs.OrderBy(entry => entry.Job.DueTime).Select(entry => entry.Job.Name).ToArray();
         }
 
+        public async Task AssertRediscoveredJobCanCompleteAsync(DurableJob job)
+        {
+            var recovered = Assert.Single(await Manager.AssignJobShardsAsync(Shard.EndTime, int.MaxValue, Token));
+            await using (recovered)
+            {
+                Assert.Equal(Shard.Id, recovered.Id);
+                await using var reader = recovered.ConsumeDurableJobsAsync().GetAsyncEnumerator(Token);
+                Assert.True(await reader.MoveNextAsync());
+                Assert.Equal(job.Id, reader.Current.Job.Id);
+                Assert.Equal(DurableJobMutationResult.Applied, await recovered.TryStartAttemptAsync(reader.Current, Token));
+                Assert.Equal(DurableJobMutationResult.Applied, await recovered.RemoveJobAsync(job.Id, Token));
+                Assert.False(await reader.MoveNextAsync());
+                await Manager.UnregisterShardAsync(recovered, Token);
+            }
+
+            Assert.Empty(await Manager.AssignJobShardsAsync(Shard.EndTime, int.MaxValue, Token));
+        }
+
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {
             AppendGate? gate;
@@ -327,6 +416,10 @@ public partial class JournaledJobShardManagerTests
             {
                 gate.Started.SetResult();
                 await gate.Release.Task.WaitAsync(cancellationToken);
+                if (gate.Failure is { } failure)
+                {
+                    throw failure;
+                }
             }
         }
 
