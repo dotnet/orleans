@@ -90,7 +90,9 @@ public abstract class DurableTaskApplicationScenarioTests : IAsyncLifetime
 
         AdvanceToRetry(retry);
         await AssertReservedAsync(order, catalog, initial, task);
-        Assert.Equal([DeliveryStatus.Accepted, DeliveryStatus.Duplicate], _deliveries.Answers);
+        Assert.Collection(_deliveries.Answers,
+            answer => Assert.True(answer is DeliveryResult.Accepted),
+            answer => Assert.True(answer is DeliveryResult.Duplicate));
     }
 
     [Fact]
@@ -261,13 +263,13 @@ public abstract class DurableTaskApplicationScenarioTests : IAsyncLifetime
     private sealed class ReservationDeliveryControl : IOutgoingGrainCallFilter
     {
         private readonly List<InboxMessage> _attempts = [];
-        private readonly List<DeliveryStatus> _answers = [];
+        private readonly List<DeliveryResult> _answers = [];
         private GrainId _target;
         private bool _loseAcceptedReply;
         private readonly TaskCompletionSource _redelivered = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public IReadOnlyList<InboxMessage> Attempts { get { lock (_attempts) return [.. _attempts]; } }
-        public IReadOnlyList<DeliveryStatus> Answers { get { lock (_attempts) return [.. _answers]; } }
+        public IReadOnlyList<DeliveryResult> Answers { get { lock (_attempts) return [.. _answers]; } }
         public Task Redelivered => _redelivered.Task;
 
         public void Arm(GrainId target, bool loseAcceptedReply)
@@ -299,10 +301,10 @@ public abstract class DurableTaskApplicationScenarioTests : IAsyncLifetime
 
             await context.Invoke();
             var answer = Assert.IsType<DeliveryResult>(context.Result);
-            lock (_attempts) _answers.Add(answer.Status);
+            lock (_attempts) _answers.Add(answer);
             if (first && _loseAcceptedReply)
             {
-                Assert.Equal(DeliveryStatus.Accepted, answer.Status);
+                Assert.True(answer is DeliveryResult.Accepted);
                 throw new TimeoutException("Reservation accepted; its answer was lost.");
             }
 
