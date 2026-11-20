@@ -24,7 +24,7 @@ A durable task body reads or changes grain state at a point from which the body 
 A replay runs the body from the start, and each recorded operation returns its recorded outcome. Grain state isn't rebuilt: it holds every committed change, including the changes which later operations made. The code before the body's last durable operation therefore runs again against newer state:
 
 - **Writes apply again.** After a deactivation, the replay of `RemindAsync` increments `_remindersSent` a second time, although the reminder was sent once.
-- **Reads observe later writes.** The replay of `ShipWhenPaidAsync` reads `Shipped`, which the recorded `ship` step wrote, and skips the branch which the first run took. A replay which schedules different operations, or the same operations with different arguments, returns a different result or fails with a divergence error.
+- **Reads observe later writes.** The replay of `ShipWhenPaidAsync` reads `Shipped`, which the recorded `ship` step wrote, and skips the branch which the first run took. A replay which schedules different operations, or the same operations with different arguments, returns a different result or diverges and stalls the execution.
 
 Three places access grain state once:
 
@@ -32,7 +32,7 @@ Three places access grain state once:
 - A local step, an `async DurableTask` method of the same grain, commits the state changes of its final code with its recorded result.
 - The body's synchronous tail, the code after its last durable operation, commits its state changes with the task's result.
 
-For the replay model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
+For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 
@@ -48,7 +48,7 @@ For the replay model, see [Writing replay-safe workflows](../grains/durable-task
 
 :::code source="snippets/durable-tasks/Orleans0200.cs" id="orleans0200_fix_step" language="csharp":::
 
-For recorded effects, see [Recorded effects](../grains/durable-tasks.md#recorded-effects).
+For recorded effects, see [Recorded effects, local steps, and calls to other grains](../grains/durable-tasks.md#recorded-effects-local-steps-and-calls-to-other-grains).
 
 ## When to suppress
 

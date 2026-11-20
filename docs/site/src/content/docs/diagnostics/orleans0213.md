@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-A durable task body declares an `async void` local function, or an `async` lambda which converts to a delegate that returns `void`, such as `Action`:
+A durable task body declares an `async void` local function, or an `async` lambda which converts to a delegate that returns `void`, such as `Action`. [ORLEANS0222](orleans0222.md) reports such a lambda which `DurableTask.Run` or `DurableTask.RunInline` receives:
 
 :::code source="snippets/durable-tasks/Orleans0213.cs" id="orleans0213_violation" language="csharp":::
 
@@ -27,7 +27,7 @@ A durable task body observes the operations which it awaits: their results, thei
 - A failure to send escapes the body, so the task completes successfully, and the exception surfaces outside the task.
 - Durable operations which the code performs after its first `await` run after the body completed, outside the task's execution.
 
-For the replay model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
+For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 

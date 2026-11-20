@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-A constant name which `WithId` or `DurableTask.RunInline` receives inside a durable task body contains `$`:
+A constant name which `WithId` or `DurableTask.RunInline` receives inside a durable task body contains `$`. Outside durable task bodies, such as in clients and ordinary grain methods, `WithId` names a root task, which can contain `$`, so the rule checks only `DurableTask.RunInline` names there:
 
 :::code source="snippets/durable-tasks/Orleans0207.cs" id="orleans0207_violation" language="csharp":::
 

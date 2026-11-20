@@ -29,7 +29,7 @@ Journal-backed `IPersistentState<T>` records its whole state on each journal wri
 
 Value types, records whose members are init-only, and immutable collections change through assignment, which the API records, so the rule reports none of them.
 
-For replay-safe state, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
+For replay-safe state, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md#state-values-and-external-work).
 
 ## How to fix violations
 

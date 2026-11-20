@@ -1,0 +1,233 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text.Json.Serialization;
+using Orleans.DurableTasks.Protocol;
+using Orleans.DurableTasks;
+using Orleans.Runtime;
+using Orleans.Serialization;
+
+namespace Orleans.DurableTasks.Runtime;
+
+/// <summary>
+/// The persisted state of one durable task.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Every persisted member is a primitive, enumeration, timestamp, string, <see cref="GrainId"/>, or set of subscribers, each a grain
+/// identity and a task identifier, so every journal format can store the state. The request and the result are
+/// polymorphic Orleans-serializable values, held as
+/// opaque Orleans-serialized payloads in <see cref="RequestPayload"/> and <see cref="ResultPayload"/>. The payloads are
+/// not serialized with the state: the state is rewritten on every update, so the owning storage persists each payload
+/// separately, once, and attaches it to the state it exposes.
+/// </para>
+/// <para>
+/// The owning storage binds each state to its <see cref="Serializer"/> before exposing it. <see cref="Request"/> and
+/// <see cref="Result"/> decode their payload on first access and cache the decoded value, so recovery does not decode
+/// every payload and later updates reuse the stored payloads. A payload which no longer decodes throws on each access and
+/// stays stored unchanged, so code which decodes it, such as a later deployment's, reads it.
+/// </para>
+/// <para>
+/// JSON journals omit unset grain identities, so they recover as <see langword="default"/>.
+/// </para>
+/// </remarks>
+[GenerateSerializer, SuppressReferenceTracking]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskState")]
+internal class DurableTaskState : IDurableTaskState
+{
+    [NonSerialized]
+    private Serializer? _serializer;
+    [NonSerialized]
+    private byte[]? _requestPayload;
+    [NonSerialized]
+    private byte[]? _resultPayload;
+    [NonSerialized]
+    private IDurableTaskRequest? _request;
+    [NonSerialized]
+    private DurableTaskResponse? _result;
+    [NonSerialized]
+    private bool _payloadsAttached;
+
+    /// <summary>
+    /// Gets or sets the Orleans-serialized <see cref="IDurableTaskRequest"/>, or <see langword="null"/> when the task has no stored request.
+    /// </summary>
+    /// <remarks>The owning storage persists the payload separately from the state.</remarks>
+    [JsonIgnore]
+    public byte[]? RequestPayload
+    {
+        get => _requestPayload;
+        set
+        {
+            _requestPayload = value;
+            _request = null;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the Orleans-serialized terminal <see cref="DurableTaskResponse"/>, or <see langword="null"/> when the task has no stored result.
+    /// </summary>
+    /// <remarks>The owning storage persists the payload separately from the state.</remarks>
+    [JsonIgnore]
+    public byte[]? ResultPayload
+    {
+        get => _resultPayload;
+        set
+        {
+            _resultPayload = value;
+            _result = null;
+        }
+    }
+
+    /// <inheritdoc cref="IDurableTaskState.Result"/>
+    /// <remarks>The value is decoded from <see cref="ResultPayload"/> on first access.</remarks>
+    /// <exception cref="InvalidOperationException">The state stores a result but is not bound to its storage.</exception>
+    [JsonIgnore]
+    public DurableTaskResponse? Result => _result ??= _resultPayload is { } payload
+        ? GetSerializer().Deserialize<DurableTaskResponse>(payload)
+        : null;
+
+    /// <inheritdoc cref="IDurableTaskState.Kind"/>
+    [Id(23)]
+    public DurableTaskRecordKind Kind { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.CompletionDestinations"/>
+    [Id(6)]
+    public HashSet<DurableTaskSubscriber> CompletionDestinations { get; set; } = [];
+
+    /// <inheritdoc cref="IDurableTaskState.Request"/>
+    /// <remarks>The value is decoded from <see cref="RequestPayload"/> on first access.</remarks>
+    /// <exception cref="InvalidOperationException">The state stores a request but is not bound to its storage.</exception>
+    [JsonIgnore]
+    public IDurableTaskRequest? Request => _request ??= _requestPayload is { } payload
+        ? GetSerializer().Deserialize<IDurableTaskRequest>(payload)
+        : null;
+
+    /// <inheritdoc cref="IDurableTaskState.HasRequest"/>
+    [JsonIgnore]
+    public bool HasRequest => _requestPayload is not null;
+
+    /// <inheritdoc cref="IDurableTaskState.CompletedAt"/>
+    [Id(3)]
+    public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.CreatedAt"/>
+    [Id(4)]
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.CancellationRequestedAt"/>
+    [Id(5)]
+    public DateTimeOffset? CancellationRequestedAt { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.CancellationReason"/>
+    [Id(18)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CancellationReason { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.Shielded"/>
+    [Id(19)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Shielded { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.Accepted"/>
+    [Id(21)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Accepted { get; set; }
+
+    [Id(7)]
+    public DateTimeOffset? DueTime { get; set; }
+
+    [Id(8)]
+    public long ResumeGeneration { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.RequestFingerprint"/>
+    [Id(9)]
+    public string? RequestFingerprint { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.Method"/>
+    [Id(24)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Method { get; set; }
+
+    [Id(11)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public GrainId RemoteTarget { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.RemoteRequestFingerprint"/>
+    [Id(12)]
+    public string? RemoteRequestFingerprint { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.CallerId"/>
+    [Id(13)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public GrainId CallerId { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.RetainedSince"/>
+    [Id(17)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? RetainedSince { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.Incarnation"/>
+    [Id(22)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public Guid Incarnation { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.CompletionSequence"/>
+    [Id(20)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public long CompletionSequence { get; set; }
+
+    IReadOnlySet<DurableTaskSubscriber> IDurableTaskState.CompletionDestinations => CompletionDestinations;
+
+    /// <summary>
+    /// Binds this state to the serializer which encodes and decodes its payloads.
+    /// </summary>
+    internal DurableTaskState Bind(Serializer serializer)
+    {
+        Debug.Assert(_serializer is null || ReferenceEquals(_serializer, serializer), "A durable task state is owned by one storage.");
+        _serializer = serializer;
+        return this;
+    }
+
+    /// <summary>Gets whether the payloads which the owning storage persists separately are attached.</summary>
+    internal bool PayloadsAttached => _payloadsAttached;
+
+    /// <summary>Attaches the payloads which the owning storage persists separately from a recovered state.</summary>
+    internal void AttachPayloads(byte[]? request, byte[]? result)
+    {
+        Debug.Assert(!_payloadsAttached, "A state's payloads are attached once.");
+        RequestPayload = request;
+        ResultPayload = result;
+        _payloadsAttached = true;
+    }
+
+    /// <summary>
+    /// Shares the payloads of the state this instance was copied from. The payloads are immutable once stored.
+    /// </summary>
+    internal void CopyPayloadsFrom(DurableTaskState source)
+    {
+        RequestPayload = source._requestPayload;
+        ResultPayload = source._resultPayload;
+    }
+
+    /// <summary>
+    /// Stores <paramref name="request"/> as an Orleans-serialized payload and caches it as the decoded value.
+    /// </summary>
+    internal void SetRequest(IDurableTaskRequest? request)
+    {
+        _requestPayload = request is null ? null : GetSerializer().SerializeToArray(request);
+        _request = request;
+        _payloadsAttached = true;
+    }
+
+    /// <summary>
+    /// Stores <paramref name="result"/> as an Orleans-serialized payload and caches it as the decoded value.
+    /// </summary>
+    internal void SetResult(DurableTaskResponse? result)
+    {
+        _resultPayload = result is null ? null : GetSerializer().SerializeToArray(result);
+        _result = result;
+    }
+
+    private Serializer GetSerializer() =>
+        _serializer ?? throw new InvalidOperationException("The durable task state is not bound to a durable task storage.");
+}

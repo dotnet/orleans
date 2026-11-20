@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-Two call sites of `WithId`, or two call sites of `DurableTask.RunInline`, in one durable task body pass the same constant name, and one run can reach both. Call sites in mutually exclusive branches, such as the two arms of an `if` statement, and one call site which a loop repeats aren't reported:
+Two call sites of `WithId`, or two call sites of `DurableTask.RunInline`, in one durable task body pass the same constant name, and one run can reach both. Call sites in mutually exclusive branches, such as the two arms of an `if` statement, and one call site which a loop repeats aren't reported. Outside durable task bodies, such as in clients and ordinary grain methods, `WithId` names root tasks, which the rule doesn't check:
 
 :::code source="snippets/durable-tasks/Orleans0208.cs" id="orleans0208_violation" language="csharp":::
 
@@ -26,11 +26,11 @@ A name which one run repeats identifies its later occurrences by their order: th
 When a deployment removes the welcome email while executions are pending, the replay of an execution which already sent both emails names the tips email `email`. That identifier holds the welcome email's record:
 
 - For a local step, the replay returns the welcome email's recorded completion, and the tips email's own record, `email$2`, is never reached.
-- For a call to another grain, the replay finds another request under the identifier and fails with a divergence error.
+- For a call to another grain, the replay finds another request under the identifier, diverges, and stalls the execution.
 
-Distinct names keep each call site's identifier when other call sites are added, removed, or reordered.
+Distinct names keep each call site's identifier when other call sites are added, removed, or reordered. For how identifiers are constructed, see [Task identity and references](../grains/durable-tasks-identity.md).
 
-For identifiers and versioning, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
+For identifiers and versioning, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 

@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-A `try` block in a durable task body contains durable operations, and one of its `catch` clauses catches `OperationCanceledException`, a type it derives from, or a type which derives from it, has no filter which reads `DurableTaskContext.IsTaskCancellationRequested` or excludes `OperationCanceledException`, such as `when (e is not OperationCanceledException)`, and doesn't rethrow:
+A `try` block in a durable task body contains durable operations, and one of its `catch` clauses catches `OperationCanceledException`, a type it derives from, or a type which derives from it, has no filter which reads `DurableTaskContext.IsTaskCancellationRequested`, and doesn't rethrow:
 
 :::code source="snippets/durable-tasks/Orleans0212.cs" id="orleans0212_violation" language="csharp":::
 
@@ -30,7 +30,7 @@ An unfiltered handler treats both alike. When the host cancels the attempt durin
 
 `DurableTask.Current.IsTaskCancellationRequested` is `true` only for task cancellation, in the canceled attempt and in every later attempt.
 
-For compensation, see [Compensating canceled work](../grains/durable-tasks.md#compensating-canceled-work).
+For compensation, see [Compensate inline when the workflow is canceled](../grains/durable-tasks-recipes.md#compensate-inline-when-the-workflow-is-canceled).
 
 ## How to fix violations
 

@@ -24,12 +24,12 @@ A durable task body awaits an operation which isn't durable, such as an `HttpCli
 A replay runs the code before the body's last durable operation again, including each await in it. An external await then:
 
 - **Repeats its effects.** A call which changes another system, such as sending a message or creating a record, runs once per replay.
-- **Observes another result.** The replay receives another exchange rate and passes another amount to the recorded `bill` step, which fails with a divergence error when the step is a call to another grain, and otherwise returns the recorded total for a different amount.
+- **Observes another result.** The replay receives another exchange rate and passes another amount to the recorded `bill` step, which diverges and stalls the execution when the step is a call to another grain, and otherwise returns the recorded total for a different amount.
 - **Fails where the first run succeeded.** A replay which runs while the service is unavailable fails the task, although every recorded operation succeeded.
 
 A step records its result, so a replay returns the result without awaiting the operation again.
 
-For the replay model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
+For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 
@@ -45,7 +45,7 @@ For the replay model, see [Writing replay-safe workflows](../grains/durable-task
 
 :::code source="snippets/durable-tasks/Orleans0202.cs" id="orleans0202_fix_tail" language="csharp":::
 
-A step which ends before its result commits runs again, and so does the tail of a run which ends before the task's result commits. An external operation in a step or the tail therefore runs at least once, so give it an idempotency key derived from the task, such as `$"{grainId}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}"`, when it changes another system. The incarnation distinguishes a later run of the same task identifier, whose operations are new.
+A step which ends before its result commits runs again, and so does the tail of a run which ends before the task's result commits. An external operation in a step or the tail therefore runs at least once, so give it an idempotency key derived from the task, such as `$"{grainId}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}"`, when it changes another system; see [Idempotency in durable tasks](../grains/durable-tasks-idempotency.md) and [Integrate durable tasks with other systems](../grains/durable-tasks-integrations.md). The incarnation distinguishes a later run of the same task identifier, whose operations are new.
 
 ## When to suppress
 

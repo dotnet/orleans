@@ -27,13 +27,13 @@ A replay runs the body from the start, so it produces another value:
 
 - **Another deadline.** The replay computes a deadline from the current clock. The recorded wait keeps its recorded due time, so the value which the body computed disagrees with the wait which it scheduled.
 - **Another key.** A replay which reaches the `charge` step before it recorded a result runs the step with a new key, so the payment provider can't recognize the retry and charges again.
-- **Divergence.** A value which reaches a durable call's arguments, a `WithId` name, or a branch makes the replay schedule a different operation than the one which the first run recorded, and the operation fails with a divergence error.
+- **Divergence.** A value which reaches a durable call's arguments, a `WithId` name, or a branch makes the replay schedule a different operation than the one which the first run recorded, and the execution diverges and stalls until code which matches the record replays it.
 
-For the replay model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
+For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 
-**Derive identifiers from the task's identity, and read logical time.** The grain, `DurableTask.Current.Id`, and `DurableTask.Current.Incarnation` name the run in every replay, so a key built from them is the same in every replay and attempt, including one which repeats a charge whose result didn't commit. The incarnation distinguishes a later run of the same task identifier, such as one which starts after the earlier run completed and its history was deleted, so that run charges under another key. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline:
+**Derive identifiers from the task's identity, and read logical time.** The grain, `DurableTask.Current.Id`, and `DurableTask.Current.Incarnation` name the run in every replay, so a key built from them is the same in every replay and attempt, including one which repeats a charge whose result didn't commit. The incarnation distinguishes a later run of the same task identifier, such as one which starts after the earlier run completed and its history was deleted, so that run charges under another key. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline. See [Derive idempotency keys from the task](../grains/durable-tasks-idempotency.md#derive-idempotency-keys-from-the-task):
 
 :::code source="snippets/durable-tasks/Orleans0201.cs" id="orleans0201_fix" language="csharp":::
 
