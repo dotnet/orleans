@@ -234,9 +234,16 @@ namespace Orleans.Runtime.Messaging
                     throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{LocalClusterId}""");
                 }
 
-                if (preamble.SiloAddress is not null)
+                if (preamble.SiloAddress is { } remoteAddress)
                 {
-                    this.RemoteSiloAddress = preamble.SiloAddress;
+                    if (this.RemoteSiloAddress is { } requestedAddress
+                        && remoteAddress.Equals(this.LocalSiloAddress)
+                        && !requestedAddress.Matches(remoteAddress))
+                    {
+                        throw new ConnectionAbortedException($"Connecting to silo {requestedAddress} reached the local silo {remoteAddress}.");
+                    }
+
+                    this.RemoteSiloAddress = remoteAddress;
                 }
             }
         }
