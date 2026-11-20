@@ -1,11 +1,11 @@
-using Azure.Messaging.EventHubs;
-using Azure.Messaging.EventHubs.Consumer;
-using Azure.Messaging.EventHubs.Primitives;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs.Primitives;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -56,13 +56,13 @@ namespace Orleans.Streaming.EventHubs
     }
 
     /// <summary>
-    /// pass through decorator class for EventHubReceiver
+    /// Adapts a partition receiver without taking ownership of its connection.
     /// </summary>
     internal partial class EventHubReceiverProxy : IEventHubReceiver
     {
         private readonly PartitionReceiver client;
 
-        public EventHubReceiverProxy(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
+        public EventHubReceiverProxy(EventHubPartitionSettings partitionSettings, string offset, ILogger logger, EventHubConnection connection)
         {
             var receiverOptions = new PartitionReceiverOptions();
             if (partitionSettings.ReceiverOptions.PrefetchCount != null)
@@ -72,7 +72,6 @@ namespace Orleans.Streaming.EventHubs
 
             var options = partitionSettings.Hub;
             receiverOptions.ConnectionOptions = options.ConnectionOptions;
-            var connection = options.CreateConnection(options.ConnectionOptions);
             this.client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
 
             EventPosition GetEventPosition()

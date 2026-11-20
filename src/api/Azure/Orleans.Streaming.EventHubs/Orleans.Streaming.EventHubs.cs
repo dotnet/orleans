@@ -34,6 +34,8 @@ namespace Orleans.Configuration
 
     public partial class EventHubOptions
     {
+        public Azure.Messaging.EventHubs.Producer.EventHubBufferedProducerClientOptions? BufferedProducerOptions { get { throw null; } set { } }
+
         public Azure.Messaging.EventHubs.EventHubConnectionOptions ConnectionOptions { get { throw null; } set { } }
 
         public void ConfigureEventHubConnection(Azure.Messaging.EventHubs.EventHubConnection connection, string consumerGroup) { }
@@ -324,6 +326,8 @@ namespace Orleans.Streaming.EventHubs
         protected virtual void InitEventHubClient() { }
 
         public virtual System.Threading.Tasks.Task QueueMessageBatchAsync<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
+
+        public virtual System.Threading.Tasks.Task ShutdownAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     [GenerateSerializer]
