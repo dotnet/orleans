@@ -1177,12 +1177,53 @@ internal sealed partial class ActivationData :
 
                     try
                     {
-                        if (!MayInvokeRequest(message))
+                        var compatibilityBlocked = false;
+                        // Check compatibility before anything reads the body. Interleaving predicates and invocation
+                        // decode it lazily, and this silo may lack the generated invokable for a method added in a
+                        // newer interface version. The check reads only headers, so an incompatible request is
+                        // rerouted with its body still encoded.
+                        if (message.InterfaceVersion > 0)
+                        {
+                            var compatibilityDirector = _shared.InternalRuntime.CompatibilityDirectorManager.GetDirector(message.InterfaceType);
+                            var currentVersion = _shared.InternalRuntime.GrainVersionManifest.GetLocalVersion(message.InterfaceType);
+                            if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
+                            {
+                                if (i > 0 || IsCurrentlyExecuting)
+                                {
+                                    // Requests queued ahead of this one have not started yet. Deactivating now would forward
+                                    // them to a new activation, so wait until they start to preserve their order.
+                                    // Running requests must also finish first: a deactivating activation stops dispatching
+                                    // interleaved requests, including cancellation of this one.
+                                    compatibilityBlocked = true;
+                                }
+                                else
+                                {
+                                    // Add this activation to cache invalidation headers.
+                                    message.AddToCacheInvalidationHeader(Address, validAddress: null);
+
+                                    var reason = new DeactivationReason(
+                                        DeactivationReasonCode.IncompatibleRequest,
+                                        $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
+
+                                    var activityContext = message.RequestContextData.TryGetActivityContext();
+
+                                    Deactivate(reason, activityContext, cancellationToken: default);
+                                    return;
+                                }
+                            }
+                        }
+
+                        if (compatibilityBlocked || !MayInvokeRequest(message))
                         {
                             // The activation is not able to process this message right now, so try the next message.
                             ++i;
 
-                            if (_blockingRequest != null)
+                            // An incompatible body cannot be inspected to determine whether an interleaving
+                            // predicate would allow it. Only infer blocking when headers and the grain's
+                            // configuration establish that it cannot interleave.
+                            if (_blockingRequest != null
+                                && (!compatibilityBlocked
+                                    || (GetComponent<GrainCanInterleave>() is null && !MayInvokeRequest(message, inspectInterleavingPredicates: false))))
                             {
                                 var currentRequestActiveTime = _busyDuration.Elapsed;
                                 if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
@@ -1202,27 +1243,6 @@ internal sealed partial class ActivationData :
                             }
 
                             continue;
-                        }
-
-                        // If the current message is incompatible, deactivate this activation and eventually forward the message to a new incarnation.
-                        if (message.InterfaceVersion > 0)
-                        {
-                            var compatibilityDirector = _shared.InternalRuntime.CompatibilityDirectorManager.GetDirector(message.InterfaceType);
-                            var currentVersion = _shared.InternalRuntime.GrainVersionManifest.GetLocalVersion(message.InterfaceType);
-                            if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
-                            {
-                                // Add this activation to cache invalidation headers.
-                                message.AddToCacheInvalidationHeader(Address, validAddress: null);
-
-                                var reason = new DeactivationReason(
-                                    DeactivationReasonCode.IncompatibleRequest,
-                                    $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
-
-                                var activityContext = message.RequestContextData.TryGetActivityContext();
-
-                                Deactivate(reason, activityContext, cancellationToken: default);
-                                return;
-                            }
                         }
                     }
                     catch (Exception exception)
@@ -1328,7 +1348,7 @@ internal sealed partial class ActivationData :
             GetDeactivationCompletionSource().TrySetResult(true);
         }
 
-        bool MayInvokeRequest(Message incoming)
+        bool MayInvokeRequest(Message incoming, bool inspectInterleavingPredicates = true)
         {
             if (!IsCurrentlyExecuting)
             {
@@ -1354,7 +1374,7 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            var canInterleave = GetComponent<GrainCanInterleave>();
+            var canInterleave = inspectInterleavingPredicates ? GetComponent<GrainCanInterleave>() : null;
             bool? incomingMayInterleave = null;
             foreach (var runningRequest in _runningRequests)
             {
@@ -2587,18 +2607,24 @@ internal sealed partial class ActivationData :
             }
 
             var didCancel = false;
-            if (message is not null && message.BodyObject is IInvokable request)
+            if (wasWaiting)
             {
-                if (wasWaiting)
+                // A waiting request has not been invoked, so it is cancelled from its headers alone. Reading its body
+                // here would decode it, which fails for a request this silo cannot decode.
+                try
                 {
-                    // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
-                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                    didCancel = true;
+                    _shared.InternalRuntime.RuntimeClient.SendResponse(message!, Response.FromException(new OperationCanceledException()));
                 }
-                else
+                finally
                 {
-                    didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                    message!.Dispose();
                 }
+                didCancel = true;
+            }
+            else if (message?.BodyObject is IInvokable request)
+            {
+                // A running request was decoded before invocation.
+                didCancel = TryCancelInvokable(request) || !request.IsCancellable;
             }
 
             return didCancel;
