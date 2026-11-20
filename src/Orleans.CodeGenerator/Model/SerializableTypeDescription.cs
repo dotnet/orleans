@@ -138,11 +138,7 @@ internal class SerializableTypeDescription : ISerializableTypeDescription
 
     public string Namespace => Type.GetNamespaceAndNesting();
 
-    public string GeneratedNamespace => Namespace switch
-    {
-        { Length: > 0 } ns => $"{GeneratedCodeUtilities.CodeGeneratorName}.{ns}",
-        _ => GeneratedCodeUtilities.CodeGeneratorName
-    };
+    public string GeneratedNamespace => GeneratedCodeUtilities.GetGeneratedNamespaceName(Type);
 
     public string Name => Type.Name;
 

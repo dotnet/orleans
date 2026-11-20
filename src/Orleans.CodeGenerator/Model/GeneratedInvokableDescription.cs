@@ -23,13 +23,14 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
         string? returnValueInitializerMethod,
         InvokableEmissionPlan emissionPlan)
     {
+        var metadataNamespaceName = GeneratedCodeUtilities.GetMetadataNamespaceName(generatedNamespaceName);
         if (methodDescription.AllTypeParameters.Count == 0)
         {
-            MetadataName = $"{generatedNamespaceName}.{generatedClassName}";
+            MetadataName = $"{metadataNamespaceName}.{generatedClassName}";
         }
         else
         {
-            MetadataName = $"{generatedNamespaceName}.{generatedClassName}`{methodDescription.AllTypeParameters.Count}";
+            MetadataName = $"{metadataNamespaceName}.{generatedClassName}`{methodDescription.AllTypeParameters.Count}";
         }
 
         BaseType = baseType;

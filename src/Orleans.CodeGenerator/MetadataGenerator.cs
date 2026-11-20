@@ -381,8 +381,8 @@ internal class MetadataGenerator(
 
     private static string GetGeneratedInvokableMetadataName(string generatedNamespace, string name, int genericArity)
         => genericArity == 0
-            ? $"{generatedNamespace}.{name}"
-            : $"{generatedNamespace}.{name}`{genericArity}";
+            ? $"{GeneratedCodeUtilities.GetMetadataNamespaceName(generatedNamespace)}.{name}"
+            : $"{GeneratedCodeUtilities.GetMetadataNamespaceName(generatedNamespace)}.{name}`{genericArity}";
 
     private static string GetGeneratedInvokableClassName(ProxyInterfaceModel proxy, MethodModel method)
     {
