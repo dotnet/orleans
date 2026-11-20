@@ -87,7 +87,7 @@ public sealed class ConversationGrain(
 
     public IAsyncEnumerable<LogEvent<string>> WatchLiveAsync(
         long epoch, long nextSequence, LogDraftId? draftId, CancellationToken cancellationToken = default) =>
-        _messages.ReadAsync(nextSequence, epoch, DurableWatchMode.Committed | DurableWatchMode.Drafts, draftId, cancellationToken);
+        _messages.ReadAsync(nextSequence, epoch, includeDrafts: true, draftId, cancellationToken);
 
     public IAsyncEnumerable<ValueChange<string>> WatchStatusAsync(CancellationToken cancellationToken = default) =>
         _status.WatchAsync(cancellationToken: cancellationToken);

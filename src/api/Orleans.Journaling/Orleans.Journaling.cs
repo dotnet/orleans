@@ -8,69 +8,6 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling
 {
-    [GenerateSerializer]
-    public enum DictionaryChangeKind : byte
-    {
-        Resync = 0,
-        Set = 1,
-        Removed = 2,
-        Cleared = 3,
-        Watermark = 4
-    }
-
-    [GenerateSerializer]
-    public readonly partial struct DictionaryChange<TKey, TValue> : System.IEquatable<DictionaryChange<TKey, TValue>>
-    {
-        private readonly TKey? _Key_k__BackingField;
-        private readonly TValue? _Value_k__BackingField;
-        private readonly System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<TKey, TValue>>? _Snapshot_k__BackingField;
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        [Id(1)]
-        public TKey? Key { get { throw null; } init { } }
-
-        [Id(0)]
-        public DictionaryChangeKind Kind { get { throw null; } init { } }
-
-        [Id(3)]
-        public System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<TKey, TValue>>? Snapshot { get { throw null; } init { } }
-
-        [Id(4)]
-        public DurableChangeStatus Status { get { throw null; } init { } }
-
-        [Id(2)]
-        public TValue? Value { get { throw null; } init { } }
-
-        [Id(5)]
-        public long Version { get { throw null; } init { } }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly bool Equals(DictionaryChange<TKey, TValue> other) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly bool Equals(object obj) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly int GetHashCode() { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator ==(DictionaryChange<TKey, TValue> left, DictionaryChange<TKey, TValue> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator !=(DictionaryChange<TKey, TValue> left, DictionaryChange<TKey, TValue> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly string ToString() { throw null; }
-    }
-
-    [GenerateSerializer]
-    public enum DurableChangeStatus : byte
-    {
-        Draft = 0,
-        Staged = 1,
-        Committed = 2
-    }
-
     public abstract partial class DurableGrain : Grain, IGrainBase
     {
         protected IDurableStateManager StateManager { get { throw null; } }
@@ -99,15 +36,7 @@ namespace Orleans.Journaling
 
     public static partial class DurableStateWatchExtensions
     {
-        public static System.Collections.Generic.IAsyncEnumerable<ListChange<T>> WatchAsync<T>(this IDurableList<T> list, DurableWatchMode mode = DurableWatchMode.Committed, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public static System.Collections.Generic.IAsyncEnumerable<QueueChange<T>> WatchAsync<T>(this IDurableQueue<T> queue, DurableWatchMode mode = DurableWatchMode.Committed, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public static System.Collections.Generic.IAsyncEnumerable<SetChange<T>> WatchAsync<T>(this IDurableSet<T> set, DurableWatchMode mode = DurableWatchMode.Committed, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public static System.Collections.Generic.IAsyncEnumerable<ValueChange<T>> WatchAsync<T>(this IDurableValue<T> value, DurableWatchMode mode = DurableWatchMode.Committed, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public static System.Collections.Generic.IAsyncEnumerable<DictionaryChange<TKey, TValue>> WatchAsync<TKey, TValue>(this IDurableDictionary<TKey, TValue> dictionary, DurableWatchMode mode = DurableWatchMode.Committed, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Collections.Generic.IAsyncEnumerable<ValueChange<T>> WatchAsync<T>(this IDurableValue<T> value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     [GenerateSerializer]
@@ -134,15 +63,6 @@ namespace Orleans.Journaling
         Completed = 1,
         Faulted = 2,
         Canceled = 3
-    }
-
-    [System.Flags]
-    [GenerateSerializer]
-    public enum DurableWatchMode : byte
-    {
-        Committed = 0,
-        Staged = 1,
-        Drafts = 2
     }
 
     public partial interface IDurableDictionaryCommandCodec<TKey, TValue>
@@ -244,7 +164,7 @@ namespace Orleans.Journaling
         long Append(T item);
         IDurableLogDraft<T> BeginDraft();
         void Clear();
-        System.Collections.Generic.IAsyncEnumerable<LogEvent<T>> ReadAsync(long fromSequence = 0, long epoch = 0, DurableWatchMode mode = DurableWatchMode.Committed, LogDraftId? resumeDraftId = null, System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IAsyncEnumerable<LogEvent<T>> ReadAsync(long fromSequence = 0, long epoch = 0, bool includeDrafts = false, LogDraftId? resumeDraftId = null, System.Threading.CancellationToken cancellationToken = default);
         void Seal();
         void TrimBefore(long sequence);
         bool TryGet(long sequence, out T item);
@@ -745,62 +665,6 @@ namespace Orleans.Journaling
     }
 
     [GenerateSerializer]
-    public enum ListChangeKind : byte
-    {
-        Resync = 0,
-        Added = 1,
-        Set = 2,
-        Inserted = 3,
-        RemovedAt = 4,
-        Cleared = 5,
-        Watermark = 6
-    }
-
-    [GenerateSerializer]
-    public readonly partial struct ListChange<T> : System.IEquatable<ListChange<T>>
-    {
-        private readonly T? _Item_k__BackingField;
-        private readonly System.Collections.Generic.IReadOnlyList<T>? _Snapshot_k__BackingField;
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        [Id(1)]
-        public int Index { get { throw null; } init { } }
-
-        [Id(2)]
-        public T? Item { get { throw null; } init { } }
-
-        [Id(0)]
-        public ListChangeKind Kind { get { throw null; } init { } }
-
-        [Id(3)]
-        public System.Collections.Generic.IReadOnlyList<T>? Snapshot { get { throw null; } init { } }
-
-        [Id(4)]
-        public DurableChangeStatus Status { get { throw null; } init { } }
-
-        [Id(5)]
-        public long Version { get { throw null; } init { } }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly bool Equals(ListChange<T> other) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly bool Equals(object obj) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly int GetHashCode() { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator ==(ListChange<T> left, ListChange<T> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator !=(ListChange<T> left, ListChange<T> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly string ToString() { throw null; }
-    }
-
-    [GenerateSerializer]
     public enum LogDraftAbandonReason : byte
     {
         None = 0,
@@ -883,13 +747,12 @@ namespace Orleans.Journaling
     {
         Entry = 0,
         Reset = 1,
-        Watermark = 2,
-        DraftItem = 3,
-        DraftCommitted = 4,
-        DraftAbandoned = 5,
-        Trimmed = 6,
-        CaughtUp = 7,
-        Sealed = 8
+        DraftItem = 2,
+        DraftCommitted = 3,
+        DraftAbandoned = 4,
+        Trimmed = 5,
+        CaughtUp = 6,
+        Sealed = 7
     }
 
     [GenerateSerializer]
@@ -898,16 +761,16 @@ namespace Orleans.Journaling
         private readonly T? _Item_k__BackingField;
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        [Id(7)]
+        [Id(6)]
         public LogDraftAbandonReason AbandonReason { get { throw null; } init { } }
 
-        [Id(6)]
+        [Id(5)]
         public int Count { get { throw null; } init { } }
 
         [Id(3)]
         public LogDraftId? DraftId { get { throw null; } init { } }
 
-        [Id(8)]
+        [Id(7)]
         public long Epoch { get { throw null; } init { } }
 
         [Id(2)]
@@ -921,9 +784,6 @@ namespace Orleans.Journaling
 
         [Id(1)]
         public long Sequence { get { throw null; } init { } }
-
-        [Id(5)]
-        public DurableChangeStatus Status { get { throw null; } init { } }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
         public readonly bool Equals(LogEvent<T> other) { throw null; }
@@ -945,119 +805,14 @@ namespace Orleans.Journaling
     }
 
     [GenerateSerializer]
-    public enum QueueChangeKind : byte
-    {
-        Resync = 0,
-        Enqueued = 1,
-        Dequeued = 2,
-        Cleared = 3,
-        Watermark = 4
-    }
-
-    [GenerateSerializer]
-    public readonly partial struct QueueChange<T> : System.IEquatable<QueueChange<T>>
-    {
-        private readonly T? _Item_k__BackingField;
-        private readonly System.Collections.Generic.IReadOnlyList<T>? _Snapshot_k__BackingField;
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        [Id(1)]
-        public T? Item { get { throw null; } init { } }
-
-        [Id(0)]
-        public QueueChangeKind Kind { get { throw null; } init { } }
-
-        [Id(2)]
-        public System.Collections.Generic.IReadOnlyList<T>? Snapshot { get { throw null; } init { } }
-
-        [Id(3)]
-        public DurableChangeStatus Status { get { throw null; } init { } }
-
-        [Id(4)]
-        public long Version { get { throw null; } init { } }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly bool Equals(QueueChange<T> other) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly bool Equals(object obj) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly int GetHashCode() { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator ==(QueueChange<T> left, QueueChange<T> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator !=(QueueChange<T> left, QueueChange<T> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly string ToString() { throw null; }
-    }
-
-    [GenerateSerializer]
-    public enum SetChangeKind : byte
-    {
-        Resync = 0,
-        Added = 1,
-        Removed = 2,
-        Cleared = 3,
-        Watermark = 4
-    }
-
-    [GenerateSerializer]
-    public readonly partial struct SetChange<T> : System.IEquatable<SetChange<T>>
-    {
-        private readonly T? _Item_k__BackingField;
-        private readonly System.Collections.Generic.IReadOnlyList<T>? _Snapshot_k__BackingField;
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        [Id(1)]
-        public T? Item { get { throw null; } init { } }
-
-        [Id(0)]
-        public SetChangeKind Kind { get { throw null; } init { } }
-
-        [Id(2)]
-        public System.Collections.Generic.IReadOnlyList<T>? Snapshot { get { throw null; } init { } }
-
-        [Id(3)]
-        public DurableChangeStatus Status { get { throw null; } init { } }
-
-        [Id(4)]
-        public long Version { get { throw null; } init { } }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly bool Equals(SetChange<T> other) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly bool Equals(object obj) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly int GetHashCode() { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator ==(SetChange<T> left, SetChange<T> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator !=(SetChange<T> left, SetChange<T> right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly string ToString() { throw null; }
-    }
-
-    [GenerateSerializer]
     public readonly partial struct ValueChange<T> : System.IEquatable<ValueChange<T>>
     {
         private readonly T? _Value_k__BackingField;
         private readonly int _dummyPrimitive;
-        [Id(1)]
-        public DurableChangeStatus Status { get { throw null; } init { } }
-
         [Id(0)]
         public T? Value { get { throw null; } init { } }
 
-        [Id(2)]
+        [Id(1)]
         public long Version { get { throw null; } init { } }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
@@ -1279,46 +1034,6 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_DictionaryChangeKind : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.DictionaryChangeKind>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public global::Orleans.Journaling.DictionaryChangeKind ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.DictionaryChangeKind value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_DictionaryChange<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.DictionaryChange<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.DictionaryChange<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
-    {
-        public Codec_DictionaryChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Journaling.DictionaryChange<TKey, TValue> instance) { }
-
-        public global::Orleans.Journaling.DictionaryChange<TKey, TValue> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Journaling.DictionaryChange<TKey, TValue> instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.DictionaryChange<TKey, TValue> value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_DurableChangeStatus : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.DurableChangeStatus>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public global::Orleans.Journaling.DurableChangeStatus ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.DurableChangeStatus value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_DurableTaskCompletionSourceState<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.DurableTaskCompletionSourceState<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.DurableTaskCompletionSourceState<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_DurableTaskCompletionSourceState(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1348,17 +1063,6 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_DurableWatchMode : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.DurableWatchMode>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public global::Orleans.Journaling.DurableWatchMode ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.DurableWatchMode value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_JournaledStatePreCommitException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.JournaledStatePreCommitException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_JournaledStatePreCommitException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Journaling.JournaledStatePreCommitException> _activator) { }
@@ -1371,35 +1075,6 @@ namespace OrleansCodeGen.Orleans.Journaling
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.JournaledStatePreCommitException value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_ListChangeKind : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.ListChangeKind>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public global::Orleans.Journaling.ListChangeKind ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.ListChangeKind value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_ListChange<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.ListChange<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.ListChange<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
-    {
-        public Codec_ListChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Journaling.ListChange<T> instance) { }
-
-        public global::Orleans.Journaling.ListChange<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Journaling.ListChange<T> instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.ListChange<T> value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -1462,64 +1137,6 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_QueueChangeKind : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.QueueChangeKind>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public global::Orleans.Journaling.QueueChangeKind ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.QueueChangeKind value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_QueueChange<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.QueueChange<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.QueueChange<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
-    {
-        public Codec_QueueChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Journaling.QueueChange<T> instance) { }
-
-        public global::Orleans.Journaling.QueueChange<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Journaling.QueueChange<T> instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.QueueChange<T> value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_SetChangeKind : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.SetChangeKind>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public global::Orleans.Journaling.SetChangeKind ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.SetChangeKind value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_SetChange<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.SetChange<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.SetChange<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
-    {
-        public Codec_SetChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Journaling.SetChange<T> instance) { }
-
-        public global::Orleans.Journaling.SetChange<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Journaling.SetChange<T> instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.SetChange<T> value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ValueChange<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.ValueChange<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.ValueChange<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ValueChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1533,16 +1150,6 @@ namespace OrleansCodeGen.Orleans.Journaling
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.ValueChange<T> value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_DictionaryChange<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Journaling.DictionaryChange<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_DictionaryChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public global::Orleans.Journaling.DictionaryChange<TKey, TValue> DeepCopy(global::Orleans.Journaling.DictionaryChange<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -1563,41 +1170,11 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_ListChange<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Journaling.ListChange<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_ListChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public global::Orleans.Journaling.ListChange<T> DeepCopy(global::Orleans.Journaling.ListChange<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_LogEvent<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Journaling.LogEvent<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_LogEvent(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public global::Orleans.Journaling.LogEvent<T> DeepCopy(global::Orleans.Journaling.LogEvent<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_QueueChange<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Journaling.QueueChange<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_QueueChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public global::Orleans.Journaling.QueueChange<T> DeepCopy(global::Orleans.Journaling.QueueChange<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_SetChange<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Journaling.SetChange<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_SetChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public global::Orleans.Journaling.SetChange<T> DeepCopy(global::Orleans.Journaling.SetChange<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

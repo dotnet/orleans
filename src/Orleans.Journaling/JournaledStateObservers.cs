@@ -5,14 +5,14 @@ using System.Runtime.CompilerServices;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Delivers staged changes and commit watermarks from one journaled state manager to its watchers.
+/// Delivers committed changes from one journaled state manager to its watchers.
 /// </summary>
 /// <remarks>
 /// <para>
 /// A manager creates at most one hub, when its state is first watched. Watchers are keyed by state machine
 /// instance, so state which nobody watches publishes nothing. Each change is tagged with the version of the
 /// journal write which will capture it. Each acknowledged write publishes one watermark which commits every
-/// change tagged with an equal or lower version.
+/// change tagged with an equal or lower version, and watchers deliver only committed changes.
 /// </para>
 /// <para>
 /// The hub and its watchers are confined to the scheduler which created the hub: the owning activation's scheduler,
@@ -78,15 +78,6 @@ internal sealed class JournaledStateObservers
         }
     }
 
-    public void OnWriteCaptured(long version)
-    {
-        AssertConfined();
-        foreach (var topic in _topics.Values)
-        {
-            topic.OnWriteCaptured(version);
-        }
-    }
-
     public void OnWriteCommitted(long version)
     {
         AssertConfined();
@@ -122,44 +113,10 @@ internal sealed class StateTopic(JournaledStateObservers hub)
 {
     private readonly List<StateWatcher> _watchers = [];
 
-    // A boxed snapshot of the state's current contents, which every watcher that resynchronizes shares until the
-    // state changes or a write is captured. Every mutation of watched state publishes to its topic, which clears it.
-    private object? _resync;
-
     public bool IsEmpty => _watchers.Count == 0;
 
     /// <summary>
-    /// Gets a snapshot of the current contents of <paramref name="source"/>, creating it only once while the contents are unchanged.
-    /// </summary>
-    public TChange GetResync<TChange>(IResyncSource<TChange> source) where TChange : struct
-    {
-        hub.AssertConfined();
-        if (_resync is not TChange resync)
-        {
-            resync = source.CreateResync();
-            _resync = resync;
-        }
-
-        return resync;
-    }
-
-    /// <summary>
-    /// Replaces every buffered change with a resync which the next journal write captures, such as after a bulk mutation.
-    /// Each watcher builds the resync's snapshot only when a capture or a staged read needs it.
-    /// </summary>
-    public void PublishStagedResync()
-    {
-        hub.AssertConfined();
-        _resync = null;
-        var version = hub.Manager.StagingWriteVersion;
-        foreach (var watcher in _watchers)
-        {
-            ((IResyncSink)watcher).OnStagedResync(version);
-        }
-    }
-
-    /// <summary>
-    /// Delivers a change which the next journal write captures.
+    /// Delivers a change which the next journal write captures, once that write is acknowledged.
     /// </summary>
     public void PublishStaged<TChange>(TChange change) => Publish(change, hub.Manager.StagingWriteVersion);
 
@@ -178,7 +135,6 @@ internal sealed class StateTopic(JournaledStateObservers hub)
     private void Publish<TChange>(TChange change, long version)
     {
         hub.AssertConfined();
-        _resync = null;
         foreach (var watcher in _watchers)
         {
             ((IChangeSink<TChange>)watcher).OnChange(change, version);
@@ -198,39 +154,23 @@ internal sealed class StateTopic(JournaledStateObservers hub)
     }
 
     /// <summary>
-    /// Wakes the watchers which read the state directly and whose mode includes <paramref name="visibility"/>.
+    /// Wakes the watchers which read the state directly and deliver volatile draft content.
     /// </summary>
-    public void Signal(DurableWatchMode visibility)
+    public void SignalDraftReaders()
     {
-        Debug.Assert(visibility is not DurableWatchMode.Committed, "Committed changes become visible through watermarks.");
         hub.AssertConfined();
         foreach (var watcher in _watchers)
         {
-            if ((watcher.Mode & visibility) != 0)
+            if (watcher.IncludesDrafts)
             {
                 watcher.Signal();
             }
         }
     }
 
-    internal void Add(StateWatcher watcher)
-    {
-        _watchers.Add(watcher);
-        watcher.Topic = this;
-    }
+    internal void Add(StateWatcher watcher) => _watchers.Add(watcher);
 
     internal bool Remove(StateWatcher watcher) => _watchers.Remove(watcher);
-
-    internal void OnWriteCaptured(long version)
-    {
-        foreach (var watcher in _watchers)
-        {
-            watcher.OnWriteCaptured(version);
-        }
-
-        // Watchers retain the snapshot which they share for as long as they need it.
-        _resync = null;
-    }
 
     internal void OnWatermark(long version)
     {
@@ -258,34 +198,10 @@ internal interface IChangeSink<TChange>
 }
 
 /// <summary>
-/// Receives resyncs published to a <see cref="StateTopic"/> without a snapshot.
-/// </summary>
-internal interface IResyncSink
-{
-    /// <summary>
-    /// Replaces every buffered change with a resync which the write with <paramref name="version"/> captures.
-    /// </summary>
-    void OnStagedResync(long version);
-}
-
-/// <summary>
-/// A watchable collection which creates snapshots of its complete current contents.
-/// </summary>
-internal interface IResyncSource<TChange>
-{
-    /// <summary>
-    /// Gets a value indicating whether the collection has journal entries which no captured write contains.
-    /// </summary>
-    bool HasStagedEntries { get; }
-
-    TChange CreateResync();
-}
-
-/// <summary>
 /// One reader of a watched state machine.
 /// </summary>
 /// <remarks>Members other than <see cref="Signal"/> are confined to the hub's scheduler.</remarks>
-internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine state, DurableWatchMode mode)
+internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine state)
 {
     private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
     private Exception? _failure;
@@ -295,17 +211,10 @@ internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine 
 
     public IStateMachine State { get; } = state;
 
-    public DurableWatchMode Mode { get; } = mode;
-
     /// <summary>
-    /// Gets the topic which delivers the state's changes, once the watcher is added to the hub.
+    /// Gets a value indicating whether the watcher delivers volatile draft content.
     /// </summary>
-    public StateTopic? Topic { get; internal set; }
-
-    /// <summary>
-    /// Gets a value indicating whether the watcher delivers staged changes and watermarks.
-    /// </summary>
-    public bool IncludesStaged => (Mode & DurableWatchMode.Staged) != 0;
+    public virtual bool IncludesDrafts => false;
 
     protected long CommittedVersion { get; set; }
 
@@ -340,13 +249,6 @@ internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine 
         OnAttached();
     }
 
-    /// <summary>
-    /// Called when the manager captures the write with <paramref name="version"/>, before its storage operation begins.
-    /// </summary>
-    internal virtual void OnWriteCaptured(long version)
-    {
-    }
-
     internal virtual void OnWatermark(long version)
     {
         CommittedVersion = version;
@@ -368,8 +270,7 @@ internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine 
 /// <summary>
 /// A watcher which delivers events of type <typeparamref name="TEvent"/>.
 /// </summary>
-internal abstract class StateWatcher<TEvent>(JournaledStateObservers hub, IStateMachine state, DurableWatchMode mode)
-    : StateWatcher(hub, state, mode)
+internal abstract class StateWatcher<TEvent>(JournaledStateObservers hub, IStateMachine state) : StateWatcher(hub, state)
 {
     /// <summary>
     /// Reads the next deliverable event.
@@ -378,173 +279,7 @@ internal abstract class StateWatcher<TEvent>(JournaledStateObservers hub, IState
 }
 
 /// <summary>
-/// Buffers a bounded number of collection changes and resynchronizes the reader after an overflow.
-/// </summary>
-/// <remarks>
-/// An overflow or a bulk mutation discards the buffered changes and folds them, and every later change, into one pending
-/// resync. The resync's snapshot is built when the write which captures the folded changes is captured, or when a reader with
-/// <see cref="DurableWatchMode.Staged"/> reads it, whichever comes first. Watchers of the same state share the snapshot
-/// while the state is unchanged.
-/// </remarks>
-internal sealed class ChangeWatcher<TChange> : StateWatcher<TChange>, IChangeSink<TChange>, IResyncSink
-    where TChange : struct, IDurableChange<TChange>
-{
-    private readonly IResyncSource<TChange> _source;
-    private readonly Queue<(TChange Change, long Version)> _buffer = new();
-    private readonly int _capacity;
-    private readonly long _initialVersion;
-
-    // The version of the pending resync which replaces every folded change. Zero when none.
-    // Every change made while a resync is pending has the same version, since a capture materializes the resync.
-    private long _resyncVersion;
-
-    // The lowest and highest versions delivered as staged and not yet confirmed by a watermark. Zero when none.
-    private long _unconfirmedVersion;
-    private long _lastStagedVersion;
-
-    public ChangeWatcher(
-        JournaledStateObservers hub,
-        IStateMachine state,
-        IResyncSource<TChange> source,
-        DurableWatchMode mode,
-        int capacity,
-        long initialVersion)
-        : base(hub, state, mode)
-    {
-        Debug.Assert(capacity > 0);
-        _source = source;
-        _capacity = capacity;
-        _initialVersion = initialVersion;
-    }
-
-    protected override void OnAttached()
-    {
-        // Watchers which subscribe while the state is unchanged share its snapshot. A completed hub attaches watchers
-        // without a topic.
-        var initialChange = Topic is { } topic ? topic.GetResync(_source) : _source.CreateResync();
-        OnChange(initialChange, _initialVersion);
-    }
-
-    public void OnChange(TChange change, long version)
-    {
-        if (version <= CommittedVersion)
-        {
-            // Durable resyncs replace every buffered change, and the staged changes already delivered which they discard.
-            _buffer.Clear();
-            _resyncVersion = 0;
-            _unconfirmedVersion = 0;
-            _lastStagedVersion = 0;
-            _buffer.Enqueue((change, version));
-            Signal();
-            return;
-        }
-
-        if (_resyncVersion != 0)
-        {
-            Debug.Assert(_resyncVersion == version);
-        }
-        else if (_buffer.Count >= _capacity)
-        {
-            _buffer.Clear();
-            _resyncVersion = version;
-        }
-        else
-        {
-            _buffer.Enqueue((change, version));
-        }
-
-        if (IncludesStaged)
-        {
-            Signal();
-        }
-    }
-
-    public void OnStagedResync(long version)
-    {
-        Debug.Assert(version > CommittedVersion);
-        Debug.Assert(_resyncVersion == 0 || _resyncVersion == version);
-
-        // The resync replaces the reader's whole view, so it supersedes the buffered changes as an overflow does. A paused
-        // reader therefore retains at most one snapshot, however many writes capture bulk mutations.
-        _buffer.Clear();
-        _resyncVersion = version;
-        if (IncludesStaged)
-        {
-            Signal();
-        }
-    }
-
-    internal override void OnWriteCaptured(long version)
-    {
-        if (_resyncVersion != 0)
-        {
-            Debug.Assert(_resyncVersion == version);
-            MaterializeResync();
-        }
-    }
-
-    internal override void OnWatermark(long version)
-    {
-        CommittedVersion = version;
-        if ((_buffer.TryPeek(out var head) && head.Version <= version) || (_unconfirmedVersion != 0 && _unconfirmedVersion <= version))
-        {
-            Signal();
-        }
-    }
-
-    public override bool TryRead(out TChange change)
-    {
-        Hub.AssertConfined();
-        if (_resyncVersion != 0 && IncludesStaged)
-        {
-            MaterializeResync();
-        }
-
-        // An eligible watermark precedes further changes, so a producer which keeps staging cannot defer it indefinitely.
-        if (_unconfirmedVersion != 0 && _unconfirmedVersion <= CommittedVersion)
-        {
-            change = TChange.CreateWatermark(CommittedVersion);
-            _unconfirmedVersion = _lastStagedVersion > CommittedVersion ? CommittedVersion + 1 : 0;
-            return true;
-        }
-
-        if (_buffer.TryPeek(out var head))
-        {
-            if (head.Version <= CommittedVersion)
-            {
-                _buffer.Dequeue();
-                change = head.Change.WithStatus(DurableChangeStatus.Committed, head.Version);
-                return true;
-            }
-
-            if (IncludesStaged)
-            {
-                _buffer.Dequeue();
-                if (_unconfirmedVersion == 0)
-                {
-                    _unconfirmedVersion = head.Version;
-                }
-
-                _lastStagedVersion = head.Version;
-                change = head.Change.WithStatus(DurableChangeStatus.Staged, head.Version);
-                return true;
-            }
-        }
-
-        change = default;
-        return false;
-    }
-
-    // The snapshot contains every change made so far, all of which carry the resync's version.
-    private void MaterializeResync()
-    {
-        Debug.Assert(Topic is not null, "A pending resync is published through the watcher's topic.");
-        _buffer.Enqueue((Topic.GetResync(_source), _resyncVersion));
-        _resyncVersion = 0;
-    }
-}
-/// <summary>
-/// Holds the latest value for a value watch, retaining at most one committed and two pending values.
+/// Holds the latest committed value for a value watch, retaining at most two values which await acknowledgement.
 /// </summary>
 internal sealed class ValueWatcher<T> : StateWatcher<ValueChange<T>>, IChangeSink<T>
 {
@@ -552,19 +287,16 @@ internal sealed class ValueWatcher<T> : StateWatcher<ValueChange<T>>, IChangeSin
     private long _version;
     private bool _hasUnreadValue;
 
-    // Committed mode: values which await their write's acknowledgement. Writes are acknowledged in order, one
-    // capture at a time, so pending values span at most the in-flight version and the next version.
+    // Values which await their write's acknowledgement. Writes are acknowledged in order, one capture at a time, so
+    // pending values span at most the in-flight version and the next version.
     private T? _pendingValue0;
     private long _pendingVersion0;
     private T? _pendingValue1;
     private long _pendingVersion1;
     private int _pendingCount;
 
-    // Staged mode: the version delivered as staged which awaits confirmation. Zero when none.
-    private long _awaitingConfirmation;
-
-    public ValueWatcher(JournaledStateObservers hub, IStateMachine state, DurableWatchMode mode, T? initialValue, long initialVersion)
-        : base(hub, state, mode)
+    public ValueWatcher(JournaledStateObservers hub, IStateMachine state, T? initialValue, long initialVersion)
+        : base(hub, state)
     {
         _pendingValue0 = initialValue;
         _pendingVersion0 = initialVersion;
@@ -580,7 +312,7 @@ internal sealed class ValueWatcher<T> : StateWatcher<ValueChange<T>>, IChangeSin
 
     public void OnChange(T value, long version)
     {
-        if (IncludesStaged || version <= CommittedVersion)
+        if (version <= CommittedVersion)
         {
             // Durable values supersede values which await acknowledgement.
             _pendingCount = 0;
@@ -619,22 +351,12 @@ internal sealed class ValueWatcher<T> : StateWatcher<ValueChange<T>>, IChangeSin
     internal override void OnWatermark(long version)
     {
         CommittedVersion = version;
-        if (!IncludesStaged)
+        while (_pendingCount > 0 && _pendingVersion0 <= version)
         {
-            while (_pendingCount > 0 && _pendingVersion0 <= version)
-            {
-                SetLatest(_pendingValue0!, _pendingVersion0);
-                (_pendingValue0, _pendingVersion0) = (_pendingValue1, _pendingVersion1);
-                (_pendingValue1, _pendingVersion1) = (default, 0);
-                _pendingCount--;
-            }
-        }
-        else if (_awaitingConfirmation != 0 && _awaitingConfirmation <= version)
-        {
-            // Deliver the staged value again as committed.
-            _hasUnreadValue = true;
-            _awaitingConfirmation = 0;
-            Signal();
+            SetLatest(_pendingValue0!, _pendingVersion0);
+            (_pendingValue0, _pendingVersion0) = (_pendingValue1, _pendingVersion1);
+            (_pendingValue1, _pendingVersion1) = (default, 0);
+            _pendingCount--;
         }
     }
 
@@ -647,14 +369,9 @@ internal sealed class ValueWatcher<T> : StateWatcher<ValueChange<T>>, IChangeSin
             return false;
         }
 
+        Debug.Assert(_version <= CommittedVersion, "Value watches deliver only committed values.");
         _hasUnreadValue = false;
-        var status = _version <= CommittedVersion ? DurableChangeStatus.Committed : DurableChangeStatus.Staged;
-        if (IncludesStaged)
-        {
-            _awaitingConfirmation = status is DurableChangeStatus.Staged ? _version : 0;
-        }
-
-        change = new() { Value = _value, Status = status, Version = _version };
+        change = new() { Value = _value, Version = _version };
         return true;
     }
 
@@ -663,7 +380,6 @@ internal sealed class ValueWatcher<T> : StateWatcher<ValueChange<T>>, IChangeSin
         _value = value;
         _version = version;
         _hasUnreadValue = true;
-        _awaitingConfirmation = 0;
         Signal();
     }
 }
@@ -673,11 +389,6 @@ internal sealed class ValueWatcher<T> : StateWatcher<ValueChange<T>>, IChangeSin
 /// </summary>
 internal static class DurableStateObservation
 {
-    /// <summary>
-    /// The number of buffered changes each collection watcher retains before it resynchronizes.
-    /// </summary>
-    public const int DefaultBufferCapacity = 1024;
-
     /// <summary>
     /// Gets the watchers of <paramref name="state"/>. Returns <see langword="false"/> without allocating when it is unwatched.
     /// </summary>
@@ -696,82 +407,21 @@ internal static class DurableStateObservation
     public static JournaledStateManager GetRequiredManager(JournaledStateManager? manager) =>
         manager ?? throw new NotSupportedException("Watching requires state registered with the built-in journaled state manager.");
 
-    /// <summary>
-    /// Publishes a snapshot of durable contents, such as recovered or reset state, if <paramref name="state"/> is watched.
-    /// </summary>
-    public static void PublishDurableResync<TState, TChange>(JournaledStateManager? manager, TState state)
-        where TState : IStateMachine, IResyncSource<TChange>
-    {
-        if (TryGetTopic(manager, state, out var topic))
-        {
-            topic.PublishDurable(state.CreateResync());
-        }
-    }
-
-    /// <summary>
-    /// Replaces the buffered changes of <paramref name="state"/>'s watchers with a resync of its staged contents, such as after a bulk mutation.
-    /// </summary>
-    public static void PublishStagedResync(JournaledStateManager? manager, IStateMachine state)
-    {
-        if (TryGetTopic(manager, state, out var topic))
-        {
-            topic.PublishStagedResync();
-        }
-    }
-
-    public static void ValidateMode(DurableWatchMode mode)
-    {
-        if ((mode & ~(DurableWatchMode.Staged | DurableWatchMode.Drafts)) != 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(mode), mode, "The watch mode is not supported.");
-        }
-    }
-
-    public static IAsyncEnumerable<TChange> WatchChanges<TState, TChange>(
-        JournaledStateManager? manager,
-        TState state,
-        DurableWatchMode mode,
-        int capacity,
-        CancellationToken cancellationToken)
-        where TState : IStateMachine, IResyncSource<TChange>
-        where TChange : struct, IDurableChange<TChange>
-    {
-        ValidateMode(mode);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
-        return WatchAsync(
-            GetRequiredManager(manager),
-            (state, mode, capacity),
-            static (hub, arg) =>
-            {
-                // Staged entries are captured by the next write. Otherwise, the snapshot is durable once the latest captured write is acknowledged.
-                var (state, mode, capacity) = arg;
-                var manager = hub.Manager;
-                var initialVersion = state.HasStagedEntries ? manager.StagingWriteVersion : manager.CapturedWriteVersion;
-                return new ChangeWatcher<TChange>(hub, state, state, mode, capacity, initialVersion);
-            },
-            cancellationToken);
-    }
-
     public static IAsyncEnumerable<ValueChange<T>> WatchValue<T>(
         JournaledStateManager? manager,
         DurableValue<T> state,
-        DurableWatchMode mode,
-        CancellationToken cancellationToken)
-    {
-        ValidateMode(mode);
-        return WatchAsync(
+        CancellationToken cancellationToken) =>
+        WatchAsync(
             GetRequiredManager(manager),
-            (state, mode),
-            static (hub, arg) =>
+            state,
+            static (hub, state) =>
             {
                 // A dirty value is captured by the next write. Otherwise, the value is durable once the latest captured write is acknowledged.
-                var (state, mode) = arg;
                 var manager = hub.Manager;
                 var initialVersion = state.IsDirty ? manager.StagingWriteVersion : manager.CapturedWriteVersion;
-                return new ValueWatcher<T>(hub, state, mode, state.Value, initialVersion);
+                return new ValueWatcher<T>(hub, state, state.Value, initialVersion);
             },
             cancellationToken);
-    }
 
     /// <summary>
     /// Creates a watcher when enumeration begins and delivers its events until the hub completes or the token is canceled.

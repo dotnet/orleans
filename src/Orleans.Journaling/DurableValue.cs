@@ -71,8 +71,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
 
     public void OnModified() => _isDirty = true;
 
-    internal IAsyncEnumerable<ValueChange<T>> WatchAsync(DurableWatchMode mode, CancellationToken cancellationToken) =>
-        DurableStateObservation.WatchValue(_manager, this, mode, cancellationToken);
+    internal IAsyncEnumerable<ValueChange<T>> WatchAsync(CancellationToken cancellationToken) =>
+        DurableStateObservation.WatchValue(_manager, this, cancellationToken);
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);

@@ -203,12 +203,9 @@ public sealed class ConversationGrain(IDurableStateManager stateManager) : Grain
 }
 ```
 
-`DurableStateWatchExtensions.WatchAsync` watches values, dictionaries, lists, sets, and queues. Each
-event carries a `DurableChangeStatus` of `Draft`, `Staged`, or `Committed`. The default
-`DurableWatchMode.Committed` mode delivers a change after the journal write which contains it is
-acknowledged, so readers observe only durable state. `DurableWatchMode.Staged` delivers staged
-changes immediately and reports their durability with watermarks. Each acknowledged write publishes one
-watermark shared by every watcher of the manager.
+`DurableStateWatchExtensions.WatchAsync` watches a durable value. Watches and log reads deliver a change
+after the journal write which contains it is acknowledged, so readers observe only durable state. Each
+acknowledged write publishes one watermark shared by every watcher of the manager.
 
 Each write captures every state, persists what it captured, and then acknowledges it. A change made while a
 write is in flight belongs to the next write, so `IStateMachine.OnWriteCompleted` implementations and
@@ -217,12 +214,9 @@ another thread holds a journal entry open, as a standalone manager's owner can, 
 to close and then captures it with every other change, so `WriteStateAsync` acknowledges every change staged
 before it was called.
 
-Value watches deliver the latest value and retain no backlog. Collection watches begin with a `Resync`
-snapshot and buffer a bounded number of changes for each reader; a reader which falls behind, or follows a
-bulk mutation, receives a `Resync` snapshot. The snapshot is built when the write which captures its changes
-begins, or when a reader with `Staged` reads it, and readers which subscribe or resynchronize while the state is unchanged share it. A manager creates its observer state when the first watch begins, and
-unwatched state publishes nothing. Watching requires a recovered manager. In committed mode, a watch which
-begins while changes are staged delivers its first snapshot after the next write.
+Value watches deliver the latest committed value and retain no backlog. A manager creates its observer
+state when the first watch begins, and unwatched state publishes nothing. Watching requires a recovered
+manager. A watch which begins while the value is staged delivers it after the next write.
 
 `IDurableLog<T>` is an append-only log with durable, monotonically increasing `long` sequence numbers.
 `Append` returns an entry's sequence and `CommittedSequence` marks the end of the durable entries.
@@ -230,18 +224,14 @@ begins while changes are staged delivers its first snapshot after the next write
 numbers are never reused within a history, and `Seal` durably ends the log. `Epoch` identifies the history:
 the first change after the log is created or its journal is deleted begins a history with a new random epoch,
 which is journaled with it. A reader position is an epoch and a sequence number, and every `LogEvent<T>`
-carries its `Epoch`. `ReadAsync(fromSequence, epoch, mode, resumeDraftId)` re-reads retained entries from a
-position and waits for new entries. Every active reader receives `Trimmed` when entries are trimmed and
+carries its `Epoch`. `ReadAsync(fromSequence, epoch, includeDrafts, resumeDraftId)` re-reads committed
+entries from a position and waits for new entries, so every entry a reader receives is a valid resume point. Every active reader receives `Trimmed` when entries are trimmed and
 `Reset` when the entries it observed are replaced: by a clear, by deleting the journal, or because it resumes
 with another history's epoch or at or before a cleared sequence number, in any activation. The stream delivers
 `CaughtUp` once after the entries which were committed when the read began, and ends with `Sealed` once a seal
 is durable.
 
-`DurableWatchMode` is a set of flags: `Staged` adds staged changes and watermarks, and `Drafts` adds draft
-content. `Committed | Drafts` streams live drafts with only durable entries, so every entry is a valid resume
-point.
-
-`BeginDraft` opens a draft whose `Write` items reach readers with `Drafts` immediately. `Commit` appends zero
+`BeginDraft` opens a draft whose `Write` items reach readers which pass `includeDrafts: true` immediately. `Commit` appends zero
 or more entries as one journal entry and reports `DraftCommitted` with the committed range; `Commit()` with no
 entries closes the draft cleanly. `Abandon` or disposal reports `DraftAbandoned` with a
 `LogDraftAbandonReason`. A closed draft releases its items, so a reader which has not read every item

@@ -78,22 +78,21 @@ public class JsonDurableLogTests
         var value = new DurableValue<int>("value", manager, services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey));
         await manager.InitializeAsync(CancellationToken);
 
-        await using var read = log.ReadAsync(0, mode: DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
-        await using var watch = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
-        Assert.Equal(DurableChangeStatus.Committed, (await watch.NextAsync()).Status);
+        await using var read = log.ReadAsync(0, includeDrafts: true, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var watch = value.WatchAsync(CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(new ValueChange<int> { Value = 0, Version = 0 }, await watch.NextAsync());
         Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
 
         var draft = log.BeginDraft();
         draft.Write("Hel");
         Assert.Equal(LogEventKind.DraftItem, (await read.NextAsync()).Kind);
         draft.Commit("Hello");
-        Assert.Equal(LogEventKind.DraftCommitted, (await read.NextAsync()).Kind);
-        Assert.Equal((LogEventKind.Entry, "Hello", DurableChangeStatus.Staged), ToTuple(await read.NextAsync()));
         value.Value = 1;
         await manager.WriteStateAsync(CancellationToken);
 
-        Assert.Equal(new LogEvent<string> { Kind = LogEventKind.Watermark, Sequence = 1, Status = DurableChangeStatus.Committed }, await read.NextAsync());
-        Assert.Equal(new ValueChange<int> { Value = 1, Status = DurableChangeStatus.Committed, Version = 1 }, await watch.NextAsync());
+        Assert.Equal(LogEventKind.DraftCommitted, (await read.NextAsync()).Kind);
+        Assert.Equal((LogEventKind.Entry, "Hello"), ToTuple(await read.NextAsync()));
+        Assert.Equal(new ValueChange<int> { Value = 1, Version = 1 }, await watch.NextAsync());
         // The commit began the log's history, so it is journaled as one snapshot entry which carries the epoch.
         Assert.Contains($"""["snapshot",{log.Epoch},0,0,false,["Hello"],[["{draft.Id}",0,1]]]""", Encoding.UTF8.GetString(storage.Segments.Single()));
 
@@ -119,12 +118,12 @@ public class JsonDurableLogTests
         Assert.Equal(["Summary"], sealedLog);
         await using var sealedRead = sealedLog.ReadAsync(2, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(LogEventKind.Reset, (await sealedRead.NextAsync()).Kind);
-        Assert.Equal((LogEventKind.Entry, "Summary", DurableChangeStatus.Committed), ToTuple(await sealedRead.NextAsync()));
+        Assert.Equal((LogEventKind.Entry, "Summary"), ToTuple(await sealedRead.NextAsync()));
         Assert.Equal(LogEventKind.CaughtUp, (await sealedRead.NextAsync()).Kind);
         Assert.Equal(LogEventKind.Sealed, (await sealedRead.NextAsync()).Kind);
         Assert.False(await sealedRead.MoveNextAsync());
 
-        static (LogEventKind, string?, DurableChangeStatus) ToTuple(LogEvent<string> logEvent) => (logEvent.Kind, logEvent.Item, logEvent.Status);
+        static (LogEventKind, string?) ToTuple(LogEvent<string> logEvent) => (logEvent.Kind, logEvent.Item);
     });
 
     private static void Apply(JsonDurableLogCommandCodec<string> codec, string expectedJson, Action<JournalStreamWriter> write, IDurableLogCommandHandler<string> handler)

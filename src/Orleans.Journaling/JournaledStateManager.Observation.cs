@@ -51,9 +51,7 @@ internal partial class JournaledStateManager
     private long OnWriteCaptured()
     {
         Debug.Assert(_capturedWriteVersion == _committedWriteVersion, "Each captured write is acknowledged before the next capture.");
-        var version = ++_capturedWriteVersion;
-        _observers?.OnWriteCaptured(version);
-        return version;
+        return ++_capturedWriteVersion;
     }
 
     // Called under the manager lock after every state has observed the write's acknowledgement.
