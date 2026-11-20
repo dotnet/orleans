@@ -16,7 +16,8 @@ for the runnable application, its host configuration, and its failure scenarios.
 ## Run your first order
 
 Use the .NET SDK selected by the repository's `global.json` and a
-running Docker-compatible container runtime. The sample targets `net10.0`. Its AppHost
+running Docker-compatible container runtime. The service and tests target `net11.0`;
+the Aspire AppHost targets `net10.0`. Install both runtimes. Its AppHost
 provides two service replicas, Redis for cluster membership, and Azurite Blob Storage
 for journals and durable jobs. Keep Redis and Azurite running throughout the exercise
 while stopping individual service replicas. These local resources provide the
@@ -64,7 +65,7 @@ The order entry point returns a <xref:Orleans.DurableTasks.DurableTask`1>. Reque
 result types have Orleans serializers because they cross grain calls and enter the
 journal. These compiled declarations mirror the sample's order contracts:
 
-:::code source="journaling/snippets/journaling/DurableOnboardingSnippets.cs" id="durable_onboarding_contract" language="csharp":::
+:::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_contract" language="csharp":::
 
 In the sample, `WorkflowGrain` derives from <xref:Orleans.Journaling.DurableGrain> and
 implements this method. `InventoryGrain` and `PaymentGrain` keep effects in durable
@@ -73,7 +74,7 @@ dictionaries by operation ID. Read their implementation in the sample alongside
 
 The service's `Program.cs` registers the durable runtime as follows:
 
-:::code source="journaling/snippets/journaling/DurableOnboardingSnippets.cs" id="durable_onboarding_hosting" language="csharp":::
+:::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_hosting" language="csharp":::
 
 `UseAzureBlobDurableJobs` also registers the default Azure Blob journal provider.
 The host supplies the `BlobServiceClient` through Aspire's
@@ -95,7 +96,7 @@ your application tracks the business request. The sample maps it to the grain ke
 `order-1001` and root task ID `order-order-1001`. The client schedules that named root,
 then waits:
 
-:::code source="journaling/snippets/journaling/DurableOnboardingSnippets.cs" id="durable_onboarding_submit" language="csharp":::
+:::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_submit" language="csharp":::
 
 <xref:Orleans.DurableTasks.DurableTaskExtensions.ScheduleAsync*> returns after the
 target has durably accepted the root invocation. Completion is a later boundary:
@@ -149,7 +150,7 @@ and root retention in detail.
 A connected caller can await its scheduled handle. A reconnecting caller reconstructs
 a reference using the same grain and root ID, without scheduling new work:
 
-:::code source="journaling/snippets/journaling/DurableOnboardingSnippets.cs" id="durable_onboarding_observe" language="csharp":::
+:::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_observe" language="csharp":::
 
 A missing or expired root raises
 <xref:Orleans.DurableTasks.DurableTaskNotFoundException>. Preserve the business identity
@@ -193,7 +194,7 @@ rebuilding or restoring against published packages:
 
 ```powershell
 dotnet test --project .\samples\DurableWorkflows\DurableWorkflows.Tests\DurableWorkflows.Tests.csproj `
-    --framework net10.0 --configuration Release --no-build --no-restore `
+    --framework net11.0 --configuration Release --no-build --no-restore `
     --filter-method "*InProgressWorkflowRecoversOnAnotherSiloAfterReplicaTermination*" `
     --minimum-expected-tests 1
 ```
@@ -254,22 +255,164 @@ request acceptance from completed compensation.
 ## Cross an external payment boundary
 
 The sample order's `PaymentGrain` records a payment effect inside Orleans Journaling.
-For a real payment API, the provider owns the charge, while Orleans records the
-application's decision about it. A remote success followed by a lost response leaves
-two distinct facts: the provider may have charged, and the step may still be
-unrecorded locally.
+Continue in the same running service with its `ExternalEffectGrain` recipe to cross
+a provider boundary. The independently journaled `RecipeEffectProviderGrain` models
+the provider's authority over payment authorization; the owner records the application's
+decision and next action. Production gateways use a provider's dispatch and lookup
+APIs with the same outcome and retention contracts.
 
-Use the same provider idempotency key for every attempt of one logical charge,
-including a retry after owner loss. Keep that key stable across any loop of durable
-retry steps, whose individual task IDs can differ. The provider's deduplication
-retention and lookup contract determine when retry is safe and when reconciliation
-is required. Return payment decline as a business outcome and compensate successful
-preparation work according to the order's policy.
+The provided `Program.cs` binds `ExternalEffectOptions` from the `ExternalEffects`
+configuration section and calls the sample's `AddExternalEffectRecipes()` helper.
+That helper registers the owner's keyed clock and retry handling for infrastructure
+wake-ups; the stored effect policy separately bounds provider attempts. The host
+maps the recipe's endpoints with `MapExternalEffectEndpoints()`.
 
-[External integration recipes](durable-tasks-integrations.md) show compiled provider
-adapters, bounded in-step retry, durable backoff, and reconciliation boundaries.
-[Idempotency](durable-tasks-idempotency.md) explains the authority and retention
-requirements for external effects.
+### Submit an authorization and inspect committed progress
+
+Use a new owner identity for this operation. Persist `$paymentId`, `$identity`, and
+`$request` with the business order before submitting; keep them unchanged for retries:
+
+```powershell
+$paymentId = 'payment-' + [guid]::NewGuid().ToString('N')
+$account = 'provider-' + $paymentId
+$identity = @{
+    executionId = 'checkout'; incarnation = [guid]::NewGuid().ToString()
+    operationId = 'authorize'; occurrence = 0
+}
+$request = @{
+    kind = 0; providerAccount = $account; destination = 'customer-account'
+    content = $paymentId; amount = 12.50; currency = 'USD'
+}
+function Send-EffectCommand($path, $body) {
+    Invoke-RestMethod "$service/$path" -Method Post -ContentType 'application/json' `
+        -Body (ConvertTo-Json -InputObject $body -Depth 10)
+}
+$submission = @{ identity = $identity; request = $request }
+$accepted = Send-EffectCommand "external-effects/$paymentId/" $submission
+Invoke-RestMethod "$service/external-effects/$paymentId/run" -Method Post
+$payment = Send-EffectCommand "external-effects/$paymentId/inspect" $identity
+$payment | Select-Object status, isCompleted, businessState, providerKey, attempts, nextAction, evidence
+```
+
+`kind: 0` selects payment authorization. Submission returns `200 OK` after the owner's
+intent write commits and a Durable Jobs wake-up has been acknowledged. Dispatch can
+then continue without the submitting client. `/run` advances work which is already
+due; Durable Jobs also drives it. A terminal success has `status: 4` (`Succeeded`),
+`isCompleted: true`, and `businessState: "authorized;ready-to-fulfill"`.
+
+The inspect endpoint returns the owner's recorded effect projection and acknowledges
+its journal write. Poll this resource to observe progress; pending responses include
+the next action and its due time. Repeating submission with the original identity
+and request returns the retained effect. Different request content under that identity
+returns `409 Conflict`. All effect records in this recipe remain retained.
+
+For durable-task composition, the sample's `ExternalEffectWorkflowGrain.RunAsync`
+creates an effect identity from the durable root's ID and incarnation, submits in the
+named `intent` step, then uses recorded reads and durable delays until the effect
+reaches a terminal outcome. Its returned result is that terminal snapshot. The
+owner's inspect resource remains the lifecycle authority for later decisions.
+
+### Lose the provider response and retry safely
+
+Configure a fresh demonstration account before submission. Fault controls are
+available in the service's Development environment:
+
+```powershell
+$paymentId = 'lost-' + [guid]::NewGuid().ToString('N')
+$account = 'provider-' + $paymentId
+$identity = @{
+    executionId = 'checkout'; incarnation = [guid]::NewGuid().ToString()
+    operationId = 'authorize'; occurrence = 0
+}
+$request = @{
+    kind = 0; providerAccount = $account; destination = 'customer-account'
+    content = $paymentId; amount = 12.50; currency = 'USD'
+}
+Invoke-RestMethod "$service/external-effect-providers/$account/behavior/LoseResponseAfterApply" -Method Post
+$submission = @{ identity = $identity; request = $request }
+$accepted = Send-EffectCommand "external-effects/$paymentId/" $submission
+Invoke-RestMethod "$service/external-effects/$paymentId/run" -Method Post
+
+# Resubmit the saved request as if its acceptance response had been lost.
+$reattached = Send-EffectCommand "external-effects/$paymentId/" $submission
+if ($accepted.providerKey -ne $reattached.providerKey) { throw 'Effect identity changed.' }
+
+$deadline = [DateTimeOffset]::UtcNow.AddSeconds(30)
+do {
+    Invoke-RestMethod "$service/external-effects/$paymentId/run" -Method Post
+    $payment = Send-EffectCommand "external-effects/$paymentId/inspect" $identity
+    if ($payment.isCompleted) { break }
+    if ([DateTimeOffset]::UtcNow -ge $deadline) { throw 'Inspect the retained effect: payment still pending.' }
+    Start-Sleep -Seconds 1
+} while ($true)
+if ($payment.status -ne 4) { throw "Payment did not succeed: $($payment.evidence)" }
+$payment | Select-Object status, businessState, providerKey, attempts, evidence
+```
+
+The provider applies the authorization and loses its first response. The owner
+preserves uncertainty and retries within its persisted policy, using the original
+provider key. The provider returns its recorded authorization. Inspect the returned
+`attempts` and `providerKey` to distinguish another attempt from new business work.
+The demonstration provider's tests also verify one applied effect under that key.
+
+The key hashes the owner grain identity, execution ID, root-run incarnation, stable
+operation name, and occurrence. Attempt GUIDs and child-task IDs are separate.
+Keep this logical-effect key stable across retry steps and owner recovery; use a
+new occurrence or operation identity for genuinely new work.
+
+The owner snapshots policy when it accepts the effect: attempt budget, backoff,
+timeouts, deadline, provider-key safety deadline, and reconciliation interval.
+The default provider backoff is five seconds. Production adapters set the safety
+window from the provider's guaranteed key retention, allowing for clock uncertainty
+and request duration. An uncertain effect whose retry budget or safe window ends
+continues through lookup or operator reconciliation, retaining its evidence and
+resolution owner.
+
+### Distinguish decline, cancellation, and an unresolved effect
+
+To exercise a payment decline, use a fresh payment ID, account, and incarnation as
+above, and set that account's behavior to `Reject` before submission:
+
+```powershell
+$paymentId = 'decline-' + [guid]::NewGuid().ToString('N')
+$account = 'provider-' + $paymentId
+$identity.incarnation = [guid]::NewGuid().ToString()
+$request.providerAccount = $account
+$request.content = $paymentId
+Invoke-RestMethod "$service/external-effect-providers/$account/behavior/Reject" -Method Post
+Send-EffectCommand "external-effects/$paymentId/" @{ identity = $identity; request = $request }
+Invoke-RestMethod "$service/external-effects/$paymentId/run" -Method Post
+Send-EffectCommand "external-effects/$paymentId/inspect" $identity
+```
+
+The terminal effect has `status: 5` (`Rejected`) and
+`businessState: "business-rejected"`. This is a recorded business decision.
+
+Send `/cancel` with the original identity and a reason to persist a request which
+stops future dispatch:
+
+```powershell
+Send-EffectCommand "external-effects/$paymentId/cancel" @{
+    identity = $identity; reason = 'customer-request'
+}
+```
+
+A terminal decision remains intact. For pending work, cancellation preserves a
+possibly applied outcome for reconciliation. A confirmed successful authorization
+can require a separately authorized refund effect. The recipe retains the original
+authorization, its relationship to the refund, and the authorization evidence.
+
+Continue with the sample's
+[payment and email protocols](https://github.com/dotnet/orleans/blob/main/samples/DurableWorkflows/ExternalEffects.md)
+for an unresolved email, revision-checked operator resolution, outgoing receipt
+intents, and authorized refund or resend operations. `nextEffectKey` identifies a
+derived receipt intent; `followUpEffectKey` identifies a separately authorized
+follow-up. Protect these endpoints and provider diagnostics with application
+authentication and authorization in a deployed service.
+
+[External integration recipes](durable-tasks-integrations.md) cover provider adapters
+and durable backoff. [Idempotency](durable-tasks-idempotency.md) explains authority
+and retention at external boundaries.
 
 ## Diagnose waits, retries, and stalls
 
@@ -281,6 +424,7 @@ requirements for external effects.
 | A delay does not resume | Durable Jobs and the shared journal provider on every replica. | Restore storage and wake-up processing. |
 | Execution is stalled | Replay-divergence diagnostics and the deployed workflow version. | Correct the incompatible code or follow the documented recovery procedure. |
 | External charge outcome is unresolved | Provider records under the original idempotency key. | Reconcile before authorizing a new effect. |
+| Effect is `Reconciling` or `Blocked` | Its retained `evidence`, `resolutionOwner`, `nextActionAt`, policy, and revision. | Follow lookup or operator resolution; preserve the original identity and use the current revision. |
 | Status is missing after completion | Root-result retention and the application's business record. | Read retained business state before resubmitting. |
 
 Use [operations and troubleshooting](durable-tasks-operations.md) for diagnostic
@@ -294,6 +438,12 @@ events, retention, storage configuration, replay stalls, and operator actions.
 | Durable Jobs | Wakes owners for pending executions and durable delays. | `UseAzureBlobDurableJobs(...)` in this sample. |
 | Messaging | Transfers and deduplicates durable work and results between grains. | Included by `AddDurableTasks()`. |
 | Durable Tasks | Records recoverable task progress, outcomes, signals, and cancellation. | `AddDurableTasks(...)`. |
+
+Messaging participants opt in by resolving their inbox or outbox during construction
+or shared activation setup. The external-effect owner injects `IOutbox`; its order
+projection injects `IInbox` and registers the outcome handler. The handler completes
+the message with its projection update. Durable-task services resolve their required
+messaging components through their runtime setup.
 
 ### Package reference
 
@@ -317,7 +467,7 @@ dotnet add package Microsoft.Orleans.Durable.AzureStorage --prerelease
 A separate Orleans client registers the durable client services after its clustering
 configuration:
 
-:::code source="journaling/snippets/journaling/DurableOnboardingSnippets.cs" id="durable_onboarding_client" language="csharp":::
+:::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_client" language="csharp":::
 
 Continue with [signals and compensation](durable-tasks-recipes.md),
 [parallel composition](durable-tasks-structured-concurrency.md),

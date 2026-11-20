@@ -1,6 +1,7 @@
 {
   "description": "Exact external URLs which cannot be probed reliably. Every entry requires a narrow reason.",
   "urls": {
+    "https://github.com/dotnet/orleans/blob/main/samples/DurableWorkflows/ExternalEffects.md": "The checked-in payment and email recipe is included in sample PR #10699 and becomes available at this canonical URL when that dependency merges.",
     "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html": "AWS serves this public ECS task-networking page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-api-permissions-reference.html": "AWS serves this public SQS API permissions reference to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html": "AWS serves this public SQS visibility-timeout page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
