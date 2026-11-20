@@ -1,13 +1,14 @@
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
-using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests;
@@ -23,19 +24,9 @@ public sealed class StatelessWorkerActivationTimerCollection
 [Collection(StatelessWorkerActivationTimerCollection.Name)]
 public sealed class StatelessWorkerActivationTimerTests
 {
-    private const string TimerInventoryChild = "ORLEANS_STATELESS_WORKER_TIMER_INVENTORY_CHILD";
-
     [Fact]
     public async Task CompletedActivationsReleaseTheirTimeoutTimers()
     {
-        // Nonparallel collections still share timers left over by earlier collections.
-        // A fresh process makes the exact inventory independent of those timers expiring.
-        if (Environment.GetEnvironmentVariable(TimerInventoryChild) != "1")
-        {
-            await RunTimerInventoryInIsolatedProcess();
-            return;
-        }
-
         await using var fixture = new Fixture();
         await fixture.InitializeAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -43,71 +34,108 @@ public sealed class StatelessWorkerActivationTimerTests
         var services = fixture.HostedCluster.Silos[0].ServiceProvider;
         var grains = services.GetRequiredService<IGrainFactory>();
         var tracker = services.GetRequiredService<StatelessWorkerSingleActivationTracker>();
+        using var events = new DiagnosticEventCollector(ActivationTimeoutEvents.ListenerName);
         var stable = grains.GetGrain<IStatelessWorkerSingleActivationGrain>(0);
         await stable.DoWork().WaitAsync(token);
-        var timers = Timer.ActiveCount;
+        AssertTimeoutReleased(stable.GetGrainId());
 
+        // Unrelated process timers must not affect the activation resource check.
+        using var unrelatedTimer = new Timer(_ => { }, null, TimeSpan.FromMinutes(5), Timeout.InfiniteTimeSpan);
         for (var call = 0; call < 100; ++call)
         {
             await stable.DoWork().WaitAsync(token);
+            AssertTimeoutReleased(stable.GetGrainId());
         }
         Assert.Equal(1, tracker.Current);
-        Assert.Equal(timers, Timer.ActiveCount);
 
         for (var key = 1; key <= 100; ++key)
         {
-            await grains.GetGrain<IStatelessWorkerSingleActivationGrain>(key).DoWork().WaitAsync(token);
+            var grain = grains.GetGrain<IStatelessWorkerSingleActivationGrain>(key);
+            await grain.DoWork().WaitAsync(token);
+            AssertTimeoutReleased(grain.GetGrainId());
         }
         Assert.Equal(101, tracker.Current);
-        Assert.Equal(timers, Timer.ActiveCount);
+
+        void AssertTimeoutReleased(GrainId grainId)
+        {
+            var scheduled = Assert.Single(events.GetEvents(nameof(ActivationTimeoutEvents.Scheduled))
+                .Select(item => Assert.IsType<ActivationTimeoutEvents.Scheduled>(item.Payload)),
+                item => item.GrainContext.GrainId == grainId);
+            // The wrapper delegates the deadline to ActivationData instead of allocating
+            // another timed caller source. The command disposes its sole timeout source.
+            Assert.False(scheduled.CallerToken.CanBeCanceled);
+            Assert.True(scheduled.TimeoutToken.CanBeCanceled);
+            Assert.Throws<ObjectDisposedException>(() => scheduled.TimeoutToken.WaitHandle);
+        }
     }
 
-    private static async Task RunTimerInventoryInIsolatedProcess()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ThrowingTimeoutDiagnosticsDoNotInterruptActivation(bool throwFromPredicate)
     {
-        var assemblyPath = typeof(StatelessWorkerActivationTimerTests).Assembly.Location;
-        var startInfo = new ProcessStartInfo(Environment.ProcessPath!)
+        await using var fixture = new Fixture();
+        await fixture.InitializeAsync();
+        using var listener = new ThrowingTimeoutListener(throwFromPredicate);
+        var grain = fixture.GrainFactory.GetGrain<IStatelessWorkerSingleActivationGrain>(Guid.NewGuid().GetHashCode());
+        var token = TestContext.Current.CancellationToken;
+        await grain.DoWork().WaitAsync(TimeSpan.FromSeconds(10), token);
+        await grain.DoWork().WaitAsync(TimeSpan.FromSeconds(10), token);
+        Assert.True(listener.Failures > 0);
+        Assert.Equal(1, fixture.HostedCluster.Silos[0].ServiceProvider
+            .GetRequiredService<StatelessWorkerSingleActivationTracker>().Current);
+        if (!throwFromPredicate)
         {
-            ArgumentList =
-            {
-                "--filter-method", $"{typeof(StatelessWorkerActivationTimerTests).FullName}.{nameof(CompletedActivationsReleaseTheirTimeoutTimers)}",
-                "--minimum-expected-tests", "1",
-                "--progress", "off", "--ansi", "off", "--output", "Minimal",
-            },
-            WorkingDirectory = Path.GetDirectoryName(assemblyPath)!,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        // Match the existing isolated hot-reload test's host selection on both apphost and dotnet launches.
-        if (string.Equals(Path.GetFileNameWithoutExtension(startInfo.FileName), "dotnet", StringComparison.OrdinalIgnoreCase))
+            var scheduled = Assert.IsType<ActivationTimeoutEvents.Scheduled>(listener.Payload);
+            Assert.Throws<ObjectDisposedException>(() => scheduled.TimeoutToken.WaitHandle);
+        }
+    }
+
+    private sealed class ThrowingTimeoutListener : IObserver<System.Diagnostics.DiagnosticListener>,
+        IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly bool _throwFromPredicate;
+        private readonly List<IDisposable> _subscriptions = [];
+        private readonly IDisposable _allListeners;
+        private int _failures;
+        public int Failures => Volatile.Read(ref _failures);
+        public object? Payload { get; private set; }
+
+        public ThrowingTimeoutListener(bool throwFromPredicate)
         {
-            startInfo.ArgumentList.Insert(0, assemblyPath);
+            _throwFromPredicate = throwFromPredicate;
+            _allListeners = System.Diagnostics.DiagnosticListener.AllListeners.Subscribe(this);
         }
 
-        startInfo.Environment[TimerInventoryChild] = "1";
-        using var process = Process.Start(startInfo)!;
-        var outputTask = process.StandardOutput.ReadToEndAsync();
-        var errorTask = process.StandardError.ReadToEndAsync();
-        try
+        public void OnNext(System.Diagnostics.DiagnosticListener listener)
         {
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken)
-                .WaitAsync(TimeSpan.FromMinutes(2), TestContext.Current.CancellationToken);
-            var output = await outputTask;
-            var error = await errorTask;
-            Assert.True(process.ExitCode == 0,
-                $"Isolated timer inventory failed with exit code {process.ExitCode}.{Environment.NewLine}"
-                + output[^Math.Min(output.Length, 4000)..] + Environment.NewLine
-                + error[^Math.Min(error.Length, 4000)..]);
-        }
-        finally
-        {
-            if (!process.HasExited)
+            if (listener.Name == ActivationTimeoutEvents.ListenerName)
             {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync();
+                _subscriptions.Add(listener.Subscribe(this, _ =>
+                {
+                    if (_throwFromPredicate)
+                    {
+                        Interlocked.Increment(ref _failures);
+                        throw new InvalidOperationException("Diagnostic predicate failed.");
+                    }
+                    return true;
+                }));
             }
+        }
 
-            await Task.WhenAll(outputTask, errorTask);
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            Payload = value.Value;
+            Interlocked.Increment(ref _failures);
+            throw new InvalidOperationException("Diagnostic observer failed.");
+        }
+
+        public void OnCompleted() { }
+        public void OnError(Exception error) { }
+        public void Dispose()
+        {
+            _allListeners.Dispose();
+            foreach (var subscription in _subscriptions) subscription.Dispose();
         }
     }
 
@@ -151,7 +179,7 @@ public sealed class StatelessWorkerActivationTimerTests
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 1;
-            // Freeze background clocks so periodic maintenance cannot change the native timer inventory.
+            // Keep background maintenance independent of the activation timeout checks.
             var clock = new FakeTimeProvider();
             builder.ConfigureSilo((_, silo) =>
             {
