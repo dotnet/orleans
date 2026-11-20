@@ -10,8 +10,8 @@ internal sealed partial class DurableTaskGrainRuntime
 {
     /// <summary>
     /// Completes once the calling code's wait for <paramref name="taskId"/>, a task of this grain, can end, and throws when
-    /// the calling code's request holds the task's segments behind it, so the wait could only end when the request itself
-    /// does.
+    /// the calling code's own request or exclusive section holds the task's segments back, so the wait could only end
+    /// when that request or section does.
     /// </summary>
     /// <remarks>
     /// The activation decides by its own admission rules. A task whose terminal result is already staged completes once
@@ -20,12 +20,13 @@ internal sealed partial class DurableTaskGrainRuntime
     /// such a task of this grain completes once that task does; inbox delivery completes the other records,
     /// such as a delay, a remote call's result, or a signal's value, alongside the waiting code. For such a task, a
     /// reentrant grain, a waiting method marked <c>[AlwaysInterleave]</c>, and a <c>[MayInterleave]</c> predicate which
-    /// admits segments wait instead. Code which belongs to no running request, or whose request doesn't exclude
-    /// segments, waits too.
+    /// admits segments wait instead, unless the waiting code holds an open exclusive section, such as a transaction,
+    /// which admits segments only once it closes. Code which belongs to no running request and holds no section, or
+    /// whose request and section don't exclude segments, waits too.
     /// A segment of the task's own attempt which already runs, other than the calling code's, continues regardless, so
     /// the check waits for that segment to end and decides again: the segment can complete the task, or park it.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">The calling code's request holds the task's segments.</exception>
+    /// <exception cref="InvalidOperationException">The calling code's request or section holds the task's segments.</exception>
     internal async ValueTask EnsureWaitCanEndAsync(TaskId taskId, CancellationToken cancellationToken)
     {
         while (GetRunningSegmentToAwait(taskId) is { } segment)
@@ -89,7 +90,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         throw new InvalidOperationException(
-            $"A request of grain {GrainId} waits for its durable task '{taskId}', whose code runs as requests to the same grain, which the grain holds until the waiting request completes, so the wait can't end. "
-            + "Await the task from durable code, such as a method which returns DurableTask, return the task's handle instead of waiting for it, or let the waiting request interleave: mark its interface method [AlwaysInterleave] or the grain class [Reentrant].");
+            $"Code of grain {GrainId} waits for its durable task '{taskId}', whose code runs as requests to the same grain, which the grain holds until the waiting request completes or the exclusive section which the waiting code holds, such as a transaction, closes, so the wait can't end. "
+            + "Await the task from durable code, such as a method which returns DurableTask, return the task's handle instead of waiting for it, or let the waiting request interleave: mark its interface method [AlwaysInterleave] or the grain class [Reentrant], and wait outside any transaction.");
     }
 }
