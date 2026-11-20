@@ -57,7 +57,10 @@ public sealed class ReminderSchedule
         => new(Runtime.ReminderScheduleKind.Interval, dueTime, null, period, null, null, isOneShot: false);
 
     public static ReminderSchedule Interval(DateTime dueAtUtc, TimeSpan period)
-        => new(Runtime.ReminderScheduleKind.Interval, null, dueAtUtc, period, null, null, isOneShot: false);
+    {
+        EnsureUtc(dueAtUtc, nameof(dueAtUtc));
+        return new(Runtime.ReminderScheduleKind.Interval, null, dueAtUtc, period, null, null, isOneShot: false);
+    }
 
     public static ReminderSchedule Cron(string cronExpression, string? cronTimeZoneId = null)
         => new(Runtime.ReminderScheduleKind.Cron, null, null, null, cronExpression, cronTimeZoneId, isOneShot: false);

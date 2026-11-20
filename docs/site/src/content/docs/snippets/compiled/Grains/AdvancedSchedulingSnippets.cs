@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
 
 namespace Documentation.Grains.AdvancedScheduling;

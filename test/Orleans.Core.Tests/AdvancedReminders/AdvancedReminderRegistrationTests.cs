@@ -5,7 +5,7 @@ using NSubstitute;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using AdvancedReminderException = Orleans.AdvancedReminders.Runtime.ReminderException;
 using AdvancedReminderOptions = Orleans.AdvancedReminders.ReminderOptions;
@@ -84,7 +84,7 @@ public class AdvancedReminderRegistrationTests : AdvancedReminderServiceTestBase
             MissedReminderAction.Skip));
 
         _ = grainFactory.DidNotReceive().GetGrain<IAdvancedReminderDispatcherGrain>(Arg.Any<string>(), null);
-        await reminderTable.DidNotReceive().UpsertRow(Arg.Any<ReminderEntry>());
+        await reminderTable.DidNotReceive().UpsertRow(Arg.Any<ReminderEntry>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public class AdvancedReminderRegistrationTests : AdvancedReminderServiceTestBase
         var grainId = GrainId.Create("test", "cron-register");
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
-        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-1");
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>(), Arg.Any<CancellationToken>()).Returns("etag-1");
 
         var jobManager = Substitute.For<ILocalDurableJobManager>();
         ScheduleJobRequest? scheduledRequest = null;
@@ -232,7 +232,7 @@ public class AdvancedReminderRegistrationTests : AdvancedReminderServiceTestBase
             && entry.Period == TimeSpan.Zero
             && entry.CronExpression == "0 9 * * *"
             && entry.Action == MissedReminderAction.Skip
-            && entry.NextDueUtc != null));
+            && entry.NextDueUtc != null), Arg.Any<CancellationToken>());
         await jobManager.Received(1).ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>());
         var request = Assert.IsType<ScheduleJobRequest>(scheduledRequest);
         Assert.Equal("advanced-reminder:cron", request.JobName);
@@ -242,13 +242,21 @@ public class AdvancedReminderRegistrationTests : AdvancedReminderServiceTestBase
         Assert.False(string.IsNullOrWhiteSpace(request.Metadata["schedule-id"]));
     }
 
-    [Fact]
-    public async Task RegisterOrUpdateReminder_WithAbsoluteIntervalSchedule_UpsertsAndSchedulesDurableJob()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterOrUpdateReminder_WithIntervalSchedule_PersistsUtcAndSchedulesDurableJob(bool useAbsoluteTime)
     {
-        var grainId = GrainId.Create("test", "absolute-register");
-        var dueAtUtc = DateTime.UtcNow.AddMinutes(10);
+        var grainId = GrainId.Create("test", "interval-register");
+        var now = new DateTimeOffset(2026, 8, 22, 10, 0, 0, TimeSpan.Zero);
+        var delay = TimeSpan.FromMinutes(10);
+        var period = TimeSpan.FromMinutes(5);
+        var dueAtUtc = now.UtcDateTime.Add(delay);
+        var schedule = useAbsoluteTime
+            ? ReminderSchedule.Interval(dueAtUtc, period)
+            : ReminderSchedule.Interval(delay, period);
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
-        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-absolute");
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>(), Arg.Any<CancellationToken>()).Returns("etag-interval");
 
         var jobManager = Substitute.For<ILocalDurableJobManager>();
         ScheduleJobRequest? scheduledRequest = null;
@@ -266,26 +274,30 @@ public class AdvancedReminderRegistrationTests : AdvancedReminderServiceTestBase
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null)
             .Returns(dispatcher);
 
-        var service = CreateService(reminderTable, jobManager: jobManager, grainFactory: grainFactory);
+        var service = CreateService(
+            reminderTable, jobManager: jobManager, grainFactory: grainFactory, timeProvider: new FakeTimeProvider(now));
         dispatcher.Service = service;
 
         var reminder = await service.RegisterOrUpdateReminder(
             grainId,
-            "absolute",
-            ReminderSchedule.Interval(dueAtUtc, TimeSpan.FromMinutes(5)),
+            "interval",
+            schedule,
             MissedReminderAction.Notify);
 
-        Assert.Equal("absolute", reminder.ReminderName);
+        Assert.Equal("interval", reminder.ReminderName);
         await reminderTable.Received().UpsertRow(Arg.Is<ReminderEntry>(entry =>
             entry.GrainId == grainId
-            && entry.ReminderName == "absolute"
+            && entry.ReminderName == "interval"
             && entry.StartAt == dueAtUtc
+            && entry.StartAt.Kind == DateTimeKind.Utc
             && entry.NextDueUtc == dueAtUtc
-            && entry.Period == TimeSpan.FromMinutes(5)
+            && entry.NextDueUtc.GetValueOrDefault().Kind == DateTimeKind.Utc
+            && entry.Period == period
             && entry.Action == MissedReminderAction.Notify
-            && string.IsNullOrEmpty(entry.CronExpression)));
+            && string.IsNullOrEmpty(entry.CronExpression)), Arg.Any<CancellationToken>());
         var request = Assert.IsType<ScheduleJobRequest>(scheduledRequest);
-        Assert.Equal("advanced-reminder:absolute", request.JobName);
+        Assert.Equal("advanced-reminder:interval", request.JobName);
+        Assert.Equal(new DateTimeOffset(dueAtUtc), request.DueTime);
         Assert.False(string.IsNullOrWhiteSpace(request.Metadata!["schedule-id"]));
     }
 
@@ -356,13 +368,13 @@ public class AdvancedReminderRegistrationTests : AdvancedReminderServiceTestBase
             ETag = "etag-remove",
             ScheduleId = "r1:registration:occurrence",
         }));
-        reminderTable.RemoveRow(grainId, "r", "etag-remove").Returns(Task.FromResult(true));
+        reminderTable.RemoveRow(grainId, "r", "etag-remove", Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
         var service = CreateService(reminderTable);
         var reminder = await service.GetReminder(grainId, "r");
 
         await service.UnregisterCoreAsync(Assert.IsType<Orleans.AdvancedReminders.ReminderData>(reminder), CancellationToken.None);
 
-        await reminderTable.Received(1).RemoveRow(grainId, "r", "etag-remove");
+        await reminderTable.Received(1).RemoveRow(grainId, "r", "etag-remove", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -375,7 +387,7 @@ public class AdvancedReminderRegistrationTests : AdvancedReminderServiceTestBase
             async () => await service.UnregisterReminder(Substitute.For<IGrainReminder>()));
 
         Assert.Equal("reminder", exception.ParamName);
-        await reminderTable.DidNotReceive().RemoveRow(Arg.Any<GrainId>(), Arg.Any<string>(), Arg.Any<string>());
+        await reminderTable.DidNotReceive().RemoveRow(Arg.Any<GrainId>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

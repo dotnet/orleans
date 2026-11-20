@@ -4,7 +4,7 @@ using NSubstitute;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using AdvancedRemindable = Orleans.AdvancedReminders.IRemindable;
 using AdvancedTickStatus = Orleans.AdvancedReminders.Runtime.TickStatus;

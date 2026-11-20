@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Dashboard\Orleans.Dashboard.AdvancedReminders\Orleans.Dashboard.AdvancedReminders.csproj" />
+    <ProjectReference Include="..\..\..\src\Dashboard\Orleans.Dashboard.AdvancedReminders\Orleans.Dashboard.AdvancedReminders.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
     <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\Orleans.Dashboard.TestGrains\Orleans.Dashboard.TestGrains.csproj" />
@@ -20,4 +20,7 @@
     <Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">
+    <Compile Remove="DashboardRemindersGrainTests.cs" />
+  </ItemGroup>
 </Project>

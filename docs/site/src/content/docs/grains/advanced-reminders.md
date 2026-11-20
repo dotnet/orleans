@@ -10,7 +10,7 @@ ms.topic: how-to
 Advanced Reminders is an opt-in reminder stack which uses Orleans Durable Jobs for delivery. It adds one-shot and cron schedules, absolute UTC due times, missed-occurrence policies, administrative paging, and cleanup guardrails. It uses separate packages, namespaces, storage, and hosting methods from classic Orleans reminders, so both stacks can run in the same application.
 
 > [!IMPORTANT]
-> Advanced Reminders is prerelease. Don't point classic and advanced providers at the same storage table or key prefix. Migrating an existing reminder definition requires an application-controlled cutover; enabling Advanced Reminders doesn't import classic registrations.
+> Advanced Reminders is prerelease and requires .NET 11. Don't point classic and advanced providers at the same storage table or key prefix. Migrating an existing reminder definition requires an application-controlled cutover; enabling Advanced Reminders doesn't import classic registrations.
 
 ## Feature guide
 
@@ -447,11 +447,11 @@ The recovery service repairs incomplete registrations in batches of 32. Missing 
 
 Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late result cannot resume an abandoned mutation. If a recovery page fails or times out, the next heartbeat retries it from the last completed page. Recovery waits up to one minute for each dispatcher repair, and the silo's shutdown token bounds the wait for the reminder provider to stop.
 
-The dispatcher awaits upserts and deletes inside its owner turn and uses the provider's timeout behavior. An additional timeout on the await would let the dispatcher start another operation while the previous provider task can still commit.
+Reminder-table writes have a one-minute wait limit, including administrative changes and delivery completion. The runtime requests provider cancellation when the wait ends. Further mutations or deliveries for the same reminder are rejected on that silo while the provider request remains pending. Other reminders can continue.
 
 Durable-job creation has a one-minute timeout and honors cancellation even when the backend ignores the token. A failed scheduling attempt leaves the committed definition pending. Recovery rotates that occurrence identity before rescheduling, fencing any job created by the abandoned request.
 
-Reminder-table writes remain awaited until their provider operation finishes so the dispatcher retains single-writer ordering. Configure storage SDK request deadlines for these writes. A timeout on observation cannot stop a late write from overwriting a newer registration. Callback execution follows Orleans messaging deadlines; cancellation cannot forcibly stop application callback code.
+A canceled or timed-out write can still commit. Providers use conditional writes based on the stored ETag or row absence. Recovery can repair a committed definition whose job handle was never recorded. Callback execution follows Orleans messaging deadlines, and cancellation cannot forcibly stop application callback code.
 
 ### Retain failed deliveries
 
@@ -473,7 +473,7 @@ For a recurring reminder, `NoRetries` advances after a failed tick, while `Limit
 
 Recovery repairs a missing job handle and rotates the occurrence identity so an orphaned or stale job cannot deliver the replacement. For a retained recurring occurrence, repair schedules another delayed attempt. An attempted occurrence remains retryable after the missed-occurrence grace period expires; `Skip` and `Notify` still apply to an initial occurrence which was never attempted. Recurring schedules resume at the next future slot after success and coalesce elapsed slots rather than replaying each one.
 
-With a limited policy, Durable Jobs retries the same occurrence and removes the registration when delivery still fails at that dequeue limit. Request cancellation releases delivery admission and leaves the occurrence unchanged. Registration replacement and explicit removal take precedence over a late callback result through the existing schedule-ID and ETag checks.
+With a limited policy, Durable Jobs retries the same occurrence and removes the registration when delivery still fails at that dequeue limit. Cancellation before completion starts releases delivery admission without advancing the occurrence. Registration replacement and explicit removal take precedence over a late callback result through the existing schedule-ID and ETag checks.
 
 Delivery can succeed at the application boundary even when the response is lost. Deduplicate durable business effects using a stable application work identifier across attempts; each retained retry has a new job ID. Monitor repeated delivery failures and overdue work to detect a target which cannot recover.
 

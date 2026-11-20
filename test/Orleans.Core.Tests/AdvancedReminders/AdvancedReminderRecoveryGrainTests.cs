@@ -31,7 +31,7 @@ public class AdvancedReminderRecoveryGrainTests
                 StartAt = DateTime.UtcNow,
                 NextDueUtc = DateTime.UtcNow.AddMinutes(1),
                 Period = TimeSpan.FromMinutes(1),
-            });
+            }, TestContext.Current.CancellationToken);
         }
 
         var rows = new List<ReminderEntry>();
@@ -61,14 +61,14 @@ public class AdvancedReminderRecoveryGrainTests
                 StartAt = DateTime.UtcNow,
                 NextDueUtc = DateTime.UtcNow.AddMinutes(1),
                 Period = TimeSpan.FromMinutes(1),
-            });
+            }, TestContext.Current.CancellationToken);
         }
 
         var first = await table.ReadRows(0, 0, maxRows: 2, continuationToken: null);
         Assert.Equal(2, first.Reminders.Count);
         Assert.NotNull(first.ContinuationToken);
         var deleted = first.Reminders[0];
-        Assert.True(await table.RemoveRow(deleted.GrainId, deleted.ReminderName, deleted.ETag));
+        Assert.True(await table.RemoveRow(deleted.GrainId, deleted.ReminderName, deleted.ETag, TestContext.Current.CancellationToken));
 
         var rows = first.Reminders.ToList();
         var continuationToken = first.ContinuationToken;

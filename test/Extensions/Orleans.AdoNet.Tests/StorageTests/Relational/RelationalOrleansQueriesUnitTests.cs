@@ -775,7 +775,8 @@ public sealed class RelationalOrleansQueriesUnitTests
             "service-delete",
             grainId,
             "reminder-delete",
-            "44");
+            "44",
+            TestContext.Current.CancellationToken);
 
         Assert.True(result);
         var call = AssertOperationCall(storage, Sql("DeleteReminderRowKey"));

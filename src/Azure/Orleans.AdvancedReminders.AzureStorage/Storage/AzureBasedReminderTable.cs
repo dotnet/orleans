@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.AzureStorage;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace Orleans.AdvancedReminders.AzureStorage;
 
@@ -283,16 +283,17 @@ public sealed partial class AzureBasedReminderTable : IReminderTable
         }
     }
 
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            await _initializationTask.Task;
+            await _initializationTask.Task.WaitAsync(cancellationToken);
 
             LogDebugUpsertRow(entry);
             ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
 
-            string? result = await this.remTableManager.UpsertRow(remTableEntry);
+            string? result = await this.remTableManager.UpsertRow(remTableEntry, cancellationToken);
             if (result == null)
             {
                 LogWarningReminderUpsertFailed(entry);
@@ -308,8 +309,9 @@ public sealed partial class AzureBasedReminderTable : IReminderTable
         }
     }
 
-    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var entry = new ReminderTableEntry
         {
             PartitionKey = ReminderTableEntry.ConstructPartitionKey(this.clusterOptions.ServiceId, grainId),
@@ -319,11 +321,11 @@ public sealed partial class AzureBasedReminderTable : IReminderTable
 
         try
         {
-            await _initializationTask.Task;
+            await _initializationTask.Task.WaitAsync(cancellationToken);
 
             LogTraceRemoveRow(entry);
 
-            bool result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag);
+            bool result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag, cancellationToken);
             if (result == false)
             {
                 LogWarningOnReminderDeleteRetry(entry);

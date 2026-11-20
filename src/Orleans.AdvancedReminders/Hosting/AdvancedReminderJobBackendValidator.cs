@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace Orleans.AdvancedReminders.Runtime.Hosting;
 

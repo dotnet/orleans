@@ -108,8 +108,9 @@ internal sealed class AdoNetReminderTable : IReminderTable
         return await this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName);
     }
 
-    public Task<string> UpsertRow(ReminderEntry entry)
+    public Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         NormalizeUtcFields(entry);
 
         return this.orleansQueries.UpsertReminderRowAsync(
@@ -126,7 +127,8 @@ internal sealed class AdoNetReminderTable : IReminderTable
             entry.ScheduleId,
             entry.JobId,
             entry.JobShardId,
-            entry.ETag);
+            entry.ETag,
+            cancellationToken);
     }
 
     internal static void NormalizeUtcFields(ReminderEntry entry)
@@ -142,9 +144,9 @@ internal sealed class AdoNetReminderTable : IReminderTable
     private static DateTime? NormalizeUtcKind(DateTime? value)
         => value.HasValue ? NormalizeUtcKind(value.Value) : null;
 
-    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
-        return this.orleansQueries.DeleteReminderRowAsync(this.serviceId, grainId, reminderName, eTag);
+        return this.orleansQueries.DeleteReminderRowAsync(this.serviceId, grainId, reminderName, eTag, cancellationToken);
     }
 
     public Task TestOnlyClearTable()

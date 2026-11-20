@@ -161,11 +161,11 @@ namespace Orleans.AdvancedReminders
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(Orleans.Runtime.GrainId grainId);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end);
-        System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag);
+        System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task TestOnlyClearTable();
-        System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry);
+        System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry, System.Threading.CancellationToken cancellationToken = default);
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
@@ -1658,43 +1658,43 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders.Runtime
     }
 }
 
-namespace OrleansCodeGen.Orleans.DurableJobs
+namespace OrleansCodeGen.Orleans.Durable.Jobs
 {
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IDurableJobHandler_GrainReference_C5FF5E5E>, global::Orleans.Serialization.Codecs.IFieldCodec
+    public sealed partial class Codec_Invokable_IDurableJobHandler_GrainReference_56C9077C : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IDurableJobHandler_GrainReference_56C9077C>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
-        public Codec_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Codec_Invokable_IDurableJobHandler_GrainReference_56C9077C(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IDurableJobHandler_GrainReference_C5FF5E5E instance) { }
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IDurableJobHandler_GrainReference_56C9077C instance) { }
 
-        public Invokable_IDurableJobHandler_GrainReference_C5FF5E5E ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+        public Invokable_IDurableJobHandler_GrainReference_56C9077C ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
 
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IDurableJobHandler_GrainReference_C5FF5E5E instance)
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IDurableJobHandler_GrainReference_56C9077C instance)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IDurableJobHandler_GrainReference_C5FF5E5E value)
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IDurableJobHandler_GrainReference_56C9077C value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IDurableJobHandler_GrainReference_C5FF5E5E>, global::Orleans.Serialization.Cloning.IDeepCopier
+    public sealed partial class Copier_Invokable_IDurableJobHandler_GrainReference_56C9077C : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IDurableJobHandler_GrainReference_56C9077C>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
-        public Copier_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Copier_Invokable_IDurableJobHandler_GrainReference_56C9077C(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
-        public Invokable_IDurableJobHandler_GrainReference_C5FF5E5E DeepCopy(Invokable_IDurableJobHandler_GrainReference_C5FF5E5E original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+        public Invokable_IDurableJobHandler_GrainReference_56C9077C DeepCopy(Invokable_IDurableJobHandler_GrainReference_56C9077C original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.DurableJobs.IDurableJobHandler), "C5FF5E5E" })]
-    public sealed partial class Invokable_IDurableJobHandler_GrainReference_C5FF5E5E : global::Orleans.Runtime.TaskRequest
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Durable.Jobs.IDurableJobHandler), "56C9077C" })]
+    public sealed partial class Invokable_IDurableJobHandler_GrainReference_56C9077C : global::Orleans.Runtime.TaskRequest
     {
-        public global::Orleans.DurableJobs.IJobRunContext arg0;
+        public global::Orleans.Durable.Jobs.IJobRunContext arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
 

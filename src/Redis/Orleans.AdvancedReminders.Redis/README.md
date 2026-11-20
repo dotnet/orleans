@@ -18,7 +18,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Redis;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
 using StackExchange.Redis;
 

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 namespace Orleans.Hosting;
 

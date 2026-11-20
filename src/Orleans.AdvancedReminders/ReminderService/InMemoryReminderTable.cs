@@ -60,10 +60,10 @@ internal sealed class InMemoryReminderTable : IReminderTable, ILifecycleParticip
             : Task.FromResult(new ReminderTableData());
     }
 
-    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
         this.ThrowIfNotAvailable();
-        return this.reminderTableGrain.RemoveRow(grainId, reminderName, eTag);
+        return this.reminderTableGrain.RemoveRow(grainId, reminderName, eTag, cancellationToken);
     }
 
     public Task TestOnlyClearTable()
@@ -72,10 +72,10 @@ internal sealed class InMemoryReminderTable : IReminderTable, ILifecycleParticip
         return this.reminderTableGrain.TestOnlyClearTable();
     }
 
-    public Task<string> UpsertRow(ReminderEntry entry)
+    public Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
         this.ThrowIfNotAvailable();
-        return this.reminderTableGrain.UpsertRow(entry);
+        return this.reminderTableGrain.UpsertRow(entry, cancellationToken);
     }
 
     private void ThrowIfNotAvailable()

@@ -59,7 +59,7 @@ public class AzureAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
             Period = TimeSpan.FromMinutes(1),
         };
 
-        var etag = await remindersTable.UpsertRow(reminder);
+        var etag = await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
         var pointRead = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
         Assert.NotNull(pointRead);
@@ -91,7 +91,7 @@ public class AzureAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
         var partitionKey = ReminderTableEntry.ConstructPartitionKey(clusterOptions.Value.ServiceId, reminder.GrainId);
         var rowKey = ReminderTableEntry.ConstructRowKey(reminder.GrainId, reminder.ReminderName);
 
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         var row = (await client.GetEntityAsync<TableEntity>(partitionKey, rowKey, cancellationToken: cancellationToken)).Value;
         Assert.Equal("2026-09-07T12:00:00.1234567Z", row.GetString(nameof(ReminderTableEntry.StartAtUtc)));
         Assert.Equal(startAt, LogFormatter.ParseDate(row.GetString(nameof(ReminderTableEntry.StartAt))!));
@@ -108,7 +108,7 @@ public class AzureAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
         Assert.Equal(DateTimeKind.Utc, legacyRead.StartAt.Kind);
 
         legacyRead.StartAt = legacyStartAt.AddTicks(7_654);
-        await remindersTable.UpsertRow(legacyRead);
+        await remindersTable.UpsertRow(legacyRead, TestContext.Current.CancellationToken);
         var updated = Assert.Single((await remindersTable.ReadRows(reminder.GrainId)).Reminders);
         Assert.Equal(legacyRead.StartAt, updated.StartAt);
         Assert.Equal(DateTimeKind.Utc, updated.StartAt.Kind);

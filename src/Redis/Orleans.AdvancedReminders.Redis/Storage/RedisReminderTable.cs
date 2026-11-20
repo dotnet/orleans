@@ -84,8 +84,9 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
     public async Task StopAsync(CancellationToken cancellationToken)
         => await DisposeAsync().AsTask().WaitAsync(cancellationToken);
 
-    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var (from, to) = GetFilter(grainId, reminderName, eTag);
@@ -110,8 +111,9 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
         }
     }
 
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         const string UpsertScript =
             """
             local key = KEYS[1]

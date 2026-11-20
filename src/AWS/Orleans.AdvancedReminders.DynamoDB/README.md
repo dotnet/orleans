@@ -20,7 +20,7 @@ using Orleans.Configuration;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.DynamoDB;
 using Orleans.Hosting;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>

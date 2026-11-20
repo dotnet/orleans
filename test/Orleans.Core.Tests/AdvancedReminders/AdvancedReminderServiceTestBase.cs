@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Metadata;
 using Xunit;
 using AdvancedRemindable = Orleans.AdvancedReminders.IRemindable;
@@ -235,7 +235,7 @@ public abstract class AdvancedReminderServiceTestBase
                 ? Clone(_current)
                 : null);
 
-        public Task<string> UpsertRow(ReminderEntry entry)
+        public Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
         {
             UpsertCount++;
             if (UpsertCount == FailUpsertCall)
@@ -248,7 +248,7 @@ public abstract class AdvancedReminderServiceTestBase
             return Task.FromResult(updated.ETag);
         }
 
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
         {
             var removed = _current is not null
                 && _current.GrainId == grainId

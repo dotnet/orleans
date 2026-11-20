@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.Runtime.Hosting;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.AdvancedReminders.Timers;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using AdvancedReminderOptions = Orleans.AdvancedReminders.ReminderOptions;
 using AdvancedReminderServiceInterface = Orleans.AdvancedReminders.IReminderService;
@@ -137,7 +137,7 @@ public class SiloBuilderReminderExtensionsTests
             }
         });
 
-        Assert.Contains("DurableJobs requires Orleans.Journaling storage", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("DurableJobs requires Orleans.Durable.Journaling storage", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

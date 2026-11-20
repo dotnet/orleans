@@ -27,7 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.AdvancedReminders.AdoNet\Orleans.AdvancedReminders.AdoNet.csproj" Aliases="AdvancedRemindersAdoNet" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.AdvancedReminders.AdoNet\Orleans.AdvancedReminders.AdoNet.csproj" Aliases="AdvancedRemindersAdoNet" Condition="'$(TargetFramework)' == 'net11.0'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" Aliases="global,ClassicRemindersAdoNet" />
@@ -51,5 +51,8 @@
     <None Include="$(SourceRoot)src\AdoNet\**\*.sql" Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">
+    <Compile Remove="AdvancedReminders\**\*.cs" />
   </ItemGroup>
 </Project>

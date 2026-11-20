@@ -34,7 +34,7 @@ public class ReminderTablePagingTests
         for (var index = expected.Length - 1; index >= 0; index--)
         {
             var (grain, name) = expected[index];
-            await table.UpsertRow(new ReminderEntry { GrainId = grain, ReminderName = name });
+            await table.UpsertRow(new ReminderEntry { GrainId = grain, ReminderName = name }, TestContext.Current.CancellationToken);
         }
 
         var begin = after.GetUniformHashCode();

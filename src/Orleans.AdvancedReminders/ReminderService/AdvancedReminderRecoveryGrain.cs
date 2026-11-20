@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Placement;
 
 namespace Orleans.AdvancedReminders.Runtime.ReminderService;

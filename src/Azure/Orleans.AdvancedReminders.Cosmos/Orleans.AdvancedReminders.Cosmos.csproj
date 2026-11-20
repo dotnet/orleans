@@ -6,7 +6,7 @@
     <Title>Microsoft Orleans Advanced Reminders for Azure Cosmos DB</Title>
     <Description>Azure Cosmos DB provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) Azure Cosmos DB</PackageTags>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <AssemblyName>Orleans.AdvancedReminders.Cosmos</AssemblyName>
     <RootNamespace>Orleans.AdvancedReminders.Cosmos</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

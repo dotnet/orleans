@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
@@ -32,5 +32,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">
+    <Compile Remove="AdvancedReminders\**\*.cs" />
   </ItemGroup>
 </Project>

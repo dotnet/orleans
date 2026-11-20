@@ -4,7 +4,7 @@ using Microsoft.Extensions.Time.Testing;
 using Orleans;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.TestingHost;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -20,7 +20,7 @@ public sealed partial class AdvancedReminderFeatureTests
     public async Task StalledDependency_ReleasesDispatcher_AndIgnoresTheLateResult(bool scheduling)
     {
         var clock = new ReminderWaitClock(DateTimeOffset.UtcNow);
-        var gate = new ReminderDependencyGate(scheduling);
+        var gate = new ReminderDependencyGate(scheduling ? StalledDependency.Scheduling : StalledDependency.Read);
         await using var cluster = await CreateClusterWithGateAsync(gate, clock);
         var grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
         gate.Target = grain.GetGrainId();
@@ -69,10 +69,55 @@ public sealed partial class AdvancedReminderFeatureTests
     }
 
     [Fact]
+    public async Task StalledWrite_ReleasesDispatcher_WhileThePendingRowRemainsProtected()
+    {
+        var gate = new ReminderDependencyGate(StalledDependency.Write);
+        var clock = new ReminderWaitClock(DateTimeOffset.UtcNow, () => gate.Started.Task.IsCompleted);
+        await using var cluster = await CreateClusterWithGateAsync(gate, clock);
+        var grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
+        gate.Target = grain.GetGrainId();
+        var name = Guid.NewGuid().ToString("N");
+        var otherName = Guid.NewGuid().ToString("N");
+        var originalDue = clock.GetUtcNow().AddDays(30);
+        var registration = grain.RegisterOneShot(name, originalDue, MissedReminderAction.FireImmediately, 0);
+        try
+        {
+            await AwaitPhase(gate.Started.Task, "the definition write is pending");
+            await AwaitPhase(clock.DeadlineArmed.Task, "the write timeout is armed");
+            clock.Advance(TimeSpan.FromMinutes(1));
+            await AwaitPhase(Assert.ThrowsAsync<TimeoutException>(() => registration), "the dispatcher exits the write wait");
+            Assert.True(gate.RequestToken.IsCancellationRequested);
+            Assert.False(gate.Finished.Task.IsCompleted);
+
+            var replacementDue = originalDue.AddDays(1);
+            await AwaitPhase(Assert.ThrowsAsync<Orleans.AdvancedReminders.Runtime.ReminderException>(
+                () => grain.RegisterOneShot(name, replacementDue, MissedReminderAction.FireImmediately, 0)),
+                "a replacement of the pending row is rejected");
+            await AwaitPhase(grain.RegisterOneShot(otherName, replacementDue, MissedReminderAction.FireImmediately, 0),
+                "a second reminder for the same recipient is scheduled");
+            Assert.NotEmpty(Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, otherName)).JobId);
+
+            gate.Release.TrySetResult();
+            await AwaitPhase(gate.Finished.Task, "the provider commits the timed-out definition");
+            var pending = Assert.IsType<ReminderEntry>(await GetEntryAsync(cluster, grain, name));
+            Assert.Equal(originalDue.UtcDateTime, pending.NextDueUtc);
+            Assert.Empty(pending.JobId);
+        }
+        finally
+        {
+            gate.Release.TrySetResult();
+            if (gate.Started.Task.IsCompleted)
+            {
+                await AwaitPhase(gate.Finished.Task, "the stalled definition write is drained");
+            }
+        }
+    }
+
+    [Fact]
     public async Task SchedulingReplyLostAfterPersistence_StillDelivers_WithoutResurrectingCompletedOneShot()
     {
         var clock = new ReminderWaitClock(DateTimeOffset.UtcNow);
-        var gate = new ReminderDependencyGate(scheduling: true, afterPersistence: true);
+        var gate = new ReminderDependencyGate(StalledDependency.Scheduling, afterPersistence: true);
         await using var cluster = await CreateClusterWithGateAsync(gate, clock);
         var grain = cluster.Client.GetGrain<IAdvancedReminderFeatureGrain>(Guid.NewGuid());
         gate.Target = grain.GetGrainId();
@@ -123,14 +168,20 @@ public sealed partial class AdvancedReminderFeatureTests
             });
         });
 
-    private sealed class ReminderWaitClock(DateTimeOffset now) : FakeTimeProvider(now)
+    private sealed class ReminderWaitClock(DateTimeOffset now, Func<bool>? isExpectedDeadline = null) : FakeTimeProvider(now)
     {
         public TaskCompletionSource DeadlineArmed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
+            // Advancing a request deadline must not trigger the recovery heartbeat.
+            if (period != Timeout.InfiniteTimeSpan)
+            {
+                return TimeProvider.System.CreateTimer(callback, state, dueTime, period);
+            }
+
             var timer = base.CreateTimer(callback, state, dueTime, period);
-            if (dueTime == TimeSpan.FromMinutes(1) && period == Timeout.InfiniteTimeSpan)
+            if (dueTime == TimeSpan.FromMinutes(1) && (isExpectedDeadline is null || isExpectedDeadline()))
             {
                 DeadlineArmed.TrySetResult();
             }
@@ -138,7 +189,14 @@ public sealed partial class AdvancedReminderFeatureTests
         }
     }
 
-    private sealed class ReminderDependencyGate(bool scheduling, bool afterPersistence = false) : Orleans.AdvancedReminders.IReminderTable, ILocalDurableJobManager
+    private enum StalledDependency
+    {
+        Read,
+        Write,
+        Scheduling,
+    }
+
+    private sealed class ReminderDependencyGate(StalledDependency dependency, bool afterPersistence = false) : Orleans.AdvancedReminders.IReminderTable, ILocalDurableJobManager
     {
         private int _stalled;
         public GrainId Target { get; set; }
@@ -152,7 +210,7 @@ public sealed partial class AdvancedReminderFeatureTests
 
         public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
-            if (!scheduling && grainId == Target && Interlocked.Exchange(ref _stalled, 1) == 0)
+            if (dependency == StalledDependency.Read && grainId == Target && Interlocked.Exchange(ref _stalled, 1) == 0)
             {
                 Started.TrySetResult();
                 try
@@ -167,7 +225,7 @@ public sealed partial class AdvancedReminderFeatureTests
 
         public async Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
         {
-            if (scheduling && request.Metadata?.GetValueOrDefault("grain-id") == Target.ToString()
+            if (dependency == StalledDependency.Scheduling && request.Metadata?.GetValueOrDefault("grain-id") == Target.ToString()
                 && Interlocked.Exchange(ref _stalled, 1) == 0)
             {
                 StalledRequest = request;
@@ -190,8 +248,28 @@ public sealed partial class AdvancedReminderFeatureTests
         public Task<ReminderTableData> ReadRows(GrainId grainId) => Table.ReadRows(grainId);
         public Task<ReminderTableData> ReadRows(uint begin, uint end) => Table.ReadRows(begin, end);
         public Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken) => Table.ReadRows(begin, end, maxRows, continuationToken);
-        public Task<string> UpsertRow(ReminderEntry entry) => Table.UpsertRow(entry);
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => Table.RemoveRow(grainId, reminderName, eTag);
+        public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
+        {
+            if (dependency == StalledDependency.Write && entry.GrainId == Target && Interlocked.Exchange(ref _stalled, 1) == 0)
+            {
+                RequestToken = cancellationToken;
+                Started.TrySetResult();
+                try
+                {
+                    await Release.Task;
+                    return await Table.UpsertRow(entry, CancellationToken.None);
+                }
+                finally
+                {
+                    Finished.TrySetResult();
+                }
+            }
+
+            return await Table.UpsertRow(entry, cancellationToken);
+        }
+
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
+            => Table.RemoveRow(grainId, reminderName, eTag, cancellationToken);
         public Task TestOnlyClearTable() => Table.TestOnlyClearTable();
     }
 }

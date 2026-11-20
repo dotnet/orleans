@@ -7,7 +7,7 @@
     <Title>Microsoft Orleans Advanced Reminders for Azure Table Storage</Title>
     <Description>Azure Table Storage provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) Azure Table Storage</PackageTags>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <AssemblyName>Orleans.AdvancedReminders.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.AdvancedReminders.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
@@ -28,7 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.DurableJobs.AzureStorage\Orleans.DurableJobs.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.AzureStorage\Orleans.Durable.AzureStorage.csproj" />
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Data.Tables" />
     <PackageReference Include="Azure.Storage.Blobs" />

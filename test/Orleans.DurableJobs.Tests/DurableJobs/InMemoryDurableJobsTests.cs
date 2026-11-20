@@ -18,10 +18,12 @@ namespace DefaultCluster.Tests;
 [TestArea("Runtime")]
 public class InMemoryDurableJobsTests : IClassFixture<InMemoryDurableJobsTests.Fixture>
 {
+    private readonly Fixture _fixture;
     private readonly DurableJobTestsRunner _runner;
 
     public InMemoryDurableJobsTests(Fixture fixture)
     {
+        _fixture = fixture;
         _runner = new DurableJobTestsRunner(fixture.GrainFactory);
     }
 
@@ -53,13 +55,13 @@ public class InMemoryDurableJobsTests : IClassFixture<InMemoryDurableJobsTests.F
     public async Task DurableJobOwnerTurnSerializesWritesAndRetainsAttemptAcrossSteps()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        var grain = GrainFactory.GetGrain<IDurableJobOwnerTurnGrain>(Guid.NewGuid());
+        var grain = _fixture.GrainFactory.GetGrain<IDurableJobOwnerTurnGrain>(Guid.NewGuid());
         await grain.ScheduleAsync().WaitAsync(cts.Token);
         await grain.WaitForFirstStepAsync().WaitAsync(cts.Token);
         Task write;
         try
         {
-            Assert.True(HostedCluster.TryGetGrainContext(grain.GetGrainId(), out var context));
+            Assert.True(_fixture.HostedCluster.TryGetGrainContext(grain.GetGrainId(), out var context));
             var owner = Assert.IsType<DurableJobOwnerTurnGrain>(context.GrainInstance);
             write = grain.WriteAsync();
             await owner.WriteQueued.WaitAsync(cts.Token);

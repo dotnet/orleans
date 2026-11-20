@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.AdvancedReminders;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 

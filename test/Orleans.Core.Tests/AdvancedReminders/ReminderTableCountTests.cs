@@ -58,16 +58,16 @@ public class ReminderTableCountTests
         var third = new ReminderEntry { GrainId = GrainId.Create("count", "two"), ReminderName = "third" };
         Assert.Equal(0, await table.GetCount());
 
-        first.ETag = await table.UpsertRow(first);
-        second.ETag = await table.UpsertRow(second);
-        third.ETag = await table.UpsertRow(third);
+        first.ETag = await table.UpsertRow(first, TestContext.Current.CancellationToken);
+        second.ETag = await table.UpsertRow(second, TestContext.Current.CancellationToken);
+        third.ETag = await table.UpsertRow(third, TestContext.Current.CancellationToken);
         Assert.Equal(3, await table.GetCount());
         first.NextDueUtc = DateTime.UtcNow.AddDays(1);
-        first.ETag = await table.UpsertRow(first);
+        first.ETag = await table.UpsertRow(first, TestContext.Current.CancellationToken);
         Assert.Equal(3, await table.GetCount());
-        Assert.False(await table.RemoveRow(first.GrainId, first.ReminderName, "stale"));
+        Assert.False(await table.RemoveRow(first.GrainId, first.ReminderName, "stale", TestContext.Current.CancellationToken));
         Assert.Equal(3, await table.GetCount());
-        Assert.True(await table.RemoveRow(first.GrainId, first.ReminderName, first.ETag));
+        Assert.True(await table.RemoveRow(first.GrainId, first.ReminderName, first.ETag, TestContext.Current.CancellationToken));
         Assert.Equal(2, await table.GetCount());
         await table.TestOnlyClearTable();
         Assert.Equal(0, await table.GetCount());
@@ -94,7 +94,7 @@ public class ReminderTableCountTests
         ((IGrainMigrationParticipant)table).OnRehydrate(context);
 
         Assert.Equal(1, await table.GetCount());
-        Assert.True(await table.RemoveRow(grainId, entry.ReminderName, entry.ETag));
+        Assert.True(await table.RemoveRow(grainId, entry.ReminderName, entry.ETag, TestContext.Current.CancellationToken));
         Assert.Equal(0, await table.GetCount());
     }
 
@@ -141,8 +141,8 @@ public class ReminderTableCountTests
         public Task<ReminderTableData> ReadRows(uint begin, uint end) => throw new NotSupportedException("Count must use bounded reads.");
         public Task<ReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
-        public Task<string> UpsertRow(ReminderEntry entry) => throw new NotSupportedException();
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => throw new NotSupportedException();
+        public Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task TestOnlyClearTable() => throw new NotSupportedException();
     }
 }

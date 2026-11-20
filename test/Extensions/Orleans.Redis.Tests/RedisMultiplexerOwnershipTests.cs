@@ -14,8 +14,10 @@ using Orleans.Storage;
 using StackExchange.Redis;
 using TestExtensions;
 using Xunit;
+#if NET11_0_OR_GREATER
 using AdvancedRedisReminderTable = Orleans.AdvancedReminders.Redis.RedisReminderTable;
 using AdvancedRedisReminderTableOptions = Orleans.AdvancedReminders.Redis.RedisReminderTableOptions;
+#endif
 
 namespace Tester.Redis;
 
@@ -141,6 +143,7 @@ public sealed class RedisMultiplexerOwnershipTests
         await AssertExclusiveMultiplexerDisposed(() => connection!, initialize, GetDispose(provider, useAsyncDispose));
     }
 
+#if NET11_0_OR_GREATER
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -171,6 +174,7 @@ public sealed class RedisMultiplexerOwnershipTests
 
         await AssertExclusiveMultiplexerDisposed(() => connection!, initialize, GetDispose(provider, useAsyncDispose));
     }
+#endif
 
     [Theory]
     [InlineData(false)]
@@ -342,6 +346,7 @@ public sealed class RedisMultiplexerOwnershipTests
         return (table, () => table.Init());
     }
 
+#if NET11_0_OR_GREATER
     private static (AdvancedRedisReminderTable Provider, Func<Task> Initialize) CreateAdvancedReminderTable(
         Func<AdvancedRedisReminderTableOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> createMultiplexer)
     {
@@ -360,6 +365,7 @@ public sealed class RedisMultiplexerOwnershipTests
         var table = new AdvancedRedisReminderTable(NullLogger<AdvancedRedisReminderTable>.Instance, clusterOptions, options);
         return (table, () => table.StartAsync(CancellationToken.None));
     }
+#endif
 
     private static (RedisGrainDirectory Provider, Func<Task> Initialize) CreateDirectory(
         Func<RedisGrainDirectoryOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> createMultiplexer)

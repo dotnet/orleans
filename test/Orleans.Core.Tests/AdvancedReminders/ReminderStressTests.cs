@@ -126,9 +126,9 @@ public class ReminderStressTests
 
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
 
-        public Task<string> UpsertRow(ReminderEntry entry) => throw new NotSupportedException();
+        public Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => throw new NotSupportedException();
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task TestOnlyClearTable() => throw new NotSupportedException();
     }

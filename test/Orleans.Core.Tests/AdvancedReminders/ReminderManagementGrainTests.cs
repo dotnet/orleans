@@ -8,7 +8,7 @@ using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Cron.Internal;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using AdvancedReminderException = Orleans.AdvancedReminders.Runtime.ReminderException;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -91,7 +91,7 @@ public class ReminderManagementGrainTests
         var advanced = await table.ReadRow(grainId, "a");
         Assert.NotNull(advanced);
         advanced.NextDueUtc = DateTime.UtcNow.AddDays(1);
-        await table.UpsertRow(advanced);
+        await table.UpsertRow(advanced, TestContext.Current.CancellationToken);
 
         var second = await grain.ListAllAsync(pageSize: 1, first.ContinuationToken);
 
@@ -430,7 +430,7 @@ public class ReminderManagementGrainTests
             Task.FromResult<ReminderEntry?>(CloneEntry(entry)),
             Task.FromResult<ReminderEntry?>(CloneEntry(entry)),
             Task.FromResult<ReminderEntry?>(CloneEntry(entry)));
-        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-2", "etag-3", "etag-4");
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>(), Arg.Any<CancellationToken>()).Returns("etag-2", "etag-3", "etag-4");
 
         var grainFactory = Substitute.For<IGrainFactory>();
         var dispatcher = new TestManagementDispatcherGrain(GrainId.Create("sys", "dispatcher"));
@@ -667,7 +667,7 @@ public class ReminderManagementGrainTests
             return Task.FromResult(entry is null ? null : CloneEntry(entry));
         }
 
-        public Task<string> UpsertRow(ReminderEntry entry)
+        public Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
         {
             var copy = CloneEntry(entry);
             copy.ETag = string.IsNullOrWhiteSpace(copy.ETag)
@@ -677,7 +677,7 @@ public class ReminderManagementGrainTests
             return Task.FromResult(copy.ETag);
         }
 
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
             => Task.FromResult(_entries.Remove((grainId, reminderName)));
 
         public Task TestOnlyClearTable()

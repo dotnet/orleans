@@ -128,8 +128,9 @@ internal sealed partial class DynamoDBReminderTable : IReminderTable
     /// <param name="reminderName"> reminder name to locate the row </param>
     /// <param name="eTag"> e tag </param>
     /// <returns> Return true if the row was removed </returns>
-    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
         var keys = new Dictionary<string, AttributeValue>
@@ -148,7 +149,7 @@ internal sealed partial class DynamoDBReminderTable : IReminderTable
             var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, eTagValue } };
             var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
 
-            await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+            await this.storage.DeleteEntryAsync(this.options.TableName, keys, cancellationToken, expression, conditionalValues).ConfigureAwait(false);
             return true;
         }
         catch (ConditionalCheckFailedException)
@@ -204,8 +205,9 @@ internal sealed partial class DynamoDBReminderTable : IReminderTable
     /// </summary>
     /// <param name="entry"> The entry to put </param>
     /// <returns> Return the entry ETag if entry was upsert successfully </returns>
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var reminderId = ConstructReminderId(this.serviceId, entry.GrainId, entry.ReminderName);
 
         var fields = new Dictionary<string, AttributeValue>
@@ -265,6 +267,7 @@ internal sealed partial class DynamoDBReminderTable : IReminderTable
                 await this.storage.PutEntryAsync(
                     this.options.TableName,
                     fields,
+                    cancellationToken,
                     $"attribute_not_exists({ETAG_PROPERTY_NAME})");
             }
             else
@@ -276,6 +279,7 @@ internal sealed partial class DynamoDBReminderTable : IReminderTable
                 await this.storage.PutEntryAsync(
                     this.options.TableName,
                     fields,
+                    cancellationToken,
                     $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
                     conditionalValues);
             }

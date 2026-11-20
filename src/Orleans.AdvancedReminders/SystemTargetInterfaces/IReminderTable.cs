@@ -73,20 +73,24 @@ public interface IReminderTable
     Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
     /// <summary>
-    /// Upserts the specified entry.
+    /// Creates the entry if its ETag is empty and the row is absent, or replaces the row
+    /// atomically if its ETag matches the stored revision.
     /// </summary>
     /// <param name="entry">The entry.</param>
+    /// <param name="cancellationToken">The token used to cancel the mutation. Cancellation can race with commit.</param>
     /// <returns>The row's new ETag.</returns>
-    Task<string> UpsertRow(ReminderEntry entry);
+    /// <exception cref="Runtime.ReminderException">The row does not satisfy the ETag precondition.</exception>
+    Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Removes a row from the table.
+    /// Removes a row atomically if its ETag matches the stored revision.
     /// </summary>
     /// <param name="grainId">The grain ID.</param>
     /// <param name="reminderName">The reminder name.</param>
     /// <param name="eTag">The ETag.</param>
+    /// <param name="cancellationToken">The token used to cancel the mutation. Cancellation can race with commit.</param>
     /// <returns>true if a row with <paramref name="grainId"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
-    Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
+    Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Clears the table.

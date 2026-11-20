@@ -1,5 +1,5 @@
 using System.Net;
-#if ORLEANS_PERSISTENCE
+#if ORLEANS_PERSISTENCE || ADVANCED_REMINDERS_COSMOS
 using System.Threading;
 #endif
 using Azure;
@@ -142,7 +142,7 @@ public interface ICosmosOperationExecutor
     /// <returns>The result of invoking the delegate.</returns>
     Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg);
 
-#if ORLEANS_PERSISTENCE
+#if ORLEANS_PERSISTENCE || ADVANCED_REMINDERS_COSMOS
     /// <summary>
     /// Executes the provided Cosmos DB operation with cancellation.
     /// </summary>
@@ -168,7 +168,7 @@ internal sealed class DefaultCosmosOperationExecutor : ICosmosOperationExecutor
 {
     public static readonly DefaultCosmosOperationExecutor Instance = new();
     private const HttpStatusCode TOO_MANY_REQUESTS = (HttpStatusCode)429;
-#if ORLEANS_PERSISTENCE
+#if ORLEANS_PERSISTENCE || ADVANCED_REMINDERS_COSMOS
     public Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg)
         => ExecuteOperation(func, arg, CancellationToken.None);
 
@@ -180,7 +180,7 @@ internal sealed class DefaultCosmosOperationExecutor : ICosmosOperationExecutor
         // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
         while (true)
         {
-#if ORLEANS_PERSISTENCE
+#if ORLEANS_PERSISTENCE || ADVANCED_REMINDERS_COSMOS
             cancellationToken.ThrowIfCancellationRequested();
 #endif
             TimeSpan sleepTime;
@@ -197,7 +197,7 @@ internal sealed class DefaultCosmosOperationExecutor : ICosmosOperationExecutor
                 sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
             }
 
-#if ORLEANS_PERSISTENCE
+#if ORLEANS_PERSISTENCE || ADVANCED_REMINDERS_COSMOS
             await Task.Delay(sleepTime, cancellationToken).ConfigureAwait(false);
 #else
             await Task.Delay(sleepTime);

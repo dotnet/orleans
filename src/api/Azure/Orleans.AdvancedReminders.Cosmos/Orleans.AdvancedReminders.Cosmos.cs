@@ -50,6 +50,7 @@ namespace Orleans.AdvancedReminders.Cosmos
 
     public partial interface ICosmosOperationExecutor
     {
+        System.Threading.Tasks.Task<TResult> ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>> func, TArg arg, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<TResult> ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>> func, TArg arg);
     }
 }

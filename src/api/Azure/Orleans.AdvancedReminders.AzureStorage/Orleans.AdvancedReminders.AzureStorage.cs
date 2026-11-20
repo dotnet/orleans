@@ -22,7 +22,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
 
         public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end) { throw null; }
 
-        public System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag) { throw null; }
+        public System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
@@ -30,7 +30,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
 
         public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
 
-        public System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry) { throw null; }
+        public System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public partial class AzureStorageOperationOptions

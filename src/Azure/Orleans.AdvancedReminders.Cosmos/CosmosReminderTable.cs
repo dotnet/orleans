@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using Orleans.AdvancedReminders.Cosmos.Models;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Runtime;
 
 namespace Orleans.AdvancedReminders.Cosmos;
@@ -243,7 +243,7 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -254,13 +254,14 @@ internal partial class CosmosReminderTable : IReminderTable
 
             var response = await _executor.ExecuteOperation(static async args =>
             {
-                var (self, pk, entity, hasETag, options) = args;
+                var (self, pk, entity, hasETag, options, token) = args;
+                token.ThrowIfCancellationRequested();
                 var result = hasETag
-                    ? await self._container.ReplaceItemAsync(entity, entity.Id, pk, options).ConfigureAwait(false)
-                    : await self._container.CreateItemAsync(entity, pk).ConfigureAwait(false);
+                    ? await self._container.ReplaceItemAsync(entity, entity.Id, pk, options, token).ConfigureAwait(false)
+                    : await self._container.CreateItemAsync(entity, pk, cancellationToken: token).ConfigureAwait(false);
                 return result.ETag;
             },
-            (this, pk, entity, hasETag, options)).ConfigureAwait(false);
+            (this, pk, entity, hasETag, options, cancellationToken), cancellationToken).ConfigureAwait(false);
 
             return response ?? string.Empty;
         }
@@ -268,6 +269,10 @@ internal partial class CosmosReminderTable : IReminderTable
         {
             throw new Runtime.ReminderException(
                 $"Could not update reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exc)
         {
@@ -277,7 +282,7 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -286,16 +291,21 @@ internal partial class CosmosReminderTable : IReminderTable
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             await _executor.ExecuteOperation(static args =>
             {
-                var (self, id, pk, options) = args;
-                return self._container.DeleteItemAsync<ReminderEntity>(id, pk, options);
+                var (self, id, pk, options, token) = args;
+                token.ThrowIfCancellationRequested();
+                return self._container.DeleteItemAsync<ReminderEntity>(id, pk, options, token);
             },
-            (this, id, pk, options)).ConfigureAwait(false);
+            (this, id, pk, options, cancellationToken), cancellationToken).ConfigureAwait(false);
 
             return true;
         }
         catch (CosmosException dce) when (dce.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
         {
             return false;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exc)
         {

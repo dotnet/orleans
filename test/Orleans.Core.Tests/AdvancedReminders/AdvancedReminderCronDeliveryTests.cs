@@ -5,7 +5,7 @@ using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Cron.Internal;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using AdvancedRemindable = Orleans.AdvancedReminders.IRemindable;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -36,7 +36,7 @@ public class AdvancedReminderCronDeliveryTests : AdvancedReminderServiceTestBase
 
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         reminderTable.ReadRow(entry.GrainId, entry.ReminderName).Returns(Task.FromResult<ReminderEntry?>(entry));
-        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-cron-2");
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>(), Arg.Any<CancellationToken>()).Returns("etag-cron-2");
 
         var remindable = Substitute.For<AdvancedRemindable>();
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
@@ -73,7 +73,7 @@ public class AdvancedReminderCronDeliveryTests : AdvancedReminderServiceTestBase
             && updated.NextDueUtc != null
             && updated.NextDueUtc > now
             && updated.Period == TimeSpan.Zero
-            && updated.CronExpression == entry.CronExpression));
+            && updated.CronExpression == entry.CronExpression), Arg.Any<CancellationToken>());
         await jobManager.Received(1).ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>());
         var request = Assert.IsType<ScheduleJobRequest>(scheduledRequest);
         Assert.Equal("advanced-reminder:cron", request.JobName);
@@ -118,7 +118,10 @@ public class AdvancedReminderCronDeliveryTests : AdvancedReminderServiceTestBase
 
         var initialEntry = await reminderTable.ReadRow(grainId, "utc-daily");
         Assert.NotNull(initialEntry);
+        Assert.Equal(expectedFirstDueUtc, initialEntry.StartAt);
+        Assert.Equal(DateTimeKind.Utc, initialEntry.StartAt.Kind);
         Assert.Equal(expectedFirstDueUtc, initialEntry.NextDueUtc);
+        Assert.Equal(DateTimeKind.Utc, initialEntry.NextDueUtc?.Kind);
         Assert.Equal(string.Empty, initialEntry.CronTimeZoneId);
         Assert.Equal(new DateTimeOffset(expectedFirstDueUtc), Assert.Single(scheduledRequests).DueTime);
 
@@ -133,6 +136,7 @@ public class AdvancedReminderCronDeliveryTests : AdvancedReminderServiceTestBase
         Assert.NotNull(updatedEntry);
         Assert.Equal(expectedFirstDueUtc, updatedEntry.LastFireUtc);
         Assert.Equal(expectedNextDueUtc, updatedEntry.NextDueUtc);
+        Assert.Equal(DateTimeKind.Utc, updatedEntry.NextDueUtc?.Kind);
         Assert.Equal(string.Empty, updatedEntry.CronTimeZoneId);
         Assert.Equal(new DateTimeOffset(expectedNextDueUtc), Assert.Single(scheduledRequests.Skip(1)).DueTime);
     }
@@ -178,7 +182,10 @@ public class AdvancedReminderCronDeliveryTests : AdvancedReminderServiceTestBase
         var initialEntry = await reminderTable.ReadRow(grainId, "paris-daily");
         Assert.NotNull(initialEntry);
         Assert.Equal(new DateTime(2026, 1, 15, 8, 0, 0, DateTimeKind.Utc), expectedFirstDueUtc);
+        Assert.Equal(expectedFirstDueUtc, initialEntry.StartAt);
+        Assert.Equal(DateTimeKind.Utc, initialEntry.StartAt.Kind);
         Assert.Equal(expectedFirstDueUtc, initialEntry.NextDueUtc);
+        Assert.Equal(DateTimeKind.Utc, initialEntry.NextDueUtc?.Kind);
         Assert.Equal(timeZoneId, initialEntry.CronTimeZoneId);
         Assert.Equal(new DateTimeOffset(expectedFirstDueUtc), Assert.Single(scheduledRequests).DueTime);
 
@@ -193,6 +200,7 @@ public class AdvancedReminderCronDeliveryTests : AdvancedReminderServiceTestBase
         Assert.NotNull(updatedEntry);
         Assert.Equal(expectedFirstDueUtc, updatedEntry.LastFireUtc);
         Assert.Equal(expectedNextDueUtc, updatedEntry.NextDueUtc);
+        Assert.Equal(DateTimeKind.Utc, updatedEntry.NextDueUtc?.Kind);
         Assert.Equal(timeZoneId, updatedEntry.CronTimeZoneId);
         Assert.Equal(new DateTimeOffset(expectedNextDueUtc), Assert.Single(scheduledRequests.Skip(1)).DueTime);
     }

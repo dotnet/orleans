@@ -1,2 +1,2 @@
 global using Orleans.AdvancedReminders.Runtime;
-global using Orleans.DurableJobs;
+global using Orleans.Durable.Jobs;

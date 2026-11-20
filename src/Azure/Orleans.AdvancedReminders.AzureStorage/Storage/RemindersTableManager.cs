@@ -9,7 +9,7 @@ using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Orleans.AdvancedReminders.AzureStorage;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace Orleans.AdvancedReminders.AzureStorage;
 
@@ -174,13 +174,13 @@ internal sealed partial class RemindersTableManager : AzureTableDataManager<Remi
         return FindReminderEntries(0, 0);
     }
 
-    internal async Task<string?> UpsertRow(ReminderTableEntry reminderEntry)
+    internal async Task<string?> UpsertRow(ReminderTableEntry reminderEntry, CancellationToken cancellationToken)
     {
         try
         {
             return string.IsNullOrEmpty(reminderEntry.ETag.ToString())
-                ? await CreateTableEntryAsync(reminderEntry)
-                : await UpdateTableEntryAsync(reminderEntry, reminderEntry.ETag);
+                ? await CreateTableEntryAsync(reminderEntry, cancellationToken)
+                : await UpdateTableEntryAsync(reminderEntry, reminderEntry.ETag, cancellationToken);
         }
         catch (Exception exc)
         {
@@ -193,11 +193,11 @@ internal sealed partial class RemindersTableManager : AzureTableDataManager<Remi
         }
     }
 
-    internal async Task<bool> DeleteReminderEntryConditionally(ReminderTableEntry reminderEntry, string eTag)
+    internal async Task<bool> DeleteReminderEntryConditionally(ReminderTableEntry reminderEntry, string eTag, CancellationToken cancellationToken)
     {
         try
         {
-            await DeleteTableEntryAsync(reminderEntry, eTag);
+            await DeleteTableEntryAsync(reminderEntry, new ETag(eTag), cancellationToken);
             return true;
         }
         catch (Exception exc)

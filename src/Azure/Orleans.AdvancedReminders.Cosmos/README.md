@@ -20,7 +20,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.AdvancedReminders;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>

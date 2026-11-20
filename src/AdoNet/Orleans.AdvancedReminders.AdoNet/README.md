@@ -60,7 +60,7 @@ builder.UseOrleans(silo => silo
 await builder.Build().RunAsync();
 ```
 
-For persisted delivery, replace `UseInMemoryDurableJobs()` with a durable backend. For example, install `Microsoft.Orleans.DurableJobs.AzureStorage` and `Azure.Identity`, then use this configuration in your silo setup:
+For persisted delivery, replace `UseInMemoryDurableJobs()` with a durable backend. For example, install `Microsoft.Orleans.Durable.AzureStorage` and `Azure.Identity`, then use this configuration in your silo setup:
 
 ```csharp
 using Azure.Identity;

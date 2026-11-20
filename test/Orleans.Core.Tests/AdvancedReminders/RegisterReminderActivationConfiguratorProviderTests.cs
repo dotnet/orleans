@@ -7,7 +7,7 @@ using NSubstitute;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Metadata;
 using Xunit;
 using AdvancedReminderOptions = Orleans.AdvancedReminders.ReminderOptions;
@@ -175,7 +175,7 @@ public class RegisterReminderActivationConfiguratorProviderTests
 
         await Assert.ThrowsAsync<ArgumentException>(() => observer.OnStart(CancellationToken.None));
 
-        await reminderTable.DidNotReceive().UpsertRow(Arg.Any<ReminderEntry>());
+        await reminderTable.DidNotReceive().UpsertRow(Arg.Any<ReminderEntry>(), Arg.Any<CancellationToken>());
     }
 
     private static RegisterReminderActivationConfiguratorProvider CreateProvider(Type grainType)

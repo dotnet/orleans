@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Runtime;
 
@@ -25,6 +25,7 @@ public sealed class ReminderManagementGrain(
     private const int ProviderPageSize = 256;
     private const ulong ScanBucketWidth = (ulong)uint.MaxValue / ScanBucketCount + 1;
     private readonly IReminderTable _reminderTable = reminderTable;
+    private readonly ReminderTableMutations _tableMutations = new(reminderTable, timeProvider);
     private readonly TimeProvider _timeProvider = timeProvider;
 
     public ReminderManagementGrain(IReminderTable reminderTable)
@@ -137,7 +138,7 @@ public sealed class ReminderManagementGrain(
             return;
         }
 
-        if (!await _reminderTable.RemoveRow(grainId, name, entry.ETag))
+        if (!await _tableMutations.RemoveAsync(grainId, name, entry.ETag))
         {
             throw new Runtime.ReminderException(
                 $"Could not delete reminder '{name}' for grain '{grainId}' due to ETag mismatch.");
@@ -153,7 +154,7 @@ public sealed class ReminderManagementGrain(
         var reminderService = GetReminderService();
         if (reminderService is null)
         {
-            entry.ETag = await _reminderTable.UpsertRow(entry);
+            entry.ETag = await _tableMutations.UpsertAsync(entry);
             return;
         }
 

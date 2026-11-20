@@ -6,7 +6,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- This is a new package with no released compatibility baseline. -->
     <EnablePackageValidation>false</EnablePackageValidation>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>

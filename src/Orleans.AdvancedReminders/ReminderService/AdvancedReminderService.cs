@@ -14,6 +14,7 @@ internal sealed partial class AdvancedReminderService : IReminderService, IAttri
     private const string LegacyETagMetadataKey = "etag";
     private const string JobNamePrefix = "advanced-reminder:";
     private readonly IReminderTable _reminderTable;
+    private readonly ReminderTableMutations _tableMutations;
     private readonly ILocalDurableJobManager _jobManager;
     private readonly IGrainFactory _grainFactory;
     private readonly ILogger<AdvancedReminderService> _logger;
@@ -35,6 +36,7 @@ internal sealed partial class AdvancedReminderService : IReminderService, IAttri
         IClusterMembershipService clusterMembershipService)
     {
         _reminderTable = reminderTable;
+        _tableMutations = new(reminderTable, timeProvider);
         _jobManager = jobManager;
         _grainFactory = grainFactory;
         _logger = logger;
@@ -196,8 +198,10 @@ internal sealed partial class AdvancedReminderService : IReminderService, IAttri
     internal async Task UnregisterCoreAsync(ReminderData data, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _tableMutations.ThrowIfPending(data.GrainId, data.ReminderName);
         var current = await ReminderTableRead.WaitAsync(
             _reminderTable.ReadRow(data.GrainId, data.ReminderName), _timeProvider, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (current is null)
         {
             return;
@@ -207,7 +211,7 @@ internal sealed partial class AdvancedReminderService : IReminderService, IAttri
                 ReminderScheduleId.GetRegistrationId(current.ScheduleId),
                 data.RegistrationId,
                 StringComparison.Ordinal)
-            || !await _reminderTable.RemoveRow(data.GrainId, data.ReminderName, current.ETag))
+            || !await _tableMutations.RemoveAsync(data.GrainId, data.ReminderName, current.ETag, cancellationToken))
         {
             throw new Runtime.ReminderException($"Could not unregister reminder {data} due to ETag mismatch.");
         }

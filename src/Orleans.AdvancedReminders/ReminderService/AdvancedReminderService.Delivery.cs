@@ -32,6 +32,7 @@ internal sealed partial class AdvancedReminderService
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _tableMutations.ThrowIfPending(grainId, reminderName);
         var entry = await ReminderTableRead.WaitAsync(
             _reminderTable.ReadRow(grainId, reminderName), _timeProvider, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -54,7 +55,7 @@ internal sealed partial class AdvancedReminderService
 
         if (_options.DeleteReminderWhenGrainTypeIsUnavailable && IsGrainTypeUnavailable(grainId.Type))
         {
-            await RemoveReminderAsync(entry);
+            await RemoveReminderAsync(entry, cancellationToken);
             _logger.LogWarning(
                 "Deleted reminder {ReminderName} for grain {GrainId} because no active silo declares grain type {GrainType}.",
                 entry.ReminderName,
@@ -151,7 +152,7 @@ internal sealed partial class AdvancedReminderService
                 throw new ReminderDeliveryException(entry.GrainId, entry.ReminderName, durableJobDequeueCount, deliveryException);
             }
 
-            await RemoveReminderAsync(entry);
+            await RemoveReminderAsync(entry, cancellationToken);
             _logger.LogWarning(
                 "Deleted reminder {ReminderName} for grain {GrainId} after its callback failed at Durable Jobs dequeue count {DequeueCount}.",
                 entry.ReminderName,
@@ -186,7 +187,7 @@ internal sealed partial class AdvancedReminderService
         var nextDue = CalculateNextDue(entry, callbackTime);
         if (nextDue is null)
         {
-            if (!await _reminderTable.RemoveRow(entry.GrainId, entry.ReminderName, entry.ETag))
+            if (!await _tableMutations.RemoveAsync(entry.GrainId, entry.ReminderName, entry.ETag, cancellationToken))
             {
                 throw new Runtime.ReminderException($"Could not remove completed reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");
             }
@@ -243,9 +244,9 @@ internal sealed partial class AdvancedReminderService
         return activeSiloSeen;
     }
 
-    private async Task RemoveReminderAsync(ReminderEntry entry)
+    private async Task RemoveReminderAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
-        if (!await _reminderTable.RemoveRow(entry.GrainId, entry.ReminderName, entry.ETag))
+        if (!await _tableMutations.RemoveAsync(entry.GrainId, entry.ReminderName, entry.ETag, cancellationToken))
         {
             throw new Runtime.ReminderException(
                 $"Could not remove reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");

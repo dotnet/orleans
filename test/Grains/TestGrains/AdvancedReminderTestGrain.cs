@@ -1,7 +1,7 @@
 #nullable enable
 
 using Orleans.AdvancedReminders;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.AdvancedReminders.Runtime;
 using UnitTests.GrainInterfaces;
 

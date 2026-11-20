@@ -29,9 +29,9 @@ interface [GrainInterfaceType("Orleans.AdvancedReminders.IReminderTableGrain")] 
   734C12EF: ReadRows(Orleans.Runtime.GrainId) -> Task<Orleans.AdvancedReminders.ReminderTableData>
   BF2C85A1: ReadRows(uint, uint) -> Task<Orleans.AdvancedReminders.ReminderTableData>
   10E221D3: ReadRows(uint, uint, int, string?) -> Task<Orleans.AdvancedReminders.ReminderTableData>
-  D81DC8D8: RemoveRow(Orleans.Runtime.GrainId, string, string) -> Task<bool>
+  3FBC532B: RemoveRow(Orleans.Runtime.GrainId, string, string, System.Threading.CancellationToken) -> Task<bool>
   F44AFE81: TestOnlyClearTable() -> Task
-  44ABA0FA: UpsertRow(Orleans.AdvancedReminders.ReminderEntry) -> Task<string>
+  5F3E2D46: UpsertRow(Orleans.AdvancedReminders.ReminderEntry, System.Threading.CancellationToken) -> Task<string>
 
 class [GrainType("remindermanagement")] Orleans.AdvancedReminders.ReminderManagementGrain
 

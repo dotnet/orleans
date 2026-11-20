@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.AdvancedReminders;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.Diagnostics;
 using Orleans.Hosting;

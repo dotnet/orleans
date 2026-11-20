@@ -90,7 +90,7 @@ internal sealed partial class AdvancedReminderService
 
     private async Task PersistAndScheduleCoreAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
-        entry.ETag = await _reminderTable.UpsertRow(entry);
+        entry.ETag = await _tableMutations.UpsertAsync(entry, cancellationToken);
         if (HasFutureSchedule(entry))
         {
             await ScheduleAndPersistHandleAsync(entry, cancellationToken);
@@ -121,7 +121,7 @@ internal sealed partial class AdvancedReminderService
 
         entry.JobId = job.Id;
         entry.JobShardId = job.ShardId;
-        entry.ETag = await _reminderTable.UpsertRow(entry);
+        entry.ETag = await _tableMutations.UpsertAsync(entry, cancellationToken);
     }
 
     private async Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
@@ -134,7 +134,9 @@ internal sealed partial class AdvancedReminderService
             // A late scheduling result must never resume handle persistence after
             // this owner turn has ended. Recovery rotates the pending occurrence
             // before scheduling another job, fencing any job created in the meantime.
-            return await _jobManager.ScheduleJobAsync(request, cancellation.Token).WaitAsync(cancellation.Token);
+            var job = await _jobManager.ScheduleJobAsync(request, cancellation.Token).WaitAsync(cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            return job;
         }
         catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {

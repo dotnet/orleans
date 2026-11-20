@@ -3,7 +3,7 @@ using NSubstitute;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using IRemindable = Orleans.AdvancedReminders.IRemindable;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;

@@ -329,7 +329,8 @@ namespace Orleans.Tests.SqlUtils
             string scheduleId,
             string jobId,
             string jobShardId,
-            string eTag)
+            string eTag,
+            CancellationToken cancellationToken)
         {
             // SqlClient otherwise sends DateTime values as the lower-precision SQL datetime type.
             DbType? timestampType = storage.InvariantName == AdoNetInvariants.InvariantNameSqlServer ? DbType.DateTime2 : null;
@@ -355,7 +356,8 @@ namespace Orleans.Tests.SqlUtils
                 },
                 ret => ret.FirstOrDefault()?.ToString(CultureInfo.InvariantCulture)
                     ?? throw new ReminderException(
-                        $"Could not upsert reminder '{reminderName}' for grain '{grainId}' due to ETag mismatch."));
+                        $"Could not upsert reminder '{reminderName}' for grain '{grainId}' due to ETag mismatch."),
+                cancellationToken);
         }
 
 #else
@@ -395,8 +397,9 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="etag"></param>
         /// <returns></returns>
         internal Task<bool> DeleteReminderRowAsync(string serviceId, GrainId grainId, string reminderName,
-            string etag)
+            string etag, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!int.TryParse(etag, out _))
             {
                 return Task.FromResult(false);
@@ -409,7 +412,7 @@ namespace Orleans.Tests.SqlUtils
                     GrainId = grainId.ToString(),
                     ReminderName = reminderName,
                     Version = etag
-                }, ret => ret.First());
+                }, ret => ret.First(), cancellationToken);
         }
 
         /// <summary>

@@ -177,8 +177,9 @@ internal sealed class AdvancedReminderTableGrain : Grain, IReminderTableGrain, I
         return Task.FromResult(result);
     }
 
-    public Task<string> UpsertRow(ReminderEntry entry)
+    public Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_reminderTable.TryGetValue(entry.GrainId, out var existingReminders)
             && existingReminders.TryGetValue(entry.ReminderName, out var existing))
         {
@@ -206,8 +207,9 @@ internal sealed class AdvancedReminderTableGrain : Grain, IReminderTableGrain, I
         return Task.FromResult(entry.ETag);
     }
 
-    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_reminderTable.TryGetValue(grainId, out var reminders)
             || !reminders.TryGetValue(reminderName, out var entry)
             || !string.Equals(entry.ETag, eTag, StringComparison.Ordinal))

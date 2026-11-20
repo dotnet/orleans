@@ -6,7 +6,7 @@ using Microsoft.Extensions.Time.Testing;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 

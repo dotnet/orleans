@@ -4,7 +4,7 @@ Advanced Reminders schedules durable callbacks to Orleans grains using intervals
 
 The package provides programmatic and attribute-based registration, missed-occurrence policies, paged administration, and Dashboard integration. It uses the existing Orleans Durable Jobs APIs for scheduling, cancellation, and delivery. Classic reminders keep their own API; Advanced Reminders uses explicitly named extensions such as `RegisterOrUpdateAdvancedReminder`.
 
-This package family is prerelease. Delivery is at least once: use application-level operation identities and idempotent side effects. A one-shot schedule describes one intended occurrence, not an exactly-once callback guarantee.
+This prerelease package family targets .NET 11. Delivery is at least once: use application-level operation identities and idempotent side effects. A one-shot schedule describes one intended occurrence, not an exactly-once callback guarantee.
 
 ## Feature guide
 
@@ -332,7 +332,7 @@ With `UntilSuccess`, each failure persists a fresh occurrence and schedules a ne
 
 One-shots preserve the original `StartAt` deadline and move `NextDueUtc` to the retry time. Successful delivery removes them. Interval and cron schedules retain their logical `NextDueUtc` while the native job waits for its retry time. After success, they advance to the next future slot on the original interval anchor or cron calendar, coalescing elapsed slots.
 
-Recovery repairs a missing handle and rotates the occurrence identity to fence orphaned jobs; retained recurring work receives another delayed attempt. An attempted occurrence remains retryable after the missed grace period expires. `Skip` and `Notify` still apply to an initial occurrence which was never attempted. Request cancellation leaves the occurrence unchanged, and registration replacement or removal wins over a late callback result.
+Recovery repairs a missing handle and rotates the occurrence identity to fence orphaned jobs; retained recurring work receives another delayed attempt. An attempted occurrence remains retryable after the missed grace period expires. `Skip` and `Notify` still apply to an initial occurrence which was never attempted. Cancellation before completion starts releases delivery admission without advancing the occurrence. Registration replacement or removal wins over a late callback result.
 
 Use `ReminderRetryPolicy.Limited(attempts)` when delivery must stop at a configured attempt limit. Make business effects idempotent using a stable application work identifier across attempts: each retained retry has a new job ID, and a lost response can cause delivery to repeat after an effect committed.
 
@@ -375,15 +375,15 @@ Replacing or unregistering a reminder commits its definition change before attem
 
 The grain-scoped registry accepts an unregister handle only from the grain that owns the reminder. Administrative removal uses the reminder management API.
 
-Journaled shard creation and discovery share the same local queue, including when discovery overlaps the first enqueue. Durable Jobs routes cancellation to the current shard owner and records removal there. An already-started attempt may finish. See [Durable Jobs shard discovery and cancellation](../Orleans.DurableJobs/README.md#shard-discovery-and-lookahead).
+Journaled shard creation and discovery share the same local queue, including when discovery overlaps the first enqueue. Durable Jobs routes cancellation to the current shard owner and records removal there. An already-started attempt may finish. See [Durable Jobs shard discovery and cancellation](../Orleans.Durable/DurableJobs/README.md#shard-discovery-and-lookahead).
 
 Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late read response is discarded and cannot resume the abandoned mutation. The next heartbeat retries a failed recovery page from the last completed page.
 
-The dispatcher awaits upserts and deletes inside its owner turn and uses the provider's timeout behavior. An additional timeout on the await would let the dispatcher start another operation while the previous provider task can still commit.
+Reminder-table creates, updates, and deletes each have a one-minute wait limit, including administrative changes and delivery completion. The runtime passes cancellation to the provider and can release the turn while a provider request is still pending. During that time, the silo rejects further mutations and delivery preparation for the same reminder. Other reminders can continue.
 
 Creating a durable job also has a one-minute timeout and honors cancellation even when the backend ignores the token. The committed definition remains pending if scheduling fails. Recovery rotates its occurrence identity before rescheduling, so a job created by an abandoned scheduling request is harmless. Recovery waits up to one minute for each dispatcher repair, and the silo's shutdown token bounds the wait for the reminder provider to stop.
 
-Reminder-table writes remain awaited until the provider finishes, preserving the dispatcher's single-writer ordering across a commit. Configure storage SDK request deadlines for those writes; stopping observation alone cannot prevent a late write from overwriting a newer registration. Callback execution uses Orleans messaging deadlines, and cancellation cannot forcibly stop application callback code.
+A timed-out or canceled write can still commit in storage. Providers apply conditional writes using the row's ETag or absence, and recovery can schedule a committed definition whose job handle was never recorded. Callback execution uses Orleans messaging deadlines, and cancellation cannot forcibly stop application callback code.
 
 ## Performance verification
 

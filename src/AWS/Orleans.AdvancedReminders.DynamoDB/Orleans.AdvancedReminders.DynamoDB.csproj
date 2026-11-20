@@ -7,7 +7,7 @@
     <Title>Microsoft Orleans Advanced Reminders for DynamoDB</Title>
     <Description>AWS DynamoDB provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>

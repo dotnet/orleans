@@ -300,7 +300,7 @@ public sealed class DashboardRemindersGrainTests
             ReminderName = "dashboard-integration",
             StartAt = due,
             NextDueUtc = due,
-        });
+        }, cancellationToken);
 
         var grain = cluster.Client.GetGrain<IDashboardRemindersGrain>(0);
         var page = (await grain.GetAdvancedReminders(1, 50, cancellationToken)).Value;
@@ -395,9 +395,9 @@ public sealed class DashboardRemindersGrainTests
 
         public Task<AdvancedReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
 
-        public Task<string> UpsertRow(AdvancedReminderEntry entry) => throw new NotSupportedException();
+        public Task<string> UpsertRow(AdvancedReminderEntry entry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => throw new NotSupportedException();
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task TestOnlyClearTable() => throw new NotSupportedException();
     }

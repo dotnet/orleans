@@ -16,9 +16,9 @@ internal interface IReminderTableGrain : IGrainWithIntegerKey
 
     Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
-    Task<string> UpsertRow(ReminderEntry entry);
+    Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default);
 
-    Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
+    Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default);
 
     Task TestOnlyClearTable();
 }

@@ -86,17 +86,17 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         var first = CreateReminder(grainId, "count-first");
         var second = CreateReminder(grainId, "count-second");
         var third = CreateReminder(MakeTestGrainReference(), "count-third");
-        first.ETag = await remindersTable.UpsertRow(first);
-        second.ETag = await remindersTable.UpsertRow(second);
-        third.ETag = await remindersTable.UpsertRow(third);
+        first.ETag = await remindersTable.UpsertRow(first, TestContext.Current.CancellationToken);
+        second.ETag = await remindersTable.UpsertRow(second, TestContext.Current.CancellationToken);
+        third.ETag = await remindersTable.UpsertRow(third, TestContext.Current.CancellationToken);
         Assert.Equal(3, await remindersTable.GetCountAsync(cancellationToken));
 
         first.NextDueUtc = DateTime.UtcNow.AddDays(1);
-        first.ETag = await remindersTable.UpsertRow(first);
+        first.ETag = await remindersTable.UpsertRow(first, TestContext.Current.CancellationToken);
         Assert.Equal(3, await remindersTable.GetCountAsync(cancellationToken));
-        Assert.False(await remindersTable.RemoveRow(first.GrainId, first.ReminderName, "stale"));
+        Assert.False(await remindersTable.RemoveRow(first.GrainId, first.ReminderName, "stale", TestContext.Current.CancellationToken));
         Assert.Equal(3, await remindersTable.GetCountAsync(cancellationToken));
-        Assert.True(await remindersTable.RemoveRow(first.GrainId, first.ReminderName, first.ETag));
+        Assert.True(await remindersTable.RemoveRow(first.GrainId, first.ReminderName, first.ETag, TestContext.Current.CancellationToken));
         Assert.Equal(2, await remindersTable.GetCountAsync(cancellationToken));
         await remindersTable.TestOnlyClearTable();
         Assert.Equal(0, await remindersTable.GetCountAsync(cancellationToken));
@@ -113,8 +113,8 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         var second = CreateReminder(grainId, secondName);
         second.Period = TimeSpan.FromMinutes(2);
 
-        first.ETag = await remindersTable.UpsertRow(first);
-        second.ETag = await remindersTable.UpsertRow(second);
+        first.ETag = await remindersTable.UpsertRow(first, TestContext.Current.CancellationToken);
+        second.ETag = await remindersTable.UpsertRow(second, TestContext.Current.CancellationToken);
 
         var storedFirst = Assert.IsType<AdvancedReminderEntry>(await remindersTable.ReadRow(grainId, firstName));
         var storedSecond = Assert.IsType<AdvancedReminderEntry>(await remindersTable.ReadRow(grainId, secondName));
@@ -142,7 +142,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
 
         Assert.Equal(new[] { firstName, secondName }.Order(StringComparer.Ordinal), pagedNames.Order(StringComparer.Ordinal));
 
-        Assert.True(await remindersTable.RemoveRow(grainId, firstName, first.ETag));
+        Assert.True(await remindersTable.RemoveRow(grainId, firstName, first.ETag, TestContext.Current.CancellationToken));
         Assert.Null(await remindersTable.ReadRow(grainId, firstName));
         Assert.NotNull(await remindersTable.ReadRow(grainId, secondName));
     }
@@ -175,7 +175,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         foreach (var (hash, grainId) in grainIds)
         {
             var reminder = CreateReminder(grainId, $"paged-{hash}");
-            await remindersTable.UpsertRow(reminder);
+            await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
             if (wraps ? hash > begin || hash <= end : hash > begin && hash <= end)
             {
                 expected.Add($"{reminder.GrainId}|{reminder.ReminderName}");
@@ -213,7 +213,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
             {
                 try
                 {
-                    return (Succeeded: true, ETag: await remindersTable.UpsertRow(CreateReminder(grainId, i.ToString())));
+                    return (Succeeded: true, ETag: await remindersTable.UpsertRow(CreateReminder(grainId, i.ToString()), TestContext.Current.CancellationToken));
                 }
                 catch (Orleans.AdvancedReminders.Runtime.ReminderException)
                 {
@@ -230,7 +230,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
     protected async Task ReminderSimple()
     {
         var reminder = CreateReminder(MakeTestGrainReference(), "foo/bar\\#b_a_z?");
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
         var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
         Assert.NotNull(readReminder);
@@ -243,12 +243,12 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         Assert.Equal(readReminder.StartAt, reminder.StartAt);
         Assert.Equal(MissedReminderAction.Skip, readReminder.Action);
 
-        reminder.ETag = await remindersTable.UpsertRow(reminder);
+        reminder.ETag = await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
-        Assert.False(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, previousETag));
-        Assert.False(await remindersTable.RemoveRow(reminder.GrainId, "missing", reminder.ETag));
-        Assert.True(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag));
-        Assert.False(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag));
+        Assert.False(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, previousETag, TestContext.Current.CancellationToken));
+        Assert.False(await remindersTable.RemoveRow(reminder.GrainId, "missing", reminder.ETag, TestContext.Current.CancellationToken));
+        Assert.True(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag, TestContext.Current.CancellationToken));
+        Assert.False(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag, TestContext.Current.CancellationToken));
     }
 
     protected async Task ReminderAddUpdateDeleteRoundTrip()
@@ -257,7 +257,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         var reminder = CreateReminder(grainId, "add_update_delete");
         reminder.NextDueUtc = reminder.StartAt.AddMinutes(1);
 
-        var createdETag = await remindersTable.UpsertRow(reminder);
+        var createdETag = await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         Assert.False(string.IsNullOrWhiteSpace(createdETag));
 
         var created = await remindersTable.ReadRow(grainId, reminder.ReminderName);
@@ -276,7 +276,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.JobId = "job-2";
         reminder.JobShardId = "shard-2";
 
-        var updatedETag = await remindersTable.UpsertRow(reminder);
+        var updatedETag = await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         Assert.False(string.IsNullOrWhiteSpace(updatedETag));
 
         var updated = await remindersTable.ReadRow(grainId, reminder.ReminderName);
@@ -288,17 +288,17 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         var row = Assert.Single(rows.Reminders);
         AssertReminderMatches(reminder, row);
 
-        Assert.False(await remindersTable.RemoveRow(grainId, reminder.ReminderName, created.ETag));
-        Assert.True(await remindersTable.RemoveRow(grainId, reminder.ReminderName, updated.ETag));
+        Assert.False(await remindersTable.RemoveRow(grainId, reminder.ReminderName, created.ETag, TestContext.Current.CancellationToken));
+        Assert.True(await remindersTable.RemoveRow(grainId, reminder.ReminderName, updated.ETag, TestContext.Current.CancellationToken));
         Assert.Null(await remindersTable.ReadRow(grainId, reminder.ReminderName));
         Assert.Empty((await remindersTable.ReadRows(grainId)).Reminders);
-        Assert.False(await remindersTable.RemoveRow(grainId, reminder.ReminderName, updated.ETag));
+        Assert.False(await remindersTable.RemoveRow(grainId, reminder.ReminderName, updated.ETag, TestContext.Current.CancellationToken));
     }
 
     protected async Task ReminderDeleteMissingReturnsFalse()
     {
         var grainId = MakeTestGrainReference();
-        Assert.False(await remindersTable.RemoveRow(grainId, "missing", "missing-etag"));
+        Assert.False(await remindersTable.RemoveRow(grainId, "missing", "missing-etag", TestContext.Current.CancellationToken));
         Assert.Null(await remindersTable.ReadRow(grainId, "missing"));
     }
 
@@ -306,16 +306,16 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
     {
         var grainId = MakeTestGrainReference();
         var current = CreateReminder(grainId, "stale_upsert");
-        current.ETag = await remindersTable.UpsertRow(current);
+        current.ETag = await remindersTable.UpsertRow(current, TestContext.Current.CancellationToken);
 
         var stale = CreateReminder(grainId, current.ReminderName);
         stale.ETag = current.ETag;
 
         current.Period = TimeSpan.FromMinutes(2);
-        current.ETag = await remindersTable.UpsertRow(current);
+        current.ETag = await remindersTable.UpsertRow(current, TestContext.Current.CancellationToken);
 
         stale.Period = TimeSpan.FromMinutes(3);
-        await Assert.ThrowsAsync<Orleans.AdvancedReminders.Runtime.ReminderException>(() => remindersTable.UpsertRow(stale));
+        await Assert.ThrowsAsync<Orleans.AdvancedReminders.Runtime.ReminderException>(() => remindersTable.UpsertRow(stale, TestContext.Current.CancellationToken));
 
         var stored = await remindersTable.ReadRow(grainId, current.ReminderName);
         Assert.NotNull(stored);
@@ -329,7 +329,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.CronExpression = "0 */5 * * * *";
         reminder.Period = TimeSpan.Zero;
 
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
 
         Assert.NotNull(readReminder);
@@ -347,7 +347,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.NextDueUtc = nextDueUtc;
         reminder.LastFireUtc = lastFireUtc;
 
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         var stored = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
 
         Assert.NotNull(stored);
@@ -371,7 +371,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.JobId = "adaptive-job";
         reminder.JobShardId = "adaptive-shard";
 
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
 
         Assert.NotNull(readReminder);
@@ -391,7 +391,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.NextDueUtc = DateTime.SpecifyKind(reminder.StartAt.AddMinutes(10), DateTimeKind.Unspecified);
         reminder.LastFireUtc = DateTime.SpecifyKind(reminder.StartAt.AddMinutes(-2), DateTimeKind.Unspecified);
 
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
         Assert.Equal(DateTimeKind.Utc, reminder.StartAt.Kind);
         Assert.Equal(DateTimeKind.Utc, reminder.NextDueUtc.Value.Kind);
@@ -411,7 +411,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.CronTimeZoneId = "Europe/Warsaw";
         reminder.Period = TimeSpan.Zero;
 
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
 
         Assert.NotNull(readReminder);
@@ -421,7 +421,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.ETag = readReminder.ETag;
         reminder.CronExpression = "0 */10 * * * *";
         reminder.CronTimeZoneId = "America/New_York";
-        await remindersTable.UpsertRow(reminder);
+        await remindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
         readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
         Assert.NotNull(readReminder);
@@ -438,7 +438,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
                 var grainRef = MakeTestGrainReference();
                 await RetryHelper.RetryOnExceptionAsync(10, RetryOperation.Sigmoid, async () =>
                 {
-                    await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()));
+                    await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()), TestContext.Current.CancellationToken);
                     return 0;
                 });
             }));

@@ -137,6 +137,18 @@ public class ReminderRegistryValidationTests
         Assert.Equal("dueAtUtc", exception.ParamName);
     }
 
+    [Theory]
+    [InlineData(DateTimeKind.Local)]
+    [InlineData(DateTimeKind.Unspecified)]
+    public void Interval_WithDateTime_RejectsNonUtcKind(DateTimeKind kind)
+    {
+        var dueAt = new DateTime(2030, 4, 15, 16, 30, 0, kind);
+
+        var exception = Assert.Throws<ArgumentException>(() => ReminderSchedule.Interval(dueAt, TimeSpan.FromMinutes(5)));
+
+        Assert.Equal("dueAtUtc", exception.ParamName);
+    }
+
     [Fact]
     public async Task RegisterInterval_RejectsEmptyName()
     {

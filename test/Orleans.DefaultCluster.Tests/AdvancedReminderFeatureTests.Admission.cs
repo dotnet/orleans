@@ -19,7 +19,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var table = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderTable>();
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
-        original.ETag = await table.UpsertRow(original);
+        original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -54,7 +54,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var table = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderTable>();
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
-        original.ETag = await table.UpsertRow(original);
+        original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
         var first = service.ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, TestContext.Current.CancellationToken);
         try
@@ -88,7 +88,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var table = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderTable>();
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
-        original.ETag = await table.UpsertRow(original);
+        original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var delivery = service.ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, cancellation.Token);

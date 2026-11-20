@@ -11,7 +11,7 @@ using Orleans.AdvancedReminders.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using TestExtensions;
 using Xunit;

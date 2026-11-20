@@ -6,7 +6,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- This is a new package with no released compatibility baseline. -->
     <EnablePackageValidation>false</EnablePackageValidation>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net11.0</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS_PROVIDER</DefineConstants>

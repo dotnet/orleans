@@ -87,7 +87,7 @@ public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
                 NextDueUtc = DateTime.UtcNow.AddMinutes(1),
                 Period = TimeSpan.FromMinutes(1),
             };
-            var etag = await table.UpsertRow(entry);
+            var etag = await table.UpsertRow(entry, TestContext.Current.CancellationToken);
 
             var timeToLive = await database.KeyTimeToLiveAsync(key);
             Assert.NotNull(timeToLive);
@@ -95,13 +95,13 @@ public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 
             await database.KeyExpireAsync(key, TimeSpan.FromMinutes(1));
             entry.ETag = "stale-etag";
-            await Assert.ThrowsAsync<Orleans.AdvancedReminders.Runtime.ReminderException>(() => table.UpsertRow(entry));
+            await Assert.ThrowsAsync<Orleans.AdvancedReminders.Runtime.ReminderException>(() => table.UpsertRow(entry, TestContext.Current.CancellationToken));
             var unchangedTtl = await database.KeyTimeToLiveAsync(key);
             Assert.NotNull(unchangedTtl);
             Assert.InRange(unchangedTtl.Value, TimeSpan.Zero, TimeSpan.FromMinutes(1));
 
             entry.ETag = etag;
-            await table.UpsertRow(entry);
+            await table.UpsertRow(entry, TestContext.Current.CancellationToken);
             var refreshedTtl = await database.KeyTimeToLiveAsync(key);
             Assert.NotNull(refreshedTtl);
             Assert.InRange(refreshedTtl.Value, expiry - TimeSpan.FromMinutes(1), expiry);
@@ -147,7 +147,7 @@ public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
                     StartAt = DateTime.UtcNow.AddMinutes(1),
                     NextDueUtc = DateTime.UtcNow.AddMinutes(1),
                     Period = TimeSpan.FromMinutes(1),
-                });
+                }, TestContext.Current.CancellationToken);
             }
 
             Assert.Null(await database.KeyTimeToLiveAsync(key));

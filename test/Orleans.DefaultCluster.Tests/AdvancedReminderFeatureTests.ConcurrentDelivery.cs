@@ -25,7 +25,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var table = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderTable>();
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
-        original.ETag = await table.UpsertRow(original);
+        original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         barrier.Target = grain.GetGrainId();
 
         // Hold a normal recipient turn before an independent delivery chain sends its callback.
@@ -75,7 +75,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var table = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderTable>();
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
-        original.ETag = await table.UpsertRow(original);
+        original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         barrier.Target = grain.GetGrainId();
         var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
 
@@ -136,7 +136,7 @@ public sealed partial class AdvancedReminderFeatureTests
             await grain.Register(name, DateTimeOffset.UtcNow.AddDays(30));
             var entry = Assert.IsType<ReminderEntry>(await table.ReadRow(grainId, name));
             entry.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
-            entry.ETag = await table.UpsertRow(entry);
+            entry.ETag = await table.UpsertRow(entry, TestContext.Current.CancellationToken);
             return entry;
         }
 
@@ -192,7 +192,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var table = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderTable>();
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
-        original.ETag = await table.UpsertRow(original);
+        original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         barrier.Target = grain.GetGrainId();
         var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);

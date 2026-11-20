@@ -1,5 +1,5 @@
 using Newtonsoft.Json;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using static Orleans.AdvancedReminders.Cosmos.CosmosIdSanitizer;
 
 namespace Orleans.AdvancedReminders.Cosmos.Models;
