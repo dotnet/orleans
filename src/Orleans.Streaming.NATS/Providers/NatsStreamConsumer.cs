@@ -84,8 +84,9 @@ internal sealed partial class NatsStreamConsumer(
 
         var i = 0;
 
+        // MaxAckPending can leave a no-wait fetch unanswered. Bound the wait before the next cache purge can acknowledge messages.
         await foreach (var msg in this._consumer.FetchNoWaitAsync(
-                               new NatsJSFetchOpts { MaxMsgs = batchCount, Expires = TimeSpan.FromSeconds(10) },
+                               new NatsJSFetchOpts { MaxMsgs = batchCount, Expires = TimeSpan.FromSeconds(1) },
                                serializer: serializer,
                                cancellationToken: cancellationToken)
                            .WithCancellation(cancellationToken))

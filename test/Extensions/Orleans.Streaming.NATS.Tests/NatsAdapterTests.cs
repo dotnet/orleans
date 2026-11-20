@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -113,6 +114,71 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
     [Fact]
     public Task SendAndReceivePersistedLegacyMessage()
         => VerifyStreamIdentity(StreamId.Create("chat", "key"), useLegacyPayload: true);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AckPendingLimitReturnsPromptlyAndResumesAfterAcknowledgement(bool partialBatch)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const int batchSize = 2;
+        const int messageCount = batchSize * 3;
+        var providerName = $"backlog-{testStreamName}";
+        var options = new NatsOptions
+        {
+            StreamName = testStreamName,
+            NatsClientOptions = NatsTestConstants.NatsClientOptions,
+            PartitionCount = 1,
+            ProducerCount = 1,
+            BatchSize = batchSize,
+        };
+        await using var factory = new NatsAdapterFactory(
+            providerName,
+            options,
+            new HashRingStreamQueueMapperOptions { TotalQueueCount = 1 },
+            new SimpleQueueCacheOptions(),
+            Options.Create(new ClusterOptions()),
+            fixture.Serializer,
+            NullLoggerFactory.Instance);
+        factory.Init();
+        var adapter = await ((IQueueAdapterFactory)factory).CreateAdapter(cancellationToken);
+        var streamId = StreamId.Create("backlog", Guid.NewGuid());
+        for (var index = 0; index < messageCount; index++)
+        {
+            await adapter.QueueMessageBatchAsync(streamId, new[] { index }, null!, null!);
+        }
+
+        var queue = Assert.Single(factory.GetStreamQueueMapper().GetAllQueues());
+        var receiver = adapter.CreateReceiver(queue);
+        await receiver.Initialize(TimeSpan.FromSeconds(5), cancellationToken);
+        try
+        {
+            for (var offset = 0; offset < messageCount; offset += batchSize)
+            {
+                var batch = await receiver.GetQueueMessagesAsync(partialBatch ? 1 : batchSize, cancellationToken);
+                if (partialBatch)
+                {
+                    var partialWatch = Stopwatch.StartNew();
+                    var remainder = Assert.Single(await receiver.GetQueueMessagesAsync(batchSize, cancellationToken));
+                    Assert.True(partialWatch.Elapsed < TimeSpan.FromSeconds(3), $"Partial fetch waited {partialWatch.Elapsed} at the acknowledgement limit.");
+                    batch.Add(remainder);
+                }
+
+                Assert.Equal(Enumerable.Range(offset, batchSize), batch.SelectMany(item => item.GetEvents<int>()).Select(item => item.Item1));
+                var watch = Stopwatch.StartNew();
+
+                Assert.Empty(await receiver.GetQueueMessagesAsync(batchSize, cancellationToken));
+
+                output.WriteLine("Fetch at MaxAckPending completed in {0}.", watch.Elapsed);
+                Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Fetch waited {watch.Elapsed} before acknowledgements could be sent.");
+                await receiver.MessagesDeliveredAsync(batch, cancellationToken);
+            }
+        }
+        finally
+        {
+            await receiver.Shutdown(TimeSpan.FromSeconds(5), CancellationToken.None);
+        }
+    }
 
     private async Task VerifyStreamIdentity(StreamId streamId, bool useLegacyPayload = false)
     {
