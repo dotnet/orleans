@@ -416,9 +416,12 @@ internal static class DurableStateObservation
             state,
             static (hub, state) =>
             {
-                // A dirty value is captured by the next write. Otherwise, the value is durable once the latest captured write is acknowledged.
+                // A dirty value is captured by the next write, and a value which the in-flight write captured is durable once that
+                // write is acknowledged. Otherwise, the value is already durable, whether or not an unrelated write is in flight.
                 var manager = hub.Manager;
-                var initialVersion = state.IsDirty ? manager.StagingWriteVersion : manager.CapturedWriteVersion;
+                var initialVersion = state.IsDirty
+                    ? manager.StagingWriteVersion
+                    : state.IsValueCaptured ? manager.CapturedWriteVersion : manager.CommittedWriteVersion;
                 return new ValueWatcher<T>(hub, state, state.Value, initialVersion);
             },
             cancellationToken);

@@ -133,6 +133,33 @@ public class DurableStateObservationTests : JournalingTestBase
     });
 
     [Fact]
+    public Task ValueWatch_OfDurableValue_DoesNotWaitForAnUnrelatedWrite() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var value = CreateValue(sut.Manager);
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        value.Value = "durable";
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        // A write which contains only the log's entry is held in storage.
+        log.Append("entry");
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+
+        // The value is already durable, so a watch which begins now delivers it without waiting for the held write.
+        await using var watch = value.WatchAsync(CancellationToken).GetAsyncEnumerator(CancellationToken);
+        var next = watch.MoveNextAsync();
+        Assert.True(next.IsCompleted);
+        Assert.True(await next);
+        Assert.Equal(Committed("durable", version: 1), watch.Current);
+
+        sut.Storage.Release();
+        await write;
+    });
+
+    [Fact]
     public Task CommittedWatch_ExcludesChangesStagedDuringAnInFlightWrite() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();

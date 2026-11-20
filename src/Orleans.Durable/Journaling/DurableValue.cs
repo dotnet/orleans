@@ -65,6 +65,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
 
     internal bool IsDirty => _isDirty;
 
+    internal bool IsValueCaptured => _isValueCaptured;
+
     public Action? OnPersisted { get; set; }
 
     private void OnValuePersisted() => OnPersisted?.Invoke();
