@@ -61,6 +61,8 @@ Don't call <xref:Orleans.IGrainFactory.CreateObjectReference*> for a grain. Grai
 
 ## Execution and cancellation
 
-Calls to one client observer reference execute sequentially and aren't reentrant. Different observer references can execute concurrently.
+Ordinary calls to one client observer reference execute sequentially and aren't reentrant. Async-enumerable bodies and disposal can execute concurrently with ordinary calls and other enumerations on that observer. Operations on each enumerator are serialized. Different observer references can execute concurrently.
 
 Observer methods can accept a <xref:System.Threading.CancellationToken> parameter. Cancellation remains cooperative and doesn't make observer delivery durable. See [Cancel Orleans grain calls](cancellation-tokens.md) for cancellation semantics.
+
+Observer shutdown waits for async-enumerable producers and their cleanup to finish. Producers should observe cancellation promptly so shutdown can complete.
