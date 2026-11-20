@@ -1,4 +1,4 @@
-# Orleans.DurableTasks.Abstractions
+# Orleans.Durable.Abstractions
 
 > [!IMPORTANT]
 > This pre-release alpha package provides Orleans durable task abstractions under active

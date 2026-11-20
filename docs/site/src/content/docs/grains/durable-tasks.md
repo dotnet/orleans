@@ -7,7 +7,7 @@ ms.topic: conceptual
 
 # Durable tasks (experimental)
 
-A durable task is an asynchronous operation whose progress survives grain deactivation, silo crashes, and redeployment. Its host records each operation which the task completes, such as a call to another grain, a delay, or a recorded effect. A task which didn't finish runs its body again from the start, and every recorded operation returns its recorded outcome, so the body resumes where it stopped. The programming model lives in the pre-release `Microsoft.Orleans.DurableTasks.Abstractions` package, in the `Orleans.DurableTasks` namespace, which also carries the [durable task analyzers](../diagnostics/index.md).
+A durable task is an asynchronous operation whose progress survives grain deactivation, silo crashes, and redeployment. Its host records each operation which the task completes, such as a call to another grain, a delay, or a recorded effect. A task which didn't finish runs its body again from the start, and every recorded operation returns its recorded outcome, so the body resumes where it stopped. The programming model lives in the pre-release `Microsoft.Orleans.Durable.Abstractions` package, in the `Orleans.DurableTasks` namespace, which also carries the [durable task analyzers](../diagnostics/index.md).
 
 ## Execution model
 

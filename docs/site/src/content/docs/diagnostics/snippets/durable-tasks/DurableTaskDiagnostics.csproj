@@ -8,7 +8,7 @@
   <PropertyGroup>
     <OutputType>Library</OutputType>
     <TargetFramework>net11.0</TargetFramework>
-    <OrleansDocumentationTargetFrameworkException>Compiles the examples for Orleans.DurableTasks.Abstractions, which targets only net11.0.</OrleansDocumentationTargetFrameworkException>
+    <OrleansDocumentationTargetFrameworkException>Compiles the examples for Orleans.Durable.Abstractions, which targets only net11.0.</OrleansDocumentationTargetFrameworkException>
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\'))</RepositoryRoot>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Durable grain state is experimental. -->
@@ -23,8 +23,8 @@
   <ItemGroup>
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
-    <ProjectReference Include="$(RepositoryRoot)src\Orleans.DurableTasks.Abstractions\Orleans.DurableTasks.Abstractions.csproj" />
-    <ProjectReference Include="$(RepositoryRoot)src\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj"
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable.Abstractions\Orleans.Durable.Abstractions.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable.Analyzers\Orleans.Durable.Analyzers.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>

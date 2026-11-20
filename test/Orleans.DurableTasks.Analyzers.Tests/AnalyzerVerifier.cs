@@ -42,7 +42,7 @@ internal static partial class AnalyzerVerifier
             .Where(static path => Path.GetFileName(path) is var name
                 && (name.StartsWith("System.", StringComparison.Ordinal)
                     || name.StartsWith("Microsoft.Extensions.", StringComparison.Ordinal)
-                    || (name.StartsWith("Orleans.", StringComparison.Ordinal) && !name.StartsWith("Orleans.DurableTasks.Analyzers", StringComparison.Ordinal))
+                    || (name.StartsWith("Orleans.", StringComparison.Ordinal) && !name.StartsWith("Orleans.Durable.Analyzers", StringComparison.Ordinal) && !name.StartsWith("Orleans.DurableTasks.Analyzers.Tests", StringComparison.Ordinal))
                     || name is "mscorlib.dll" or "netstandard.dll"))
             .Select(static path => MetadataReference.CreateFromFile(path)),
     ];

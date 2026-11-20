@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.DurableTasks.Abstractions</PackageId>
-    <Title>Microsoft Orleans Durable Task Abstractions</Title>
+    <PackageId>Microsoft.Orleans.Durable.Abstractions</PackageId>
+    <Title>Microsoft Orleans Durable Abstractions</Title>
     <Description>Programming model abstractions for durable asynchronous operations in Microsoft Orleans.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFrameworks>net11.0</TargetFrameworks>
@@ -14,8 +14,6 @@
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
-    <GenAPITargetDirectory>$(SourceRoot)src\api\Orleans.DurableTasks.Abstractions\</GenAPITargetDirectory>
-    <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
@@ -24,16 +22,16 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
     <!-- The host enters covered regions (DurableTaskContext.EnterCoveredRegion, RunInCoveredFlowAsync), which stay internal. -->
-    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks" />
+    <InternalsVisibleTo Include="Orleans.Durable" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Supplies the [Alias] attributes which give persisted types stable wire names. -->
     <ProjectReference Include="..\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj"
+    <ProjectReference Include="..\Orleans.Durable.Analyzers\Orleans.Durable.Analyzers.csproj"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all" />
-    <None Include="..\Orleans.DurableTasks.Analyzers\bin\$(Configuration)\netstandard2.0\Orleans.DurableTasks.Analyzers.dll"
+    <None Include="..\Orleans.Durable.Analyzers\bin\$(Configuration)\netstandard2.0\Orleans.Durable.Analyzers.dll"
           Pack="true"
           PackagePath="analyzers/dotnet/cs"
           Visible="false" />
