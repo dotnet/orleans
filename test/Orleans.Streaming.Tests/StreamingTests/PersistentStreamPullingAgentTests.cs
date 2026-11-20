@@ -86,15 +86,15 @@ namespace UnitTests.StreamingTests
 
             Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
 
-            Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 1));
-            await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+            Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
+            await receiver.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
 
             // Completing registration should resolve the tracked task and clear it.
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
             await registrationTask;
             Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
             Assert.Null(streamData.RegistrationTask);
-            await receiver.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+            await receiver.Received(3).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
         }
 
         [TestSuite("BVT")]
@@ -450,6 +450,92 @@ namespace UnitTests.StreamingTests
                 }
 
                 Assert.Equal(StreamConsumerDataState.Inactive, consumerData.State);
+            }
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_PreservesPendingStreamWhileAnotherStreamProgresses()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var release = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cold = StreamId.Create("cold", Guid.NewGuid());
+            var warm = StreamId.Create("warm", Guid.NewGuid());
+            var coldId = new QualifiedStreamId("provider", cold);
+            var warmId = new QualifiedStreamId("provider", warm);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, cancellationToken).ReturnsForAnyArgs(call =>
+            {
+                if (call.ArgAt<QualifiedStreamId>(0).Equals(coldId))
+                {
+                    entered.TrySetResult();
+                    return release.Task;
+                }
+                return Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>());
+            });
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var coldBatch = new TestBatchContainer(cold, new EventSequenceTokenV2(1));
+            var warmBatch = new TestBatchContainer(warm, new EventSequenceTokenV2(2));
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>([coldBatch]),
+                    Task.FromResult<IList<IBatchContainer>>([warmBatch]),
+                    Task.FromResult<IList<IBatchContainer>>([]));
+            var queueCache = new SimpleQueueCache(100, NullLogger.Instance);
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var clock = new FakeTimeProvider();
+            var options = new StreamPullingAgentOptions { StreamInactivityPeriod = TimeSpan.FromSeconds(10) };
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache, clock, options);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(warmId, warmBatch.SequenceToken, clock.GetUtcNow().UtcDateTime);
+            var warmData = (await accessor.GetPubSubCache())[warmId];
+            var consumer = new RecordingConsumer();
+            var data = warmData.AddConsumer(GuidId.GetGuidId(Guid.NewGuid()), warmId, consumer, null, clock.GetUtcNow().UtcDateTime);
+            data.IsRegistered = true;
+            data.Cursor = queueCache.GetCacheCursor(warm, warmBatch.SequenceToken);
+            Task? registration = null;
+            try
+            {
+                Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1));
+                await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+                registration = (await accessor.GetPubSubCache())[coldId].RegistrationTask;
+                Assert.NotNull(registration);
+                // Cleanup must not retire a stream which still owns its registration pin.
+                clock.Advance(TimeSpan.FromSeconds(11));
+                warmData.RefreshActivity(clock.GetUtcNow().UtcDateTime);
+                Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1));
+                await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+                Assert.False(registration.IsCompleted);
+                Assert.Equal(warmBatch.SequenceToken, Assert.Single(consumer.DeliveredTokens));
+                Assert.True((await accessor.GetPubSubCache()).ContainsKey(coldId));
+                using var cursor = queueCache.GetCacheCursor(cold, coldBatch.SequenceToken);
+                Assert.True(cursor.MoveNext());
+                Assert.Same(coldBatch, cursor.GetCurrent(out _));
+                release.SetResult(new HashSet<PubSubSubscriptionState>());
+                await registration.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+                var coldData = (await accessor.GetPubSubCache())[coldId];
+                var recoveredConsumer = new RecordingConsumer
+                {
+                    OnDelivery = _ => Task.FromResult<StreamHandshakeToken?>(null),
+                };
+                var recovered = coldData.AddConsumer(GuidId.GetGuidId(Guid.NewGuid()), coldId,
+                    recoveredConsumer, null, clock.GetUtcNow().UtcDateTime);
+                recovered.IsRegistered = true;
+                recovered.Cursor = queueCache.GetCacheCursor(cold, coldBatch.SequenceToken);
+                await accessor.RunConsumerCursor(recovered);
+                Assert.Equal(coldBatch.SequenceToken, Assert.Single(recoveredConsumer.DeliveredTokens));
+            }
+            finally
+            {
+                consumer.ReleaseDelivery();
+                release.TrySetResult(new HashSet<PubSubSubscriptionState>());
+                if (registration is not null) await registration.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+                await accessor.Shutdown();
             }
         }
 

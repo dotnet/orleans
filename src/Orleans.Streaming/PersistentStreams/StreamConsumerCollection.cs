@@ -88,6 +88,8 @@ namespace Orleans.Streams
             // 2) All consumer for that stream are currently inactive (that is, all cursors are inactive) - 
             //    meaning there is nothing for those consumers in the adapter cache.
             // 3) Consumer handshakes have completed and their positions are reconciled.
+            // Registration owns a pin cursor until subscriber cursors have been established.
+            if (RegistrationTask is { IsCompleted: false }) return false;
             if (now - lastActivityTime < inactivityPeriod) return false;
             return !queueData.Values.Any(data => data.PendingHandshakes != 0 || data.HasUnresolvedHandshake
                 || data.State.Equals(StreamConsumerDataState.Active));
