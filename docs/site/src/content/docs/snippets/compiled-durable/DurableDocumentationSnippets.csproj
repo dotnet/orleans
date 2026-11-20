@@ -9,4 +9,10 @@
     <OrleansDocumentationTargetFrameworkException>Documents packages which target only net11.0.</OrleansDocumentationTargetFrameworkException>
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\'))</RepositoryRoot>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Messaging\Orleans.Messaging.csproj" />
+  </ItemGroup>
 </Project>

@@ -9,6 +9,18 @@ using Orleans.Runtime;
 
 namespace Documentation.Grains.Journaling;
 
+// <volatile_journal_thresholds>
+internal static class VolatileJournalConfiguration
+{
+    internal static ISiloBuilder Configure(ISiloBuilder silo) =>
+        silo.AddVolatileJournalStorage(options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 100;
+            options.MaxBytesBeforeSnapshot = 1024 * 1024;
+        });
+}
+// </volatile_journal_thresholds>
+
 // <composed_shopping_cart>
 public interface IShoppingCartGrain : IGrainWithStringKey
 {

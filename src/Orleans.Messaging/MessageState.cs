@@ -40,8 +40,8 @@ internal sealed class OutboxMessageState
     public DateTimeOffset? SentAt { get; set; }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
-internal sealed class InboxDeadLetter
+[GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetterRecord")]
+internal sealed class InboxDeadLetterRecord
 {
     [Id(0)]
     public required InboxMessage Message { get; init; }

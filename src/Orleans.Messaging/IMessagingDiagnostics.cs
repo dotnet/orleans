@@ -13,7 +13,7 @@ public interface IMessagingDiagnostics
     /// <summary>
     /// Gets messages which failed during inbox processing.
     /// </summary>
-    IReadOnlyList<DeadLetter> InboxDeadLetters { get; }
+    IReadOnlyList<InboxDeadLetter> InboxDeadLetters { get; }
 
     /// <summary>
     /// Gets messages which could not be delivered from the outbox.
@@ -49,8 +49,8 @@ public interface IMessagingDiagnostics
 /// <summary>
 /// Describes a message which the inbox dead-lettered.
 /// </summary>
-[GenerateSerializer, Alias("Orleans.Messaging.DeadLetter")]
-public sealed class DeadLetter
+[GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
+public sealed class InboxDeadLetter
 {
     /// <summary>
     /// Gets the message.
@@ -119,8 +119,8 @@ public sealed class OutboxDeadLetter
 
 internal sealed class MessagingDiagnostics(Inbox inbox, Outbox outbox) : IMessagingDiagnostics
 {
-    public IReadOnlyList<DeadLetter> InboxDeadLetters =>
-        inbox.DeadLetterState.Values.Select(static entry => new DeadLetter
+    public IReadOnlyList<InboxDeadLetter> InboxDeadLetters =>
+        inbox.DeadLetterState.Values.Select(static entry => new InboxDeadLetter
         {
             Message = entry.Message,
             DeadLetteredAt = entry.DeadLetteredAt,
