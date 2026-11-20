@@ -13,6 +13,11 @@
   <Folder Name="/site/src/content/docs/deployment/snippets/service-fabric/">
     <Project Path="site/src/content/docs/deployment/snippets/service-fabric/ServiceFabricSilo/ServiceFabricSilo.csproj" />
   </Folder>
+  <Folder Name="/site/src/content/docs/diagnostics/" />
+  <Folder Name="/site/src/content/docs/diagnostics/snippets/" />
+  <Folder Name="/site/src/content/docs/diagnostics/snippets/durable-tasks/">
+    <Project Path="site/src/content/docs/diagnostics/snippets/durable-tasks/DurableTaskDiagnostics.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/grains/" />
   <Folder Name="/site/src/content/docs/grains/grain-persistence/" />
   <Folder Name="/site/src/content/docs/grains/grain-persistence/snippets/">

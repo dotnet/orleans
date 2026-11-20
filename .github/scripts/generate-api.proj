@@ -1,7 +1,7 @@
 <Project DefaultTargets="GenerateApi">
   <ItemGroup>
     <ApiProject Include="$(MSBuildThisFileDirectory)..\..\src\**\*.csproj"
-                Exclude="$(MSBuildThisFileDirectory)..\..\src\**\bin\**;$(MSBuildThisFileDirectory)..\..\src\**\obj\**;$(MSBuildThisFileDirectory)..\..\src\Orleans.Analyzers*\**;$(MSBuildThisFileDirectory)..\..\src\Orleans.CodeGenerator*\**" />
+                Exclude="$(MSBuildThisFileDirectory)..\..\src\**\bin\**;$(MSBuildThisFileDirectory)..\..\src\**\obj\**;$(MSBuildThisFileDirectory)..\..\src\Orleans.Analyzers*\**;$(MSBuildThisFileDirectory)..\..\src\*.Analyzers\**;$(MSBuildThisFileDirectory)..\..\src\Orleans.CodeGenerator*\**" />
     <!-- NuGet walks all entry points together, deduplicating their shared dependencies. -->
     <RestoreGraphProjectInputItems Include="@(ApiProject->'%(FullPath)')" />
   </ItemGroup>

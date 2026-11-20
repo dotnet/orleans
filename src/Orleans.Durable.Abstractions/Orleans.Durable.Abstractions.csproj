@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Durable.Abstractions</PackageId>
+    <Title>Microsoft Orleans Durable Abstractions</Title>
+    <Description>Programming model abstractions for durable asynchronous operations in Microsoft Orleans.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
+    <!-- First release: there is no prior package to compare against. Keep within-package validation enabled. -->
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- The host enters covered regions (DurableTaskContext.EnterCoveredRegion, RunInCoveredFlowAsync), which stay internal. -->
+    <InternalsVisibleTo Include="Orleans.Durable" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Supplies the [Alias] attributes which give persisted types stable wire names. -->
+    <ProjectReference Include="..\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Analyzers\Orleans.Durable.Analyzers.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+    <None Include="..\Orleans.Durable.Analyzers\bin\$(Configuration)\netstandard2.0\Orleans.Durable.Analyzers.dll"
+          Pack="true"
+          PackagePath="analyzers/dotnet/cs"
+          Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+  </ItemGroup>
+</Project>
