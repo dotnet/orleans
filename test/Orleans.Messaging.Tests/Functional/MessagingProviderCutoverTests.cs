@@ -5,10 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
@@ -16,7 +16,7 @@ using Orleans.TestingHost;
 using Orleans.Timers;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [Collection(MessagingClusterCollection.Name)]
 [TestSuite("BVT")]

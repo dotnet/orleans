@@ -1,11 +1,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Provides operations for observing and signaling existing durable tasks on grain references.

@@ -1,6 +1,6 @@
 using System.Buffers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class S3ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
 {

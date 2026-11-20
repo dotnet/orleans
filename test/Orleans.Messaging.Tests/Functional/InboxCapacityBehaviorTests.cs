@@ -1,10 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class InboxCapacityCollection : ICollectionFixture<InboxCapacityClusterFixture>

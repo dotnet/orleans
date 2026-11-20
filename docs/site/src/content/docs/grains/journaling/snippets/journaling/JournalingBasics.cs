@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 namespace Orleans.Docs.Snippets.Journaling;
 

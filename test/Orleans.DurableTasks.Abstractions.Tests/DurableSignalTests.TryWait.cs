@@ -1,7 +1,7 @@
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 public partial class DurableSignalTests
 {

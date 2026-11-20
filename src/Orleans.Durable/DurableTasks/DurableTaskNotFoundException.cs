@@ -1,12 +1,12 @@
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Represents an existing durable task identifier whose state is unavailable or has expired.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.DurableTaskNotFoundException")]
+[Alias("Orleans.Durable.Tasks.DurableTaskNotFoundException")]
 public sealed class DurableTaskNotFoundException : Exception
 {
     private DurableTaskNotFoundException()

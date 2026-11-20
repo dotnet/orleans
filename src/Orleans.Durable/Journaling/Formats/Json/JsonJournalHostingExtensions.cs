@@ -3,7 +3,7 @@ using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Orleans.Journaling.Json;
+namespace Orleans.Durable.Journaling.Json;
 
 /// <summary>
 /// Options for configuring JSON Lines-based journaling.
@@ -47,12 +47,12 @@ public sealed class JsonJournalOptions
 }
 
 /// <summary>
-/// Extension methods for configuring the JSON Lines Orleans.Journaling format.
+/// Extension methods for configuring the JSON Lines Orleans.Durable.Journaling format.
 /// </summary>
 public static class JsonJournalHostingExtensions
 {
     /// <summary>
-    /// Configures this silo with the JSON Lines Orleans.Journaling format family.
+    /// Configures this silo with the JSON Lines Orleans.Durable.Journaling format family.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">Optional delegate to configure <see cref="JsonJournalOptions"/>.</param>
@@ -84,7 +84,7 @@ public static class JsonJournalHostingExtensions
     }
 
     /// <summary>
-    /// Configures this silo with the JSON Lines Orleans.Journaling format family and registers source-generated metadata for journaled payload values.
+    /// Configures this silo with the JSON Lines Orleans.Durable.Journaling format family and registers source-generated metadata for journaled payload values.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="typeInfoResolver">The resolver, typically a generated <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> instance.</param>

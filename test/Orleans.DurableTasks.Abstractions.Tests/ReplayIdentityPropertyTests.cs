@@ -1,8 +1,8 @@
 using CsCheck;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Verifies over generated bodies that a replay, which returns recorded effects without running them, assigns every

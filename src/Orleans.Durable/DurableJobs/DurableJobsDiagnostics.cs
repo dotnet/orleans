@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Orleans.Diagnostics;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Helpers for creating Durable Jobs distributed-tracing activities.

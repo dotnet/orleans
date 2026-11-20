@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 internal sealed class DurableMessagingInstruments(OrleansInstruments instruments)
 {

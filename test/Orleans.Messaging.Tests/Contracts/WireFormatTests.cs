@@ -3,7 +3,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 /// <summary>
 /// Pins the serialized bytes of every messaging wire type. Messages cross silos of different versions and persist in

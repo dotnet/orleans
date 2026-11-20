@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using TestExtensions;
 using Xunit;
 
@@ -43,7 +43,7 @@ public class AzureStorageDurableJobsConfigurationTests
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<JsonJournalOptions>>().Value;
 
-        var durableJobsJsonContextType = typeof(DurableJob).Assembly.GetType("Orleans.DurableJobs.DurableJobsJsonContext", throwOnError: true)!;
+        var durableJobsJsonContextType = typeof(DurableJob).Assembly.GetType("Orleans.Durable.Jobs.DurableJobsJsonContext", throwOnError: true)!;
         Assert.Contains(options.SerializerOptions.TypeInfoResolverChain, resolver => durableJobsJsonContextType.IsInstanceOfType(resolver));
     }
 
@@ -73,7 +73,7 @@ public class AzureStorageDurableJobsConfigurationTests
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.Equal("durablejobstest", serviceProvider.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value.TableName);
         var options = serviceProvider.GetRequiredService<IOptions<JsonJournalOptions>>().Value;
-        var contextType = typeof(DurableJob).Assembly.GetType("Orleans.DurableJobs.DurableJobsJsonContext", throwOnError: true)!;
+        var contextType = typeof(DurableJob).Assembly.GetType("Orleans.Durable.Jobs.DurableJobsJsonContext", throwOnError: true)!;
         Assert.Contains(options.SerializerOptions.TypeInfoResolverChain, resolver => contextType.IsInstanceOfType(resolver));
     }
 

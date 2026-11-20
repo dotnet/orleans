@@ -2,7 +2,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using StackExchange.Redis;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class RedisJournalStorageOptionsValidator(
     RedisJournalStorageOptions options,

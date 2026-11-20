@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Identifies one message by an application-supplied <see cref="HierarchicalKey"/>.
@@ -12,7 +12,7 @@ namespace Orleans.Messaging;
 /// The receiver deduplicates messages by this identity, so applications reuse it when retrying a send.
 /// Equality, hashing, parsing, and formatting use the key's canonical escaped path.
 /// </remarks>
-[Immutable, Alias("Orleans.Messaging.MessageId")]
+[Immutable, Alias("Orleans.Durable.Messaging.MessageId")]
 [JsonConverter(typeof(MessageIdJsonConverter))]
 public readonly struct MessageId : ISpanFormattable, IEquatable<MessageId>, IParsable<MessageId>, ISpanParsable<MessageId>
 {

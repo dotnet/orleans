@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>Extensions for encoding and staging typed messages and replies.</summary>
 public static class OutboxExtensions

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal static class JournalFormatServices
 {

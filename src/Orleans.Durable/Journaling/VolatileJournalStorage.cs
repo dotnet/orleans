@@ -3,10 +3,10 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Storage;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Provides shared in-memory journal storage instances identified by journal id.

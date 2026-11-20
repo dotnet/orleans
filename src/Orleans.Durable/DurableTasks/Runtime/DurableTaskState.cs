@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// The persisted state of one durable task.
@@ -32,7 +32,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// </para>
 /// </remarks>
 [GenerateSerializer, SuppressReferenceTracking]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskState")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskState")]
 internal class DurableTaskState : IDurableTaskState
 {
     [NonSerialized]

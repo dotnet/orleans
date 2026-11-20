@@ -1,4 +1,4 @@
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Provides awaiting, identification, scheduling, timeout, and combinator operations for durable task definitions and handles.</summary>
 public static partial class DurableTaskExtensions

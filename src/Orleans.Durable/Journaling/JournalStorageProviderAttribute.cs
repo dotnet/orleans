@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Metadata;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Selects the named journal storage provider used by a grain type's activation-scoped durable state manager.

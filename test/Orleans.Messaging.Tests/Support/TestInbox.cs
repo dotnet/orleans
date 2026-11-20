@@ -1,4 +1,4 @@
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 /// <summary>An <see cref="IInbox"/> which dispatches directly to its registered handlers.</summary>
 internal sealed class TestInbox : IInbox

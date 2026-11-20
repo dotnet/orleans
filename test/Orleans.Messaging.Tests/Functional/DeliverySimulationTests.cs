@@ -1,9 +1,9 @@
 using CsCheck;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Messaging.Tests.Support;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 /// <summary>
 /// Runs generated schedules of sends, delivery faults, crashes, and time against one sender and one receiver, and checks

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>Dispatches each inbox message to the first registered handler which can handle it.</summary>
 internal readonly struct InboxDispatcher

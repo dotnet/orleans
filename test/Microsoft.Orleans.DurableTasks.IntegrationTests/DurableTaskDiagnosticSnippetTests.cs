@@ -1,6 +1,6 @@
 using Documentation.Diagnostics.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 using Xunit;
 

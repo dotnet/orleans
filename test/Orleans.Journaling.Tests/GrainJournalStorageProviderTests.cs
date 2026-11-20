@@ -2,13 +2,13 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestCategory("BVT"), TestSuite("BVT"), TestProvider("None"), TestArea("Journaling")]
 public sealed class GrainJournalStorageProviderTests(JournalCompositionFixture fixture) : IClassFixture<JournalCompositionFixture>

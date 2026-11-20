@@ -1,7 +1,7 @@
 using Orleans.Runtime;
 using StackExchange.Redis;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Options for configuring Redis journal storage.

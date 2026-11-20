@@ -4,7 +4,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
 {

@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Text.Json;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Runtime;
 using Xunit;
 

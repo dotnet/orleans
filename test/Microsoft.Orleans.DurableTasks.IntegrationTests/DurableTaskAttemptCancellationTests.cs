@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
-using Orleans.DurableTasks;
-using Orleans.Journaling;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Xunit;
 

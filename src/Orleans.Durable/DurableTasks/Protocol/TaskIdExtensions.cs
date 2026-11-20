@@ -1,5 +1,5 @@
-using Orleans.DurableTasks;
-using MessagingHierarchicalKey = Orleans.Messaging.HierarchicalKey;
+using Orleans.Durable.Tasks;
+using MessagingHierarchicalKey = Orleans.Durable.Messaging.HierarchicalKey;
 
 namespace Orleans;
 
@@ -8,7 +8,7 @@ namespace Orleans;
 /// </summary>
 /// <remarks>
 /// These extensions enable interoperability between the <see cref="TaskId"/> type from
-/// Orleans.DurableTasks and the <see cref="MessagingHierarchicalKey"/> type from Orleans Messaging.
+/// Orleans.Durable.Tasks and the <see cref="MessagingHierarchicalKey"/> type from Orleans Messaging.
 /// Both types share the same string representation and hierarchical semantics, making conversion
 /// straightforward via string parsing.
 /// </remarks>
@@ -25,7 +25,7 @@ public static class TaskIdExtensions
     /// <example>
     /// <code>
     /// TaskId taskId = TaskId.Parse("workflow/task-123");
-    /// Orleans.Messaging.HierarchicalKey? key = taskId.ToHierarchicalKey();
+    /// Orleans.Durable.Messaging.HierarchicalKey? key = taskId.ToHierarchicalKey();
     /// // key.ToString() == "workflow/task-123"
     /// </code>
     /// </example>
@@ -42,8 +42,8 @@ public static class TaskIdExtensions
     /// </returns>
     /// <example>
     /// <code>
-    /// Orleans.Messaging.HierarchicalKey key =
-    ///     Orleans.Messaging.HierarchicalKey.Parse("workflow/task-123", null);
+    /// Orleans.Durable.Messaging.HierarchicalKey key =
+    ///     Orleans.Durable.Messaging.HierarchicalKey.Parse("workflow/task-123", null);
     /// TaskId taskId = key.ToTaskId();
     /// // taskId.ToString() == "workflow/task-123"
     /// </code>

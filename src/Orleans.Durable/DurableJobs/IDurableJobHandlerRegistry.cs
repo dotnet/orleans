@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Registers framework-owned durable job handlers for a grain activation.

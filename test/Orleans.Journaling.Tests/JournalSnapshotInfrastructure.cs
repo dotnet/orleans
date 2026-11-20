@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Codec-agnostic snapshot formatting helpers used by both the binary and JSONL codec snapshot tests.

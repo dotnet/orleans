@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Represents a list whose mutations are recorded in a journal.

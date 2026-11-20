@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Messaging;
-using Orleans.Messaging.Configuration;
-using Orleans.DurableJobs;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Messaging;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling.Json;
 
 namespace Orleans.Hosting;
 

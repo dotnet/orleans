@@ -2,7 +2,7 @@ using Azure;
 using Azure.Core;
 using Azure.Data.Tables;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Options for configuring the Azure Table journal storage provider.

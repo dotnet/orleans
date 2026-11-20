@@ -1,13 +1,13 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Represents the result of a durable job execution.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobRunResult")]
+[Alias("Orleans.Durable.Jobs.DurableJobRunResult")]
 public sealed class DurableJobRunResult
 {
     /// <summary>

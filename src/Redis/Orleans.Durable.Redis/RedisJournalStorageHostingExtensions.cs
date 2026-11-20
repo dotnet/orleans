@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.Runtime;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Extension methods for configuring Redis journal storage.

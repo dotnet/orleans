@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 
 namespace Orleans.Hosting;
@@ -345,6 +345,6 @@ internal sealed class DurableJobsJournalingConfigurationValidator : IConfigurati
 
     private static OrleansConfigurationException CreateServiceResolutionException<TService>(Exception exception)
         => new(
-            $"DurableJobs requires Orleans.Journaling storage, but service '{typeof(TService).Name}' could not be resolved. Configure named journal storage and select it using UseJournaledDurableJobs(...).",
+            $"DurableJobs requires Orleans.Durable.Journaling storage, but service '{typeof(TService).Name}' could not be resolved. Configure named journal storage and select it using UseJournaledDurableJobs(...).",
             exception);
 }

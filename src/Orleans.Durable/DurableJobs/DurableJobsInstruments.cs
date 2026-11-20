@@ -4,7 +4,7 @@ using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
 {

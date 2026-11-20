@@ -2,12 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Provides extensions for configuring journaling services.

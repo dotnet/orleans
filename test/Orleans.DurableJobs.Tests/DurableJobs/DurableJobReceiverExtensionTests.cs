@@ -9,7 +9,7 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Diagnostics;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Xunit;

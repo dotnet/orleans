@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains;

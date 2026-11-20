@@ -3,10 +3,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
-using Orleans.DurableTasks.Storage;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Tasks.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,10 +14,10 @@ using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
@@ -110,16 +110,16 @@ public sealed class DurableRpcProtocolTests
     {
         var taskId = TaskId.Parse("workflow/child");
 
-        global::Orleans.Messaging.HierarchicalKey? key = taskId.ToHierarchicalKey();
+        global::Orleans.Durable.Messaging.HierarchicalKey? key = taskId.ToHierarchicalKey();
 
         Assert.NotNull(key);
         Assert.Equal("workflow/child", key.Value.ToString());
         Assert.Equal(taskId, key.ToTaskId());
         Assert.Null(TaskId.None.ToHierarchicalKey());
-        Assert.Equal(TaskId.None, ((global::Orleans.Messaging.HierarchicalKey?)null).ToTaskId());
-        Assert.Equal(TaskId.None, ((global::Orleans.Messaging.HierarchicalKey?)default(global::Orleans.Messaging.HierarchicalKey)).ToTaskId());
-        Assert.Equal(taskId, global::Orleans.Messaging.HierarchicalKey.Parse("workflow/child", null).ToTaskId());
-        Assert.Equal(TaskId.None, default(global::Orleans.Messaging.HierarchicalKey).ToTaskId());
+        Assert.Equal(TaskId.None, ((global::Orleans.Durable.Messaging.HierarchicalKey?)null).ToTaskId());
+        Assert.Equal(TaskId.None, ((global::Orleans.Durable.Messaging.HierarchicalKey?)default(global::Orleans.Durable.Messaging.HierarchicalKey)).ToTaskId());
+        Assert.Equal(taskId, global::Orleans.Durable.Messaging.HierarchicalKey.Parse("workflow/child", null).ToTaskId());
+        Assert.Equal(TaskId.None, default(global::Orleans.Durable.Messaging.HierarchicalKey).ToTaskId());
     }
 
     [Fact]

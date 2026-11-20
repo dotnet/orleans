@@ -1,8 +1,8 @@
 using Microsoft.Accordant;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

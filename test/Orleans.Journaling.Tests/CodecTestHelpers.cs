@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 public static class CodecTestHelpers
 {

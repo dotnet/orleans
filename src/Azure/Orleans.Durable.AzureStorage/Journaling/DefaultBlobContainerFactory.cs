@@ -1,6 +1,6 @@
 using Azure.Storage.Blobs;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// A default blob container factory that uses the default container name.

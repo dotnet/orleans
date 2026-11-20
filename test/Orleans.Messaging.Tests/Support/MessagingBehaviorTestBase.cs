@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public abstract class MessagingBehaviorTestBase : IAsyncLifetime
 {

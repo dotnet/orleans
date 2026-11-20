@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// An immutable, ordinal application identity formed from nonempty hierarchical segments.
@@ -15,7 +15,7 @@ namespace Orleans.Messaging;
 /// Parse reads the canonical escaped path. The key wraps its canonical string; equality and hashing use that string. Applications preserve the identity across retries.
 /// Every key is well-formed UTF-16: surrogate characters appear only as high-low pairs, so distinct keys keep distinct serialized forms.
 /// </remarks>
-[Immutable, Alias("Orleans.Messaging.HierarchicalKey")]
+[Immutable, Alias("Orleans.Durable.Messaging.HierarchicalKey")]
 [JsonConverter(typeof(HierarchicalKeyJsonConverter))]
 public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {

@@ -1,10 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Serialization;
 using Orleans.Serialization.TypeSystem;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Serializable types in Orleans.Durable carry aliases, so the type names which the serializer writes to journals and job
@@ -28,9 +28,9 @@ public sealed class DurableTypeIdentityTests
     }
 
     [Theory]
-    [InlineData(typeof(ValueChange<int>), "Orleans.Journaling.ValueChange`1[[int]]")]
-    [InlineData(typeof(JournaledStatePreCommitException), "Orleans.Journaling.JournaledStatePreCommitException")]
-    [InlineData(typeof(DurableJob), "Orleans.DurableJobs.DurableJob")]
+    [InlineData(typeof(ValueChange<int>), "Orleans.Durable.Journaling.ValueChange`1[[int]]")]
+    [InlineData(typeof(JournaledStatePreCommitException), "Orleans.Durable.Journaling.JournaledStatePreCommitException")]
+    [InlineData(typeof(DurableJob), "Orleans.Durable.Jobs.DurableJob")]
     public void FormattedNameIsTheAlias(Type type, string expected)
     {
         var converter = CreateTypeConverter();

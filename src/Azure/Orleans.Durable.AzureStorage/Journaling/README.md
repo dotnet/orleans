@@ -101,7 +101,7 @@ For ad-hoc local development you may register a `BlobServiceClient` from a conne
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Configuration;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using System.Text.Json.Serialization;
 using System;
 using System.Threading.Tasks;
@@ -155,7 +155,7 @@ await host.WaitForShutdownAsync();
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 namespace MyGrainNamespace;
 

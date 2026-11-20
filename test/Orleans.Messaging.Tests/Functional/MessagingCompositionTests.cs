@@ -4,15 +4,15 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Session;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [Collection(MessagingClusterCollection.Name)]
 [TestSuite("BVT")]
@@ -358,7 +358,7 @@ public class MessagingCompositionTests : MessagingBehaviorTestBase
         Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IOutbox));
         Assert.DoesNotContain(services, static descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(IOutbox));
         var extension = Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IGrainExtension));
-        Assert.Equal(typeof(Orleans.DurableJobs.DurableJob).Assembly, Assert.IsAssignableFrom<Type>(extension.ServiceKey).Assembly);
+        Assert.Equal(typeof(Orleans.Durable.Jobs.DurableJob).Assembly, Assert.IsAssignableFrom<Type>(extension.ServiceKey).Assembly);
 
     }
 

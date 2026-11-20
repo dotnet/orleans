@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Calls the host members of <see cref="DurableTaskContext"/>, which hosts reach through derivation, for tests which act as

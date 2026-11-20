@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Applies durable grain RPC messages delivered to the grain's inbox.

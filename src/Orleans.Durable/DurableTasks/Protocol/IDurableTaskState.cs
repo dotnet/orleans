@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 internal interface IDurableTaskState
 {

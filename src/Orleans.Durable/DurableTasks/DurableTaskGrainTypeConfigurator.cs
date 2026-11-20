@@ -1,12 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Storage;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Storage;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Binds the durable task runtime, and messaging, to activations of durable grain types.

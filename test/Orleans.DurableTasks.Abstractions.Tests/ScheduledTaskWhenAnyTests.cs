@@ -1,7 +1,7 @@
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>Verifies that <c>ScheduledTask.WhenAny</c> selects through the host within a durable execution.</summary>
 [TestSuite("BVT")]

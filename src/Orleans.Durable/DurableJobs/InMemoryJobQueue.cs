@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Provides an in-memory priority queue for managing durable jobs based on their due times.

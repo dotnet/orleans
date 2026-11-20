@@ -3,7 +3,7 @@ using Azure.Core;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Options for configuring the Azure Blob journal storage provider.

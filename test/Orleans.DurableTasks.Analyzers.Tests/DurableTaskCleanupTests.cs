@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>Tests the rule and code fix for cleanup which passes the already-canceled token after task cancellation.</summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]

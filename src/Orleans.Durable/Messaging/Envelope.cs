@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>Contains a command identity, payload, subject, optional application headers, and an optional delivery time.</summary>
 /// <remarks>
@@ -11,7 +11,7 @@ namespace Orleans.Messaging;
 /// unchanged afterward. Struct assignment shares these objects; ordinary Orleans deep copying
 /// and deserialization produce independent payload arrays, header dictionaries, and header value arrays.
 /// </remarks>
-[GenerateSerializer, Alias("Orleans.Messaging.Envelope")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.Envelope")]
 public readonly struct Envelope
 {
     /// <summary>Gets the exact application-defined command identity within the receiving inbox.</summary>

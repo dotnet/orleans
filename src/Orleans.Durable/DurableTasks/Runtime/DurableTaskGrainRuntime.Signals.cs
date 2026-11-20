@@ -5,12 +5,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.DurableTasks.Diagnostics;
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks.Diagnostics;
+using Orleans.Durable.Tasks.Protocol;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <remarks>
 /// <para>

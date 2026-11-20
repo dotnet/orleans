@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Provides catalog operations for journal storage instances.

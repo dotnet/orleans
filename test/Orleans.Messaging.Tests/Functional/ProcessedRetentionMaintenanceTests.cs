@@ -1,10 +1,10 @@
-using Orleans.Journaling;
-using Orleans.Messaging.Configuration;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [Collection(MessagingClusterCollection.Name)]
 [TestSuite("BVT")]

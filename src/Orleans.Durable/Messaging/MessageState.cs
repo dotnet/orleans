@@ -1,8 +1,8 @@
 using System;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
-[GenerateSerializer, Alias("Orleans.Messaging.InboxMessageState")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxMessageState")]
 internal sealed class InboxMessageState
 {
     [Id(0)]
@@ -20,7 +20,7 @@ internal sealed class InboxMessageState
     public DateTimeOffset? ExpirationTime { get; set; }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.OutboxMessageState")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxMessageState")]
 internal sealed class OutboxMessageState
 {
     [Id(0)]
@@ -40,7 +40,7 @@ internal sealed class OutboxMessageState
     public DateTimeOffset? SentAt { get; set; }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetterRecord")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxDeadLetterRecord")]
 internal sealed class InboxDeadLetterRecord
 {
     [Id(0)]
@@ -56,7 +56,7 @@ internal sealed class InboxDeadLetterRecord
     public int AttemptCount { get; init; }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.OutboxDeadLetterRecord")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxDeadLetterRecord")]
 internal sealed class OutboxDeadLetterRecord
 {
     [Id(0)]

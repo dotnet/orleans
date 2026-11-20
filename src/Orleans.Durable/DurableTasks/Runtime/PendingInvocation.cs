@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// An invocation which this grain's outbox holds by reference, which the runtime journals until the outbox retires it.
@@ -18,7 +18,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// tree which started it.
 /// </remarks>
 [GenerateSerializer, Immutable]
-[Alias("Orleans.DurableTasks.Runtime.PendingInvocation")]
+[Alias("Orleans.Durable.Tasks.Runtime.PendingInvocation")]
 internal sealed record PendingInvocation(
     [property: Id(0)] GrainId Target,
     [property: Id(1)] byte[] Payload,

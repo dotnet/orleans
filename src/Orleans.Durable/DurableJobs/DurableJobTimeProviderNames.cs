@@ -1,4 +1,4 @@
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Service key used to resolve the durable jobs subsystem's <see cref="System.TimeProvider"/> from keyed dependency

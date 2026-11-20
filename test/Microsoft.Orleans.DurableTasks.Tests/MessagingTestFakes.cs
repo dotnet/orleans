@@ -5,9 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Runtime;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 

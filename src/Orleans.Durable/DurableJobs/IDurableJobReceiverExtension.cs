@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Extension interface for grains that can receive durable job invocations.

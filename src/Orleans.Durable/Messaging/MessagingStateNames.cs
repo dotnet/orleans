@@ -1,4 +1,4 @@
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 internal static class MessagingStateNames
 {

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 internal static class DeadLetterRetention
 {

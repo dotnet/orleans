@@ -3,10 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;

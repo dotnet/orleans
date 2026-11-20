@@ -1,11 +1,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 internal sealed partial class DurableTaskGrainRuntime
 {

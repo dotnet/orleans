@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Creates journaled state managers for journals identified independently of a grain activation.

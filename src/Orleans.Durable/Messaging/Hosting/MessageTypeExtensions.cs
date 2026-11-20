@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Serialization;
 
 namespace Orleans.Hosting;

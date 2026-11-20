@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Storage;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 {

@@ -1,4 +1,4 @@
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>Registers handlers for the messages delivered to a grain's inbox.</summary>
 /// <remarks>

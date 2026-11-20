@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs.Diagnostics;
+namespace Orleans.Durable.Jobs.Diagnostics;
 
 internal static class DurableJobsEvents
 {

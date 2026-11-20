@@ -2,7 +2,7 @@ using System;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Binds an exact message subject to an Orleans payload serializer.

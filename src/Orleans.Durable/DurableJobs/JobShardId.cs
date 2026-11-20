@@ -1,8 +1,8 @@
 using System;
 using System.Globalization;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 internal readonly record struct JobShardId
 {

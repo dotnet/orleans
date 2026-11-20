@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>Tests that each durable task diagnostic links to a documented index entry and page with its severity.</summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]

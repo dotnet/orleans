@@ -3,7 +3,7 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Binary codec for durable dictionary journal entries, preserving the legacy Orleans binary wire format.

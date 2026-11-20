@@ -10,15 +10,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs.Diagnostics;
+using Orleans.Durable.Jobs.Diagnostics;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Storage;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 internal sealed partial class JournaledJobShardManager : JobShardManager
 {

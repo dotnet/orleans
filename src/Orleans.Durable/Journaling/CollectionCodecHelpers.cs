@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal static class CollectionCodecHelpers
 {

@@ -3,8 +3,8 @@ using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 using Orleans.TestingHost;
 
 namespace Documentation.Grains.Journaling.Observation;

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
-namespace Orleans.Journaling.Json;
+namespace Orleans.Durable.Journaling.Json;
 
 /// <summary>
 /// JSON codec for durable log journal entries.

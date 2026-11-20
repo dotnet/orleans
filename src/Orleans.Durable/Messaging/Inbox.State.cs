@@ -6,9 +6,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 internal sealed partial class Inbox
 {
@@ -224,7 +224,7 @@ internal sealed partial class Inbox
 /// Case identifiers follow declaration order and are part of the journal format. In JSON, each case leads with its
 /// <c>kind</c>, which <see cref="InboxCommandClassifier"/> reads to select the case.
 /// </remarks>
-[GenerateSerializer, Alias("Orleans.Messaging.InboxCommand")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand")]
 [JsonUnion(TypeClassifier = typeof(InboxCommandClassifier))]
 internal union InboxCommand(
     InboxCommand.Accept,
@@ -236,7 +236,7 @@ internal union InboxCommand(
     InboxCommand.CleanStop,
     InboxCommand.Resume)
 {
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Accept")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.Accept")]
     internal sealed class Accept(InboxMessage message)
     {
         [Id(0)] public InboxMessage Message { get; } = message;
@@ -245,7 +245,7 @@ internal union InboxCommand(
         public string Kind => "accept";
     }
 
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Retry")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.Retry")]
     internal sealed class Retry(MessageId messageId, InboxMessageState state)
     {
         [Id(0)] public MessageId MessageId { get; } = messageId;
@@ -256,7 +256,7 @@ internal union InboxCommand(
     }
 
     /// <summary>Records a message's processed outcome, replacing any earlier record and dead letter of it.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Complete")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.Complete")]
     internal sealed class Complete(MessageId messageId, DateTimeOffset sentAt, InboxDeadLetterRecord? deadLetter, InboxRejection? rejection)
     {
         [Id(0)] public MessageId MessageId { get; } = messageId;
@@ -268,7 +268,7 @@ internal union InboxCommand(
         public string Kind => "complete";
     }
 
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.RemoveDeadLetters")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.RemoveDeadLetters")]
     internal sealed class RemoveDeadLetters(MessageId[] keys)
     {
         [Id(0)] public MessageId[] Keys { get; } = keys;
@@ -278,7 +278,7 @@ internal union InboxCommand(
     }
 
     /// <summary>Replaces the inbox's state.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Snapshot")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.Snapshot")]
     internal sealed class Snapshot(InboxEntry[] messages, InboxProcessedEntry[] processed, InboxDeadLetterRecord[] deadLetters, DateTimeOffset admissionFloor, bool stoppedCleanly)
     {
         [Id(0)] public InboxEntry[] Messages { get; } = messages;
@@ -291,7 +291,7 @@ internal union InboxCommand(
         public string Kind => "snapshot";
     }
 
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.AdvanceAdmissionFloor")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.AdvanceAdmissionFloor")]
     internal sealed class AdvanceAdmissionFloor(DateTimeOffset floor)
     {
         [Id(0)] public DateTimeOffset Floor { get; } = floor;
@@ -301,7 +301,7 @@ internal union InboxCommand(
     }
 
     /// <summary>Records that an activation stopped with no handler attempt interrupted, so recovery charges none.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.CleanStop")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.CleanStop")]
     internal sealed class CleanStop
     {
         public static CleanStop Instance { get; } = new();
@@ -311,7 +311,7 @@ internal union InboxCommand(
     }
 
     /// <summary>Records that a recovered activation consumed a clean stop, so a later unclean stop is charged.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Resume")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxCommand.Resume")]
     internal sealed class Resume
     {
         public static Resume Instance { get; } = new();
@@ -359,7 +359,7 @@ internal sealed class InboxCommandClassifier : JsonTypeClassifierFactory
     }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.InboxProcessedEntry")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxProcessedEntry")]
 internal sealed class InboxProcessedEntry
 {
     [Id(0)] public MessageId MessageId { get; init; }
@@ -370,14 +370,14 @@ internal sealed class InboxProcessedEntry
 }
 
 /// <summary>The answer which an inbox sink gave when it rejected a message on delivery.</summary>
-[GenerateSerializer, Alias("Orleans.Messaging.InboxRejection")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxRejection")]
 internal sealed class InboxRejection
 {
     [Id(0)] public required string Reason { get; init; }
     [Id(1)] public string? Code { get; init; }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.InboxEntry")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxEntry")]
 internal sealed class InboxEntry
 {
     [Id(0)] public required InboxMessage Message { get; init; }

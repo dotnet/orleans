@@ -6,12 +6,12 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// The grain extension through which other grains exchange durable messages with this grain.
 /// </summary>
-[Alias("Orleans.Messaging.IMessagingExtension")]
+[Alias("Orleans.Durable.Messaging.IMessagingExtension")]
 public interface IMessagingExtension : IGrainExtension
 {
     /// <summary>

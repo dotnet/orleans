@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using Orleans.Runtime;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class JournalingInstruments(OrleansInstruments instruments)
 {

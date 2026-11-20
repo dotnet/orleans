@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
-namespace Orleans.DurableTasks.Analyzers;
+namespace Orleans.Durable.Analyzers;
 
 /// <summary>Reports unnamed durable operations whose generated identifiers can shift between runs and deployments.</summary>
 /// <remarks>

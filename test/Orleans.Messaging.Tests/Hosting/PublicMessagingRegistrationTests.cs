@@ -4,16 +4,16 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using NSubstitute;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Messaging.Configuration;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Hosting;
+namespace Orleans.Durable.Messaging.Tests.Hosting;
 
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -52,7 +52,7 @@ public sealed class PublicMessagingRegistrationTests
 
         // The inbox binds the messaging extension when the activation resolves it; the only keyed grain extension is the durable-jobs receiver.
         var extension = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IGrainExtension));
-        Assert.Equal(typeof(Orleans.DurableJobs.DurableJob).Assembly, Assert.IsAssignableFrom<Type>(extension.ServiceKey).Assembly);
+        Assert.Equal(typeof(Orleans.Durable.Jobs.DurableJob).Assembly, Assert.IsAssignableFrom<Type>(extension.ServiceKey).Assembly);
     }
 
     [Fact]

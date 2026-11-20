@@ -8,7 +8,7 @@ ms.topic: how-to
 # Messaging practical recipes
 
 These compiled examples use ordinary grains which inject
-<xref:Orleans.Messaging.IInbox> or <xref:Orleans.Messaging.IOutbox>, and named
+<xref:Orleans.Durable.Messaging.IInbox> or <xref:Orleans.Durable.Messaging.IOutbox>, and named
 journaled state. Configure
 Journaling and Durable Jobs and call
 <xref:Orleans.Hosting.MessagingExtensions.AddMessaging*> as shown in
@@ -22,9 +22,9 @@ without awaiting. Input which can never become valid is dead-lettered with
 `Fail(reason)` or answered with a typed rejection reply. The inbox persists that
 outcome. Ordinary grain methods await
 their own journal write. Each grain registers typed handlers with
-<xref:Orleans.Messaging.InboxExtensions.Register*> and injects the outbox directly.
+<xref:Orleans.Durable.Messaging.InboxExtensions.Register*> and injects the outbox directly.
 Grains inject the application's `Messages` class, whose
-<xref:Orleans.Messaging.MessageType`1> bindings pair each subject with its body type.
+<xref:Orleans.Durable.Messaging.MessageType`1> bindings pair each subject with its body type.
 
 ## Run the stock-reservation sample
 
@@ -58,7 +58,7 @@ and places the quantity and response destination in `ReserveStock`. The
 record under the envelope's `inventory.reserve.v1` subject.
 
 The inventory registers two typed handlers with
-<xref:Orleans.Messaging.InboxExtensions.Register*>: `inventory.reserve.v1` decodes
+<xref:Orleans.Durable.Messaging.InboxExtensions.Register*>: `inventory.reserve.v1` decodes
 `ReserveStock` for the reservation method, and `inventory.restock.v1` decodes
 `Restock` for the stock-increment method. Each method receives its decoded record
 and the handler context. The grain registers both in
@@ -81,7 +81,7 @@ The original outbox intent delivers the reply
 within its configured delivery policy.
 
 For a nonpositive `Restock` increment, the handler calls
-<xref:Orleans.Messaging.IInboxHandlerContext.Fail*> with a clear reason
+<xref:Orleans.Durable.Messaging.IInboxHandlerContext.Fail*> with a clear reason
 and returns before mutation, because that command can never become valid. A positive
 increment computes the checked new stock value before mutation, then commits that
 update with inbox completion. Checked overflow throws and follows the processing
@@ -107,7 +107,7 @@ reconciliation protocol.
 
 The handler first validates the immutable command. An amount, currency, or response
 destination which can never become valid dead-letters the command with
-<xref:Orleans.Messaging.IInboxHandlerContext.Fail*>, before any provider call. The
+<xref:Orleans.Durable.Messaging.IInboxHandlerContext.Fail*>, before any provider call. The
 provider call precedes shared journaled changes. The asynchronous handler
 passes its token to the gateway, and the method checks cancellation after that
 await before `SendReply` and the final result update. A provider fault throws, so the
@@ -156,7 +156,7 @@ recipient set.
 
 The campaign record and every outgoing intent are captured in the same sender
 journal write. The typed batch
-<xref:Orleans.Messaging.OutboxExtensions.Send*> helper encodes every recipient
+<xref:Orleans.Durable.Messaging.OutboxExtensions.Send*> helper encodes every recipient
 command before staging any, so an encoding failure stages nothing, then stages them
 in order. The campaign record is added after all sends succeed, and a repeated
 submission uses the same recipient command identities and content.

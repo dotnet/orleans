@@ -1,7 +1,7 @@
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Represents the start of a durable task whose invocation the starter's outbox dead-lettered without a confirmed
@@ -22,7 +22,7 @@ namespace Orleans.DurableTasks;
 /// </para>
 /// </remarks>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.DurableTaskDeliveryException")]
+[Alias("Orleans.Durable.Tasks.DurableTaskDeliveryException")]
 public sealed class DurableTaskDeliveryException : Exception
 {
     private DurableTaskDeliveryException()

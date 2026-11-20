@@ -1,10 +1,10 @@
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Starts the executions which a durable grain's activation recovered once the activation has completed, and aborts

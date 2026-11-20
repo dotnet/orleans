@@ -7,10 +7,10 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans.DurableTasks.Analyzers;
+using Orleans.Durable.Analyzers;
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>
 /// Runs the durable task analyzers over source which marks each expected diagnostic as <c>{|ORLEANS0200:text|}</c>, and
@@ -30,8 +30,8 @@ internal static partial class AnalyzerVerifier
         using System.Threading.Tasks;
         using Microsoft.Extensions.Logging;
         using Orleans;
-        using Orleans.DurableTasks;
-        using Orleans.Journaling;
+        using Orleans.Durable.Tasks;
+        using Orleans.Durable.Journaling;
 
         """;
 

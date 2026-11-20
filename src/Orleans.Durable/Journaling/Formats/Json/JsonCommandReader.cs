@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling.Json;
+namespace Orleans.Durable.Journaling.Json;
 
 internal ref struct JsonCommandReader
 {

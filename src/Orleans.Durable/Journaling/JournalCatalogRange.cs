@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal readonly struct JournalCatalogRange
 {

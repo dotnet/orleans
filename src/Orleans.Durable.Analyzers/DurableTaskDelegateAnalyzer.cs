@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
-namespace Orleans.DurableTasks.Analyzers;
+namespace Orleans.Durable.Analyzers;
 
 /// <summary>
 /// Reports delegates which <c>DurableTask.Run</c> and <c>DurableTask.RunInline</c> receive and which the call can't run as

@@ -1,4 +1,4 @@
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Provides outgoing messages whose payload and receiver the application stores in its own journaled state.

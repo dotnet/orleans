@@ -3,7 +3,7 @@ using System.Buffers.Text;
 using System.Text.Json;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling.Json;
+namespace Orleans.Durable.Journaling.Json;
 
 /// <summary>
 /// Encodes journal entries as UTF-8 JSON Lines and replays complete records in order.

@@ -2,12 +2,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Concurrency;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Drives inbox processing and outbox delivery for one activation.

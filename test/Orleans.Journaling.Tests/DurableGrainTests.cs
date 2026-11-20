@@ -1,7 +1,7 @@
 using Orleans.Core.Internal;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Integration tests for DurableGrain functionality in Orleans.

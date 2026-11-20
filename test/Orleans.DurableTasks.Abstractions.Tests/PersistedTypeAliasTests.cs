@@ -1,8 +1,8 @@
 using System.Reflection;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Pins the wire names of the abstraction types which hosts persist, such as recorded responses in a journal, so a rename
@@ -16,24 +16,24 @@ public class PersistedTypeAliasTests
 {
     public static TheoryData<Type, string> PersistedTypes() => new()
     {
-        { typeof(TaskId), "Orleans.DurableTasks.TaskId" },
-        { typeof(DurableTask), "Orleans.DurableTasks.DurableTask" },
-        { typeof(DurableTask<>), "Orleans.DurableTasks.DurableTask`1" },
-        { typeof(DurableTaskStatus), "Orleans.DurableTasks.DurableTaskStatus" },
-        { typeof(DurableTaskResponseKind), "Orleans.DurableTasks.DurableTaskResponseKind" },
-        { typeof(DurableTaskResponse), "Orleans.DurableTasks.DurableTaskResponse" },
-        { typeof(SuccessDurableTaskResponse), "Orleans.DurableTasks.SuccessDurableTaskResponse" },
-        { typeof(DurableTaskResponse<>), "Orleans.DurableTasks.DurableTaskResponse`1" },
-        { typeof(ExceptionDurableTaskResponse), "Orleans.DurableTasks.ExceptionDurableTaskResponse" },
-        { typeof(CanceledDurableTaskResponse), "Orleans.DurableTasks.CanceledDurableTaskResponse" },
-        { typeof(PendingDurableTaskResponse), "Orleans.DurableTasks.PendingDurableTaskResponse" },
-        { typeof(SubscribedDurableTaskResponse), "Orleans.DurableTasks.SubscribedDurableTaskResponse" },
-        { typeof(DurableTaskStartOptions), "Orleans.DurableTasks.DurableTaskStartOptions" },
-        { typeof(PollingOptions), "Orleans.DurableTasks.PollingOptions" },
-        { typeof(DurableTaskAttemptCancellationReason), "Orleans.DurableTasks.DurableTaskAttemptCancellationReason" },
-        { typeof(DurableTaskAbortedException), "Orleans.DurableTasks.DurableTaskAbortedException" },
-        { typeof(DurableTaskAttemptCanceledException), "Orleans.DurableTasks.DurableTaskAttemptCanceledException" },
-        { typeof(DurableTaskVersionException), "Orleans.DurableTasks.DurableTaskVersionException" },
+        { typeof(TaskId), "Orleans.Durable.Tasks.TaskId" },
+        { typeof(DurableTask), "Orleans.Durable.Tasks.DurableTask" },
+        { typeof(DurableTask<>), "Orleans.Durable.Tasks.DurableTask`1" },
+        { typeof(DurableTaskStatus), "Orleans.Durable.Tasks.DurableTaskStatus" },
+        { typeof(DurableTaskResponseKind), "Orleans.Durable.Tasks.DurableTaskResponseKind" },
+        { typeof(DurableTaskResponse), "Orleans.Durable.Tasks.DurableTaskResponse" },
+        { typeof(SuccessDurableTaskResponse), "Orleans.Durable.Tasks.SuccessDurableTaskResponse" },
+        { typeof(DurableTaskResponse<>), "Orleans.Durable.Tasks.DurableTaskResponse`1" },
+        { typeof(ExceptionDurableTaskResponse), "Orleans.Durable.Tasks.ExceptionDurableTaskResponse" },
+        { typeof(CanceledDurableTaskResponse), "Orleans.Durable.Tasks.CanceledDurableTaskResponse" },
+        { typeof(PendingDurableTaskResponse), "Orleans.Durable.Tasks.PendingDurableTaskResponse" },
+        { typeof(SubscribedDurableTaskResponse), "Orleans.Durable.Tasks.SubscribedDurableTaskResponse" },
+        { typeof(DurableTaskStartOptions), "Orleans.Durable.Tasks.DurableTaskStartOptions" },
+        { typeof(PollingOptions), "Orleans.Durable.Tasks.PollingOptions" },
+        { typeof(DurableTaskAttemptCancellationReason), "Orleans.Durable.Tasks.DurableTaskAttemptCancellationReason" },
+        { typeof(DurableTaskAbortedException), "Orleans.Durable.Tasks.DurableTaskAbortedException" },
+        { typeof(DurableTaskAttemptCanceledException), "Orleans.Durable.Tasks.DurableTaskAttemptCanceledException" },
+        { typeof(DurableTaskVersionException), "Orleans.Durable.Tasks.DurableTaskVersionException" },
     };
 
     [Theory]

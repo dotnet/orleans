@@ -1,4 +1,4 @@
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Defines a durable task which a host can start as a root task, outside a durable execution.</summary>
 public interface ISchedulableTask
@@ -102,7 +102,7 @@ public interface IScheduledTaskHandle
 }
 
 /// <summary>Configures a polling operation.</summary>
-[Alias("Orleans.DurableTasks.PollingOptions")]
+[Alias("Orleans.Durable.Tasks.PollingOptions")]
 public readonly struct PollingOptions : IEquatable<PollingOptions>
 {
     private readonly TimeSpan? _pollTimeout;

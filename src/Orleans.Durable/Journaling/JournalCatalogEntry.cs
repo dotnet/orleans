@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// A journal identity and an optional metadata snapshot returned by a catalog.

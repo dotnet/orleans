@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Runtime;
 using Xunit;
 

@@ -3,10 +3,10 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Tests which <c>DurableTask.Run</c> overload each delegate shape binds to, and that delegates which return durable tasks
@@ -101,7 +101,7 @@ public class DurableTaskRunOverloadTests
             using System;
             using System.Threading;
             using System.Threading.Tasks;
-            using Orleans.DurableTasks;
+            using Orleans.Durable.Tasks;
 
             public class C
             {

@@ -1,4 +1,4 @@
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 /// <summary>
 /// A Durable Jobs clock whose current time moves only when a test advances it.

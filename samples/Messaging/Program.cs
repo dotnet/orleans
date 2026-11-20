@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.SetMinimumLevel(LogLevel.Warning);

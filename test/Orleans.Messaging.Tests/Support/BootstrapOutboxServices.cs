@@ -1,10 +1,10 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Messaging.Diagnostics;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Diagnostics;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, IObserver<MessagingEvents.MessagingEvent>, IDisposable
 {

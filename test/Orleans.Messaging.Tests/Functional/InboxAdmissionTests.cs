@@ -1,14 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [Collection(MessagingClusterCollection.Name)]
 [TestSuite("BVT")]

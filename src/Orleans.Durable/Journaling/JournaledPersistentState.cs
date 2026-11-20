@@ -4,7 +4,7 @@ using Orleans.Core;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Serializers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 [DebuggerDisplay("{Value}")]
 internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateMachine, IPersistentStateCommandHandler<T>

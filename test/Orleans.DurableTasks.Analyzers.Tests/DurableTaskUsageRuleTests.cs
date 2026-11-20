@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>Tests the rules for effects, definitions, names, scheduling, cancellation, signals, and logging.</summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]

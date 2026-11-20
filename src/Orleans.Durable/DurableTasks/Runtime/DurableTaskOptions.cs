@@ -9,7 +9,7 @@ public sealed class DurableTaskOptions
     /// <remarks>
     /// Applies to tasks without a grain caller, such as tasks scheduled by clients, and to tasks whose completion message
     /// was dead-lettered, measured from the dead letter. When the period ends, the task is deleted with its execution
-    /// tree: polls report <see cref="Orleans.DurableTasks.DurableTaskNotFoundException"/>, and scheduling the same task
+    /// tree: polls report <see cref="Orleans.Durable.Tasks.DurableTaskNotFoundException"/>, and scheduling the same task
     /// identifier executes it again, so a task identifier deduplicates schedules for this period after completion. The
     /// period is independent of Messaging's <c>DeduplicationWindow</c>: each run of a task identifier has its own
     /// incarnation, which the identities of its messages cover, so a later run's messages are delivered, and replies to an

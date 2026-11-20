@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>Registers typed subject handlers with an <see cref="IInbox"/>.</summary>
 /// <remarks>Stateful overloads store their argument directly and support static delegates.</remarks>

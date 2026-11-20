@@ -1,7 +1,7 @@
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Verifies <c>Race</c>, which cancels and awaits the inputs which lose, and the timeouts which <c>WaitAsync</c> and

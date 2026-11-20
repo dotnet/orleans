@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>Tests that <see cref="DurableTaskLoggerExtensions.ReplaySafe(ILogger)"/> reports each event of a task once.</summary>
 [TestSuite("BVT")]

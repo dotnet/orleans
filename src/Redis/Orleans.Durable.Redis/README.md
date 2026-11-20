@@ -17,7 +17,7 @@ dotnet add package Microsoft.Orleans.Durable.Redis --prerelease
 Configure the silo:
 
 ```csharp
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using StackExchange.Redis;
 
 builder.UseOrleans(siloBuilder =>

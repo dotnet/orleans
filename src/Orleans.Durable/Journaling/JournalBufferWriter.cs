@@ -1,7 +1,7 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Base class for in-memory journal buffers used to assemble a pending journal batch.

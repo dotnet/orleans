@@ -2,11 +2,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Journaling.Tests;
+using Orleans.Durable.Journaling.Tests;
 using Xunit;
-using static Orleans.Journaling.Tests.ObservationTestHelpers;
+using static Orleans.Durable.Journaling.Tests.ObservationTestHelpers;
 
-namespace Orleans.Journaling.Json.Tests;
+namespace Orleans.Durable.Journaling.Json.Tests;
 
 /// <summary>
 /// Tests the JSON durable log codec and observation of JSON-journaled state.

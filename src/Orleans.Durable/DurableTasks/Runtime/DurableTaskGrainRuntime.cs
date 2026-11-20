@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Diagnostics;
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Diagnostics;
+using Orleans.Durable.Tasks.Protocol;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -14,11 +14,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Executes durable tasks for one grain activation.
@@ -36,7 +36,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// </para>
 /// <para>
 /// A delay stages a resume message to its own grain together with its delay state, scheduled with
-/// <see cref="Orleans.Messaging.Envelope.DeliverAt"/> for the delay's due time. The grain's own inbox accepts the message
+/// <see cref="Orleans.Durable.Messaging.Envelope.DeliverAt"/> for the delay's due time. The grain's own inbox accepts the message
 /// in the same journal write as the delay, so the resume is durable whenever the delay is, and the inbox processes it
 /// once it is due. The adapter schedules no Durable Jobs of its own: it registers its wake-up delay with the inbox, which
 /// reports its runnable executions, for which Messaging's wake-up reactivates the grain.
@@ -67,7 +67,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// of a root task ID has its own incarnation, which the identifiers of the messages which name its nodes cover, as
 /// <see cref="CallerScope"/> describes. A cancellation or a signal which arrives before its
 /// invocation is recorded, and the invocation finds it in its tree. The grain admits an invocation until
-/// <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow"/> has elapsed since its sender
+/// <see cref="Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow"/> has elapsed since its sender
 /// first staged it, and dead-letters a later one. A record whose invocation doesn't arrive is deleted after
 /// <see cref="DurableTaskGrainRuntimeShared.EarlyRecordRetention"/>, which covers the skew between the sender's clock and
 /// the grain's.
@@ -3356,7 +3356,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private bool IsRequestRunning(TaskId taskId) => _runningRequests.ContainsKey(taskId);
 
     private static InvalidOperationException CreateUnboundException() => new(
-        "Durable Tasks requires grain activations to derive from Orleans.Journaling.DurableGrain so the runtime binds to the activation's journal and inbox.");
+        "Durable Tasks requires grain activations to derive from Orleans.Durable.Journaling.DurableGrain so the runtime binds to the activation's journal and inbox.");
 
     private void ThrowIfStopping()
     {

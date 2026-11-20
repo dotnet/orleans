@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [GenerateSerializer]
 public sealed record TestDurableGrainState(string Name, int Counter);

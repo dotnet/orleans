@@ -1,6 +1,6 @@
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks.Protocol;
 using Orleans;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 
 [assembly: InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]

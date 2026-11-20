@@ -1,4 +1,4 @@
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Inspects the complete shard namespace of a selected Durable Jobs journal provider.

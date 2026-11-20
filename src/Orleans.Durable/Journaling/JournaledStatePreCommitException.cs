@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Reports a state preparation failure which prevented a journal write.
@@ -8,7 +8,7 @@ namespace Orleans.Journaling;
 /// and explicitly retry persistence, or retire its owner and recover from durable state.
 /// </remarks>
 [GenerateSerializer]
-[Alias("Orleans.Journaling.JournaledStatePreCommitException")]
+[Alias("Orleans.Durable.Journaling.JournaledStatePreCommitException")]
 public sealed class JournaledStatePreCommitException : Exception
 {
     /// <summary>

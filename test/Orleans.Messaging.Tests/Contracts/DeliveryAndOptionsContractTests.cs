@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Messaging.Configuration;
+using Orleans.Durable.Messaging.Configuration;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

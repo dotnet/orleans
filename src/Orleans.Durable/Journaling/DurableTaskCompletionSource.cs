@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Represents a task completion source whose terminal state is recorded in a journal.
@@ -234,7 +234,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 /// Identifies the state of a durable task completion source.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.Journaling.DurableTaskCompletionSourceStatus")]
+[Alias("Orleans.Durable.Journaling.DurableTaskCompletionSourceStatus")]
 public enum DurableTaskCompletionSourceStatus : byte
 {
     /// <summary>
@@ -263,7 +263,7 @@ public enum DurableTaskCompletionSourceStatus : byte
 /// </summary>
 /// <typeparam name="T">The type of the task result.</typeparam>
 [GenerateSerializer, Immutable]
-[Alias("Orleans.Journaling.DurableTaskCompletionSourceState`1")]
+[Alias("Orleans.Durable.Journaling.DurableTaskCompletionSourceState`1")]
 public readonly struct DurableTaskCompletionSourceState<T>
 {
     /// <summary>

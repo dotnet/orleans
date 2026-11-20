@@ -3,12 +3,12 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
-using Orleans.Messaging.Configuration;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Configuration;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Services and settings shared by every messaging activation in the silo.

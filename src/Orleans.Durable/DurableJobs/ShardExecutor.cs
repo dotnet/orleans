@@ -12,7 +12,7 @@ using Orleans.Diagnostics;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Handles the execution of job shards and individual durable jobs.

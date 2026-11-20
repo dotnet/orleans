@@ -5,12 +5,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public sealed class BootstrapProbe
 {

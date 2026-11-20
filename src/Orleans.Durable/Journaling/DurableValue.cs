@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Represents a value whose changes are recorded in a journal.

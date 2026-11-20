@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Xunit;
-using static Orleans.Journaling.Tests.ObservationTestHelpers;
+using static Orleans.Durable.Journaling.Tests.ObservationTestHelpers;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Tests watch streams for durable values and log reads, including delivery after acknowledged writes, recovery,

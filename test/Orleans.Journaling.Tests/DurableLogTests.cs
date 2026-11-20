@@ -1,8 +1,8 @@
 using CsCheck;
 using Xunit;
-using static Orleans.Journaling.Tests.ObservationTestHelpers;
+using static Orleans.Durable.Journaling.Tests.ObservationTestHelpers;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Tests the append-only durable log: sequencing, retention, committed reads, drafts, and recovery.

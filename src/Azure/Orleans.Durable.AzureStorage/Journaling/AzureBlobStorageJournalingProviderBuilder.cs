@@ -1,7 +1,7 @@
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 
 [assembly: RegisterProvider("AzureBlobStorage", "Journaling", "Silo", typeof(AzureBlobStorageJournalingProviderBuilder))]

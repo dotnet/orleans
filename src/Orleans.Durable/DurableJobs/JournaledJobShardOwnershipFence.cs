@@ -1,6 +1,6 @@
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 internal sealed class JournaledJobShardOwnershipFence(IDurableValueCommandCodec<string> codec)
     : IStateMachine, IDurableValueCommandHandler<string>

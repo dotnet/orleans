@@ -6,7 +6,7 @@ using Orleans.Diagnostics;
 using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {

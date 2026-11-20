@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Represents a durable job that will be executed at a specific time.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJob")]
+[Alias("Orleans.Durable.Jobs.DurableJob")]
 public sealed class DurableJob
 {
     /// <summary>

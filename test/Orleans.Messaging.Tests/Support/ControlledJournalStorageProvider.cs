@@ -1,9 +1,9 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Options;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
 {

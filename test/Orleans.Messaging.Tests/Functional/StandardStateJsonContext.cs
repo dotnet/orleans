@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(int))]

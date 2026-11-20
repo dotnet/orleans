@@ -1,4 +1,4 @@
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Exposes the received message and its attempt-scoped terminal outcome.

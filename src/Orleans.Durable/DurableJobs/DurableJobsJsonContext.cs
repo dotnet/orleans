@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 [JsonSerializable(typeof(DurableJob))]
 [JsonSerializable(typeof(DurableJobShardJournalRecord))]

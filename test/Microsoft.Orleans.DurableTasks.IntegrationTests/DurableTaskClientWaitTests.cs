@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;

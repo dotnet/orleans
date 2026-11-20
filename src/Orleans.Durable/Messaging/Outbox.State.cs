@@ -6,9 +6,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 internal sealed partial class Outbox
 {
@@ -111,7 +111,7 @@ internal sealed partial class Outbox
 /// Case identifiers follow declaration order and are part of the journal format. In JSON, each case leads with its
 /// <c>kind</c>, which <see cref="OutboxCommandClassifier"/> reads to select the case.
 /// </remarks>
-[GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxCommand")]
 [JsonUnion(TypeClassifier = typeof(OutboxCommandClassifier))]
 internal union OutboxCommand(
     OutboxCommand.Enqueue,
@@ -122,7 +122,7 @@ internal union OutboxCommand(
     OutboxCommand.Snapshot)
 {
     /// <summary>Stages a message which the outbox journals in full.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand.Enqueue")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxCommand.Enqueue")]
     internal sealed class Enqueue(OutboxMessage message, OutboxMessageState state)
     {
         [Id(0)] public OutboxMessage Message { get; } = message;
@@ -133,7 +133,7 @@ internal union OutboxCommand(
     }
 
     /// <summary>Stages a message which an <see cref="IOutboxMessageSource"/> provides, journaling only its identity.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand.EnqueueReference")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxCommand.EnqueueReference")]
     internal sealed class EnqueueReference(OutboxMessageReference reference, OutboxMessageState state)
     {
         [Id(0)] public OutboxMessageReference Reference { get; } = reference;
@@ -143,7 +143,7 @@ internal union OutboxCommand(
         public string Kind => "enqueueReference";
     }
 
-    [GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand.Retry")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxCommand.Retry")]
     internal sealed class Retry(MessageId messageId, OutboxMessageState state)
     {
         [Id(0)] public MessageId MessageId { get; } = messageId;
@@ -154,7 +154,7 @@ internal union OutboxCommand(
     }
 
     /// <summary>Removes a pending message, recording its dead letter when the outbox dead-lettered it.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand.Retire")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxCommand.Retire")]
     internal sealed class Retire(MessageId messageId, OutboxDeadLetterRecord? deadLetter = null)
     {
         [Id(0)] public MessageId MessageId { get; } = messageId;
@@ -164,7 +164,7 @@ internal union OutboxCommand(
         public string Kind => "retire";
     }
 
-    [GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand.RemoveDeadLetters")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxCommand.RemoveDeadLetters")]
     internal sealed class RemoveDeadLetters(MessageId[] keys)
     {
         [Id(0)] public MessageId[] Keys { get; } = keys;
@@ -174,7 +174,7 @@ internal union OutboxCommand(
     }
 
     /// <summary>Replaces the outbox's state.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.OutboxCommand.Snapshot")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxCommand.Snapshot")]
     internal sealed class Snapshot(OutboxEntry[] messages, OutboxDeadLetterRecord[] deadLetters)
     {
         [Id(0)] public OutboxEntry[] Messages { get; } = messages;
@@ -222,13 +222,13 @@ internal sealed class OutboxCommandClassifier : JsonTypeClassifierFactory
 }
 
 /// <summary>Identifies a message which an <see cref="IOutboxMessageSource"/> provides.</summary>
-[GenerateSerializer, Alias("Orleans.Messaging.OutboxMessageReference")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxMessageReference")]
 internal readonly struct OutboxMessageReference
 {
     [Id(0)] public required MessageId MessageId { get; init; }
 }
 
-[GenerateSerializer, Alias("Orleans.Messaging.OutboxEntry")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxEntry")]
 internal sealed class OutboxEntry
 {
     // Exactly one of Message and Reference is set. A reference entry journals no payload or receiver: its source provides the message.

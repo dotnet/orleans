@@ -1,13 +1,13 @@
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskInvocationMessage")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskInvocationMessage")]
 internal sealed class DurableTaskInvocationMessage
 {
     /// <summary>
@@ -49,7 +49,7 @@ internal sealed class DurableTaskInvocationMessage
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskCompletionMessage")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskCompletionMessage")]
 internal sealed class DurableTaskCompletionMessage
 {
     /// <summary>Gets the sender's task whose terminal result the message carries.</summary>
@@ -71,7 +71,7 @@ internal sealed class DurableTaskCompletionMessage
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskCancellationMessage")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskCancellationMessage")]
 internal sealed class DurableTaskCancellationMessage
 {
     /// <summary>
@@ -109,7 +109,7 @@ internal sealed class DurableTaskCancellationMessage
 /// Resumes a durable delay. The owning grain sends it to itself, scheduled for the delay's due time.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskResumeMessage")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskResumeMessage")]
 internal sealed class DurableTaskResumeMessage
 {
     [Id(0)]
@@ -130,7 +130,7 @@ internal sealed class DurableTaskResumeMessage
 /// Delivers a signal's value to an invoked task, which records the first value for each signal name.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskSignalMessage")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskSignalMessage")]
 internal sealed class DurableTaskSignalMessage
 {
     [Id(0)]

@@ -41,8 +41,8 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -109,7 +109,7 @@ To migrate to JSON, configure `JournaledStateManagerOptions.JournalFormatKey` to
 ## Example - Using durable state
 ```csharp
 using Orleans;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 public interface IShoppingCartGrain : IGrainWithStringKey
 {
@@ -302,7 +302,7 @@ state machine components with caller-supplied dependencies and register them bef
 This helper accepts a caller-owned component and an operation which updates it after recovery:
 
 ```csharp
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 public static class StandaloneJournal
 {

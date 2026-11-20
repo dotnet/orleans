@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 /// <summary>Separates actor job clocks without advancing the background scheduler's clock or timers.</summary>
 internal sealed class IndependentJobClockFixture : FaultInjectionClusterFixture

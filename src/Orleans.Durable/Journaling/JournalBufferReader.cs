@@ -1,6 +1,6 @@
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Provides access to buffered journal data read from storage.

@@ -1,10 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 internal sealed record DurableJobsJournalProvider(
     string Name,

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using StackExchange.Redis;
 using TestExtensions;

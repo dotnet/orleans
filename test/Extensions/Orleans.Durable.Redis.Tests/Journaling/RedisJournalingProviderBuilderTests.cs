@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 using Orleans.Runtime;
 using StackExchange.Redis;

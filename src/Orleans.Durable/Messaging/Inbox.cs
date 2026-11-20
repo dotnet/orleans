@@ -7,12 +7,12 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Journaling;
-using Orleans.Messaging.Configuration;
-using Orleans.Messaging.Diagnostics;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Messaging.Diagnostics;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Accepts, deduplicates, and processes durable incoming messages for one grain.

@@ -1,4 +1,4 @@
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 internal sealed class InboxHandlerContext(InboxMessage message, Inbox.HandlerExecution execution) : IInboxHandlerContext
 {

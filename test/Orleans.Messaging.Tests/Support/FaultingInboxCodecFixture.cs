@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public sealed class FaultingInboxCodecFixture : MessagingClusterFixture
 {

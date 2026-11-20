@@ -17,7 +17,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <inheritdoc/>
 internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>

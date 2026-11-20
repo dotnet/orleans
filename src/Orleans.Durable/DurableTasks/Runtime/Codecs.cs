@@ -1,7 +1,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
@@ -11,7 +11,7 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Activator for <see cref="PendingDurableTaskResponse"/>.
@@ -409,7 +409,7 @@ internal sealed class DurableTaskAbortedExceptionConverter : IConverter<DurableT
 
 /// <remarks>Orleans copies exceptions shallowly, so the surrogate, which holds only a string and an exception, is immutable.</remarks>
 [GenerateSerializer, Immutable]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskAbortedExceptionSurrogate")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskAbortedExceptionSurrogate")]
 internal readonly struct DurableTaskAbortedExceptionSurrogate(string reason, Exception? innerException)
 {
     [Id(0)]
@@ -436,7 +436,7 @@ internal sealed class DurableTaskAttemptCanceledExceptionConverter
 }
 
 [GenerateSerializer, Immutable]
-[Alias("Orleans.DurableTasks.Runtime.DurableTaskAttemptCanceledExceptionSurrogate")]
+[Alias("Orleans.Durable.Tasks.Runtime.DurableTaskAttemptCanceledExceptionSurrogate")]
 internal readonly struct DurableTaskAttemptCanceledExceptionSurrogate(string message, DurableTaskAttemptCancellationReason reason)
 {
     [Id(0)]

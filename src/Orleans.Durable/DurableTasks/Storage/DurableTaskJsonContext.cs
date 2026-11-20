@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
-using Orleans.DurableTasks.Runtime;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Messaging;
 
-namespace Orleans.DurableTasks.Storage;
+namespace Orleans.Durable.Tasks.Storage;
 
 /// <summary>
 /// Source-generated JSON metadata for the task state and pending invocations which the adapter stores in JSON journals,

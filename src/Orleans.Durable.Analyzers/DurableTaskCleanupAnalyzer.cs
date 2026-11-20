@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
-namespace Orleans.DurableTasks.Analyzers;
+namespace Orleans.Durable.Analyzers;
 
 /// <summary>
 /// Reports code which runs only after task cancellation and passes <c>DurableTaskContext.CancellationToken</c>, which

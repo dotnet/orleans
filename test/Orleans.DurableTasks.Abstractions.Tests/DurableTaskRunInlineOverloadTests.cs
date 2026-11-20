@@ -2,10 +2,10 @@ using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Tests that <c>DurableTask.RunInline</c> accepts synchronous effects and rejects asynchronous and durable effects at compile
@@ -111,7 +111,7 @@ public class DurableTaskRunInlineOverloadTests
         var source = $$"""
             using System;
             using System.Threading.Tasks;
-            using Orleans.DurableTasks;
+            using Orleans.Durable.Tasks;
 
             public class C
             {

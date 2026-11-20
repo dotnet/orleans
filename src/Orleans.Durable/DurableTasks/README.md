@@ -6,7 +6,7 @@
 > stabilization.
 
 The durable task runtime in `Microsoft.Orleans.Durable` executes grain interface methods which return
-`Orleans.DurableTasks.DurableTask` over Orleans Messaging. It owns the request
+`Orleans.Durable.Tasks.DurableTask` over Orleans Messaging. It owns the request
 protocol, runtime adapter, storage integration, code-generation mapping,
 diagnostics, cancellation propagation, completion delivery, signals, and durable delays,
 which resume through scheduled inbox messages.

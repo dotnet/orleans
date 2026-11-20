@@ -1,8 +1,8 @@
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Describes how an invoked durable task handled a signal.</summary>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.DurableSignalResult")]
+[Alias("Orleans.Durable.Tasks.DurableSignalResult")]
 public enum DurableSignalResult
 {
     /// <summary>The task recorded the signal's value.</summary>

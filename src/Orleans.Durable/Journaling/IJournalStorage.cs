@@ -1,6 +1,6 @@
 using System.Buffers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Provides journal storage.

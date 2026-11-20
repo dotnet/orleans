@@ -7,12 +7,12 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Messaging.Configuration;
-using Orleans.Messaging.Diagnostics;
-using Orleans.Journaling;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Messaging.Diagnostics;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Delivers journal-acknowledged messages to their receivers' inboxes.

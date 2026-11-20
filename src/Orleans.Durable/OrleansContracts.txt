@@ -10,27 +10,27 @@
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
-interface [GrainInterfaceType("Orleans.DurableJobs.IDurableJobReceiverExtension")] Orleans.DurableJobs.IDurableJobReceiverExtension [Version(0)]
-  703DB2D4: HandleDurableJobAsync(Orleans.DurableJobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableJobs.DurableJobRunResult>
+interface [GrainInterfaceType("Orleans.Durable.Jobs.IDurableJobReceiverExtension")] Orleans.Durable.Jobs.IDurableJobReceiverExtension [Version(0)]
+  71047BC9: HandleDurableJobAsync(Orleans.Durable.Jobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Jobs.DurableJobRunResult>
 
-interface [GrainInterfaceType("Orleans.DurableJobs.ILocalDurableJobManagerSystemTarget")] Orleans.DurableJobs.ILocalDurableJobManagerSystemTarget [Version(0)]
-  4D559F22: CancelAsync(Orleans.DurableJobs.DurableJob, System.Threading.CancellationToken) -> Task<bool>
+interface [GrainInterfaceType("Orleans.Durable.Jobs.ILocalDurableJobManagerSystemTarget")] Orleans.Durable.Jobs.ILocalDurableJobManagerSystemTarget [Version(0)]
+  3C126920: CancelAsync(Orleans.Durable.Jobs.DurableJob, System.Threading.CancellationToken) -> Task<bool>
 
-class [GrainType("localdurablejobmanager")] Orleans.DurableJobs.LocalDurableJobManager
+class [GrainType("localdurablejobmanager")] Orleans.Durable.Jobs.LocalDurableJobManager
 
-interface [GrainInterfaceType("IDurableTaskGrainExtension")] Orleans.DurableTasks.Protocol.IDurableTaskGrainExtension [Version(0)]
-  GetRunningTasksAsync: GetRunningTasksAsync(System.Threading.CancellationToken) -> System.Collections.Generic.IAsyncEnumerable<Orleans.DurableTasks.TaskId>
-  GetTasksAsync: GetTasksAsync(System.Threading.CancellationToken) -> System.Collections.Generic.IAsyncEnumerable<(Orleans.DurableTasks.TaskId, DurableTaskDiagnosticState)>
-  SignalAsync: SignalAsync(Orleans.DurableTasks.TaskId, string, Orleans.DurableTasks.DurableTaskResponse, System.Threading.CancellationToken) -> ValueTask
-  TrySignalAsync: TrySignalAsync(Orleans.DurableTasks.TaskId, string, Orleans.DurableTasks.DurableTaskResponse, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableTasks.DurableSignalResult>
+interface [GrainInterfaceType("Orleans.Durable.Messaging.IMessagingExtension")] Orleans.Durable.Messaging.IMessagingExtension [Version(0)]
+  DeliverAsync: DeliverAsync(Orleans.Durable.Messaging.InboxMessage, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Messaging.DeliveryResult>
 
-# Orleans.DurableTasks.Protocol.IDurableTaskServer
-interface [GrainInterfaceType("IDurableTaskServerGrainExtension")] Orleans.DurableTasks.Protocol.IDurableTaskServer [Version(0)]
-  AbortAsync: AbortAsync(Orleans.DurableTasks.TaskId, string, System.Threading.CancellationToken) -> ValueTask
-  CancelAsync: CancelAsync(Orleans.DurableTasks.TaskId, System.Threading.CancellationToken) -> ValueTask
-  CancelWithReasonAsync: CancelAsync(Orleans.DurableTasks.TaskId, string?, System.Threading.CancellationToken) -> ValueTask
-  ScheduleAsync: ScheduleAsync(Orleans.DurableTasks.TaskId, Orleans.DurableTasks.Protocol.IDurableTaskRequest, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableTasks.DurableTaskResponse>
-  SubscribeOrPollAsync: SubscribeOrPollAsync(Orleans.DurableTasks.TaskId, SubscribeOrPollOptions, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableTasks.DurableTaskResponse>
+interface [GrainInterfaceType("IDurableTaskGrainExtension")] Orleans.Durable.Tasks.Protocol.IDurableTaskGrainExtension [Version(0)]
+  GetRunningTasksAsync: GetRunningTasksAsync(System.Threading.CancellationToken) -> System.Collections.Generic.IAsyncEnumerable<Orleans.Durable.Tasks.TaskId>
+  GetTasksAsync: GetTasksAsync(System.Threading.CancellationToken) -> System.Collections.Generic.IAsyncEnumerable<(Orleans.Durable.Tasks.TaskId, DurableTaskDiagnosticState)>
+  SignalAsync: SignalAsync(Orleans.Durable.Tasks.TaskId, string, Orleans.Durable.Tasks.DurableTaskResponse, System.Threading.CancellationToken) -> ValueTask
+  TrySignalAsync: TrySignalAsync(Orleans.Durable.Tasks.TaskId, string, Orleans.Durable.Tasks.DurableTaskResponse, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Tasks.DurableSignalResult>
 
-interface [GrainInterfaceType("Orleans.Messaging.IMessagingExtension")] Orleans.Messaging.IMessagingExtension [Version(0)]
-  DeliverAsync: DeliverAsync(Orleans.Messaging.InboxMessage, System.Threading.CancellationToken) -> ValueTask<Orleans.Messaging.DeliveryResult>
+# Orleans.Durable.Tasks.Protocol.IDurableTaskServer
+interface [GrainInterfaceType("IDurableTaskServerGrainExtension")] Orleans.Durable.Tasks.Protocol.IDurableTaskServer [Version(0)]
+  AbortAsync: AbortAsync(Orleans.Durable.Tasks.TaskId, string, System.Threading.CancellationToken) -> ValueTask
+  CancelAsync: CancelAsync(Orleans.Durable.Tasks.TaskId, System.Threading.CancellationToken) -> ValueTask
+  CancelWithReasonAsync: CancelAsync(Orleans.Durable.Tasks.TaskId, string?, System.Threading.CancellationToken) -> ValueTask
+  ScheduleAsync: ScheduleAsync(Orleans.Durable.Tasks.TaskId, Orleans.Durable.Tasks.Protocol.IDurableTaskRequest, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Tasks.DurableTaskResponse>
+  SubscribeOrPollAsync: SubscribeOrPollAsync(Orleans.Durable.Tasks.TaskId, SubscribeOrPollOptions, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Tasks.DurableTaskResponse>

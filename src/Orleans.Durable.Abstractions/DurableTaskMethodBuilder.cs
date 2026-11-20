@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Builds compiler-lowered asynchronous methods which return <see cref="DurableTask"/>.</summary>
 [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Compiler method builders are mutable protocol values without an equality contract.")]

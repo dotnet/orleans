@@ -3,7 +3,7 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Reads and writes Orleans binary command values using an isolated serializer session for each value.

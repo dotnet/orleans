@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
-using Orleans.DurableTasks;
-using Orleans.Journaling;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
 
 namespace DurableOrderProcessing.Grains;
 

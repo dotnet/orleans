@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Journaling.Json;
+namespace Orleans.Durable.Journaling.Json;
 
 internal sealed class JsonDurableDictionaryCommandCodecService<TKey, TValue>(IOptions<JsonJournalOptions> options)
     : IDurableDictionaryCommandCodec<TKey, TValue> where TKey : notnull

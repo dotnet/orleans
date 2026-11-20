@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 /// <summary>
 /// The kind of operation which a stored task records, which the runtime sets when it creates the record.
@@ -12,7 +12,7 @@ namespace Orleans.DurableTasks.Protocol;
 /// <see cref="Invocation"/>. JSON journals store the kind by name.
 /// </remarks>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.Protocol.DurableTaskRecordKind")]
+[Alias("Orleans.Durable.Tasks.Protocol.DurableTaskRecordKind")]
 [JsonConverter(typeof(JsonStringEnumConverter<DurableTaskRecordKind>))]
 internal enum DurableTaskRecordKind : byte
 {

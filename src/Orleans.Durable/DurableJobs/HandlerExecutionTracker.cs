@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Tracks a single invocation of <see cref="IDurableJobHandler.ExecuteJobAsync"/>, recording the

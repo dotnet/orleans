@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Runtime.Messaging;
 using Xunit;
 

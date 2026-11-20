@@ -7,17 +7,17 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
-using Orleans.Messaging.Configuration;
-using Orleans.Messaging.Diagnostics;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Messaging.Diagnostics;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 /// <summary>
 /// Outbox sources and inbox sinks keep application-owned payloads as the only journaled copy.

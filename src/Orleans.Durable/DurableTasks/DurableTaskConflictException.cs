@@ -1,6 +1,6 @@
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Represents a schedule of a request under a task identifier which the target grain already associates with a different
@@ -12,7 +12,7 @@ namespace Orleans.DurableTasks;
 /// and the existing task is unchanged.
 /// </remarks>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.DurableTaskConflictException")]
+[Alias("Orleans.Durable.Tasks.DurableTaskConflictException")]
 public sealed class DurableTaskConflictException : InvalidOperationException
 {
     private DurableTaskConflictException()

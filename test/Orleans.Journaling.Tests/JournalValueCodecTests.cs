@@ -8,7 +8,7 @@ using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Tests for the binary durable journal codec implementations.

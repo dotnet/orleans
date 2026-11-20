@@ -1,8 +1,8 @@
 #nullable enable
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Journaling;
-using Orleans.Journaling.Tests;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Tests;
 using StackExchange.Redis;
 using TestExtensions;
 using Xunit;

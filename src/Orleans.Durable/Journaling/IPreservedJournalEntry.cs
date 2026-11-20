@@ -1,6 +1,6 @@
 using System.Buffers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// A format-owned journal entry which can be copied forward without interpreting it.

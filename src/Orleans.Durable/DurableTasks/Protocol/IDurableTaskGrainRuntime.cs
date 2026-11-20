@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 /// <remarks>
 /// The server's operations stage task state and commit it without running grain code, so they interleave with the grain's

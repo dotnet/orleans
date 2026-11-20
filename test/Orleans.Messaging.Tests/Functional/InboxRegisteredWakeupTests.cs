@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 /// <summary>
 /// The inbox's durable wake-up reactivates a grain while a callback registered with <see cref="IInbox.RegisterWakeup"/> reports work.

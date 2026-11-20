@@ -8,15 +8,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Invocation;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 /// <summary>
 /// Represents a durable task request.

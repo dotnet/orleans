@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Executes one attempt of a durable task within a grain activation.

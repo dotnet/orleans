@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
 using Xunit;
 

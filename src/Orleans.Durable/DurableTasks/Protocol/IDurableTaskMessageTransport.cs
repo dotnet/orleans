@@ -1,9 +1,9 @@
 using Orleans.Runtime;
 
-using Orleans.DurableTasks;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Messaging;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 internal interface IDurableTaskMessageTransport
 {

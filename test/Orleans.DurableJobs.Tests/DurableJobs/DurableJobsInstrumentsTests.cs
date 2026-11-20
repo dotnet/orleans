@@ -1,7 +1,7 @@
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Runtime;
 using Xunit;
 

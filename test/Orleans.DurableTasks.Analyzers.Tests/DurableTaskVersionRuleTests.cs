@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>Tests the rule for version checks.</summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]

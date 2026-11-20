@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
-namespace Orleans.DurableTasks.Analyzers;
+namespace Orleans.Durable.Analyzers;
 
 /// <summary>
 /// Reports code in durable task bodies which a replay re-runs with effects or values which differ from the run which

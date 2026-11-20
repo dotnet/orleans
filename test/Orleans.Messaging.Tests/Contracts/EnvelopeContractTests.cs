@@ -5,7 +5,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -182,7 +182,7 @@ public sealed class EnvelopeContractTests
             : new OutboxMessage { Envelope = envelope, ReceiverId = Receiver };
         if (kind.Contains("DeadLetter", StringComparison.Ordinal))
         {
-            var type = typeof(Envelope).Assembly.GetType("Orleans.Messaging." + kind, true)!;
+            var type = typeof(Envelope).Assembly.GetType("Orleans.Durable.Messaging." + kind, true)!;
             var record = Activator.CreateInstance(type)!;
             type.GetProperty("Message")!.SetValue(record, value);
             type.GetProperty("DeadLetteredAt")!.SetValue(record, DateTimeOffset.UnixEpoch);
@@ -244,12 +244,12 @@ public sealed class EnvelopeContractTests
         Assert.Equal(typeof(byte[]), typeof(Envelope).GetProperty("Payload")!.PropertyType);
         Assert.Null(typeof(Envelope).GetCustomAttribute<ImmutableAttribute>());
         Assert.Single(typeof(Envelope).GetCustomAttributes<GenerateSerializerAttribute>());
-        Assert.Equal("Orleans.Messaging.Envelope", typeof(Envelope).GetCustomAttribute<AliasAttribute>()!.Alias);
-        Assert.Equal("Orleans.Messaging.IMessagingExtension", typeof(IMessagingExtension).GetCustomAttribute<AliasAttribute>()!.Alias);
+        Assert.Equal("Orleans.Durable.Messaging.Envelope", typeof(Envelope).GetCustomAttribute<AliasAttribute>()!.Alias);
+        Assert.Equal("Orleans.Durable.Messaging.IMessagingExtension", typeof(IMessagingExtension).GetCustomAttribute<AliasAttribute>()!.Alias);
         Assert.Equal(typeof(DateTimeOffset?), typeof(Envelope).GetProperty("DeliverAt")!.PropertyType);
         Assert.Equal(new[] { "DeliverAt", "Headers", "MessageId", "Payload", "Subject" }, typeof(Envelope).GetProperties().Select(p => p.Name).Order(StringComparer.Ordinal));
-        Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Messaging.PackedEnvelopeHeaders"));
-        Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Messaging.EnvelopeBuilder"));
+        Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Durable.Messaging.PackedEnvelopeHeaders"));
+        Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Durable.Messaging.EnvelopeBuilder"));
         Assert.Equal(typeof(void), typeof(IInboxHandlerContext).GetMethod("Fail")!.ReturnType);
         Assert.Equal(typeof(string), Assert.Single(typeof(IInboxHandlerContext).GetMethod("Fail")!.GetParameters()).ParameterType);
         AssertIds(typeof(DeliveryResult.DeadLettered), ("Reason", 0u), ("Code", 1u));
@@ -399,7 +399,7 @@ public sealed class EnvelopeContractTests
     private static void Validate<T>(T message) => Invoke<object?>("EnvelopeValidation", "Validate", message!);
     private static T Invoke<T>(string type, string method, params object[] args)
     {
-        var helper = typeof(Envelope).Assembly.GetType("Orleans.Messaging." + type, true)!;
+        var helper = typeof(Envelope).Assembly.GetType("Orleans.Durable.Messaging." + type, true)!;
         try { return (T)helper.GetMethod(method, args.Select(a => a.GetType()).ToArray())!.Invoke(null, args)!; }
         catch (TargetInvocationException exception) when (exception.InnerException is { } cause)
         {

@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Manages the lifecycle of job shards for a specific silo.

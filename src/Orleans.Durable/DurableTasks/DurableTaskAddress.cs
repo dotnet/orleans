@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// The address of a durable task which other parties reach: the grain which stores the task and the task's identifier on
@@ -26,7 +26,7 @@ namespace Orleans.DurableTasks;
 /// </para>
 /// </remarks>
 [GenerateSerializer, Immutable]
-[Alias("Orleans.DurableTasks.DurableTaskAddress")]
+[Alias("Orleans.Durable.Tasks.DurableTaskAddress")]
 public readonly record struct DurableTaskAddress(
     [property: Id(0)] GrainId Target,
     [property: Id(1)] TaskId Id) : IDurableTaskReference;

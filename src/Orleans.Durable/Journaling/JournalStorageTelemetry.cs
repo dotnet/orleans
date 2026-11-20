@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class JournalStorageTelemetry
 {

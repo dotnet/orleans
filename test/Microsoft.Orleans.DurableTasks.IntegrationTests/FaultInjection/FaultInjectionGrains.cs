@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
-using Orleans.DurableTasks;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 

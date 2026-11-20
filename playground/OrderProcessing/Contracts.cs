@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Serialization;
 
 namespace OrderProcessing;

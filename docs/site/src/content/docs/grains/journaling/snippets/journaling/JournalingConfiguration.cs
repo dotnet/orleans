@@ -4,8 +4,8 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 
 namespace Orleans.Docs.Snippets.Journaling;
 

@@ -1,16 +1,16 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
-using Orleans.DurableTasks.Storage;
-using Orleans.Messaging;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Tasks.Storage;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
 
@@ -25,7 +25,7 @@ public static class DurableTaskHostingExtensions
         clientBuilder.Configure<TypeManifestOptions>(
             options =>
             {
-                options.AddAllowedAssembly(typeof(Orleans.DurableTasks.DurableTaskResponse).Assembly);
+                options.AddAllowedAssembly(typeof(Orleans.Durable.Tasks.DurableTaskResponse).Assembly);
                 options.AddAllowedAssembly(typeof(DurableTaskRequest).Assembly);
             });
         return clientBuilder;
@@ -34,7 +34,7 @@ public static class DurableTaskHostingExtensions
     /// <summary>Adds the silo-side durable grain RPC runtime over Orleans Messaging.</summary>
     /// <remarks>
     /// Messaging requires Durable Jobs, which wakes grains with pending messages, including scheduled delay resumes.
-    /// Every grain deriving from <see cref="Orleans.Journaling.DurableGrain"/> receives an inbox and an outbox,
+    /// Every grain deriving from <see cref="Orleans.Durable.Journaling.DurableGrain"/> receives an inbox and an outbox,
     /// and binds the runtime during activation setup, before journal recovery, and can inject its
     /// <see cref="IDurableTaskManager"/>. Task state lives in the grain's journal, in any journal format;
     /// this method registers the source-generated JSON metadata which the JSON journal format requires for task state and
@@ -67,7 +67,7 @@ public static class DurableTaskHostingExtensions
         siloBuilder.Configure<TypeManifestOptions>(
             options =>
             {
-                options.AddAllowedAssembly(typeof(Orleans.DurableTasks.DurableTaskResponse).Assembly);
+                options.AddAllowedAssembly(typeof(Orleans.Durable.Tasks.DurableTaskResponse).Assembly);
                 options.AddAllowedAssembly(typeof(DurableTaskRequest).Assembly);
             });
         siloBuilder.Services.AddSingleton<DurableTaskGrainRuntimeShared>();

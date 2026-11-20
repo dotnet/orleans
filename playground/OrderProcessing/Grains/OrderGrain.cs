@@ -1,9 +1,9 @@
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 
 namespace OrderProcessing.Grains;
 

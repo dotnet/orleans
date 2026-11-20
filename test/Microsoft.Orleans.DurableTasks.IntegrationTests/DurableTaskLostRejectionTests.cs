@@ -1,10 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
-using Orleans.DurableTasks;
-using Orleans.Journaling;
-using Orleans.Messaging;
-using Orleans.Messaging.Configuration;
-using Orleans.Messaging.Diagnostics;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Messaging.Diagnostics;
 using Orleans.Runtime;
 using Orleans.TestingHost.Diagnostics;
 using Xunit;

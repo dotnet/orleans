@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public sealed class HandlerProbe
 {

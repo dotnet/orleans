@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 internal sealed partial class DurableJobsStorageInspector(
     DurableJobsJournalProviders providers,

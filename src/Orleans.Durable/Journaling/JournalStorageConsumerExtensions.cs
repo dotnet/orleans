@@ -1,7 +1,7 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Helper methods for reading journal storage data.

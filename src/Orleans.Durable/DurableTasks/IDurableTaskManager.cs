@@ -1,13 +1,13 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Observes and controls the durable tasks of the current durable grain activation, without a grain call.
 /// </summary>
 /// <remarks>
-/// Durable grains, which derive from <see cref="Orleans.Journaling.DurableGrain"/>, resolve the manager from their
+/// Durable grains, which derive from <see cref="Orleans.Durable.Journaling.DurableGrain"/>, resolve the manager from their
 /// activation services, for example
 /// through constructor injection. Each activation has its own manager, whose operations run against that activation's
 /// durable task runtime. Call it from the activation, such as from the grain's methods and durable tasks.

@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Service key used to resolve the journaling subsystem's <see cref="System.TimeProvider"/> from keyed dependency

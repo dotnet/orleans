@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Describes the latest committed value of an <see cref="IDurableValue{T}"/>.
@@ -9,7 +9,7 @@ namespace Orleans.Journaling;
 /// intermediate values.
 /// </remarks>
 [GenerateSerializer]
-[Alias("Orleans.Journaling.ValueChange`1")]
+[Alias("Orleans.Durable.Journaling.ValueChange`1")]
 public readonly record struct ValueChange<T>
 {
     /// <summary>

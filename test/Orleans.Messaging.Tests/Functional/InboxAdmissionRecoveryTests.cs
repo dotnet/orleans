@@ -1,13 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using System.Text.Json;
-using Orleans.Journaling;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 /// <summary>Runs persisted admission boundaries through both supported journal encodings.</summary>
 [Collection(MessagingClusterCollection.Name)]

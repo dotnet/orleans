@@ -5,7 +5,7 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

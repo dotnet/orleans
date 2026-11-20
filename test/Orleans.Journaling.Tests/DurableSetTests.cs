@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Tests for DurableSet, a persistent set implementation that uses Orleans' journaling

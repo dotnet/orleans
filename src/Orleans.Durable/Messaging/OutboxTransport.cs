@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>Calls a receiver's inbox for one outbox delivery attempt.</summary>
 /// <remarks>Tests replace the transport to inject delivery faults.</remarks>

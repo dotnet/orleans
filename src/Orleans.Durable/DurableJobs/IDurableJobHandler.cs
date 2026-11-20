@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Provides contextual information about a durable job execution.
@@ -29,7 +29,7 @@ public interface IJobRunContext
 /// Represents the execution context for a durable job.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.JobRunContext")]
+[Alias("Orleans.Durable.Jobs.JobRunContext")]
 internal class JobRunContext : IJobRunContext
 {
     /// <summary>

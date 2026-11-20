@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Represents a shard of durable jobs that manages a collection of jobs within a specific time range.

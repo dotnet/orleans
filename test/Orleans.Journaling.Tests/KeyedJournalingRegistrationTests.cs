@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Hosting;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
@@ -17,7 +17,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

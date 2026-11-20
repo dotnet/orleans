@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans.Diagnostics;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

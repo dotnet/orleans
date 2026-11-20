@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace UnitTests.GrainInterfaces;
 

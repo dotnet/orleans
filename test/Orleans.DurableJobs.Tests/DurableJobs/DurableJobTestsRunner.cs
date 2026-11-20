@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.TestingHost.Utils;
 using Xunit;
 using UnitTests.GrainInterfaces;

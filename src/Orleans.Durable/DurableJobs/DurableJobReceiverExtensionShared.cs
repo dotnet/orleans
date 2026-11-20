@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Singleton dependencies shared by every <see cref="DurableJobReceiverExtension"/> instance on a silo.

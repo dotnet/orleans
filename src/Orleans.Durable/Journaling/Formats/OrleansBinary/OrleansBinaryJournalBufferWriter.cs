@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
 {

@@ -1,7 +1,7 @@
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Represents the start of a durable task whose grain permanently rejected the invocation for a reason other than a
@@ -15,7 +15,7 @@ namespace Orleans.DurableTasks;
 /// task, and deleted it after its retention, before the late delivery arrived.
 /// </remarks>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.DurableTaskRejectedException")]
+[Alias("Orleans.Durable.Tasks.DurableTaskRejectedException")]
 public sealed class DurableTaskRejectedException : Exception
 {
     private DurableTaskRejectedException()

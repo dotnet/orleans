@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public sealed class MessagingMetricProbe : IDisposable
 {

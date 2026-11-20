@@ -3,10 +3,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks.Protocol;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <remarks>
 /// <para>

@@ -1,8 +1,8 @@
 #nullable enable
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Serialization;
 using Xunit;
 

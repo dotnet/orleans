@@ -305,7 +305,7 @@ shards, including creations which completed after request cancellation.
 #### 1. Implement the IDurableJobHandler Interface
 ```csharp
 using Orleans;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 public interface INotificationGrain : IGrainWithStringKey
 {

@@ -3,7 +3,7 @@ using System.Text.Json;
 using CsCheck;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 /// <summary>
 /// Checks the identity laws on which deduplication relies against an independent model: a key is the list of its

@@ -6,7 +6,7 @@ using System.Text;
 using Orleans.Storage;
 using StackExchange.Redis;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class RedisJournalStorage : IJournalStorage
 {

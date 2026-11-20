@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Orleans.Journaling.Json;
+namespace Orleans.Durable.Journaling.Json;
 
 internal static class JsonCommandWriter
 {

@@ -8,7 +8,7 @@ ms.topic: how-to
 # Durable task recipes
 
 These compiled examples use grains which derive from
-<xref:Orleans.Journaling.DurableGrain> and the contracts from
+<xref:Orleans.Durable.Journaling.DurableGrain> and the contracts from
 [Durable tasks](durable-tasks.md#define-durable-task-methods). Configure Journaling,
 Durable Jobs, and the durable task runtime as shown in
 [Configure the silo and clients](durable-tasks.md#configure-the-silo-and-clients).
@@ -23,7 +23,7 @@ line's result in line order.
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_fan_out" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTask.WhenAll*?displayProperty=nameWithType> schedules
+<xref:Orleans.Durable.Tasks.DurableTask.WhenAll*?displayProperty=nameWithType> schedules
 one reservation per line in one batch, which the order grain commits with one journal
 write, and returns a `bool[]` in input order. It waits for every reservation, including
 after a cancellation request, so the `catch` block runs when no reservation is still
@@ -51,7 +51,7 @@ carrier's request.
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_race" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTask.Race*?displayProperty=nameWithType> schedules the
+<xref:Orleans.Durable.Tasks.DurableTask.Race*?displayProperty=nameWithType> schedules the
 requests as `first-quote/0` and `first-quote/1` and selects the one which completed
 first. The grain stamps each input's result with a durable completion sequence, so a
 replay selects the same winner even when the other request has completed since. `Race`
@@ -67,7 +67,7 @@ Pitfalls:
 - Cancellation is cooperative. A carrier which ignores the request keeps the race
   waiting until its call completes, and the race discards that call's result.
 - To leave the other inputs running, use
-  <xref:Orleans.DurableTasks.DurableTask.WhenAny*?displayProperty=nameWithType>, whose
+  <xref:Orleans.Durable.Tasks.DurableTask.WhenAny*?displayProperty=nameWithType>, whose
   other inputs run until they complete or the runtime deletes the task's execution tree.
 
 **Verify:** while the slower request settles, the shipping grain lists it as
@@ -80,7 +80,7 @@ returns, `first-quote/0` and `first-quote/1` are both terminal.
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_timeout" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTaskExtensions.WaitAsync*?displayProperty=nameWithType>
+<xref:Orleans.Durable.Tasks.DurableTaskExtensions.WaitAsync*?displayProperty=nameWithType>
 races the call, `ground-quote/0`, with a durable delay, `ground-quote/1`. The runtime
 records the delay's due time, so a replay after a deactivation keeps the original
 deadline: the timeout counts from the first run. When the delay elapses first, the call
@@ -90,20 +90,20 @@ outcome. A call which ends canceled throws <xref:System.TimeoutException>, whose
 exception is the call's `OperationCanceledException`; a quote which the carrier returns
 anyway is the result. When the call completes first, `WaitAsync` cancels the delay and
 returns the call's result or throws its failure.
-<xref:Orleans.DurableTasks.DurableTaskExtensions.WaitUntilAsync*> takes an absolute
+<xref:Orleans.Durable.Tasks.DurableTaskExtensions.WaitUntilAsync*> takes an absolute
 deadline instead.
 
 Pitfalls:
 
 - Compute absolute deadlines from
-  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>, so
+  <xref:Orleans.Durable.Tasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>, so
   a replay computes the same deadline.
 - Catch `TimeoutException` to handle the timeout. An `OperationCanceledException`
   reports another cancellation, such as the workflow's own.
 - `Race(...).WaitAsync(timeout).WithId(name)` bounds a whole race, which then runs as the
   child `{name}/0` with its inputs beneath it.
 - For a task which is already scheduled,
-  <xref:Orleans.DurableTasks.ScheduledTask.WaitAsync*?displayProperty=nameWithType> with a
+  <xref:Orleans.Durable.Tasks.ScheduledTask.WaitAsync*?displayProperty=nameWithType> with a
   timeout applies the same rules. Outside a durable task, such as in a client, it
   measures the timeout on the system clock.
 
@@ -120,14 +120,14 @@ and record why the order was canceled.
 The `catch` block in [the fan-out recipe](#fan-out-to-every-line-with-a-named-whenall)
 filters on `IsTaskCancellationRequested`, so it handles the workflow's own task
 cancellation, and passes
-<xref:Orleans.DurableTasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>
+<xref:Orleans.Durable.Tasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>
 to the compensation:
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_compensation" language="csharp":::
 
 Children which a canceled task starts terminate as canceled without running, unless the
 task starts them with
-<xref:Orleans.DurableTasks.DurableTaskExtensions.Shielded*>. The shielded `release`
+<xref:Orleans.Durable.Tasks.DurableTaskExtensions.Shielded*>. The shielded `release`
 combinator shields each of its inputs, so the inputs and the `cancel` effect run to
 completion, and the
 workflow returns an `OrderResult` which records the reason. A reservation which never
@@ -157,16 +157,16 @@ canceled, release exactly the lines whose reservation succeeded.
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_when_all_completed" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTask.WhenAllCompleted*?displayProperty=nameWithType>
+<xref:Orleans.Durable.Tasks.DurableTask.WhenAllCompleted*?displayProperty=nameWithType>
 schedules every input, waits until each is terminal, and returns their handles in input
 order. An input's failure or cancellation leaves the combinator successful, including
 after the workflow's own cancellation request, which reaches the inputs. Each handle has
 observed its outcome, so
-<xref:Orleans.DurableTasks.ScheduledTask`1.TryGetResult*> returns `true` with the result
+<xref:Orleans.Durable.Tasks.ScheduledTask`1.TryGetResult*> returns `true` with the result
 of a reservation which completed successfully, and
-<xref:Orleans.DurableTasks.ScheduledTask.Status>,
-<xref:Orleans.DurableTasks.ScheduledTask.Exception>, and
-<xref:Orleans.DurableTasks.ScheduledTask`1.GetResult*> inspect the others. The workflow
+<xref:Orleans.Durable.Tasks.ScheduledTask.Status>,
+<xref:Orleans.Durable.Tasks.ScheduledTask.Exception>, and
+<xref:Orleans.Durable.Tasks.ScheduledTask`1.GetResult*> inspect the others. The workflow
 releases the held lines with a shielded combinator, so the release also runs when the
 workflow was canceled, then rethrows the cancellation so the task ends as canceled.
 
@@ -177,7 +177,7 @@ Pitfalls:
 - Shield the release whenever the workflow can be canceled while it compensates.
 - `WhenAllCompleted` runs only when awaited inside a durable execution. For handles which
   `ScheduleAll` returned earlier,
-  <xref:Orleans.DurableTasks.ScheduledTask.WhenAllCompleted*?displayProperty=nameWithType>
+  <xref:Orleans.Durable.Tasks.ScheduledTask.WhenAllCompleted*?displayProperty=nameWithType>
   waits the same way.
 
 **Verify:** with one line out of stock, the allocation grain lists `reserve/{i}` with
@@ -191,14 +191,14 @@ arrive, and cancel the remaining requests.
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_when_each" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTask.ScheduleAll*?displayProperty=nameWithType>
+<xref:Orleans.Durable.Tasks.DurableTask.ScheduleAll*?displayProperty=nameWithType>
 schedules the requests as `quotes/0`, `quotes/1`, and so on, and returns their handles.
-<xref:Orleans.DurableTasks.ScheduledTask.WhenEach*?displayProperty=nameWithType> yields
+<xref:Orleans.Durable.Tasks.ScheduledTask.WhenEach*?displayProperty=nameWithType> yields
 each handle once, in completion order, including failed and canceled requests. The
 runtime selects each next handle by the durable completion sequence of its result, so
 every replay yields the same order and runs the same steps, including a replay in which
 more requests have completed. After the loop,
-<xref:Orleans.DurableTasks.ScheduledTask.CancelAsync*?displayProperty=nameWithType>
+<xref:Orleans.Durable.Tasks.ScheduledTask.CancelAsync*?displayProperty=nameWithType>
 cancels each request with a reason; canceling a request which already completed changes
 nothing.
 
@@ -224,7 +224,7 @@ the labels print, then collect the labels.
 
 `ScheduleAll(...).WithId("labels")` commits every label request with one journal write
 and returns their handles without waiting. The `pick` step runs while the labels print.
-<xref:Orleans.DurableTasks.ScheduledTask.WhenAll*?displayProperty=nameWithType> then
+<xref:Orleans.Durable.Tasks.ScheduledTask.WhenAll*?displayProperty=nameWithType> then
 waits for every label and throws the first failure in input order, otherwise the first
 cancellation, so each handle's `GetResult()` returns its label.
 
@@ -245,7 +245,7 @@ complete in any order relative to `pick`.
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_signal" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableSignal`1.TryWaitAsync*> races the signal with a durable
+<xref:Orleans.Durable.Tasks.DurableSignal`1.TryWaitAsync*> races the signal with a durable
 delay to the deadline and returns `(true, decision)` or `(false, default)`. The task
 records the first decision, and every wait and replay returns it. An ordinary grain
 method delivers a decision with `IDurableTaskManager.TrySignalAsync`, which commits with
@@ -257,12 +257,12 @@ the same signal through the grain reference:
 Pitfalls:
 
 - Compute the deadline from
-  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>,
+  <xref:Orleans.Durable.Tasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>,
   so a replay computes the same deadline.
 - Address the invoked task, here the root task which the client scheduled. A local
   child's ID isn't an invoked task, so a signal to it returns `TaskNotFound`.
 - Each name records one value. Use
-  <xref:Orleans.DurableTasks.DurableSignal`1.For*> to derive a name per occurrence of a
+  <xref:Orleans.Durable.Tasks.DurableSignal`1.For*> to derive a name per occurrence of a
   repeated event, such as one per approval round.
 - While the task runs, a decision which arrives after the deadline is recorded, and a
   later `Decided.WaitAsync()` in the same task returns it.
@@ -278,10 +278,10 @@ the notification service or cancel the receipt when the invoice is canceled.
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_detach" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTaskExtensions.Detached*> makes the call an independent
+<xref:Orleans.Durable.Tasks.DurableTaskExtensions.Detached*> makes the call an independent
 root task on the notification grain, named `receipt-{invoiceId}` by
-<xref:Orleans.DurableTasks.DurableTaskExtensions.WithId*>, and
-<xref:Orleans.DurableTasks.ConfiguredDurableTask.Post*> stages it in the invoice grain's
+<xref:Orleans.Durable.Tasks.DurableTaskExtensions.WithId*>, and
+<xref:Orleans.Durable.Tasks.ConfiguredDurableTask.Post*> stages it in the invoice grain's
 outbox. The invocation and its record in the invoice's execution tree commit with the
 invoice's result, so a replay which reaches the record starts nothing. Observers address
 the receipt by its name:
@@ -313,7 +313,7 @@ runtime, without a grain call. `CancelAsync(rootId, reason)` completes once the 
 has committed and propagated; the workflow observes it and decides its outcome, as in
 [the compensation recipe](#compensate-inline-when-the-workflow-is-canceled).
 `AbortAsync(rootId, reason)` commits the workflow and its execution tree as failed with
-<xref:Orleans.DurableTasks.DurableTaskAbortedException>, whose message is the reason, and
+<xref:Orleans.Durable.Tasks.DurableTaskAbortedException>, whose message is the reason, and
 sends an abort to each pending call to another grain. Clients use the task's handle:
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_client_controls" language="csharp":::
@@ -337,7 +337,7 @@ reason as its response. An aborted root reports `Faulted` with
 **Task:** start the order workflow when a buyer checks out, and observe its result.
 
 A durable grain starts the workflow from an ordinary method with
-<xref:Orleans.DurableTasks.ConfiguredDurableTask.Post*>, which stages the invocation in
+<xref:Orleans.Durable.Tasks.ConfiguredDurableTask.Post*>, which stages the invocation in
 its outbox, so the cleared basket and the invocation commit together in the journal write
 which follows:
 
@@ -348,13 +348,13 @@ The workflow is a root task on the order grain, which retains it and its result 
 `GetDurableTask<TResult>` grain-reference extension.
 
 A client schedules the workflow with
-<xref:Orleans.DurableTasks.ConfiguredDurableTask.ScheduleAsync*>, which returns once the
+<xref:Orleans.Durable.Tasks.ConfiguredDurableTask.ScheduleAsync*>, which returns once the
 order grain holds the task, and awaits the returned handle, or reattaches to it later by
 root ID with `GetDurableTask<TResult>`:
 
 :::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_schedule_from_client" language="csharp":::
 
-A <xref:Orleans.DurableTasks.PollingOptions> value with a zero `PollTimeout` returns the
+A <xref:Orleans.Durable.Tasks.PollingOptions> value with a zero `PollTimeout` returns the
 current status at once; a longer timeout waits up to that time for completion. Inside a
 durable task, awaiting the call runs it as a child, and `WithId(name).ScheduleAsync()`
 starts a child and returns its handle to await later.

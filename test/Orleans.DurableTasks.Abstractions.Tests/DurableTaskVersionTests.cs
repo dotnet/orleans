@@ -1,7 +1,7 @@
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>Tests the argument contract of <see cref="DurableTask.GetVersion(string, int, int)"/>.</summary>
 [TestSuite("BVT")]

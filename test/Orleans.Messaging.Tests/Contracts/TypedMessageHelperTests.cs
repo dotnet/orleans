@@ -4,7 +4,7 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Hosting;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
@@ -13,7 +13,7 @@ using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

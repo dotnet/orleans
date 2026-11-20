@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Reads raw journal data from an <see cref="IJournalStorage"/> instance.

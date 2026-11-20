@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Represents a request to schedule a durable job.

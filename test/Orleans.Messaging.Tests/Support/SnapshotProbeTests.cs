@@ -1,7 +1,7 @@
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

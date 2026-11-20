@@ -3,12 +3,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
-using Orleans.Messaging.Configuration;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Messaging.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 internal sealed class DurableTaskGrainRuntimeShared(
     IGrainContextAccessor grainContextAccessor,

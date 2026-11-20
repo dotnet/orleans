@@ -1,9 +1,9 @@
 using System.Runtime.CompilerServices;
 using Orleans.Core.Internal;
 using Orleans.Dashboard;
-using Orleans.DurableTasks;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 using DurableOrderProcessing;
 using DurableOrderProcessing.Grains;
 

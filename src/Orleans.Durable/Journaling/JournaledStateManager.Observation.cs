@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal partial class JournaledStateManager
 {

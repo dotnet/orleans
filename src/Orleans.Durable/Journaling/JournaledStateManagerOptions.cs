@@ -1,6 +1,6 @@
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Options to configure the <see cref="IJournaledStateManager"/>.

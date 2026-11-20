@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using EmptyFiles;
 
-namespace Orleans.Journaling.Json.Tests;
+namespace Orleans.Durable.Journaling.Json.Tests;
 
 internal static class VerifyModuleInitializer
 {

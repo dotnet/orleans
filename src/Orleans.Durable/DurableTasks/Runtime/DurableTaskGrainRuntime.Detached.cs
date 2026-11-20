@@ -5,11 +5,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <remarks>
 /// <para>

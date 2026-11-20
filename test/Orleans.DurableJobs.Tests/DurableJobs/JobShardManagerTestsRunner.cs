@@ -1,11 +1,11 @@
 #nullable enable
 
 using System.Buffers;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using TestExtensions;
 using Xunit;
 
-namespace Orleans.DurableJobs.Tests;
+namespace Orleans.Durable.Jobs.Tests;
 
 [TestSuite("BVT")]
 [TestCategory("BVT")]

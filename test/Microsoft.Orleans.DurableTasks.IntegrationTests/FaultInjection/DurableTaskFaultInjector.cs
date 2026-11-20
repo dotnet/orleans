@@ -1,12 +1,12 @@
 using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.DurableJobs;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 

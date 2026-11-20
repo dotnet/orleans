@@ -1,6 +1,6 @@
 using System;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Describes how an attempt diverged from its execution's record: it requested another operation under a recorded

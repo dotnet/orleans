@@ -5,7 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Diagnostics;
+namespace Orleans.Durable.Tasks.Diagnostics;
 
 /// <summary>
 /// Provides the diagnostic listener and event payload types for the durable task runtime of grains.

@@ -2,7 +2,7 @@ using Azure.Core;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 
 [assembly: RegisterProvider("AzureTableStorage", "Journaling", "Silo", typeof(AzureTableStorageJournalingProviderBuilder))]

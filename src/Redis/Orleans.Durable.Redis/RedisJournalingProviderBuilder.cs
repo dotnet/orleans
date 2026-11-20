@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 using StackExchange.Redis;
 

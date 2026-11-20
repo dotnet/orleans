@@ -3,7 +3,7 @@ using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Options for configuring the Amazon S3 journal storage provider.

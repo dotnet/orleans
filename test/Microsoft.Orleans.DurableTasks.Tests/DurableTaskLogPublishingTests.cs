@@ -1,7 +1,7 @@
 using System.Threading.Channels;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.Journaling;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Journaling;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;

@@ -4,7 +4,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

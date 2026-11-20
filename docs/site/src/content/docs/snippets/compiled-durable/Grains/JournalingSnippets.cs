@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Metadata;
 using Orleans.Runtime;
 

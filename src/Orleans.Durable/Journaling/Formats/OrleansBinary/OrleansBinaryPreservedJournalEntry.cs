@@ -1,7 +1,7 @@
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class OrleansBinaryPreservedJournalEntry : IPreservedJournalEntry
 {

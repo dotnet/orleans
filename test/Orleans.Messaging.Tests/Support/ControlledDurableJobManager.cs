@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public sealed class DurableJobManagerProbe
 {

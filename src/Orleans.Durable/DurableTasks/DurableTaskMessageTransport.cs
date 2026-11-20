@@ -3,12 +3,12 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Stages durable grain RPC messages, including delay resumes, through the grain's outbox.

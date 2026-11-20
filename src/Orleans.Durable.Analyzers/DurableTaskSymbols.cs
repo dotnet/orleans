@@ -6,13 +6,13 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
-namespace Orleans.DurableTasks.Analyzers;
+namespace Orleans.Durable.Analyzers;
 
 /// <summary>Resolves the durable task, grain state, and platform symbols which the rules inspect, by metadata name.</summary>
 /// <remarks>Matching by name keeps the analyzers independent of the abstractions assembly's version.</remarks>
 internal sealed class DurableTaskSymbols
 {
-    private const string DurableTasksNamespace = "Orleans.DurableTasks";
+    private const string DurableTasksNamespace = "Orleans.Durable.Tasks";
 
     private readonly ImmutableArray<INamedTypeSymbol> _grainStateTypes;
     private readonly INamedTypeSymbol? _durableValue;
@@ -21,8 +21,8 @@ internal sealed class DurableTaskSymbols
     private DurableTaskSymbols(Compilation compilation, INamedTypeSymbol durableTask)
     {
         DurableTask = durableTask;
-        DurableSignal = compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableSignal`1");
-        DurableVersion = compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableVersion");
+        DurableSignal = compilation.GetTypeByMetadataName("Orleans.Durable.Tasks.DurableSignal`1");
+        DurableVersion = compilation.GetTypeByMetadataName("Orleans.Durable.Tasks.DurableVersion");
         GrainBase = compilation.GetTypeByMetadataName("Orleans.IGrainBase");
         Task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
         Thread = compilation.GetTypeByMetadataName("System.Threading.Thread");
@@ -36,22 +36,22 @@ internal sealed class DurableTaskSymbols
         LoggerMessageAttribute = compilation.GetTypeByMetadataName("Microsoft.Extensions.Logging.LoggerMessageAttribute");
         TimerTypes = Resolve(compilation, "System.Threading.Timer", "System.Timers.Timer", "System.Threading.PeriodicTimer");
 
-        var context = compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableTaskContext");
+        var context = compilation.GetTypeByMetadataName("Orleans.Durable.Tasks.DurableTaskContext");
         IsTaskCancellationRequested = GetProperty(context, "IsTaskCancellationRequested");
         ContextCancellationToken = GetProperty(context, "CancellationToken");
 
         var stateTypes = Resolve(
             compilation,
-            "Orleans.Journaling.IDurableValue`1",
-            "Orleans.Journaling.IDurableDictionary`2",
-            "Orleans.Journaling.IDurableList`1",
-            "Orleans.Journaling.IDurableQueue`1",
-            "Orleans.Journaling.IDurableSet`1",
-            "Orleans.Journaling.IDurableTaskCompletionSource`1",
-            "Orleans.Journaling.IDurableLog`1",
+            "Orleans.Durable.Journaling.IDurableValue`1",
+            "Orleans.Durable.Journaling.IDurableDictionary`2",
+            "Orleans.Durable.Journaling.IDurableList`1",
+            "Orleans.Durable.Journaling.IDurableQueue`1",
+            "Orleans.Durable.Journaling.IDurableSet`1",
+            "Orleans.Durable.Journaling.IDurableTaskCompletionSource`1",
+            "Orleans.Durable.Journaling.IDurableLog`1",
             "Orleans.Runtime.IPersistentState`1");
         _grainStateTypes = stateTypes;
-        _durableValue = compilation.GetTypeByMetadataName("Orleans.Journaling.IDurableValue`1");
+        _durableValue = compilation.GetTypeByMetadataName("Orleans.Durable.Journaling.IDurableValue`1");
         _persistentState = compilation.GetTypeByMetadataName("Orleans.Runtime.IPersistentState`1");
         NonDeterministicTypes = Resolve(
             compilation,
@@ -107,7 +107,7 @@ internal sealed class DurableTaskSymbols
 
     /// <summary>Returns the symbols for a compilation which references the durable task abstractions, or null.</summary>
     public static DurableTaskSymbols? Create(Compilation compilation) =>
-        compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableTask") is { } durableTask
+        compilation.GetTypeByMetadataName("Orleans.Durable.Tasks.DurableTask") is { } durableTask
             ? new DurableTaskSymbols(compilation, durableTask)
             : null;
 

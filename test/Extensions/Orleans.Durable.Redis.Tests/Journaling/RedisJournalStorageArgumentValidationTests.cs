@@ -1,4 +1,4 @@
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Xunit;
 
 namespace Tester.Redis.Journaling;

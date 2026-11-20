@@ -1,15 +1,15 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public interface IMessagingTestGrain : IGrainWithGuidKey
 {

@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Diagnostics;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Diagnostics;
+using Orleans.Durable.Messaging;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;

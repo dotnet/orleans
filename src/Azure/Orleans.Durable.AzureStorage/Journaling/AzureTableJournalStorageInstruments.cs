@@ -2,7 +2,7 @@ using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed class AzureTableJournalStorageInstruments(OrleansInstruments instruments)
 {

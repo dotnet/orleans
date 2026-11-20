@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// Defines the replay, snapshot, and acknowledgement protocol for a journal-backed state machine.

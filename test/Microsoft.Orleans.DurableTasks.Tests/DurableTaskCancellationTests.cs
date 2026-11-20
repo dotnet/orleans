@@ -1,9 +1,9 @@
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;

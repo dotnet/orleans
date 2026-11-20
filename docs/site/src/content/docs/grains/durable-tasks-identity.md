@@ -8,7 +8,7 @@ ms.topic: reference
 # Durable task identity and references
 
 Every durable task is identified by the grain which hosts it and a hierarchical
-<xref:Orleans.DurableTasks.TaskId>. Identity is how a replay finds each recorded
+<xref:Orleans.Durable.Tasks.TaskId>. Identity is how a replay finds each recorded
 operation, how a retried start reaches the same task, how a callee distinguishes its
 callers, and how other parties observe, cancel, and signal a task. This page lists every
 kind of ID which the runtime constructs, where each one is visible, which changes
@@ -232,7 +232,7 @@ as `archive-{reportId}`, and keep them stable across deployments.
 
 ### Store and send addresses
 
-A <xref:Orleans.DurableTasks.DurableTaskAddress> is the value which names a task elsewhere:
+A <xref:Orleans.Durable.Tasks.DurableTaskAddress> is the value which names a task elsewhere:
 its `Target` grain and its task `Id`. Orleans serializes it in grain calls and journaled
 state, and System.Text.Json writes it as `{"Target":"report/q3","Id":"publish-q3"}` in
 JSON journals and HTTP payloads. A `TaskId` on its own serializes as its escaped path.

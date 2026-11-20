@@ -1,10 +1,10 @@
 using System;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>An outgoing command with destination routing separate from its common envelope.</summary>
-[GenerateSerializer, Alias("Orleans.Messaging.OutboxMessage")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxMessage")]
 public readonly struct OutboxMessage
 {
     /// <summary>Gets the command identity, payload, and application metadata.</summary>

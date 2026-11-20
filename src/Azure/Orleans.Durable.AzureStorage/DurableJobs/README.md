@@ -198,7 +198,7 @@ builder.UseOrleans(siloBuilder =>
 ### Email Scheduling with Cancellation
 ```csharp
 using Orleans;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 public interface IEmailGrain : IGrainWithStringKey
 {
@@ -551,8 +551,8 @@ upload behavior.
 
 ### Enable Logging
 ```csharp
-builder.Logging.AddFilter("Orleans.DurableJobs", LogLevel.Information);
-builder.Logging.AddFilter("Orleans.DurableJobs.AzureStorage", LogLevel.Information);
+builder.Logging.AddFilter("Orleans.Durable.Jobs", LogLevel.Information);
+builder.Logging.AddFilter("Orleans.Durable.Jobs.AzureStorage", LogLevel.Information);
 ```
 
 ### Key Metrics to Monitor

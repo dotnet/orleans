@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public interface INamedFactoryMessagingGrain : IGrainWithGuidKey
 {

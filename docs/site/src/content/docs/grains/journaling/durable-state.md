@@ -11,21 +11,21 @@ Install the pre-release `Microsoft.Orleans.Durable` package in the silo project.
 
 ## Define a durable grain
 
-Inject <xref:Orleans.Journaling.IDurableStateManager> into an ordinary <xref:Orleans.Grain> and declare named state components during construction. The manager creates each component once and Orleans recovers the grain's state before application methods run:
+Inject <xref:Orleans.Durable.Journaling.IDurableStateManager> into an ordinary <xref:Orleans.Grain> and declare named state components during construction. The manager creates each component once and Orleans recovers the grain's state before application methods run:
 
 :::code language="csharp" source="../../snippets/compiled-durable/Grains/JournalingSnippets.cs" id="composed_shopping_cart":::
 
 The standard manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>, before resolution returns. Declare durable state components during construction or synchronous activation setup. Recovery at <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> finishes before <xref:Orleans.Grain.OnActivateAsync*> and request processing. The same composition works with an application-owned grain base class.
 
-The dictionary mutation is immediately visible to the current activation. Awaiting <xref:Orleans.Journaling.IDurableStateManager.WriteStateAsync*> establishes the durability point for pending mutations to the grain's state. Accept a <xref:System.Threading.CancellationToken> on grain operations and flow it through state-manager calls so cancellation follows the caller's operation lifetime.
+The dictionary mutation is immediately visible to the current activation. Awaiting <xref:Orleans.Durable.Journaling.IDurableStateManager.WriteStateAsync*> establishes the durability point for pending mutations to the grain's state. Accept a <xref:System.Threading.CancellationToken> on grain operations and flow it through state-manager calls so cancellation follows the caller's operation lifetime.
 
 The composition example is compiled against repository source so it exercises constructor-owned lifecycle enrollment.
 
-<xref:Orleans.Journaling.IDurableStateManager.GetOrAddState*> accepts an application contract, such as `IDurableDictionary<string, int>`. A registered factory supplies the implementation. The <xref:Orleans.Journaling.DurableStateManagerExtensions> helpers provide the same access with discoverable names.
+<xref:Orleans.Durable.Journaling.IDurableStateManager.GetOrAddState*> accepts an application contract, such as `IDurableDictionary<string, int>`. A registered factory supplies the implementation. The <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions> helpers provide the same access with discoverable names.
 
 ### Use keyed injection and the convenience base class
 
-<xref:Orleans.Journaling.DurableGrain> supplies a <xref:Orleans.Journaling.DurableGrain.StateManager> property typed as `IDurableStateManager` and a protected <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*> forwarding helper. Inject a state component with <xref:Microsoft.Extensions.DependencyInjection.FromKeyedServicesAttribute> when its name is fixed:
+<xref:Orleans.Durable.Journaling.DurableGrain> supplies a <xref:Orleans.Durable.Journaling.DurableGrain.StateManager> property typed as `IDurableStateManager` and a protected <xref:Orleans.Durable.Journaling.DurableGrain.WriteStateAsync*> forwarding helper. Inject a state component with <xref:Microsoft.Extensions.DependencyInjection.FromKeyedServicesAttribute> when its name is fixed:
 
 :::code language="csharp" source="./snippets/journaling/JournalingBasics.cs" id="keyed_durable_counter":::
 
@@ -35,20 +35,20 @@ Keyed injection of `IDurableValue<int>` with the key `"count"` and `stateManager
 
 | State type | Setup-time helper | In-memory API | Journaled operations |
 | --- | --- | --- | --- |
-| <xref:Orleans.Journaling.IDurableValue`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddValue*> | One mutable value | Set |
-| <xref:Orleans.Journaling.IDurableDictionary`2> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddDictionary*> | <xref:System.Collections.Generic.IDictionary`2> | Set, remove, clear, snapshot |
-| <xref:Orleans.Journaling.IDurableList`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddList*> | <xref:System.Collections.Generic.IList`1> plus `AddRange` | Add, insert, set, remove, clear, snapshot |
-| <xref:Orleans.Journaling.IDurableQueue`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddQueue*> | Queue operations | Enqueue, dequeue, clear, snapshot |
-| <xref:Orleans.Journaling.IDurableSet`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddSet*> | <xref:System.Collections.Generic.ISet`1> | Add, remove, clear, snapshot |
-| <xref:Orleans.Journaling.IDurableLog`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddLog*> | Append-only entries addressed by epoch and sequence number, reads, and drafts | Append, draft commit, trim, clear, seal, snapshot |
-| <xref:Orleans.Journaling.IDurableTaskCompletionSource`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddTaskCompletionSource*> | Durable task completion | Complete, fault, or cancel |
-| <xref:Orleans.Runtime.IPersistentState`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddPersistentState*> | Record-style state | Set or clear a versioned state value |
+| <xref:Orleans.Durable.Journaling.IDurableValue`1> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddValue*> | One mutable value | Set |
+| <xref:Orleans.Durable.Journaling.IDurableDictionary`2> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddDictionary*> | <xref:System.Collections.Generic.IDictionary`2> | Set, remove, clear, snapshot |
+| <xref:Orleans.Durable.Journaling.IDurableList`1> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddList*> | <xref:System.Collections.Generic.IList`1> plus `AddRange` | Add, insert, set, remove, clear, snapshot |
+| <xref:Orleans.Durable.Journaling.IDurableQueue`1> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddQueue*> | Queue operations | Enqueue, dequeue, clear, snapshot |
+| <xref:Orleans.Durable.Journaling.IDurableSet`1> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddSet*> | <xref:System.Collections.Generic.ISet`1> | Add, remove, clear, snapshot |
+| <xref:Orleans.Durable.Journaling.IDurableLog`1> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddLog*> | Append-only entries addressed by epoch and sequence number, reads, and drafts | Append, draft commit, trim, clear, seal, snapshot |
+| <xref:Orleans.Durable.Journaling.IDurableTaskCompletionSource`1> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddTaskCompletionSource*> | Durable task completion | Complete, fault, or cancel |
+| <xref:Orleans.Runtime.IPersistentState`1> | <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddPersistentState*> | Record-style state | Set or clear a versioned state value |
 
 All named state components registered with a manager share its pending journal and write acknowledgement boundary. A caller's write can include changes staged by interleaved callers. Prepare fallible work before staging mutations and await `WriteStateAsync` before returning success. Cancelling the caller's wait leaves an already queued write running to its storage outcome. A failed journal operation fences the manager; a fresh activation recovers the durable outcome. See [Runtime behavior and consistency](runtime-behavior.md) for failure handling and safe staging.
 
 Coordination with another grain or an external service requires an application protocol such as idempotency, an inbox, or an outbox.
 
-An <xref:Orleans.Journaling.IDurableTaskCompletionSource`1> changes status in memory when `TrySetResult`, `TrySetException`, or `TrySetCanceled` succeeds. Its `Task` completes after a write acknowledges that status or recovery replays it, allowing waiters to observe a durable completion.
+An <xref:Orleans.Durable.Journaling.IDurableTaskCompletionSource`1> changes status in memory when `TrySetResult`, `TrySetException`, or `TrySetCanceled` succeeds. Its `Task` completes after a write acknowledges that status or recovery replays it, allowing waiters to observe a durable completion.
 
 To stream changes to callers, or to stream volatile drafts from a durable log, see [Observe state and stream drafts](observe-state.md).
 
@@ -64,7 +64,7 @@ The name supplied to the manager or keyed service identifies a durable state com
 
 Names use ordinal comparison. Repeated requests for a name and compatible application contract return the same instance. An incompatible contract or closed generic type for that name fails immediately. An unsupported application contract produces an explicit factory-registration error.
 
-Declare all state components during construction or synchronous activation setup, before initialization begins. Use recovered state after initialization succeeds. Later `GetOrAddState` calls resolve existing components; a missing name fails immediately without changing the registry. Use <xref:Orleans.Journaling.IDurableStateManager.TryGetState*> for lookup without creation. Put runtime-varying keys inside a declared durable dictionary rather than creating a new named component for each key.
+Declare all state components during construction or synchronous activation setup, before initialization begins. Use recovered state after initialization succeeds. Later `GetOrAddState` calls resolve existing components; a missing name fails immediately without changing the registry. Use <xref:Orleans.Durable.Journaling.IDurableStateManager.TryGetState*> for lookup without creation. Put runtime-varying keys inside a declared durable dictionary rather than creating a new named component for each key.
 
 ## Compose an activation-scoped feature
 
@@ -88,7 +88,7 @@ Use a unique keyed service name exactly as you would for another durable state c
 
 ## Implement a custom journaled state
 
-Define a grain-facing state contract and an implementation of that contract and <xref:Orleans.Journaling.IStateMachine>. Register the mapping on <xref:Microsoft.Extensions.DependencyInjection.IServiceCollection> with <xref:Orleans.Journaling.JournalingHostingExtensions.AddStateMachine*> using the application contract and implementation as its two type arguments. Both types are reference types. In silo configuration, call `siloBuilder.AddJournaling()` for core setup and `siloBuilder.Services.AddStateMachine<TState, TImplementation>()` for the grain state component mapping. A storage-provider registration already performs the core setup. Grain code obtains the component with `GetOrAddState<TState>(name)` during setup. The manager constructs and registers the implementation once using the existing activation scope, then binds its journal stream.
+Define a grain-facing state contract and an implementation of that contract and <xref:Orleans.Durable.Journaling.IStateMachine>. Register the mapping on <xref:Microsoft.Extensions.DependencyInjection.IServiceCollection> with <xref:Orleans.Durable.Journaling.JournalingHostingExtensions.AddStateMachine*> using the application contract and implementation as its two type arguments. Both types are reference types. In silo configuration, call `siloBuilder.AddJournaling()` for core setup and `siloBuilder.Services.AddStateMachine<TState, TImplementation>()` for the grain state component mapping. A storage-provider registration already performs the core setup. Grain code obtains the component with `GetOrAddState<TState>(name)` during setup. The manager constructs and registers the implementation once using the existing activation scope, then binds its journal stream.
 
 The parameterless registration overload resolves the implementation's constructor dependencies from dependency injection. When construction needs the state name, use the factory overload: its callback receives the owning service provider and the requested state name and returns the implementation.
 
@@ -96,24 +96,24 @@ The state-machine protocol owns operation encoding, snapshots, replay, and volat
 
 | Member | Responsibility |
 | --- | --- |
-| <xref:Orleans.Journaling.IStateMachine.Reset*> | Reset in-memory state and bind the supplied journal stream writer. |
-| <xref:Orleans.Journaling.IStateMachine.ReplayEntry*> | Apply a recorded operation during recovery. |
-| <xref:Orleans.Journaling.IStateMachine.WritePendingEntries*> | Emit pending operations into the supplied writer. |
-| <xref:Orleans.Journaling.IStateMachine.WriteSnapshot*> | Emit the state needed to reconstruct the current contents. |
-| <xref:Orleans.Journaling.IStateMachine.OnRecoveryCompleted*> | Finish reconstruction before application use. |
-| <xref:Orleans.Journaling.IStateMachine.OnWriteCompleted*> | Publish effects which depend on storage acknowledgement. |
+| <xref:Orleans.Durable.Journaling.IStateMachine.Reset*> | Reset in-memory state and bind the supplied journal stream writer. |
+| <xref:Orleans.Durable.Journaling.IStateMachine.ReplayEntry*> | Apply a recorded operation during recovery. |
+| <xref:Orleans.Durable.Journaling.IStateMachine.WritePendingEntries*> | Emit pending operations into the supplied writer. |
+| <xref:Orleans.Durable.Journaling.IStateMachine.WriteSnapshot*> | Emit the state needed to reconstruct the current contents. |
+| <xref:Orleans.Durable.Journaling.IStateMachine.OnRecoveryCompleted*> | Finish reconstruction before application use. |
+| <xref:Orleans.Durable.Journaling.IStateMachine.OnWriteCompleted*> | Publish effects which depend on storage acknowledgement. |
 
 An implementation runs on one logical grain thread. Recovery uses fresh instances and replay. After a journal operation fails, the manager remains fenced and its owner creates a new manager and state instances.
 
 ## Own a standalone journal
 
-<xref:Orleans.Journaling.IJournaledStateManager> is the journal-owner contract, independent of the grain-facing `IDurableStateManager`. It provides <xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*>, <xref:Orleans.Journaling.IJournaledStateManager.TryGetStateMachine*>, <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*>, <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*>, whole-journal <xref:Orleans.Journaling.IJournaledStateManager.DeleteStateAsync*>, asynchronous disposal, and <xref:Orleans.Journaling.IJournaledStateManager.PendingWriteByteCount> diagnostics.
+<xref:Orleans.Durable.Journaling.IJournaledStateManager> is the journal-owner contract, independent of the grain-facing `IDurableStateManager`. It provides <xref:Orleans.Durable.Journaling.IJournaledStateManager.RegisterStateMachine*>, <xref:Orleans.Durable.Journaling.IJournaledStateManager.TryGetStateMachine*>, <xref:Orleans.Durable.Journaling.IJournaledStateManager.InitializeAsync*>, <xref:Orleans.Durable.Journaling.IJournaledStateManager.WriteStateAsync*>, whole-journal <xref:Orleans.Durable.Journaling.IJournaledStateManager.DeleteStateAsync*>, asynchronous disposal, and <xref:Orleans.Durable.Journaling.IJournaledStateManager.PendingWriteByteCount> diagnostics.
 
-Use <xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> when an integration owns a journal independently of a grain activation. It returns the owner contract. Construct state machine components with caller-supplied dependencies and register them before initialization. Await recovery before using their contents, and await writes before reporting durable changes:
+Use <xref:Orleans.Durable.Journaling.IJournaledStateManagerFactory.CreateStandalone*> when an integration owns a journal independently of a grain activation. It returns the owner contract. Construct state machine components with caller-supplied dependencies and register them before initialization. Await recovery before using their contents, and await writes before reporting durable changes:
 
 :::code language="csharp" source="./snippets/journaling/JournalingBasics.cs" id="standalone_durable_state":::
 
-The example explicitly constructs a counter component implementing `IStateMachine` and <xref:Orleans.Journaling.IDurableValueCommandHandler`1>. Its supplied <xref:Orleans.Journaling.IDurableValueCommandCodec`1> must correspond to the journal's configured write format. The component applies replayed set commands and emits its current value for pending writes and snapshots.
+The example explicitly constructs a counter component implementing `IStateMachine` and <xref:Orleans.Durable.Journaling.IDurableValueCommandHandler`1>. Its supplied <xref:Orleans.Durable.Journaling.IDurableValueCommandCodec`1> must correspond to the journal's configured write format. The component applies replayed set commands and emits its current value for pending writes and snapshots.
 
 The caller owns the manually supplied state components and their dependencies, including any scopes used to construct them. Disposing the journal owner stops processing and releases journal resources; the caller arranges component and dependency disposal. The standalone owner never creates or disposes DI scopes. Use `TryGetStateMachine` to find a component registered with that owner.
 

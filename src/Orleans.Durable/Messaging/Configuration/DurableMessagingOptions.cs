@@ -1,6 +1,6 @@
 using System;
 
-namespace Orleans.Messaging.Configuration;
+namespace Orleans.Durable.Messaging.Configuration;
 
 /// <summary>
 /// Configuration options for durable messaging inboxes, outboxes, and the messaging pump.

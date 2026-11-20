@@ -1,4 +1,4 @@
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// The rejection codes with which a grain dead-letters a durable task invocation which it rejects permanently, and which

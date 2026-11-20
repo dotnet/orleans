@@ -1,9 +1,9 @@
 using System;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>A received command whose destination is the grain owning the inbox.</summary>
-[GenerateSerializer, Alias("Orleans.Messaging.InboxMessage")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxMessage")]
 public readonly struct InboxMessage
 {
     /// <summary>Gets the command identity, payload, and application metadata.</summary>

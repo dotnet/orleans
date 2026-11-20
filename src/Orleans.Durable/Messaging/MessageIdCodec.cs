@@ -6,7 +6,7 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 [RegisterSerializer]
 internal sealed class MessageIdCodec(IFieldCodec<string> strings) : IFieldCodec<MessageId>

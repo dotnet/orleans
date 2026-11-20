@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace UnitTests.GrainInterfaces;
 

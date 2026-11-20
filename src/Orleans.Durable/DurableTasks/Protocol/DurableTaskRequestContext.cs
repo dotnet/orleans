@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 using Orleans.Serialization.Cloning;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 [GenerateSerializer]
 [Alias("DurableTaskRequestContext")]
@@ -95,7 +95,7 @@ internal sealed class DurableTaskPopulator<T> : IConverter<DurableTask<T>, Durab
 }
 
 [GenerateSerializer, Immutable]
-[Alias("Orleans.DurableTasks.Protocol.DurableTaskSurrogate")]
+[Alias("Orleans.Durable.Tasks.Protocol.DurableTaskSurrogate")]
 internal readonly struct DurableTaskSurrogate
 {
 }
@@ -117,7 +117,7 @@ internal sealed class TaskIdConverter : IConverter<TaskId, TaskIdSurrogate>
 }
 
 [GenerateSerializer, Immutable]
-[Alias("Orleans.DurableTasks.Protocol.TaskIdSurrogate")]
+[Alias("Orleans.Durable.Tasks.Protocol.TaskIdSurrogate")]
 internal readonly struct TaskIdSurrogate(string value)
 {
     [Id(0)]

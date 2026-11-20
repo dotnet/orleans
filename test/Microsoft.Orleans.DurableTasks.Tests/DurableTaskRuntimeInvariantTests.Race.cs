@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 using Xunit;
 
@@ -181,7 +181,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     /// <summary>Returns the node of this grain's execution tree which the wire identifier <paramref name="wireId"/> names.</summary>
     private static TaskId GetNodeId(TaskId wireId)
     {
-        Assert.True(global::Orleans.DurableTasks.Runtime.CallerScope.TryParseWireId(wireId, out _, out var nodeId));
+        Assert.True(global::Orleans.Durable.Tasks.Runtime.CallerScope.TryParseWireId(wireId, out _, out var nodeId));
         return nodeId;
     }
 

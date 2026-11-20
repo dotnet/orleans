@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Provides operational access to a grain's messaging state.
@@ -49,7 +49,7 @@ public interface IMessagingDiagnostics
 /// <summary>
 /// Describes a message which the inbox dead-lettered.
 /// </summary>
-[GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.InboxDeadLetter")]
 public sealed class InboxDeadLetter
 {
     /// <summary>
@@ -85,7 +85,7 @@ public sealed class InboxDeadLetter
 /// <summary>
 /// Describes a message which the outbox dead-lettered.
 /// </summary>
-[GenerateSerializer, Alias("Orleans.Messaging.OutboxDeadLetter")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.OutboxDeadLetter")]
 public sealed class OutboxDeadLetter
 {
     /// <summary>

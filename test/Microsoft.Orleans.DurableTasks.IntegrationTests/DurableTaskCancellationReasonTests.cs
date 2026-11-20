@@ -1,5 +1,5 @@
-using Orleans.DurableTasks;
-using Orleans.Journaling;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;

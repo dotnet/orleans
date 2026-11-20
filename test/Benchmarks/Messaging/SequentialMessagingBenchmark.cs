@@ -2,9 +2,9 @@ using System.Globalization;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 

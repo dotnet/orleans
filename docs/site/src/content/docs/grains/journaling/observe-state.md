@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Observe journaled state and stream drafts
 
-Watch streams deliver the committed changes made to a grain's journaled state. A grain exposes them to callers as <xref:System.Collections.Generic.IAsyncEnumerable`1> methods. <xref:Orleans.Journaling.IDurableLog`1> adds an append-only log whose readers resume from a sequence number, and drafts which stream volatile content, such as model output, before its durable entry exists.
+Watch streams deliver the committed changes made to a grain's journaled state. A grain exposes them to callers as <xref:System.Collections.Generic.IAsyncEnumerable`1> methods. <xref:Orleans.Durable.Journaling.IDurableLog`1> adds an append-only log whose readers resume from a sequence number, and drafts which stream volatile content, such as model output, before its durable entry exists.
 
 Configure journaling as described in [Use durable state](durable-state.md).
 
@@ -29,22 +29,22 @@ Durable state takes ownership of the values, items, and entries passed to it, an
 
 ## Watch a value
 
-<xref:Orleans.Journaling.DurableStateWatchExtensions.WatchAsync*> watches an <xref:Orleans.Journaling.IDurableValue`1>. The stream begins with the current value once it is durable, so a watch which begins while the value is staged receives it after the next write, and then delivers the latest value after each write which changes it. Each <xref:Orleans.Journaling.ValueChange`1> carries the value and the write version which made it durable. A slow reader receives the newest value and skips intermediate values, so a value watch retains no backlog.
+<xref:Orleans.Durable.Journaling.DurableStateWatchExtensions.WatchAsync*> watches an <xref:Orleans.Durable.Journaling.IDurableValue`1>. The stream begins with the current value once it is durable, so a watch which begins while the value is staged receives it after the next write, and then delivers the latest value after each write which changes it. Each <xref:Orleans.Durable.Journaling.ValueChange`1> carries the value and the write version which made it durable. A slow reader receives the newest value and skips intermediate values, so a value watch retains no backlog.
 
 A value which nobody watches publishes nothing and allocates nothing for observation. The manager creates its observer state when the first stream begins, once it has recovered its state.
 
 ## Read a durable log
 
-<xref:Orleans.Journaling.IDurableLog`1>, created with <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddLog*>, assigns each appended entry the next value of a durable, monotonically increasing sequence number:
+<xref:Orleans.Durable.Journaling.IDurableLog`1>, created with <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions.GetOrAddLog*>, assigns each appended entry the next value of a durable, monotonically increasing sequence number:
 
-- <xref:Orleans.Journaling.IDurableLog`1.Append*> stages an entry and returns its sequence number.
-- <xref:Orleans.Journaling.IDurableLog`1.FirstSequence>, <xref:Orleans.Journaling.IDurableLog`1.NextSequence>, and <xref:Orleans.Journaling.IDurableLog`1.CommittedSequence> describe the retained, appended, and durable entries. Serve paged history from entries before `CommittedSequence`.
-- <xref:Orleans.Journaling.IDurableLog`1.TrimBefore*> discards old entries to bound retention. The retained entries remain valid.
-- <xref:Orleans.Journaling.IDurableLog`1.Clear*> discards every entry to replace them, for example with a compacted summary. A clear consumes one sequence number, so sequence numbers are never reused within a history.
-- <xref:Orleans.Journaling.IDurableLog`1.Epoch> identifies the history. The first change after the log is created, or after the grain's journal is deleted, begins a history with a new random epoch, which is journaled with it. Deleting the journal restarts sequence numbers at zero in the new history.
-- <xref:Orleans.Journaling.IDurableLog`1.Seal*> durably ends the log. A sealed log rejects `Append`, `Clear`, and `BeginDraft`, abandons open drafts, and can still be trimmed. Only deleting the journal unseals it.
+- <xref:Orleans.Durable.Journaling.IDurableLog`1.Append*> stages an entry and returns its sequence number.
+- <xref:Orleans.Durable.Journaling.IDurableLog`1.FirstSequence>, <xref:Orleans.Durable.Journaling.IDurableLog`1.NextSequence>, and <xref:Orleans.Durable.Journaling.IDurableLog`1.CommittedSequence> describe the retained, appended, and durable entries. Serve paged history from entries before `CommittedSequence`.
+- <xref:Orleans.Durable.Journaling.IDurableLog`1.TrimBefore*> discards old entries to bound retention. The retained entries remain valid.
+- <xref:Orleans.Durable.Journaling.IDurableLog`1.Clear*> discards every entry to replace them, for example with a compacted summary. A clear consumes one sequence number, so sequence numbers are never reused within a history.
+- <xref:Orleans.Durable.Journaling.IDurableLog`1.Epoch> identifies the history. The first change after the log is created, or after the grain's journal is deleted, begins a history with a new random epoch, which is journaled with it. Deleting the journal restarts sequence numbers at zero in the new history.
+- <xref:Orleans.Durable.Journaling.IDurableLog`1.Seal*> durably ends the log. A sealed log rejects `Append`, `Clear`, and `BeginDraft`, abandons open drafts, and can still be trimmed. Only deleting the journal unseals it.
 
-<xref:Orleans.Journaling.IDurableLog`1.ReadAsync*> reads retained entries from a position and then waits for new ones. Readers re-read entries from the log at their position instead of buffering them, so a slow reader retains no entries. A position is an epoch and a sequence number. Every event carries the epoch of its history in <xref:Orleans.Journaling.LogEvent`1.Epoch>, so an epoch and a sequence number form a complete replay checkpoint. Pass zero as the epoch to read the current history. Besides entries, a stream delivers these <xref:Orleans.Journaling.LogEventKind> events:
+<xref:Orleans.Durable.Journaling.IDurableLog`1.ReadAsync*> reads retained entries from a position and then waits for new ones. Readers re-read entries from the log at their position instead of buffering them, so a slow reader retains no entries. A position is an epoch and a sequence number. Every event carries the epoch of its history in <xref:Orleans.Durable.Journaling.LogEvent`1.Epoch>, so an epoch and a sequence number form a complete replay checkpoint. Pass zero as the epoch to read the current history. Besides entries, a stream delivers these <xref:Orleans.Durable.Journaling.LogEventKind> events:
 
 | Event | Meaning |
 | --- | --- |
@@ -59,7 +59,7 @@ A stream which begins before the first retained entry starts with `Trimmed`. A s
 
 ## Stream drafts
 
-<xref:Orleans.Journaling.IDurableLog`1.BeginDraft*> opens an <xref:Orleans.Journaling.IDurableLogDraft`1>:
+<xref:Orleans.Durable.Journaling.IDurableLog`1.BeginDraft*> opens an <xref:Orleans.Durable.Journaling.IDurableLogDraft`1>:
 
 - `Write` delivers a volatile item immediately to streams which include drafts: pass `includeDrafts: true` to `ReadAsync`. The draft holds its items in memory only while it is open.
 - `Commit` closes the draft and appends zero or more entries which replace its items. The entries form one journal entry, so one write makes all of them durable, and an entry which can't be encoded leaves the draft open without appending any entry. Readers receive `DraftCommitted`, whose `Sequence` and `Count` give the range of committed entries, followed by the entries. `Commit` with no entries closes the draft cleanly.
@@ -67,7 +67,7 @@ A stream which begins before the first retained entry starts with `Trimmed`. A s
 
 A stream reports `DraftCommitted` once the committed entries are durable. A stream which includes drafts and begins while a draft is open receives the draft's items from position zero. When a draft closes, its items are released: a reader which hasn't yet read every item receives `DraftCommitted` or `DraftAbandoned` next and never receives the remaining items. The committed entries carry the final content.
 
-`DraftAbandoned` carries a <xref:Orleans.Journaling.LogDraftAbandonReason>:
+`DraftAbandoned` carries a <xref:Orleans.Durable.Journaling.LogDraftAbandonReason>:
 
 | Reason | Cause |
 | --- | --- |
@@ -80,7 +80,7 @@ A stream reports `DraftCommitted` once the committed entries are durable. A stre
 
 The log closes a draft when its journal is deleted or the log is sealed. Its owner then holds a closed draft, whose `Write` and `Commit` throw an <xref:System.InvalidOperationException> that states why it closed. Check `IsOpen` before committing a draft which the log can close.
 
-Each <xref:Orleans.Journaling.LogDraftId> includes an identifier for the log instance, and therefore the activation, which opened the draft. A reconnecting reader passes its position and the draft it was viewing. If that draft is still open, the stream repeats its items from position zero. The log journals a draft's identifier with its committed entries, so when the draft committed, the stream reports `DraftCommitted` with the range which replaced it, in any activation, while the log retains the first of those entries. If this activation abandoned the draft, the stream reports `DraftAbandoned` with its reason; each log records the reasons for its 16 most recently abandoned drafts and reports `Unknown` for older ones. A draft which a previous activation opened and never committed is reported as `PreviousActivation`; regenerate its content from the last committed entry.
+Each <xref:Orleans.Durable.Journaling.LogDraftId> includes an identifier for the log instance, and therefore the activation, which opened the draft. A reconnecting reader passes its position and the draft it was viewing. If that draft is still open, the stream repeats its items from position zero. The log journals a draft's identifier with its committed entries, so when the draft committed, the stream reports `DraftCommitted` with the range which replaced it, in any activation, while the log retains the first of those entries. If this activation abandoned the draft, the stream reports `DraftAbandoned` with its reason; each log records the reasons for its 16 most recently abandoned drafts and reports `Unknown` for older ones. A draft which a previous activation opened and never committed is reported as `PreviousActivation`; regenerate its content from the last committed entry.
 
 This client renders committed history and in-progress drafts and tracks its resume position:
 

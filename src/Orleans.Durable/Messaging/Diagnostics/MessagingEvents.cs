@@ -5,7 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Diagnostics;
+namespace Orleans.Durable.Messaging.Diagnostics;
 
 /// <summary>
 /// Provides the diagnostic listener and event payload types for durable messaging events.

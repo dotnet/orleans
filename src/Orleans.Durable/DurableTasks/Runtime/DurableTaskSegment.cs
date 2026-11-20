@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// The interface which grain call filters observe for a segment of a durable task attempt: the code of an attempt

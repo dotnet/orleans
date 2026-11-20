@@ -1,5 +1,5 @@
 using System.Reflection;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 
 namespace NonSilo.Tests.DurableJobs;

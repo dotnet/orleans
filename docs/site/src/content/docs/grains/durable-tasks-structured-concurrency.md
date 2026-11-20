@@ -105,13 +105,13 @@ sequenceDiagram
 - Children which haven't started, and children which the canceled task starts later,
   end canceled without running.
 - Running children observe the request through
-  <xref:Orleans.DurableTasks.DurableTaskContext.CancellationToken?displayProperty=nameWithType>,
+  <xref:Orleans.Durable.Tasks.DurableTaskContext.CancellationToken?displayProperty=nameWithType>,
   and calls to other grains carry it to their callees, which cancel their own trees.
 - The body decides the task's outcome. Awaiting a canceled child throws
   `OperationCanceledException`, and the task ends canceled when the exception escapes
   the body.
 - The first request's reason is durable, and
-  <xref:Orleans.DurableTasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>
+  <xref:Orleans.Durable.Tasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>
   returns it in the task, its descendants, and every replay.
 
 A handler which compensates for cancellation filters by
@@ -149,7 +149,7 @@ Durable tasks distinguish two kinds of cancellation:
 | `IsTaskCancellationRequested` | `true` | Unchanged |
 | `CancellationToken` | Canceled | Canceled |
 | `AttemptCancellationToken` | Unchanged | Canceled |
-| Exception which durable operations throw | `OperationCanceledException` from the canceled work | <xref:Orleans.DurableTasks.DurableTaskAttemptCanceledException>, with its `Reason` |
+| Exception which durable operations throw | `OperationCanceledException` from the canceled work | <xref:Orleans.Durable.Tasks.DurableTaskAttemptCanceledException>, with its `Reason` |
 
 Once an attempt is canceled, every durable operation of its code throws
 `DurableTaskAttemptCanceledException`: `DurableTask.RunInline`, starting or awaiting children,

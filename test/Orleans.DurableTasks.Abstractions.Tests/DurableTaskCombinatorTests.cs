@@ -1,7 +1,7 @@
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>Verifies combinator outcomes, enumerable inputs, and operation naming with <c>WithId</c>.</summary>
 [TestSuite("BVT")]

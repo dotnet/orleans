@@ -3,9 +3,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 internal interface IDurableTaskGrainStorage
 {

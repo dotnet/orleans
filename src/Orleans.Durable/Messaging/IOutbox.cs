@@ -1,6 +1,6 @@
 using System;
 
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// Stages opaque durable messages alongside a grain's journaled business state.

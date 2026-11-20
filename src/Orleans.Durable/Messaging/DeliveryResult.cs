@@ -1,10 +1,10 @@
-namespace Orleans.Messaging;
+namespace Orleans.Durable.Messaging;
 
 /// <summary>
 /// The receiver's answer to an attempt to deliver a message to its inbox.
 /// </summary>
 /// <remarks>Case identifiers follow declaration order and are part of the wire format.</remarks>
-[GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult")]
+[GenerateSerializer, Alias("Orleans.Durable.Messaging.DeliveryResult")]
 public union DeliveryResult(
     DeliveryResult.Accepted,
     DeliveryResult.Duplicate,
@@ -14,7 +14,7 @@ public union DeliveryResult(
     DeliveryResult.Expired)
 {
     /// <summary>The receiver durably accepted the message.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Accepted")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.DeliveryResult.Accepted")]
     public sealed class Accepted
     {
         /// <summary>Gets the shared result.</summary>
@@ -26,7 +26,7 @@ public union DeliveryResult(
     /// A duplicate of a message which an inbox message sink rejected receives that rejection instead: the original
     /// <see cref="DeadLettered"/> result, with its reason and code.
     /// </remarks>
-    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Duplicate")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.DeliveryResult.Duplicate")]
     public sealed class Duplicate
     {
         /// <summary>Gets the shared result.</summary>
@@ -34,7 +34,7 @@ public union DeliveryResult(
     }
 
     /// <summary>The inbox is at capacity; the sender retries later.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Backpressured")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.DeliveryResult.Backpressured")]
     public sealed class Backpressured
     {
         /// <summary>Gets the shared result.</summary>
@@ -42,7 +42,7 @@ public union DeliveryResult(
     }
 
     /// <summary>The receiving inbox has no registered handler.</summary>
-    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.HandlerNotFound")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.DeliveryResult.HandlerNotFound")]
     public sealed class HandlerNotFound
     {
         /// <summary>Gets the shared result.</summary>
@@ -53,7 +53,7 @@ public union DeliveryResult(
     /// <param name="reason">The diagnostic reason for the rejection.</param>
     /// <param name="code">The code which identifies why the receiver rejected the message, if any.</param>
     /// <remarks>A redelivery while its processed record is retained receives the same result.</remarks>
-    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.DeadLettered")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.DeliveryResult.DeadLettered")]
     public sealed class DeadLettered(string reason, string? code = null)
     {
         /// <summary>Gets the diagnostic reason for the rejection.</summary>
@@ -81,7 +81,7 @@ public union DeliveryResult(
     /// This attempt stages no message effects. An earlier attempt can have been accepted, so the sender treats the
     /// delivery outcome as unknown and retires the message as <see cref="OutboxMessageRetirement.DeadLettered"/>.
     /// </remarks>
-    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Expired")]
+    [GenerateSerializer, Alias("Orleans.Durable.Messaging.DeliveryResult.Expired")]
     public sealed class Expired
     {
         /// <summary>Gets the shared result.</summary>

@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 internal sealed class JournaledJobShardState : IStateMachine, IDurableValueCommandHandler<DurableJobShardJournalRecord>
 {
@@ -242,7 +242,7 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobShardJournalRecordKind")]
+[Alias("Orleans.Durable.Jobs.DurableJobShardJournalRecordKind")]
 internal enum DurableJobShardJournalRecordKind : byte
 {
     /// <summary>
@@ -261,7 +261,7 @@ internal enum DurableJobShardJournalRecordKind : byte
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobShardJournalRecord")]
+[Alias("Orleans.Durable.Jobs.DurableJobShardJournalRecord")]
 internal sealed class DurableJobShardJournalRecord
 {
     [Id(0)]
@@ -335,7 +335,7 @@ internal sealed class DurableJobShardJournalRecord
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobShardScheduleOperation")]
+[Alias("Orleans.Durable.Jobs.DurableJobShardScheduleOperation")]
 internal sealed class DurableJobShardScheduleOperation
 {
     [Id(0)]
@@ -343,7 +343,7 @@ internal sealed class DurableJobShardScheduleOperation
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobShardRemoveOperation")]
+[Alias("Orleans.Durable.Jobs.DurableJobShardRemoveOperation")]
 internal sealed class DurableJobShardRemoveOperation
 {
     [Id(0)]
@@ -351,7 +351,7 @@ internal sealed class DurableJobShardRemoveOperation
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobShardRetryOperation")]
+[Alias("Orleans.Durable.Jobs.DurableJobShardRetryOperation")]
 internal sealed class DurableJobShardRetryOperation
 {
     [Id(0)]
@@ -368,7 +368,7 @@ internal sealed class DurableJobShardRetryOperation
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobShardSnapshot")]
+[Alias("Orleans.Durable.Jobs.DurableJobShardSnapshot")]
 internal sealed class DurableJobShardSnapshot
 {
     [Id(0)]
@@ -376,7 +376,7 @@ internal sealed class DurableJobShardSnapshot
 }
 
 [GenerateSerializer]
-[Alias("Orleans.DurableJobs.DurableJobShardSnapshotEntry")]
+[Alias("Orleans.Durable.Jobs.DurableJobShardSnapshotEntry")]
 internal sealed class DurableJobShardSnapshotEntry
 {
     [Id(0)]

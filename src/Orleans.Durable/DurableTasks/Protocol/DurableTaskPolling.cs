@@ -1,11 +1,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 
-namespace Orleans.DurableTasks.Protocol;
+namespace Orleans.Durable.Tasks.Protocol;
 
 /// <summary>
 /// Polls a task's grain, and requests its cancellation or abort, from code outside a durable execution, such as a client,

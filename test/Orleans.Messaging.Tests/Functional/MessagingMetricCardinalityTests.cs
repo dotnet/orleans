@@ -1,10 +1,10 @@
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [Collection(MessagingClusterCollection.Name)]
 [TestSuite("BVT")]

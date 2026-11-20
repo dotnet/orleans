@@ -1,15 +1,15 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.DurableTasks.Storage;
+namespace Orleans.Durable.Tasks.Storage;
 
 /// <summary>
 /// Stores durable task state in the grain's journal.

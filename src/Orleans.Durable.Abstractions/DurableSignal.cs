@@ -1,4 +1,4 @@
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Describes a named signal which carries a value of type <typeparamref name="T"/> into a durable task, such as an

@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal static class OrleansBinaryCollectionWireHelpers
 {

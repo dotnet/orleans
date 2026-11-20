@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Xunit;

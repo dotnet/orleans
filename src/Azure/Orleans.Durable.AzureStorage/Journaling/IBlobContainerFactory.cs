@@ -1,6 +1,6 @@
 using Azure.Storage.Blobs;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 /// <summary>
 /// A factory for building container clients for blob storage.

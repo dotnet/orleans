@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Runtime;
+namespace Orleans.Durable.Tasks.Runtime;
 
 /// <summary>
 /// Maps the tasks which grains invoke on other grains to the identifiers under which their targets store them, and the

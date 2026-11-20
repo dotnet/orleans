@@ -3,9 +3,9 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
 namespace Documentation.Grains.DurableTasks;

@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 // Captures opaque handler output in the same journal as inbox effects. Dispatch belongs to the outbox layer.
 internal sealed class JournaledTestOutbox(IDurableDictionary<MessageId, OutboxMessage> messages)

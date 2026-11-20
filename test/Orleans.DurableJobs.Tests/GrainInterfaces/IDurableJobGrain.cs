@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace UnitTests.GrainInterfaces;
 

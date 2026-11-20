@@ -4,11 +4,11 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Diagnostics;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 
-namespace Orleans.DurableJobs;
+namespace Orleans.Durable.Jobs;
 
 /// <summary>
 /// Journaled implementation of <see cref="IJobShard"/> that stores shard state in Orleans journaling storage.

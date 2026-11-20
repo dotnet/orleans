@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 using Orleans.Storage;
 
-namespace Orleans.Journaling;
+namespace Orleans.Durable.Journaling;
 
 internal sealed partial class AzureTableJournalStorage : IJournalStorage
 {
