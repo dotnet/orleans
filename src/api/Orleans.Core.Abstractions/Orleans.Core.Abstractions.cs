@@ -2314,6 +2314,8 @@ namespace Orleans.Runtime
 
         public ushort InterfaceVersion { get { throw null; } }
 
+        protected internal GrainReferenceShared Shared { get { throw null; } }
+
         public virtual TGrainInterface Cast<TGrainInterface>()
             where TGrainInterface : IAddressable { throw null; }
 
@@ -2958,6 +2960,8 @@ namespace Orleans.Runtime
     {
         public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
 
+        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke(Orleans.Serialization.Cloning.CopyContextPool copyContextPool) { throw null; }
+
         protected abstract System.Threading.Tasks.ValueTask InvokeInner();
     }
 
@@ -2989,6 +2993,8 @@ namespace Orleans.Runtime
         public abstract string GetMethodName();
         public abstract object GetTarget();
         public abstract System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke();
+        public virtual System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke(Orleans.Serialization.Cloning.CopyContextPool copyContextPool) { throw null; }
+
         public virtual void SetArgument(int index, object value) { }
 
         public abstract void SetTarget(Orleans.Serialization.Invocation.ITargetHolder holder);
@@ -3030,6 +3036,8 @@ namespace Orleans.Runtime
     public abstract partial class Request<TResult> : RequestBase
     {
         public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+
+        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke(Orleans.Serialization.Cloning.CopyContextPool copyContextPool) { throw null; }
 
         protected abstract System.Threading.Tasks.ValueTask<TResult> InvokeInner();
     }
@@ -3207,6 +3215,8 @@ namespace Orleans.Runtime
     {
         public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
 
+        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke(Orleans.Serialization.Cloning.CopyContextPool copyContextPool) { throw null; }
+
         protected abstract System.Threading.Tasks.Task InvokeInner();
     }
 
@@ -3214,6 +3224,8 @@ namespace Orleans.Runtime
     public abstract partial class TaskRequest<TResult> : RequestBase
     {
         public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+
+        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke(Orleans.Serialization.Cloning.CopyContextPool copyContextPool) { throw null; }
 
         protected abstract System.Threading.Tasks.Task<TResult> InvokeInner();
     }
@@ -3332,6 +3344,8 @@ namespace Orleans.Runtime
     public abstract partial class VoidRequest : RequestBase
     {
         public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+
+        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke(Orleans.Serialization.Cloning.CopyContextPool copyContextPool) { throw null; }
 
         protected abstract void InvokeInner();
     }

@@ -34,6 +34,7 @@ namespace Orleans.Serialization.Configuration
         private readonly HashSet<Type> _converters = new();
         private readonly HashSet<Type> _interfaces = new();
         private readonly HashSet<Type> _interfaceProxies = new();
+        private readonly Dictionary<Type, Type> _interfaceProxyActivators = new();
         private readonly HashSet<Type> _interfaceImplementations = new();
         private readonly Dictionary<Type, InterfaceDiscoveryKinds> _interfaceDiscoveryRequests = new();
         private int _nextContractRegistrationOrder;
@@ -222,6 +223,23 @@ namespace Orleans.Serialization.Configuration
         }
 
         /// <summary>
+        /// Gets the activator type which creates instances of each interface proxy type, keyed by proxy type.
+        /// </summary>
+        /// <remarks>
+        /// The runtime creates one activator for each target of a proxy and uses it to create every proxy instance for that
+        /// target. A generic proxy type definition maps to a generic activator type definition with the same type parameters.
+        /// </remarks>
+        public Dictionary<Type, Type> InterfaceProxyActivators
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve activator constructors required by trimming. "
+                + "Use AddInterfaceProxyActivator(Type, Type) when registering interface proxy activators.")]
+#endif
+            get => _interfaceProxyActivators;
+        }
+
+        /// <summary>
         /// Gets the set of interface implementations, which are implementations of the interfaces present in <see cref="Interfaces"/>.
         /// </summary>
         public HashSet<Type> InterfaceImplementations
@@ -324,6 +342,8 @@ namespace Orleans.Serialization.Configuration
         internal HashSet<Type> InterfaceTypes => _interfaces;
 
         internal HashSet<Type> InterfaceProxyTypes => _interfaceProxies;
+
+        internal Dictionary<Type, Type> InterfaceProxyActivatorTypes => _interfaceProxyActivators;
 
         internal HashSet<Type> InterfaceImplementationTypes => _interfaceImplementations;
 
@@ -739,6 +759,23 @@ namespace Orleans.Serialization.Configuration
                 DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
 #endif
             Type type) => _interfaceProxies.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds the activator type which creates instances of a generated proxy type and preserves its public constructors.
+        /// </summary>
+        /// <param name="proxyType">The generated proxy type.</param>
+        /// <param name="activatorType">The activator type for <paramref name="proxyType"/>.</param>
+        public void AddInterfaceProxyActivator(
+            Type proxyType,
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+#endif
+            Type activatorType)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(proxyType);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(activatorType);
+            _interfaceProxyActivators[proxyType] = activatorType;
+        }
 
         /// <summary>
         /// Adds a generated interface implementation type and preserves its public constructors and implemented interfaces.

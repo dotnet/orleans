@@ -492,7 +492,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         else
         {
             var instanceCopier = copierFields.OfType<CopierFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
-            copierExpression = GetCodecExpression(instanceCopier);
+            copierExpression = instanceCopier.AccessExpression ?? GetCodecExpression(instanceCopier);
         }
 
         // If the member type differs from the copier type (eg because the member is an array), cast the result.
@@ -521,6 +521,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     internal sealed class CopierFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType, bool lazyInitialization = false) : GeneratedFieldDescription(fieldType, fieldName), ICopierDescription
     {
         public ITypeSymbol UnderlyingType { get; } = underlyingType;
+        public string? AccessExpression { get; set; }
         public override bool IsInjected => false;
         public override bool LazyInitialization { get; } = lazyInitialization;
     }

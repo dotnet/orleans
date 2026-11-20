@@ -1353,6 +1353,8 @@ namespace Orleans.Serialization.Cloning
 
         public void Dispose() { }
 
+        public IDeepCopier<T> GetCopier<T>() { throw null; }
+
         public void RecordCopy(object original, object copy) { }
 
         public void Reset() { }
@@ -3432,6 +3434,8 @@ namespace Orleans.Serialization.Configuration
 
         public System.Collections.Generic.HashSet<System.Type> InterfaceProxies { get { throw null; } }
 
+        public System.Collections.Generic.Dictionary<System.Type, System.Type> InterfaceProxyActivators { get { throw null; } }
+
         public System.Collections.Generic.HashSet<System.Type> Interfaces { get { throw null; } }
 
         public System.Collections.Generic.HashSet<System.Type> Serializers { get { throw null; } }
@@ -3471,6 +3475,8 @@ namespace Orleans.Serialization.Configuration
         public void AddInterfaceImplementation(System.Type type) { }
 
         public void AddInterfaceProxy(System.Type type) { }
+
+        public void AddInterfaceProxyActivator(System.Type proxyType, System.Type activatorType) { }
 
         public void AddSerializationContract(System.Type type, System.Type contractType, SerializationType targetType, SerializationType? surrogateType = null) { }
 
@@ -3617,6 +3623,7 @@ namespace Orleans.Serialization.Invocation
         string GetMethodName();
         object? GetTarget();
         System.Threading.Tasks.ValueTask<Response> Invoke();
+        System.Threading.Tasks.ValueTask<Response> Invoke(Cloning.CopyContextPool copyContextPool);
         void SetArgument(int index, object value);
         void SetTarget(ITargetHolder holder);
         bool TryCancel();

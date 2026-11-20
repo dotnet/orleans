@@ -16,6 +16,7 @@ using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Invocation;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
@@ -51,7 +52,7 @@ namespace Orleans.Runtime
         private IGrainReferenceRuntime grainReferenceRuntime = null!;
         private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
-        private readonly DeepCopier<Response> responseCopier;
+        private readonly CopyContextPool copyContextPool;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -64,6 +65,7 @@ namespace Orleans.Runtime
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier,
+            CopyContextPool copyContextPool,
             [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
@@ -82,7 +84,7 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
-            this.responseCopier = deepCopier.GetCopier<Response>();
+            this.copyContextPool = copyContextPool;
             var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
@@ -315,6 +317,7 @@ namespace Orleans.Runtime
                     RequestContextExtensions.Import(message.RequestContextData);
                 }
 
+                var hasFilters = GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter;
                 Response response;
                 try
                 {
@@ -325,22 +328,17 @@ namespace Orleans.Runtime
                                 invokable.SetTarget(target);
 
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
-                                if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
+                                if (hasFilters)
                                 {
-                                    var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
+                                    var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.copyContextPool);
                                     await invoker.Invoke();
                                     response = invoker.Response!;
                                 }
                                 else
                                 {
-                                    response = await invokable.Invoke();
-
-                                    // A local request is passed by reference, and so is its response.
-                                    if (!message.IsLocalOnly)
-                                    {
-                                        // The copier preserves the null state of its input.
-                                        response = this.responseCopier.Copy(response)!;
-                                    }
+                                    response = message.IsLocalOnly
+                                        ? await invokable.Invoke()
+                                        : await invokable.Invoke(copyContextPool);
                                 }
 
                                 // A local request is disposed once it is completed.
@@ -394,7 +392,7 @@ namespace Orleans.Runtime
 
                 if (message.Direction != Message.Directions.OneWay)
                 {
-                    SafeSendResponse(message, response);
+                    SafeSendResponse(message, response, hasFilters);
                 }
 
                 return;
@@ -414,12 +412,12 @@ namespace Orleans.Runtime
             }
         }
 
-        private void SafeSendResponse(Message message, Response response)
+        private void SafeSendResponse(Message message, Response response, bool copyResponse)
         {
             try
             {
-                // The copier preserves the null state of its input.
-                SendResponse(message, (Response)this._deepCopier.Copy(response)!);
+                // Filters can replace the result or retain it after returning.
+                SendResponse(message, copyResponse ? this._deepCopier.Copy(response)! : response);
             }
             catch (Exception exc)
             {

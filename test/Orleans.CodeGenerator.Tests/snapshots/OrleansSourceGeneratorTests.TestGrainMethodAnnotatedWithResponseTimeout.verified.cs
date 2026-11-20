@@ -153,6 +153,18 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class ProxyActivator_IResponseTimeoutGrain : global::Orleans.GrainReferences.IGrainReferenceActivator
+    {
+        private readonly global::Orleans.Runtime.GrainReferenceShared _shared;
+        public ProxyActivator_IResponseTimeoutGrain(global::Orleans.Runtime.GrainType arg0, global::Orleans.Runtime.GrainInterfaceType arg1, ushort arg2, global::Orleans.Runtime.IGrainReferenceRuntime arg3, global::Orleans.CodeGeneration.InvokeMethodOptions arg4, global::Orleans.Serialization.Serializers.CodecProvider arg5, global::Orleans.Serialization.Cloning.CopyContextPool arg6, global::System.IServiceProvider arg7)
+        {
+            _shared = new global::Orleans.Runtime.GrainReferenceShared(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+        }
+
+        public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new global::OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain(_shared, grainId.Key);
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
@@ -160,6 +172,7 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8), typeof(OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8), typeof(OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
+            config.AddInterfaceProxyActivator(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain), typeof(OrleansCodeGen.TestProject.ProxyActivator_IResponseTimeoutGrain));
             config.AddInterface(typeof(global::TestProject.IResponseTimeoutGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ResponseTimeoutGrain));
             var n1 = config.CompoundTypeAliases.GetOrAdd("inv");

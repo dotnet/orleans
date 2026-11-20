@@ -42,6 +42,18 @@ public class TrimFlowTests
     }
 
     [Fact]
+    public void InterfaceProxyActivators_ExposeTrimSafeAlternative()
+    {
+        var legacyWarning = typeof(TypeManifestOptions).GetProperty(nameof(TypeManifestOptions.InterfaceProxyActivators))!
+            .GetMethod!.GetCustomAttribute<RequiresUnreferencedCodeAttribute>();
+        var activatorParameter = typeof(TypeManifestOptions).GetMethod(nameof(TypeManifestOptions.AddInterfaceProxyActivator), [typeof(Type), typeof(Type)])!.GetParameters()[1];
+
+        Assert.NotNull(legacyWarning);
+        Assert.Contains(nameof(TypeManifestOptions.AddInterfaceProxyActivator), legacyWarning.Message, StringComparison.Ordinal);
+        Assert.Equal(DynamicallyAccessedMemberTypes.PublicConstructors, activatorParameter.GetCustomAttribute<DynamicallyAccessedMembersAttribute>()?.MemberTypes);
+    }
+
+    [Fact]
     public void ShallowCopyableTypes_InspectsPrivateValueTypeFields()
     {
         Assert.False(ShallowCopyableTypes.Contains(typeof(StructWithPrivateReference)));

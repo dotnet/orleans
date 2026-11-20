@@ -121,7 +121,7 @@ namespace Orleans
                     this,
                     ServiceProvider.GetRequiredService<DeepCopier>(),
                     messagingTrace,
-                    ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
+                    ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(),
                     _interfaceToImplementationMapping,
                     loggerFactory.CreateLogger<ClientGrainContext>());
 

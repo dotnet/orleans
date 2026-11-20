@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Serialization.Cloning;
 
 namespace Orleans.Serialization.Invocation
 {
@@ -26,6 +27,22 @@ namespace Orleans.Serialization.Invocation
         /// Invoke the object.
         /// </summary>
         ValueTask<Response> Invoke();
+
+        /// <summary>
+        /// Invokes the object and copies its result before returning it to the caller.
+        /// </summary>
+        /// <param name="copyContextPool">The pool used to isolate the invocation result.</param>
+        /// <returns>A response containing the copied result.</returns>
+        /// <remarks>
+        /// Copying completes before the response is returned, so callers and call filters receive an isolated result.
+        /// Implementations can copy the typed result before constructing its response wrapper.
+        /// </remarks>
+        async ValueTask<Response> Invoke(CopyContextPool copyContextPool)
+        {
+            var response = await Invoke();
+            using var context = copyContextPool.GetContext();
+            return context.DeepCopy(response);
+        }
 
         /// <summary>
         /// Gets the number of arguments.

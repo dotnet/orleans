@@ -17,6 +17,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 {
     private const string CopyContextPoolMemberName = "CopyContextPool";
     private const string CodecProviderMemberName = "CodecProvider";
+    private const string SharedBaseTypeName = "global::Orleans.Runtime.GrainReferenceShared";
     private readonly IGeneratorServices _generatorServices = generatorServices;
     private readonly CopierGenerator _copierGenerator = copierGenerator;
 
@@ -30,19 +31,83 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
     {
         var generatedClassName = GetSimpleClassName(interfaceDescription);
         var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
+        var typeParameters = GenericParameterEmissionPlan.Create(interfaceDescription.TypeParameters);
+
+        // Grain reference proxies have an activator which holds their shared state, including any copiers, so the runtime
+        // creates every reference for a grain type and interface from one instance. Generated code names the activator and
+        // shared types by their qualified names, which type parameters cannot shadow.
+        ProxyActivatorEmissionPlan? activator = null;
+        string? sharedType = null;
+        string? sharedProperty = null;
+        if (HasActivator(LibraryTypes, interfaceDescription.ProxyBaseType))
+        {
+            var qualifier = $"global::{interfaceDescription.GeneratedNamespace}.";
+            var typeArguments = typeParameters.Count == 0 ? string.Empty : $"<{string.Join(", ", typeParameters.Select(static parameter => parameter.Name))}>";
+            var sharedClassName = fieldDescriptions.Count > 0 ? GetSharedClassName(interfaceDescription.Name) : null;
+            sharedType = sharedClassName is null ? null : $"{qualifier}{sharedClassName}{typeArguments}";
+            var sharedConstructor = LibraryTypes.GrainReferenceSharedOrDefault!.InstanceConstructors.Single(
+                constructor => constructor.DeclaredAccessibility == Accessibility.Public);
+            var constructorParameters = new StringBuilder();
+            AppendParameters(constructorParameters, sharedConstructor.Parameters, typeParameterSubstitutions: null);
+            var constructorArguments = string.Join(", ", Enumerable.Range(0, sharedConstructor.Parameters.Length).Select(static index => $"arg{index}"));
+            activator = new(
+                GetActivatorClassName(interfaceDescription.Name),
+                sharedType ?? SharedBaseTypeName,
+                constructorParameters.ToString(),
+                constructorArguments,
+                $"{qualifier}{generatedClassName}{typeArguments}",
+                sharedClassName);
+        }
+
+        if (sharedType is not null)
+        {
+            var propertyName = "Shared";
+            while (interfaceDescription.TypeParameters.Any(parameter => parameter.Name == propertyName))
+            {
+                propertyName += "_";
+            }
+
+            var modifier = propertyName == "Shared" ? "private new" : "private";
+            sharedProperty = $"{modifier} {sharedType} {propertyName} => ({sharedType})base.Shared;";
+            foreach (var field in fieldDescriptions.OfType<CopierFieldDescription>())
+            {
+                field.AccessExpression = $"this.{propertyName}.{field.FieldName}";
+            }
+        }
+
         var methods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
-        var (constructors, constructorStatements) = CreateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+        var (constructors, constructorStatements) = CreateConstructors(generatedClassName, fieldDescriptions, sharedType, interfaceDescription.ProxyBaseType);
+        var fields = fieldDescriptions.Select(field => $"{(sharedType is null ? "private" : "public")} readonly {CodeText.Type(field.FieldType)} {field.FieldName};").ToImmutableArray();
 
         return new ProxyEmissionPlan(
             generatedClassName,
             CodeText.Type(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
             CodeText.Type(interfaceDescription.InterfaceType.ToTypeSyntax()),
-            GenericParameterEmissionPlan.Create(interfaceDescription.TypeParameters),
-            fieldDescriptions.Select(static field => $"private readonly {CodeText.Type(field.FieldType)} {field.FieldName};").ToImmutableArray(),
+            typeParameters,
+            sharedType is null ? fields : [],
             constructors,
             constructorStatements,
-            methods);
+            methods,
+            activator,
+            sharedProperty,
+            sharedType is null ? [] : fields,
+            sharedType is null ? [] : fieldDescriptions.Select(GetCopierResolutionStatement).ToImmutableArray());
     }
+
+    /// <summary>
+    /// Gets a value indicating whether proxies with the provided base type have a generated activator.
+    /// </summary>
+    internal static bool HasActivator(LibraryTypes libraryTypes, ITypeSymbol proxyBaseType)
+        => SymbolEqualityComparer.Default.Equals(proxyBaseType, libraryTypes.GrainReferenceOrDefault)
+            && libraryTypes.GrainReferenceSharedOrDefault is not null
+            && libraryTypes.IGrainReferenceActivatorOrDefault is not null;
+
+    /// <summary>Gets the name of the activator type for the proxy of the interface named <paramref name="name"/>.</summary>
+    internal static string GetActivatorClassName(string name)
+        => $"ProxyActivator_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
+
+    private static string GetSharedClassName(string name)
+        => $"ProxyShared_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
 
     internal static void Write(SourceWriter writer, ProxyEmissionPlan plan)
     {
@@ -56,6 +121,12 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         foreach (var field in plan.Fields)
         {
             writer.WriteLine(field);
+        }
+
+        if (plan.SharedProperty is { } sharedProperty)
+        {
+            writer.WriteLine(sharedProperty);
+            writer.BlankLine();
         }
 
         foreach (var constructor in plan.Constructors)
@@ -83,7 +154,62 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         }
 
         writer.CloseBlock();
+
+        if (plan.Activator is { } activator)
+        {
+            WriteActivator(writer, activator, plan);
+            if (activator.SharedClassName is { } sharedClassName)
+            {
+                WriteShared(writer, activator, sharedClassName, plan);
+            }
+        }
     }
+
+    private static void WriteActivator(SourceWriter writer, ProxyActivatorEmissionPlan activator, ProxyEmissionPlan plan)
+    {
+        var declaration = new StringBuilder();
+        declaration.Append("internal sealed class ").Append(activator.ClassName);
+        GenericParameterEmissionPlan.AppendParameterList(declaration, plan.TypeParameters);
+        declaration.Append(" : global::Orleans.GrainReferences.IGrainReferenceActivator");
+        writer.WriteLine(GeneratedCodeUtilities.GeneratedCodeAttributeText);
+        GenericParameterEmissionPlan.WriteDeclarationLine(writer, declaration, plan.TypeParameters);
+        writer.OpenBlock();
+        writer.WriteLine($"private readonly {activator.SharedType} _shared;");
+        writer.WriteLine($"public {activator.ClassName}({activator.ConstructorParameters})");
+        writer.OpenBlock();
+        writer.WriteLine($"_shared = new {activator.SharedType}({activator.ConstructorArguments});");
+        writer.CloseBlock();
+        writer.WriteLine($"public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new {activator.ProxyType}(_shared, grainId.Key);");
+        writer.CloseBlock();
+    }
+
+    private static void WriteShared(SourceWriter writer, ProxyActivatorEmissionPlan activator, string sharedClassName, ProxyEmissionPlan plan)
+    {
+        var declaration = new StringBuilder();
+        declaration.Append("internal sealed class ").Append(sharedClassName);
+        GenericParameterEmissionPlan.AppendParameterList(declaration, plan.TypeParameters);
+        declaration.Append(" : ").Append(SharedBaseTypeName);
+        writer.WriteLine(GeneratedCodeUtilities.GeneratedCodeAttributeText);
+        GenericParameterEmissionPlan.WriteDeclarationLine(writer, declaration, plan.TypeParameters);
+        writer.OpenBlock();
+        foreach (var field in plan.SharedFields)
+        {
+            writer.WriteLine(field);
+        }
+
+        writer.WriteLine($"public {sharedClassName}({activator.ConstructorParameters}) : base({activator.ConstructorArguments})");
+        writer.OpenBlock();
+        foreach (var statement in plan.SharedStatements)
+        {
+            writer.WriteLine(statement);
+        }
+
+        writer.CloseBlock();
+        writer.CloseBlock();
+    }
+
+    private static string GetCopierResolutionStatement(GeneratedFieldDescription field)
+        => $"{CodeText.Identifier(field.FieldName)} = {GetServiceExpression(CodeText.Type(field.FieldType), CodecProviderMemberName)};";
 
     public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
         => GetSimpleClassName(interfaceDescription.Name);
@@ -405,9 +531,10 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         return (isAsync, statements.ToImmutable());
     }
 
-    private static (EquatableArray<string> Declarations, EquatableArray<string> Statements) CreateConstructors(
+    private (EquatableArray<string> Declarations, EquatableArray<string> Statements) CreateConstructors(
         string simpleClassName,
         List<GeneratedFieldDescription> fieldDescriptions,
+        string? sharedType,
         INamedTypeSymbol baseType)
     {
         if (baseType is null)
@@ -415,20 +542,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             return ([], []);
         }
 
-        var statements = ImmutableArray.CreateBuilder<string>();
-        foreach (var field in fieldDescriptions)
-        {
-            var name = CodeText.Identifier(field.FieldName);
-            switch (field)
-            {
-                case GeneratedFieldDescription _ when field.IsInjected:
-                    statements.Add($"this.{name} = OrleansGeneratedCodeHelper.UnwrapService(this, {name});");
-                    break;
-                case CopierFieldDescription:
-                    statements.Add($"{name} = {GetServiceExpression(CodeText.Type(field.FieldType), CodecProviderMemberName)};");
-                    break;
-            }
-        }
+        EquatableArray<string> statements = sharedType is not null ? [] : fieldDescriptions.Select(GetCopierResolutionStatement).ToImmutableArray();
 
         var declarations = ImmutableArray.CreateBuilder<string>();
         foreach (var member in baseType.GetMembers())
@@ -453,8 +567,10 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                     break;
             }
 
+            // The proxy's activator constructs the shared type once and passes it to every proxy it creates.
+            var sharedParameterType = sharedType is null ? null : LibraryTypes.GrainReferenceSharedOrDefault;
             declaration.Append(simpleClassName).Append('(');
-            AppendParameters(declaration, method.Parameters, typeParameterSubstitutions: null);
+            AppendParameters(declaration, method.Parameters, typeParameterSubstitutions: null, sharedParameterType, sharedType);
             declaration.Append(") : base(");
             for (var index = 0; index < method.Parameters.Length; index++)
             {
@@ -474,10 +590,15 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             declarations.Add(declaration.Append(')').ToString());
         }
 
-        return (declarations.ToImmutable(), statements.ToImmutable());
+        return (declarations.ToImmutable(), statements);
     }
 
-    private static void AppendParameters(StringBuilder builder, ImmutableArray<IParameterSymbol> parameters, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
+    private static void AppendParameters(
+        StringBuilder builder,
+        ImmutableArray<IParameterSymbol> parameters,
+        Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions,
+        ITypeSymbol? replacedType = null,
+        string? replacementType = null)
     {
         for (var index = 0; index < parameters.Length; index++)
         {
@@ -494,7 +615,15 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                 RefKind.In => "in ",
                 _ => string.Empty,
             });
-            CodeText.AppendType(builder, parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
+            if (replacementType is not null && SymbolEqualityComparer.Default.Equals(parameter.Type, replacedType))
+            {
+                builder.Append(replacementType);
+            }
+            else
+            {
+                CodeText.AppendType(builder, parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
+            }
+
             builder.Append(" arg").Append(index);
         }
     }

@@ -254,24 +254,24 @@ internal static class Program
         var proxyType = options.InterfaceProxies.Single(type => typeof(ITrimSmokeGrain).IsAssignableFrom(type));
         var grainType = GrainType.Create("trim-smoke");
         var interfaceType = GrainInterfaceType.Create("trim-smoke-interface");
-        var shared = new GrainReferenceShared(
+        object?[] arguments = [
             grainType,
             interfaceType,
-            interfaceVersion: 0,
-            runtime: null!,
+            (ushort)0,
+            null,
             InvokeMethodOptions.None,
             codecProvider,
             serviceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(),
-            serviceProvider);
+            serviceProvider];
         var referenceActivator = new Orleans.GrainReferences.GrainReferenceActivator(
             serviceProvider,
-            [new TrimSmokeReferenceActivatorProvider(proxyType, shared)]);
+            [new TrimSmokeReferenceActivatorProvider(options.InterfaceProxyActivators[proxyType], arguments)]);
 
         var proxy = referenceActivator.CreateReference(
             GrainId.Create(grainType, IdSpan.Create("key")),
             interfaceType);
 
-        Ensure(proxy is ITrimSmokeGrain, "The generated grain proxy constructor was not preserved.");
+        Ensure(proxy is ITrimSmokeGrain, "The generated grain reference activator was not preserved.");
     }
 
     private static void Ensure([DoesNotReturnIf(false)] bool condition, string message)
@@ -370,33 +370,25 @@ internal sealed class CustomGenericActivator<T> : Orleans.Serialization.Activato
 }
 
 internal sealed class TrimSmokeReferenceActivatorProvider(
-    Type proxyType,
-    GrainReferenceShared shared) : Orleans.GrainReferences.IGrainReferenceActivatorProvider
+    Type activatorType,
+    object?[] arguments) : Orleans.GrainReferences.IGrainReferenceActivatorProvider
 {
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2067",
+        Justification = "TypeManifestOptions.AddInterfaceProxyActivator preserves the public constructor used to instantiate generated proxy activators.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2077",
+        Justification = "TypeManifestOptions.AddInterfaceProxyActivator preserves the public constructor used to instantiate generated proxy activators.")]
     public bool TryGet(
         GrainType grainType,
         GrainInterfaceType interfaceType,
         [NotNullWhen(true)] out Orleans.GrainReferences.IGrainReferenceActivator? activator)
     {
-        activator = new TrimSmokeReferenceActivator(proxyType, shared);
+        activator = (Orleans.GrainReferences.IGrainReferenceActivator)Activator.CreateInstance(activatorType, arguments)!;
         return true;
     }
-}
-
-internal sealed class TrimSmokeReferenceActivator(
-    Type proxyType,
-    GrainReferenceShared shared) : Orleans.GrainReferences.IGrainReferenceActivator
-{
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2067",
-        Justification = "TypeManifestOptions.AddInterfaceProxy preserves the public constructor used to instantiate generated proxy types.")]
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2077",
-        Justification = "TypeManifestOptions.AddInterfaceProxy preserves the public constructor used to instantiate generated proxy types.")]
-    public GrainReference CreateReference(GrainId grainId) =>
-        (GrainReference)Activator.CreateInstance(proxyType, shared, grainId.Key)!;
 }
 
 [Serializable]

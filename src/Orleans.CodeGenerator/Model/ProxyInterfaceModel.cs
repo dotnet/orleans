@@ -12,6 +12,7 @@ internal sealed record class ProxyBaseModel(
 /// <summary>
 /// Describes a <c>[GenerateMethodSerializers]</c>-annotated interface for incremental proxy/invokable generation.
 /// </summary>
+/// <param name="HasActivator">Whether the generated proxy has a generated activator, which the type manifest registers.</param>
 internal sealed record class ProxyInterfaceModel(
     TypeRef InterfaceType,
     string Name,
@@ -20,4 +21,5 @@ internal sealed record class ProxyInterfaceModel(
     ProxyBaseModel ProxyBase,
     EquatableArray<MethodModel> Methods,
     SourceLocationModel SourceLocation = default,
-    TypeMetadataIdentity MetadataIdentity = default);
+    TypeMetadataIdentity MetadataIdentity = default,
+    bool HasActivator = false);

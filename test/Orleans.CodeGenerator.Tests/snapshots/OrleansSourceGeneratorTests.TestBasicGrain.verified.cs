@@ -246,6 +246,18 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class ProxyActivator_IBasicGrain : global::Orleans.GrainReferences.IGrainReferenceActivator
+    {
+        private readonly global::Orleans.Runtime.GrainReferenceShared _shared;
+        public ProxyActivator_IBasicGrain(global::Orleans.Runtime.GrainType arg0, global::Orleans.Runtime.GrainInterfaceType arg1, ushort arg2, global::Orleans.Runtime.IGrainReferenceRuntime arg3, global::Orleans.CodeGeneration.InvokeMethodOptions arg4, global::Orleans.Serialization.Serializers.CodecProvider arg5, global::Orleans.Serialization.Cloning.CopyContextPool arg6, global::System.IServiceProvider arg7)
+        {
+            _shared = new global::Orleans.Runtime.GrainReferenceShared(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+        }
+
+        public global::Orleans.Runtime.GrainReference CreateReference(global::Orleans.Runtime.GrainId grainId) => new global::OrleansCodeGen.TestProject.Proxy_IBasicGrain(_shared, grainId.Key);
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
@@ -257,6 +269,7 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BasicGrain), typeof(global::TestProject.BasicGrain));
             config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_BasicGrain), typeof(global::TestProject.BasicGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain));
+            config.AddInterfaceProxyActivator(typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain), typeof(OrleansCodeGen.TestProject.ProxyActivator_IBasicGrain));
             config.AddInterface(typeof(global::TestProject.IBasicGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.BasicGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_BasicGrain), typeof(global::TestProject.BasicGrain));

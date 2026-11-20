@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.CodeGeneration;
+using Orleans.GrainReferences;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -341,18 +342,15 @@ public class MembershipTableCancellationTests
     private static async Task<IInvokable> CaptureProxyCall(ServiceProvider services, string operation, object[] arguments)
     {
         var runtime = new CapturingRuntime();
-        var shared = new GrainReferenceShared(
-            GrainType.Create("membership-wire-test"),
-            GrainInterfaceType.Create("membership-wire-test"),
-            interfaceVersion: 0,
-            runtime,
-            InvokeMethodOptions.None,
-            services.GetRequiredService<CodecProvider>(),
-            services.GetRequiredService<CopyContextPool>(),
-            services);
-        var proxyType = Assert.Single(services.GetRequiredService<IOptions<TypeManifestOptions>>().Value.InterfaceProxies,
+        var grainType = GrainType.Create("membership-wire-test");
+        var options = services.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var proxyType = Assert.Single(options.InterfaceProxyTypes,
             type => type.Assembly == typeof(IMembershipTable).Assembly && typeof(IMembershipTableSystemTarget).IsAssignableFrom(type));
-        var proxy = Activator.CreateInstance(proxyType, shared, IdSpan.Create("membership"));
+        var activator = GrainReferenceActivatorProvider.CreateActivator(
+            proxyType, options.InterfaceProxyActivatorTypes[proxyType],
+            grainType, GrainInterfaceType.Create("membership-wire-test"), interfaceVersion: 0, runtime,
+            InvokeMethodOptions.None, services.GetRequiredService<CodecProvider>(), services.GetRequiredService<CopyContextPool>(), services);
+        var proxy = activator.CreateReference(GrainId.Create(grainType, IdSpan.Create("membership")));
 
         var method = Assert.Single(typeof(IMembershipTable).GetMethods(), method => method.Name == operation);
         await Assert.IsAssignableFrom<Task>(method.Invoke(proxy, arguments));

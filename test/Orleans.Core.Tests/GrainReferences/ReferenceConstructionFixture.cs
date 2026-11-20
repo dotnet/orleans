@@ -24,16 +24,18 @@ internal sealed class ReferenceConstructionFixture : IDisposable
 
     public ReferenceConstructionFixture(
         bool unordered = false,
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)] Type? proxyType = null)
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)] Type? proxyType = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         Runtime = new RecordingReferenceRuntime();
-        Services = new ServiceCollection()
+        var services = new ServiceCollection()
             .AddSerializer()
             // Construction uses these services for shared state; payload serialization is tested separately.
             .AddSingleton(_ => new TypeConverter([], [], [], Options.Create(new TypeManifestOptions()), new CachedTypeResolver()))
             .AddSingleton(serviceProvider => new CodecProvider(serviceProvider, Options.Create(new TypeManifestOptions())))
-            .AddSingleton<IGrainReferenceRuntime>(Runtime)
-            .BuildServiceProvider();
+            .AddSingleton<IGrainReferenceRuntime>(Runtime);
+        configureServices?.Invoke(services);
+        Services = services.BuildServiceProvider();
         var options = Services.GetRequiredService<IOptions<TypeManifestOptions>>();
         if (proxyType is not null)
         {
@@ -62,6 +64,9 @@ internal sealed class ReferenceConstructionFixture : IDisposable
 
     public GrainReference CreateReference(string key) =>
         Activator.CreateReference(GrainId.Create(GrainType, IdSpan.Create(key)), InterfaceType);
+
+    public GrainReference CreateReference(string key, GrainInterfaceType interfaceType) =>
+        Activator.CreateReference(GrainId.Create(GrainType, IdSpan.Create(key)), interfaceType);
 
     public void Dispose() => Services.Dispose();
 
@@ -105,6 +110,7 @@ internal sealed class RecordingReferenceRuntime : IGrainReferenceRuntime
 {
     public GrainReference? CastReference { get; private set; }
     public Type? CastInterface { get; private set; }
+    public IInvokable? LastRequest { get; private set; }
 
     public object Cast(IAddressable grain, Type interfaceType)
     {
@@ -116,8 +122,11 @@ internal sealed class RecordingReferenceRuntime : IGrainReferenceRuntime
     public ValueTask<T?> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options) =>
         throw new NotSupportedException();
 
-    public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options) =>
-        throw new NotSupportedException();
+    public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+    {
+        LastRequest = request;
+        return default;
+    }
 
     public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options) =>
         throw new NotSupportedException();
