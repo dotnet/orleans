@@ -244,7 +244,10 @@ namespace Orleans.Messaging
     {
         System.Collections.Generic.IReadOnlyList<DeadLetter> InboxDeadLetters { get; }
 
+        System.Collections.Generic.IReadOnlyList<OutboxDeadLetter> OutboxDeadLetters { get; }
+
         bool RemoveInboxDeadLetter(MessageId messageId);
+        bool RemoveOutboxDeadLetter(MessageId messageId);
     }
 
     [Alias("Orleans.Messaging.IMessagingExtension")]
@@ -356,6 +359,23 @@ namespace Orleans.Messaging
         public T Decode(Envelope envelope) { throw null; }
     }
 
+    [GenerateSerializer]
+    [Alias("Orleans.Messaging.OutboxDeadLetter")]
+    public sealed partial class OutboxDeadLetter
+    {
+        [Id(3)]
+        public int AttemptCount { get { throw null; } init { } }
+
+        [Id(1)]
+        public System.DateTimeOffset DeadLetteredAt { get { throw null; } init { } }
+
+        [Id(0)]
+        public required OutboxMessage Message { get { throw null; } init { } }
+
+        [Id(2)]
+        public required string Reason { get { throw null; } init { } }
+    }
+
     public static partial class OutboxExtensions
     {
         public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, MessageId messageId, Runtime.GrainId destination, T body, System.DateTimeOffset? deliverAt = null) { }
@@ -444,6 +464,44 @@ namespace Orleans.Messaging.Configuration
         public System.TimeSpan RetryInitialInterval { get { throw null; } set { } }
 
         public void Validate() { }
+    }
+}
+
+namespace Orleans.Messaging.Diagnostics
+{
+    public static partial class MessagingEvents
+    {
+        public const string ListenerName = "Orleans.Messaging";
+        public static System.IObservable<MessagingEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class InboxMessageReceiving : MessagingEvent
+        {
+            public readonly InboxMessage Message;
+            public InboxMessageReceiving(Runtime.IGrainContext grainContext, InboxMessage message) : base(default!) { }
+        }
+
+        public abstract partial class MessagingEvent
+        {
+            public readonly Runtime.IGrainContext GrainContext;
+            protected MessagingEvent(Runtime.IGrainContext grainContext) { }
+        }
+
+        public sealed partial class OutboxMessageRetired : MessagingEvent
+        {
+            public readonly MessageId MessageId;
+            public readonly OutboxMessageRetirement Retirement;
+            public OutboxMessageRetired(Runtime.IGrainContext grainContext, MessageId messageId, OutboxMessageRetirement retirement) : base(default!) { }
+        }
+
+        public sealed partial class OutboxRetryScheduled : MessagingEvent
+        {
+            public readonly int AttemptCount;
+            public readonly string Error;
+            public readonly MessageId MessageId;
+            public readonly System.DateTimeOffset NextAttemptAt;
+            public readonly Runtime.GrainId ReceiverId;
+            public OutboxRetryScheduled(Runtime.IGrainContext grainContext, MessageId messageId, Runtime.GrainId receiverId, int attemptCount, System.DateTimeOffset nextAttemptAt, string error) : base(default!) { }
+        }
     }
 }
 
@@ -542,6 +600,24 @@ namespace OrleansCodeGen.Orleans.Messaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_OutboxDeadLetter : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.OutboxDeadLetter>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_OutboxDeadLetter(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.OutboxDeadLetter> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Messaging.OutboxDeadLetter instance) { }
+
+        public global::Orleans.Messaging.OutboxDeadLetter ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Messaging.OutboxDeadLetter instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Messaging.OutboxDeadLetter value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_OutboxMessage : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Messaging.OutboxMessage>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Messaging.OutboxMessage>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_OutboxMessage(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.OutboxMessage> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -605,6 +681,16 @@ namespace OrleansCodeGen.Orleans.Messaging
         public Copier_Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 DeepCopy(Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_OutboxDeadLetter : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Messaging.OutboxDeadLetter>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_OutboxDeadLetter(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Messaging.OutboxDeadLetter> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Messaging.OutboxDeadLetter DeepCopy(global::Orleans.Messaging.OutboxDeadLetter original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

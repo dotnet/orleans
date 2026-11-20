@@ -23,6 +23,7 @@ public interface IMessagingTestGrain : IGrainWithGuidKey
     Task<DeliveryResult> AcceptAndDeactivateAsync(InboxMessage envelope);
     Task ConfigureHandlerAsync(bool enabled);
     Task<bool> RemoveInboxDeadLetterAsync(MessageId messageId);
+    Task<bool> RemoveOutboxDeadLetterAsync(MessageId messageId);
     Task<EndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
     Task SetControlEnvelopeAsync(InboxMessage envelope);
@@ -42,7 +43,8 @@ public sealed record TestMessage(
     [property: Id(6)] bool DeleteDuringHandling = false,
     [property: Id(9)] bool ThrowOnceDuringPreparation = false,
     [property: Id(10)] int ThrowForAttempts = 0,
-    [property: Id(11)] bool ThrowAfterStaging = false);
+    [property: Id(11)] bool ThrowAfterStaging = false,
+    [property: Id(12)] bool ThrowAfterSending = false);
 
 [GenerateSerializer, Immutable]
 public sealed record MessageEffect(
@@ -226,6 +228,17 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
         return true;
     }
 
+    public async Task<bool> RemoveOutboxDeadLetterAsync(MessageId messageId)
+    {
+        if (!_diagnostics.RemoveOutboxDeadLetter(messageId))
+        {
+            return false;
+        }
+
+        await WriteStateAsync();
+        return true;
+    }
+
     public Task<EndpointSnapshot> GetSnapshotAsync() => Task.FromResult(CreateSnapshot());
 
     internal EndpointSnapshot GetSnapshotForTest() => CreateSnapshot();
@@ -399,6 +412,13 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
                 NextApplyFailure = null;
                 throw failure;
             }
+            if (message.ThrowAfterSending && outgoing is { } unsent)
+            {
+                // The handler fails after its outbox send, before it stages its effect.
+                _outbox.Send(unsent);
+                throw new InvalidOperationException($"Injected handler failure after sending for {message.LogicalId}.");
+            }
+
             _effects.TryGetValue(message.LogicalId, out var prior);
             _effects[message.LogicalId] = new MessageEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
             if (message.ThrowAfterStaging)
@@ -434,10 +454,18 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             _maxConcurrentHandlers,
             _effects.Values.OrderBy(static effect => effect.Sequence).ToArray(),
             _diagnostics.InboxDeadLetters.Select(ToSnapshot).ToArray(),
-            [],
+            _diagnostics.OutboxDeadLetters.Select(ToSnapshot).ToArray(),
             InboxTestAccess.GetProcessedCount(_inboxState));
 
     private DeadLetterSnapshot ToSnapshot(DeadLetter deadLetter) =>
+        new(
+            deadLetter.Message.Envelope.MessageId,
+            TestApplicationProtocol.Read(_sessions, deadLetter.Message).Route,
+            deadLetter.Reason,
+            deadLetter.AttemptCount,
+            deadLetter.DeadLetteredAt);
+
+    private DeadLetterSnapshot ToSnapshot(OutboxDeadLetter deadLetter) =>
         new(
             deadLetter.Message.Envelope.MessageId,
             TestApplicationProtocol.Read(_sessions, deadLetter.Message).Route,

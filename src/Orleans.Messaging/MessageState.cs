@@ -20,11 +20,47 @@ internal sealed class InboxMessageState
     public DateTimeOffset? ExpirationTime { get; set; }
 }
 
+[GenerateSerializer, Alias("Orleans.Messaging.OutboxMessageState")]
+internal sealed class OutboxMessageState
+{
+    [Id(0)]
+    public int AttemptCount { get; set; }
+
+    [Id(1)]
+    public DateTimeOffset? NextAttemptAt { get; set; }
+
+    [Id(2)]
+    public string? LastError { get; set; }
+
+    /// <summary>
+    /// Gets or sets the logical send's staging time on the Durable Jobs clock. Every attempt preserves this value;
+    /// retries end <c>OutboxRetryTimeout</c> after it. A recovered entry requires this journaled value.
+    /// </summary>
+    [Id(3)]
+    public DateTimeOffset? SentAt { get; set; }
+}
+
 [GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
 internal sealed class InboxDeadLetter
 {
     [Id(0)]
     public required InboxMessage Message { get; init; }
+
+    [Id(1)]
+    public required DateTimeOffset DeadLetteredAt { get; init; }
+
+    [Id(2)]
+    public required string Reason { get; init; }
+
+    [Id(3)]
+    public int AttemptCount { get; init; }
+}
+
+[GenerateSerializer, Alias("Orleans.Messaging.OutboxDeadLetterRecord")]
+internal sealed class OutboxDeadLetterRecord
+{
+    [Id(0)]
+    public required OutboxMessage Message { get; init; }
 
     [Id(1)]
     public required DateTimeOffset DeadLetteredAt { get; init; }

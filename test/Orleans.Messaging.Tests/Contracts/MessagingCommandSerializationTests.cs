@@ -12,8 +12,10 @@ namespace Orleans.Messaging.Tests.Contracts;
 public sealed class MessagingCommandSerializationTests
 {
     private static readonly DateTimeOffset Now = new(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
+    private static readonly GrainId Receiver = GrainId.Create("receiver", "1");
 
     public static TheoryData<int> InboxCommands => new(Enumerable.Range(0, CreateInboxCommands().Length));
+    public static TheoryData<int> OutboxCommands => new(Enumerable.Range(0, CreateOutboxCommands().Length));
 
     [Theory]
     [MemberData(nameof(InboxCommands))]
@@ -32,6 +34,24 @@ public sealed class MessagingCommandSerializationTests
         Assert.DoesNotContain("\"ProcessedAt\"", json, StringComparison.Ordinal);
         Assert.Equal(json, JsonSerializer.Serialize(fromJson, InboxJsonContext.Default.InboxCommand));
         Assert.Equal(json, JsonSerializer.Serialize(fromBinary, InboxJsonContext.Default.InboxCommand));
+    }
+
+    [Theory]
+    [MemberData(nameof(OutboxCommands))]
+    public void OutboxCommand_RoundTripsThroughJsonAndOrleansSerialization(int index)
+    {
+        var command = CreateOutboxCommands()[index];
+        var json = JsonSerializer.Serialize(command, OutboxJsonContext.Default.OutboxCommand);
+        var fromJson = JsonSerializer.Deserialize(json, OutboxJsonContext.Default.OutboxCommand);
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<OutboxCommand>>();
+        var fromBinary = serializer.Deserialize(serializer.SerializeToArray(command));
+
+        Assert.StartsWith("{\"kind\":", json, StringComparison.Ordinal);
+        Assert.Equal(command.Value!.GetType(), fromJson.Value!.GetType());
+        Assert.Equal(command.Value.GetType(), fromBinary.Value!.GetType());
+        Assert.Equal(json, JsonSerializer.Serialize(fromJson, OutboxJsonContext.Default.OutboxCommand));
+        Assert.Equal(json, JsonSerializer.Serialize(fromBinary, OutboxJsonContext.Default.OutboxCommand));
     }
 
     [Fact]
@@ -56,9 +76,35 @@ public sealed class MessagingCommandSerializationTests
         Assert.DoesNotContain("DeliverAt", immediateJson, StringComparison.Ordinal);
         Assert.Null(((InboxCommand.Accept)JsonSerializer.Deserialize(immediateJson, InboxJsonContext.Default.InboxCommand).Value!).Message.Envelope.DeliverAt);
         Assert.Null(((InboxCommand.Accept)serializer.Deserialize(serializer.SerializeToArray(immediate)).Value!).Message.Envelope.DeliverAt);
+        Assert.DoesNotContain("DeliverAt",
+            JsonSerializer.Serialize<OutboxCommand>(new OutboxCommand.Enqueue(OutboxMessage("immediate"), new()),
+                OutboxJsonContext.Default.OutboxCommand),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReferenceEnqueue_CarriesNoMessageInJsonAndOrleansSerialization()
+    {
+        OutboxCommand command = new OutboxCommand.EnqueueReference(Reference("reference"), new());
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<OutboxCommand>>();
+
+        var json = JsonSerializer.Serialize(command, OutboxJsonContext.Default.OutboxCommand);
+        var fromJson = JsonSerializer.Deserialize(json, OutboxJsonContext.Default.OutboxCommand);
+        var fromBinary = serializer.Deserialize(serializer.SerializeToArray(command));
+
+        Assert.DoesNotContain("Payload", json, StringComparison.Ordinal);
+        foreach (var recovered in new[] { fromJson, fromBinary })
+        {
+            Assert.Equal(MessageId.Create("orders", "reference"), Assert.IsType<OutboxCommand.EnqueueReference>(recovered.Value).Reference.MessageId);
+        }
     }
 
     private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), SentAt = Now };
+
+    private static OutboxMessage OutboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), ReceiverId = Receiver };
+
+    private static OutboxMessageReference Reference(string id) => new() { MessageId = MessageId.Create("orders", id) };
 
     private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
@@ -72,7 +118,7 @@ public sealed class MessagingCommandSerializationTests
     private static InboxCommand[] CreateInboxCommands()
     {
         var deadLetter = new InboxDeadLetter { Message = InboxMessage("dead"), DeadLetteredAt = Now, Reason = "failed", AttemptCount = 3 };
-        var rejection = new InboxRejection { Reason = "failed" };
+        var rejection = new InboxRejection { Reason = "failed", Code = "orders/invalid" };
         return
         [
             new InboxCommand.Accept(InboxMessage("accept")),
@@ -95,6 +141,27 @@ public sealed class MessagingCommandSerializationTests
                 [deadLetter],
                 Now,
                 stoppedCleanly: true)
+        ];
+    }
+
+    private static OutboxCommand[] CreateOutboxCommands()
+    {
+        var deadLetter = new OutboxDeadLetterRecord { Message = OutboxMessage("dead"), DeadLetteredAt = Now, Reason = "rejected", AttemptCount = 3 };
+        return
+        [
+            new OutboxCommand.Enqueue(OutboxMessage("enqueue"), new() { SentAt = Now }),
+            new OutboxCommand.Enqueue(OutboxMessage("scheduled", Now), new() { SentAt = Now }),
+            new OutboxCommand.EnqueueReference(Reference("reference"), new() { SentAt = Now }),
+            new OutboxCommand.Retry(MessageId.Create("orders", "retry"), new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", SentAt = Now }),
+            new OutboxCommand.Retire(MessageId.Create("orders", "done")),
+            new OutboxCommand.Retire(MessageId.Create("orders", "dead"), deadLetter),
+            new OutboxCommand.RemoveDeadLetters([MessageId.Create("orders", "dead")]),
+            new OutboxCommand.Snapshot(
+                [
+                    new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, SentAt = Now } },
+                    new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2, SentAt = Now } }
+                ],
+                [deadLetter])
         ];
     }
 }

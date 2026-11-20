@@ -10,11 +10,11 @@ using Orleans.Runtime;
 namespace Orleans.Messaging;
 
 /// <summary>
-/// Drives inbox processing for one activation.
+/// Drives inbox processing and outbox delivery for one activation.
 /// </summary>
 /// <remarks>
-/// A single loop runs on the activation scheduler and services the inbox whenever it is signaled.
-/// One durable job keeps waking the grain while the inbox holds work which the activation can perform, or a callback
+/// A single loop runs on the activation scheduler and services both queues whenever it is signaled.
+/// One durable job keeps waking the grain while either queue holds work which the activation can perform, or a callback
 /// registered with <see cref="IInbox.RegisterWakeup"/> reports work; inbox messages wait for a handler without a wake-up.
 /// Work staged with an earlier due time than the current wake-up schedules an earlier one, and the job which a newer,
 /// earlier wake-up supersedes completes when it runs.
@@ -25,7 +25,7 @@ namespace Orleans.Messaging;
 /// per write. The job retries indefinitely when an activation fails (see <see cref="GetRetryTime"/>), and every
 /// activation re-arms it from recovered state, so committed work always keeps a wake-up.
 /// Wake-up bookkeeping runs on the activation scheduler: journal writes prepare on it and serialize with job runs.
-/// The loop keeps the activation alive while a pass runs over queued work.
+/// The loop keeps the activation alive while a pass runs over queued work and while outbox deliveries are in flight.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
 /// </remarks>
 internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecycleObserver
@@ -38,6 +38,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdown = new();
     private Inbox? _inbox;
+    private Outbox? _outbox;
     private Task? _loop;
     private TaskCompletionSource? _nextPass;
     private Task<DurableJob>? _scheduling;
@@ -81,6 +82,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.SetupState, static _ => Task.CompletedTask, _ =>
         {
             _inbox?.ReleaseDepth();
+            _outbox?.ReleaseDepth();
             return Task.CompletedTask;
         });
     }
@@ -99,7 +101,10 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     internal void Register(Inbox inbox) => _inbox = inbox;
 
-    private Inbox Inbox => _inbox ?? throw new InvalidOperationException("The messaging inbox has not been registered.");
+    internal void Register(Outbox outbox) => _outbox = outbox;
+
+    internal Inbox Inbox => _inbox ?? throw new InvalidOperationException("The messaging inbox has not been registered.");
+
 
     public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
 
@@ -168,7 +173,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
-        // A running job keeps rescheduling itself until the inbox and every registered wake-up report no work.
+        // A running job keeps rescheduling itself until both queues and every registered wake-up report no work.
         var jobId = context.Job.Id;
         if (_wakeupJobId is null)
         {
@@ -192,7 +197,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
 
         var now = Shared.JobTimeProvider.GetUtcNow();
-        if (Inbox.GetNextWakeupDelay(now) is not { } delay)
+        if (GetNextWakeupDelay(now) is not { } delay)
         {
             CompleteWakeup(jobId);
             return DurableJobRunResult.Completed;
@@ -217,6 +222,14 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         _wakeupEpoch++;
     }
 
+    // The delay until the inbox, the outbox, or a registered wake-up next holds work, or null when none does.
+    private TimeSpan? GetNextWakeupDelay(DateTimeOffset now) =>
+        (Inbox.GetNextWakeupDelay(now), _outbox?.GetNextWakeupDelay(now)) switch
+        {
+            ({ } inbox, { } outbox) => inbox < outbox ? inbox : outbox,
+            (var inbox, var outbox) => inbox ?? outbox
+        };
+
     private async Task RepairWakeupAsync()
     {
         try
@@ -238,13 +251,14 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         var cancellationToken = _shutdown.Token;
         while (!cancellationToken.IsCancellationRequested)
         {
-            SetKeepAlive(Inbox.Count > 0);
+            SetKeepAlive(Inbox.Count > 0 || _outbox?.Count > 0);
             var pass = _nextPass;
             _nextPass = null;
             var progress = false;
             try
             {
                 progress = await Inbox.ProcessReadyAsync(cancellationToken).ConfigureAwait(true);
+                if (_outbox is { } outbox) progress |= await outbox.AdvanceAsync(cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -260,7 +274,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             pass?.TrySetResult();
             if (!progress)
             {
-                SetKeepAlive(false);
+                SetKeepAlive(_outbox?.IsDelivering == true);
                 await _signal.WaitAsync().ConfigureAwait(true);
             }
         }
@@ -285,11 +299,12 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public async Task OnStart(CancellationToken cancellationToken)
     {
+        if (_outbox is { } outbox) await outbox.StartAsync(cancellationToken).ConfigureAwait(true);
         await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
 
         // Recovered work keeps a wake-up at its real due time, even if the job which woke this activation completes.
         var now = Shared.JobTimeProvider.GetUtcNow();
-        if (Inbox.GetNextWakeupDelay(now) is { } delay)
+        if (GetNextWakeupDelay(now) is { } delay)
         {
             await EnsureWakeupAsync(MessagingTime.AddClamped(now, delay), cancellationToken).ConfigureAwait(true);
         }
@@ -311,7 +326,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         var scheduling = _scheduling;
         Stop();
 
-        // Grain calls finish before deactivation stops the lifecycle, so the loop owns every remaining write.
+        // Grain calls finish before deactivation stops the lifecycle, so the loop and outbox deliveries own every remaining write.
         if (_loop is { } loop)
         {
             await loop.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
@@ -322,7 +337,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             await ((Task)scheduling).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
 
-        // The loop has ended, so no attempt is in progress unless messaging failed.
+        if (_outbox is { } outbox) await outbox.StopAsync().ConfigureAwait(true);
+
+        // The loop and the outbox's deliveries have ended, so no attempt is in progress unless messaging failed.
         await Inbox.RecordCleanStopAsync().ConfigureAwait(true);
     }
 
