@@ -392,6 +392,61 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
+        public async Task AdvanceCollection_StaleClaimCannotOverwriteReplacementTicket()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var timeout = TimeSpan.FromSeconds(30);
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(activation);
+            activation.CollectionAgeLimit.Returns(ageLimit);
+            var claimEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseClaim = new ManualResetEventSlim();
+            activation.TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var oldDelay = DateTime.MaxValue - call.ArgAt<DateTime>(1);
+                    claimEntered.SetResult();
+                    if (!releaseClaim.Wait(timeout, cancellationToken))
+                    {
+                        throw new TimeoutException("Timed out waiting to release the stale collection claim.");
+                    }
+
+                    return ActivationCollectionResult.Reschedule(oldDelay);
+                });
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, ageLimit, now);
+            var registration = activation.CollectionRegistration;
+            timeProvider.Advance(ageLimit);
+            var scan = Task.Run(() => collector.CollectStaleActivations(cancellationToken), cancellationToken);
+            try
+            {
+                await claimEntered.Task.WaitAsync(timeout, cancellationToken);
+                Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+
+                var replacementDeadline = now.AddMinutes(3);
+                collector.AdvanceCollection(activation, replacementDeadline);
+                Assert.Equal(replacementDeadline, collector.GetCollectionTicketForTesting(activation));
+
+                releaseClaim.Set();
+                await scan.WaitAsync(timeout, cancellationToken);
+                Assert.Equal(replacementDeadline, collector.GetCollectionTicketForTesting(activation));
+                Assert.Same(registration, activation.CollectionRegistration);
+            }
+            finally
+            {
+                releaseClaim.Set();
+                await scan.WaitAsync(timeout, CancellationToken.None);
+            }
+        }
+
+        [Fact, TestCategory("Activation")]
         public async Task CollectStaleActivations_ClaimRetriesAfterCursorAdvances()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
