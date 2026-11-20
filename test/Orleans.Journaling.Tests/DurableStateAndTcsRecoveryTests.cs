@@ -98,9 +98,43 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         Assert.True(tcs.TrySetResult(18));
     }
 
+    [Fact]
+    public async Task DurableTaskCompletionSource_CopyFailureLeavesSourcePending()
+    {
+        var sut = CreateTestSystem();
+        var pool = ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>();
+        var tcs = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut.Manager,
+            new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
+            new DeepCopier<int>(new ThrowingCopier<int>(), pool),
+            new DeepCopier<Exception>(new ThrowingCopier<Exception>(), pool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        Assert.Throws<InvalidOperationException>(() => tcs.TrySetResult(17));
+        Assert.Throws<InvalidOperationException>(() => tcs.TrySetException(new ArgumentException("faulted")));
+        Assert.Equal(DurableTaskCompletionSourceStatus.Pending, tcs.State.Status);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystem(storage: sut.Storage);
+        var recoveredTcs = new DurableTaskCompletionSource<int>(
+            "tcs",
+            recovered.Manager,
+            new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
+            Copier<int>(),
+            Copier<Exception>());
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskCompletionSourceStatus.Pending, recoveredTcs.State.Status);
+    }
+
     private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
+
+    private sealed class ThrowingCopier<T> : Orleans.Serialization.Cloning.IDeepCopier<T>
+    {
+        public T? DeepCopy(T? input, Orleans.Serialization.Cloning.CopyContext context) => throw new InvalidOperationException("The value can't be copied.");
+    }
 
     private sealed class TrackingPersistentStateCommandCodec<T>(IFieldCodec<T> valueCodec, SerializerSessionPool sessionPool) : IPersistentStateCommandCodec<T>
     {

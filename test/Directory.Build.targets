@@ -6,6 +6,12 @@
   
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
 
+  <!-- A run which selects a framework this project doesn't target, such as a framework-selecting dotnet test run, skips it. -->
+  <PropertyGroup Condition="'$(TargetFramework)' != '' and '$(TargetFrameworks)' != '' and !$([System.String]::Copy(';$(TargetFrameworks);').Contains(';$(TargetFramework);'))">
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+  </PropertyGroup>
+
   <ItemGroup Condition="'@(PackageReference->WithMetadataValue('Identity', 'NSubstitute'))' != ''">
     <PackageReference Include="NSubstitute.Analyzers.CSharp">
       <PrivateAssets>all</PrivateAssets>

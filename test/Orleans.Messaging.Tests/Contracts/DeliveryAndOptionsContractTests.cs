@@ -11,56 +11,34 @@ namespace Orleans.Messaging.Tests.Contracts;
 public sealed class DeliveryAndOptionsContractTests
 {
     [Fact]
-    public void DeliveryResult_EachFactory_PreservesStatusAndPayload()
+    public void RetentionTimeArithmetic_HandlesMaximumDurationsWithoutOverflow()
     {
-        var handlerMissing = DeliveryResult.HandlerNotFound();
-        var deadLettered = DeliveryResult.DeadLettered("poison body");
-        var coded = DeliveryResult.DeadLettered("duplicate order", "orders/duplicate");
-        var expired = DeliveryResult.Expired();
+        var timestamp = DateTimeOffset.MaxValue - TimeSpan.FromTicks(1);
+        var fullDateTimeRange = TimeSpan.FromTicks(DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
 
-        Assert.Equal(DeliveryStatus.Accepted, DeliveryResult.Accepted().Status);
-        Assert.Equal(DeliveryStatus.Duplicate, DeliveryResult.Duplicate().Status);
-        Assert.Equal(DeliveryStatus.Backpressured, DeliveryResult.Backpressured().Status);
-        Assert.Equal(DeliveryStatus.HandlerNotFound, handlerMissing.Status);
-        Assert.Equal("No inbox handler is registered.", handlerMissing.Message);
-        Assert.Equal(DeliveryStatus.DeadLettered, deadLettered.Status);
-        Assert.Equal("poison body", deadLettered.Message);
-        Assert.Null(deadLettered.Code);
-        Assert.Equal("duplicate order", coded.Message);
-        Assert.Equal("orders/duplicate", coded.Code);
-        Assert.Equal(DeliveryStatus.Expired, expired.Status);
-        Assert.Equal("The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown.", expired.Message);
-        Assert.Null(expired.Code);
+        Assert.False(MessagingTime.IsExpired(DateTimeOffset.MaxValue, timestamp, TimeSpan.MaxValue));
+        Assert.True(MessagingTime.IsExpired(DateTimeOffset.MaxValue, DateTimeOffset.MinValue, fullDateTimeRange));
+        Assert.False(MessagingTime.IsExpired(DateTimeOffset.MaxValue, DateTimeOffset.MinValue, TimeSpan.MaxValue));
+        Assert.False(MessagingTime.IsExpired(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, TimeSpan.FromTicks(1)));
+        Assert.Equal(DateTimeOffset.MaxValue, MessagingTime.AddClamped(timestamp, TimeSpan.MaxValue));
     }
 
     [Fact]
-    public void DeliveryResult_Expired_RoundTripsStatusAndPayload()
+    public void DeadLetterCompaction_SaturatesMaximumRetentionWithoutOverflow()
     {
-        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var serializer = services.GetRequiredService<Serializer<DeliveryResult>>();
+        var entries = new Dictionary<string, DateTimeOffset>
+        {
+            ["oldest"] = DateTimeOffset.MinValue,
+            ["newest"] = DateTimeOffset.MaxValue
+        };
 
-        var decoded = serializer.Deserialize(serializer.SerializeToArray(DeliveryResult.Expired()));
+        Assert.False(DeadLetterRetention.Compact(entries, DateTimeOffset.MaxValue, TimeSpan.MaxValue, int.MaxValue, static timestamp => timestamp));
+        Assert.Equal(2, entries.Count);
 
-        Assert.Equal(DeliveryStatus.Expired, decoded.Status);
-        Assert.Equal("The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown.", decoded.Message);
-        Assert.Null(decoded.Code);
-    }
-
-    [Fact]
-    public void DeliveryStatus_AllValues_HaveContiguousDistinctValues()
-    {
-        Assert.Equal(
-            [
-                DeliveryStatus.Accepted,
-                DeliveryStatus.Duplicate,
-                DeliveryStatus.Backpressured,
-                DeliveryStatus.HandlerNotFound,
-                DeliveryStatus.DeadLettered,
-                DeliveryStatus.Expired
-            ],
-            Enum.GetValues<DeliveryStatus>());
-        Assert.Equal([1, 2, 3, 4, 5, 6], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
-        Assert.False(Enum.IsDefined(default(DeliveryResult).Status));
+        var fullDateTimeRange = TimeSpan.FromTicks(DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
+        Assert.True(DeadLetterRetention.Compact(entries, DateTimeOffset.MaxValue, fullDateTimeRange, int.MaxValue, static timestamp => timestamp));
+        Assert.DoesNotContain("oldest", entries);
+        Assert.Contains("newest", entries);
     }
 
     [Fact]
@@ -74,6 +52,7 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal(TimeSpan.FromDays(7), options.DeduplicationWindow);
         Assert.Equal(TimeSpan.FromHours(6), options.OutboxRetryTimeout);
         Assert.Equal(TimeSpan.FromDays(30), options.DeadLetterRetentionPeriod);
+        Assert.Equal(TimeSpan.FromHours(6), options.InboxRetryTimeout);
         Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
         Assert.Equal(32, options.OutboxBatchSize);
@@ -89,6 +68,7 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableMessagingOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.MaxValue),
+            (nameof(DurableMessagingOptions.InboxRetryTimeout), options => options.InboxRetryTimeout = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.OutboxRetryTimeout), options => options.OutboxRetryTimeout = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.OutboxRetryTimeout), options => options.OutboxRetryTimeout = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),

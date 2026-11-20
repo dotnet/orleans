@@ -58,6 +58,20 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    A package which uses another Orleans package's internals depends on that package's exact version, because internal
+    surfaces change between versions. Mark the ProjectReference with PackExactVersion="true" to pack an exact dependency.
+  -->
+  <Target Name="_PackExactProjectReferenceVersions" AfterTargets="_GetProjectReferenceVersions">
+    <ItemGroup>
+      <_ExactVersionProjectReference Include="@(ProjectReference->WithMetadataValue('PackExactVersion', 'true')->'%(FullPath)')" />
+      <_RangeVersionProjectReference Include="@(_ProjectReferencesWithVersions)" Exclude="@(_ExactVersionProjectReference)" />
+      <_ExactVersionProjectReferenceWithVersion Include="@(_ProjectReferencesWithVersions)" Exclude="@(_RangeVersionProjectReference)" />
+      <_ProjectReferencesWithVersions Remove="@(_ExactVersionProjectReferenceWithVersion)" />
+      <_ProjectReferencesWithVersions Include="@(_ExactVersionProjectReferenceWithVersion)" ProjectVersion="[%(_ExactVersionProjectReferenceWithVersion.ProjectVersion)]" />
+    </ItemGroup>
+  </Target>
+
   <PropertyGroup>
     <!-- If the project is packable, we generate its API surface in a separate file to be used by the API review process. -->
     <GenAPITargetDirectory Condition="'$(IsPackable)' == 'true'">$(MSBuildThisFileDirectory)/api/$([MSBuild]::MakeRelative($(MSBuildThisFileDirectory), $(MSBuildProjectDirectory)))/</GenAPITargetDirectory>

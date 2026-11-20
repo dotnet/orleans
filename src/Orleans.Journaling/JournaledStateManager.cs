@@ -14,6 +14,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly Lock _lock = new();
     private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _statesMap = [];
+
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
@@ -276,6 +277,32 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         {
                             throw new InvalidOperationException(
                                 "The journaled state operation was queued before deletion reset its state.");
+                        }
+
+                        if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
+                        {
+                            try
+                            {
+                                // Preparation serves every caller coalesced into this write, so only shutdown cancels it.
+                                while (!TryPrepareStates(_shutdownCancellation.Token, out var preparation))
+                                {
+                                    await preparation.ConfigureAwait(true);
+                                }
+
+                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            }
+                            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                            {
+                                workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                return;
+                            }
+                            catch (Exception exception)
+                            {
+                                LogStatePreparationFailed(_shared.Logger, exception);
+                                storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal state preparation failed.");
+                                workItem.SetException(new JournaledStatePreCommitException(exception));
+                                continue;
+                            }
                         }
 
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -593,6 +620,30 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Prepares every state in one synchronous pass, or returns the first preparation which hasn't completed.
+    /// </summary>
+    /// <remarks>
+    /// Capture follows a complete synchronous pass without yielding. Other turns can stage changes while an incomplete
+    /// preparation is awaited, so the caller then prepares every state again; a state whose prerequisites are in place
+    /// completes synchronously, so the passes converge.
+    /// </remarks>
+    private bool TryPrepareStates(CancellationToken cancellationToken, out ValueTask preparation)
+    {
+        lock (_lock)
+        {
+            foreach (var state in _states.Values)
+            {
+                preparation = state.PrepareWriteAsync(cancellationToken);
+                if (!preparation.IsCompletedSuccessfully) return false;
+                preparation.GetAwaiter().GetResult();
+            }
+        }
+
+        preparation = default;
+        return true;
     }
 
     private void Fence(Exception exception)
@@ -1053,6 +1104,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
+
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
 
@@ -1350,6 +1402,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal state preparation failed; pending changes remain staged.")]
+    private static partial void LogStatePreparationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,

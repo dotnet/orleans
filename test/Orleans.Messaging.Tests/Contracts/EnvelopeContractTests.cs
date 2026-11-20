@@ -170,6 +170,7 @@ public sealed class EnvelopeContractTests
     [Theory]
     [InlineData("InboxMessage")]
     [InlineData("OutboxMessage")]
+    [InlineData("InboxDeadLetter")]
     public void MessageAndDeadLetterCopyPreservesMetadataAndIsolation(string kind)
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -206,6 +207,29 @@ public sealed class EnvelopeContractTests
     }
 
     [Fact]
+    public void PublicDeadLetterRoundTripsThroughOrleansSerialization()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var letter = new DeadLetter
+        {
+            Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" }, SentAt = SentAt },
+            DeadLetteredAt = DateTimeOffset.UnixEpoch,
+            Reason = "failure",
+            AttemptCount = 3
+        };
+        var serializer = services.GetRequiredService<Serializer<DeadLetter>>();
+
+        var result = Assert.IsType<DeadLetter>(serializer.Deserialize(serializer.SerializeToArray(letter)));
+
+        Assert.Equal(letter.Message.Envelope.MessageId, result.Message.Envelope.MessageId);
+        Assert.Equal(new byte[] { 1, 2 }, result.Message.Envelope.Payload);
+        Assert.Equal("subject.v1", result.Message.Envelope.Subject);
+        Assert.Equal(DateTimeOffset.UnixEpoch, result.DeadLetteredAt);
+        Assert.Equal("failure", result.Reason);
+        Assert.Equal(3, result.AttemptCount);
+    }
+
+    [Fact]
     public void SimpleEnvelopeSurfaceUsesGeneratedOrdinaryFields()
     {
         AssertIds(typeof(Envelope), ("MessageId", 0u), ("Payload", 1u), ("Subject", 2u), ("Headers", 3u), ("DeliverAt", 4u));
@@ -225,9 +249,7 @@ public sealed class EnvelopeContractTests
         Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Messaging.EnvelopeBuilder"));
         Assert.Equal(typeof(void), typeof(IInboxHandlerContext).GetMethod("Fail")!.ReturnType);
         Assert.Equal(typeof(string), Assert.Single(typeof(IInboxHandlerContext).GetMethod("Fail")!.GetParameters()).ParameterType);
-        Assert.Equal(new[] { "Accepted:1", "Backpressured:3", "DeadLettered:5", "Duplicate:2", "Expired:6", "HandlerNotFound:4" },
-            Enum.GetNames<DeliveryStatus>().Select(name => $"{name}:{(int)Enum.Parse<DeliveryStatus>(name)}").Order(StringComparer.Ordinal));
-        AssertIds(typeof(DeliveryResult), ("Status", 0u), ("Message", 1u), ("Code", 2u));
+        AssertIds(typeof(DeliveryResult.DeadLettered), ("Reason", 0u), ("Code", 1u));
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var outgoing = new OutboxMessage { Envelope = Create([7]), ReceiverId = Receiver };
         var other = outgoing with { ReceiverId = GrainId.Create("receiver", "other") };

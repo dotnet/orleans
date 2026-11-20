@@ -207,14 +207,28 @@ provider and requested state name.
 
 - `Reset`: reset in-memory state and bind a `JournalStreamWriter`.
 - `ReplayEntry`: reconstruct state from a recorded operation.
+- `PrepareWriteAsync`: establish asynchronous persistence prerequisites for pending state.
 - `WritePendingEntries`: emit pending operations into the supplied writer.
 - `WriteSnapshot`: emit a reconstructible snapshot into the supplied writer.
 - `OnRecoveryCompleted`: finish reconstruction before application use.
 - `OnWriteCompleted`: publish effects that depend on storage acknowledgement.
 
+Command-backed states can use `IDurableValueCommandCodec<TCommand>` to encode a
+complete command before applying it locally. A snapshot is a command in the same
+application-defined schema which reconstructs the whole state. Annotate command data
+for Orleans serialization and supply System.Text.Json metadata when using the JSON codec.
+
 Recovery resets state machines and replays durable entries. A failed initialization can be retried on the
 same manager and registered states. `JournalReplayContext.ResolveStateMachine` routes entries to the
 state machine for their stream.
+
+Write preparation runs before append or snapshot capture.
+Each state prepares its own prerequisites idempotently. An asynchronous completion
+leaves prepared prerequisites synchronously ready; the manager then rechecks all states
+to include mutations staged on interleaved turns. A complete synchronous pass flows
+directly into capture. Preparation failures retain pending changes for an explicit
+write retry and report `JournaledStatePreCommitException`. The owner's shutdown token
+cancels preparation, and disposal drains its actual completion.
 
 `IJournaledStateManager` is independent of the grain-facing `IDurableStateManager` and extends
 `IAsyncDisposable`. Its owner API provides `RegisterStateMachine`, `TryGetStateMachine`,

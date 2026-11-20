@@ -1,77 +1,90 @@
-using Orleans.Serialization;
-
 namespace Orleans.Messaging;
 
 /// <summary>
-/// Result of attempting to deliver a message to an inbox.
+/// The receiver's answer to an attempt to deliver a message to its inbox.
 /// </summary>
-[GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult")]
-public readonly struct DeliveryResult
+/// <remarks>Case identifiers follow declaration order and are part of the wire format.</remarks>
+[GenerateSerializer]
+public union DeliveryResult(
+    DeliveryResult.Accepted,
+    DeliveryResult.Duplicate,
+    DeliveryResult.Backpressured,
+    DeliveryResult.HandlerNotFound,
+    DeliveryResult.DeadLettered,
+    DeliveryResult.Expired)
 {
-    /// <summary>
-    /// The status of the delivery attempt.
-    /// </summary>
-    [Id(0)]
-    public DeliveryStatus Status { get; init; }
+    /// <summary>The receiver durably accepted the message.</summary>
+    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Accepted")]
+    public sealed class Accepted
+    {
+        /// <summary>Gets the shared result.</summary>
+        public static Accepted Instance { get; } = new();
+    }
+
+    /// <summary>The inbox already holds the message or retains its processed record.</summary>
+    /// <remarks>
+    /// A duplicate of a message which an inbox message sink rejected receives that rejection instead: the original
+    /// <see cref="DeadLettered"/> result, with its reason and code.
+    /// </remarks>
+    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Duplicate")]
+    public sealed class Duplicate
+    {
+        /// <summary>Gets the shared result.</summary>
+        public static Duplicate Instance { get; } = new();
+    }
+
+    /// <summary>The inbox is at capacity; the sender retries later.</summary>
+    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Backpressured")]
+    public sealed class Backpressured
+    {
+        /// <summary>Gets the shared result.</summary>
+        public static Backpressured Instance { get; } = new();
+    }
+
+    /// <summary>The receiving inbox has no registered handler.</summary>
+    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.HandlerNotFound")]
+    public sealed class HandlerNotFound
+    {
+        /// <summary>Gets the shared result.</summary>
+        public static HandlerNotFound Instance { get; } = new();
+    }
+
+    /// <summary>The receiver rejected the message permanently.</summary>
+    /// <param name="reason">The diagnostic reason for the rejection.</param>
+    /// <param name="code">The code which identifies why the receiver rejected the message, if any.</param>
+    /// <remarks>A redelivery while its processed record is retained receives the same result.</remarks>
+    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.DeadLettered")]
+    public sealed class DeadLettered(string reason, string? code = null)
+    {
+        /// <summary>Gets the diagnostic reason for the rejection.</summary>
+        [Id(0)]
+        public string Reason { get; } = reason;
+
+        /// <summary>
+        /// Gets the code which identifies why the receiver rejected the message: an application-defined code from an
+        /// inbox message sink, such as <c>"orders/duplicate-order"</c>; <see langword="null"/> when the receiver
+        /// reported none.
+        /// </summary>
+        /// <remarks>
+        /// Messaging carries the code to the receiver's processed record and to the sender's
+        /// <see cref="OutboxMessageRetirement.Rejected.Code"/> without interpreting it.
+        /// </remarks>
+        [Id(1)]
+        public string? Code { get; } = code;
+    }
 
     /// <summary>
-    /// Optional diagnostic message (e.g., reason for rejection).
-    /// </summary>
-    [Id(1)]
-    public string? Message { get; init; }
-
-    /// <summary>
-    /// Gets the code which identifies why the receiver dead-lettered the message: an application-defined code from an
-    /// inbox message sink, such as <c>"orders/duplicate-order"</c>;
-    /// <see langword="null"/> when the receiver reported none.
+    /// The message was sent at or before the receiver's durable admission floor, and the receiver retains no outcome
+    /// for it.
     /// </summary>
     /// <remarks>
-    /// Messaging carries the code to the inbox dead letter and to the sender's
-    /// <see cref="OutboxMessageRetirement.Code"/> without interpreting it.
+    /// This attempt stages no message effects. An earlier attempt can have been accepted, so the sender treats the
+    /// delivery outcome as unknown and retires the message as <see cref="OutboxMessageRetirement.DeadLettered"/>.
     /// </remarks>
-    [Id(2)]
-    public string? Code { get; init; }
-
-    /// <summary>
-    /// Creates a result indicating the message was accepted and persisted to inbox.
-    /// </summary>
-    public static DeliveryResult Accepted() => new() { Status = DeliveryStatus.Accepted };
-
-    /// <summary>
-    /// Creates a result indicating the message was a duplicate.
-    /// </summary>
-    public static DeliveryResult Duplicate() => new() { Status = DeliveryStatus.Duplicate };
-
-    /// <summary>
-    /// Creates a result indicating the inbox is at capacity.
-    /// </summary>
-    public static DeliveryResult Backpressured() => new() { Status = DeliveryStatus.Backpressured };
-
-    /// <summary>
-    /// Creates a result indicating the receiving inbox has no registered handler.
-    /// </summary>
-    public static DeliveryResult HandlerNotFound() => new()
+    [GenerateSerializer, Alias("Orleans.Messaging.DeliveryResult.Expired")]
+    public sealed class Expired
     {
-        Status = DeliveryStatus.HandlerNotFound,
-        Message = "No inbox handler is registered."
-    };
-
-    /// <summary>
-    /// Creates a result indicating the message was dead-lettered.
-    /// </summary>
-    /// <param name="reason">The diagnostic reason.</param>
-    /// <param name="code">The application-defined code which identifies the rejection, if any.</param>
-    public static DeliveryResult DeadLettered(string reason, string? code = null) => new()
-    {
-        Status = DeliveryStatus.DeadLettered,
-        Message = reason,
-        Code = code
-    };
-
-    /// <summary>Creates a terminal result for an expired send whose earlier delivery outcome is unknown.</summary>
-    public static DeliveryResult Expired() => new()
-    {
-        Status = DeliveryStatus.Expired,
-        Message = "The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown."
-    };
+        /// <summary>Gets the shared result.</summary>
+        public static Expired Instance { get; } = new();
+    }
 }

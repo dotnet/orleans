@@ -7,6 +7,10 @@ namespace Orleans.Messaging;
 /// time. <see cref="InboxExtensions"/> registers typed subject handlers.
 /// </para>
 /// <para>
+/// A grain receives messages by resolving its inbox during construction or activation setup, typically by constructor
+/// injection, so the inbox recovers with the grain's journal.
+/// </para>
+/// <para>
 /// A handler decodes the body, performs asynchronous I/O, validates local results, and checks cancellation before
 /// the first shared business or journaled mutation. From that mutation until it returns, it executes synchronously:
 /// it applies safe-to-commit business changes, stages outgoing messages through <see cref="IOutbox.Send(OutboxMessage)"/>, and calls
@@ -29,4 +33,28 @@ public interface IInbox
     /// Register sinks during construction or activation setup, before the grain receives messages.
     /// </remarks>
     IInbox Register(IInboxMessageSink sink);
+
+    /// <summary>
+    /// Registers a callback which reports durable work held outside the inbox, such as messages which an
+    /// <see cref="IInboxMessageSink"/> accepted, so the messaging wake-up reactivates the grain while that work remains.
+    /// </summary>
+    /// <param name="getWakeupDelay">
+    /// Returns <see langword="null"/> when no work is pending; otherwise, the longest acceptable delay before a
+    /// deactivated grain is reactivated to resume the work. A delay of <see cref="System.TimeSpan.Zero"/> or less requests
+    /// a prompt wake-up.
+    /// </param>
+    /// <returns>This inbox.</returns>
+    /// <remarks>
+    /// <para>
+    /// The callback runs synchronously on the activation scheduler before each journal write and on each wake-up. A write
+    /// which leaves work pending schedules the wake-up before it is stored, so a deactivation or crash can't strand the
+    /// work. Each wake-up reschedules after the shortest reported delay, and wake-ups end once no callback reports work
+    /// and no messages are pending. Wake-ups may be early, late, or duplicated.
+    /// </para>
+    /// <para>
+    /// Hold the work in journaled state of the grain's journal and resume it when the grain activates. Register the
+    /// callback during construction or activation setup, before the grain activates.
+    /// </para>
+    /// </remarks>
+    IInbox RegisterWakeup(System.Func<System.TimeSpan?> getWakeupDelay);
 }

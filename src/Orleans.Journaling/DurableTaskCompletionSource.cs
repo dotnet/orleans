@@ -89,8 +89,9 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        var copy = _copier.Copy(value);
         _status = DurableTaskCompletionSourceStatus.Completed;
-        _value = _copier.Copy(value);
+        _value = copy;
         return true;
     }
 
@@ -101,8 +102,9 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        var copy = _exceptionCopier.Copy(exception);
         _status = DurableTaskCompletionSourceStatus.Faulted;
-        _exception = _exceptionCopier.Copy(exception);
+        _exception = copy;
         return true;
     }
 

@@ -83,13 +83,12 @@ public sealed class HandlerRoutingContractTests : IDisposable
     [Fact]
     public void HandlerNotFound_RoundTripsStatusAndDiagnostic()
     {
-        var result = DeliveryResult.HandlerNotFound();
+        var result = DeliveryResult.HandlerNotFound.Instance;
         var serializer = _services.GetRequiredService<Serializer<DeliveryResult>>();
 
         var decoded = serializer.Deserialize(serializer.SerializeToArray(result));
 
-        Assert.Equal(DeliveryStatus.HandlerNotFound, decoded.Status);
-        Assert.Equal(result.Message, decoded.Message);
+        DeliveryResultAssert.IsCase<DeliveryResult.HandlerNotFound>(decoded);
     }
 
     private MessageType<string> CreateType(string subject) =>

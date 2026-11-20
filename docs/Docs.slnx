@@ -112,6 +112,9 @@
   <Folder Name="/site/src/content/docs/snippets/compiled/">
     <Project Path="site/src/content/docs/snippets/compiled/CompiledDocumentationSnippets.csproj" />
   </Folder>
+  <Folder Name="/site/src/content/docs/snippets/compiled-durable/">
+    <Project Path="site/src/content/docs/snippets/compiled-durable/DurableDocumentationSnippets.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/streaming/" />
   <Folder Name="/site/src/content/docs/streaming/snippets/">
     <Project Path="site/src/content/docs/streaming/snippets/streaming/streaming.csproj" />

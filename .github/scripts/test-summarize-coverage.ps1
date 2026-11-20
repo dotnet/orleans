@@ -1235,7 +1235,7 @@ exit 0
         Assert-Equal 0 ([regex]::Matches($workflow, 'name: Checkout covered source')).Count 'The privileged reporter must not check out untrusted pull request code.'
         Assert-Equal 23 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
         Assert-Equal 23 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
-        Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -notmatch 'net10\.0$' })).Count 'Coverage artifacts must target .NET 10.'
+        Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -notmatch 'net11\.0$' })).Count 'Coverage artifacts must target .NET 11.'
         Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -match 'macos|windows' })).Count 'Coverage artifacts must target Linux.'
     }
 
@@ -1656,7 +1656,7 @@ exit 0
             'Coverage upload must retry under a distinct immutable name and keep the retry gating.'
     }
 
-    Invoke-Test 'collects GitHub coverage only on Linux .NET 10' {
+    Invoke-Test 'collects GitHub coverage only on Linux .NET 11' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
@@ -1667,7 +1667,7 @@ exit 0
         $wrappedTestCommands = ([regex]::Matches($dotnetTestAction, 'invoke-test\.ps1')).Count
         $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'\$\{\{ inputs\.solution \}\}'")).Count
         Assert-Equal 2 ($wrappedTestCommands + $coveredTestCommands) 'Native test command count differs.'
-        Assert-Equal 4 ([regex]::Matches($runTestsAction, "runner\.os == 'Linux' && inputs\.framework == 'net10\.0'")).Count 'Coverage selection boundary count differs.'
+        Assert-Equal 4 ([regex]::Matches($runTestsAction, "runner\.os == 'Linux' && inputs\.framework == 'net11\.0'")).Count 'Coverage selection boundary count differs.'
         Assert-Equal 0 ([regex]::Matches($workflow + $runTestsAction + $dotnetTestAction, 'static-instrumentation|coverage\.static\.config\.xml|IncludeFiles')).Count 'GitHub coverage must not use static instrumentation.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
         Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'

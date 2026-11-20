@@ -8,10 +8,10 @@ namespace Orleans.Messaging;
 /// After validation and deduplication, the inbox offers each message to the registered sinks in registration order,
 /// including messages the grain sends to itself and messages with <see cref="Envelope.DeliverAt"/>. The first sink
 /// which takes the message decides its <see cref="DeliveryResult"/>. A sink which reports
-/// <see cref="DeliveryStatus.Accepted"/> has synchronously staged the message's effects in its own journaled state. The
+/// <see cref="DeliveryResult.Accepted"/> has synchronously staged the message's effects in its own journaled state. The
 /// inbox then journals only the message's processed record, without its payload, in the same journal write, and reports
 /// the result once that write is durable. Run effects which depend on the write, such as starting work, from
-/// <c>Orleans.Journaling.IStateMachine.OnWriteCompleted</c>.
+/// <see cref="Orleans.Journaling.IStateMachine.OnWriteCompleted"/>.
 /// </para>
 /// <para>
 /// A sink-owned message never occupies inbox capacity and has no inbox retry lifecycle: the sink owns its processing,
@@ -22,7 +22,7 @@ namespace Orleans.Messaging;
 /// <para>
 /// Sinks must be idempotent. The inbox deduplicates the message ID while it retains the processed record, for
 /// <c>DeduplicationWindow</c> after the message's <see cref="InboxMessage.SentAt"/>. Delayed retries after that receive
-/// <see cref="DeliveryStatus.Expired"/> before reaching a sink. A message whose journal write fails is redelivered to
+/// <see cref="DeliveryResult.Expired"/> before reaching a sink. A message whose journal write fails is redelivered to
 /// the next activation, which recovers the sink's state from the journal.
 /// </para>
 /// </remarks>
@@ -40,33 +40,32 @@ public interface IInboxMessageSink
     /// <remarks>
     /// <para>
     /// Runs synchronously on the activation scheduler. Validate the message before staging any change. The sink reports
-    /// one of these statuses:
+    /// one of these results:
     /// </para>
     /// <list type="bullet">
     /// <item><description>
-    /// <see cref="DeliveryStatus.Accepted"/>: the sink staged the message's effects, and the inbox records the message
+    /// <see cref="DeliveryResult.Accepted"/>: the sink staged the message's effects, and the inbox records the message
     /// as processed in the same write.
     /// </description></item>
     /// <item><description>
-    /// <see cref="DeliveryStatus.Duplicate"/>: the sink already holds the message and stages nothing. The inbox reports
+    /// <see cref="DeliveryResult.Duplicate"/>: the sink already holds the message and stages nothing. The inbox reports
     /// it once any write in progress, which can hold the original, is durable.
     /// </description></item>
     /// <item><description>
-    /// <see cref="DeliveryStatus.Backpressured"/>: the sink is at capacity and stages nothing, so the sender retries
-    /// later. A message the grain sends to itself can't wait for a retry, so this status fails that send.
+    /// <see cref="DeliveryResult.Backpressured"/>: the sink is at capacity and stages nothing, so the sender retries
+    /// later. A message the grain sends to itself can't wait for a retry, so this result fails that send.
     /// </description></item>
     /// <item><description>
-    /// <see cref="DeliveryStatus.DeadLettered"/>: the sink rejects the message and stages nothing. The inbox
-    /// dead-letters it with its payload and the result's reason and <see cref="DeliveryResult.Code"/>, records it as
-    /// processed, and returns the reason and code to the sender. The processed record keeps the reason and code, so a
-    /// duplicate of the message, such as a retry whose first answer was lost, receives the same rejection.
+    /// <see cref="DeliveryResult.DeadLettered"/>: the sink rejects the message and stages nothing. The inbox records
+    /// the message as processed with the result's reason and <see cref="DeliveryResult.DeadLettered.Code"/>, and returns them to
+    /// the sender. A duplicate of the message, such as a retry whose first answer was lost, receives the same rejection.
     /// </description></item>
     /// </list>
     /// <para>
-    /// A sink exception, or any other status, means the outcome is unknown, so the inbox stages nothing and fails the
+    /// A sink exception, or any other result, means the outcome is unknown, so the inbox stages nothing and fails the
     /// delivery: the sender's outbox retries it with backoff until <c>OutboxRetryTimeout</c>, and a send to the grain
-    /// itself throws to its caller. A sink which throws must leave no staged change. Return
-    /// <see cref="DeliveryStatus.DeadLettered"/> to reject a message permanently.
+    /// itself throws to its caller. A sink which throws or reports another result must leave no staged change.
+    /// Return <see cref="DeliveryResult.DeadLettered"/> to reject a message permanently.
     /// </para>
     /// </remarks>
     bool TryAccept(InboxMessage message, out DeliveryResult result);

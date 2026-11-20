@@ -1,9 +1,23 @@
 # Microsoft Orleans Messaging
 
-`Microsoft.Orleans.Messaging` defines the contracts for grain-scoped durable
-inboxes and outboxes in Microsoft Orleans: envelopes, hierarchical message
-identities, inbox and outbox interfaces, handler, sink, and source registration,
-typed message bindings, delivery results, and options.
+`Microsoft.Orleans.Messaging` provides durable, grain-scoped inbox processing for
+Microsoft Orleans, built on Orleans Journaling and Durable Jobs, together with the
+messaging contracts for inboxes and outboxes. A grain's inbox accepts messages durably,
+persists them with the grain's other journaled state, processes each at least once,
+and deduplicates them by message ID.
+
+## Setup
+
+Configure Journaling and Durable Jobs storage, then call `AddMessaging` on the silo
+builder or service collection. The optional `DurableMessagingOptions` callback configures
+capacity, batch sizes, retries, deduplication, and dead-letter retention; options are
+validated at startup. Register typed subjects with `AddMessageType<T>(subject)`.
+
+A grain receives messages by resolving `IInbox` during construction or activation
+setup, typically by constructor injection, so the inbox recovers with the grain's
+journal. Deliveries reach the inbox through the grain's messaging extension. Stateless
+worker grains are rejected; reentrant and interleaving grains are supported, and the
+grain's code is responsible for correctness when calls interleave.
 
 ## Messages
 
@@ -46,8 +60,7 @@ inbox.Register(reserve, this, static (request, grain, context) => grain.HandleRe
 ```
 
 Overloads accept synchronous or asynchronous delegates, with or without a `TArg`
-argument for static, allocation-free delegates. Register typed subjects with
-`AddMessageType<T>(subject)`.
+argument for static, allocation-free delegates.
 
 A handler finishes each message with `IInboxHandlerContext.Complete()` or
 `Fail(reason)`:
@@ -55,6 +68,23 @@ A handler finishes each message with `IInboxHandlerContext.Complete()` or
 - `Complete()` stages the message's removal and completion record.
 - `Fail(reason)` moves the message to the inbox dead letters and records its ID as
   processed.
+- A handler exception, or a return without either call, leaves the outcome unknown.
+  Changes staged by the attempt share the grain's pending journal write, so the grain
+  deactivates and recovery from the journal discards them.
+- Recovery after an activation stops without recording an attempt's outcome, through
+  such a failure or a crash, charges one attempt to each due message. The message
+  retries with exponential backoff until `InboxRetryTimeout` (6 hours) after its first
+  failure, then moves to the dead letters. A graceful deactivation journals a clean
+  stop when messages are pending, so it charges nothing. A crash can charge a message
+  that hadn't run, so attempts overcount by at most one per crash, and a charge alone
+  never dead-letters a message whose retries hadn't started.
+- `Fail(reason)` after `Complete()`, or after `Fail` with a different reason, deactivates
+  the grain. `Complete()` after `Fail(reason)` keeps the dead letter.
+
+The inbox persists each batch's outcomes and business changes in one journal write.
+Perform asynchronous and fallible work with local values first, then send, apply
+state changes and complete in one synchronous block with no await after the first
+change.
 
 ## Send messages
 
@@ -82,8 +112,8 @@ construction or activation setup, before journal recovery.
   returns `false` for a message that isn't the source's. A source withdraws a pending
   message with `IOutbox.Withdraw(messageId)`, staged in the same journal write that
   releases its payload. When the message retires, `OnRetired` reports an
-  `OutboxMessageRetirement` whose `Status` is `Delivered`, `Rejected` (with the
-  receiver's reason and code), or `DeadLettered` (with the outbox's reason). After the
+  `OutboxMessageRetirement`: `Delivered`, `Rejected` (with the receiver's reason and
+  code), or `DeadLettered` (with the outbox's reason). After the
   send, a source that throws, returns an invalid message, or no longer provides the
   message dead-letters that entry alone, with `OnRetired` in the same journal write; an
   exception during `Send` propagates without staging anything. A recovered entry that
@@ -93,23 +123,38 @@ construction or activation setup, before journal recovery.
   prior journaled state, and retiring the recovered entry invokes the callback
   again. Stage durable callback effects in the same journal write as retirement;
   make effects outside that write idempotent across repeated calls.
-- `IInbox.Register(IInboxMessageSink)` adds a sink. The inbox offers each message,
-  including self-sent and scheduled messages, to the sinks in order. The first sink
-  whose `TryAccept` returns `true` reports the `DeliveryResult`:
-  - `Accepted`: the sink staged the message in its own journaled state.
+- `IInbox.Register(IInboxMessageSink)` adds a sink. After validation and
+  deduplication, the inbox offers each message, including self-sent and scheduled
+  messages, to the sinks in order. The first sink whose `TryAccept` returns `true`
+  reports the `DeliveryResult` case:
+  - `Accepted`: the sink staged the message in its own state. The inbox journals
+    only the processed record in the same write and returns `Accepted` once it is
+    durable.
   - `Duplicate`: the sink already holds the message.
-  - `Backpressured`: the sink is at capacity. A self-sent message fails its `Send`.
+  - `Backpressured`: the sink is at capacity, so the sender retries. A self-sent
+    message fails its `Send` instead.
   - `DeadLettered`: the sink rejects the message with a reason and an optional
     application-defined `Code`. This is the only permanent rejection.
 
-  A sink that throws or reports another status leaves the outcome unknown: the inbox
+  A sink that throws or reports another case leaves the outcome unknown: the inbox
   stages nothing and fails the delivery, so the sender retries it.
 
-  A sink that takes a scheduled message honors its `DeliverAt`. Sinks are idempotent.
+  Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
+  sink honors their `DeliverAt`. Declined messages follow the handler path once
+  `DeliverAt` passes. Retained completion records deduplicate before a sink runs;
+  the durable admission floor expires an untracked message's old send time.
+- `IInbox.RegisterWakeup(getWakeupDelay)` adds a callback for a component, such as a
+  sink, that holds durable work in the grain's journal. It returns how soon a
+  deactivated grain must wake to resume that work, or `null` when none is pending.
+  Every journal write that leaves work pending schedules the messaging wake-up before
+  it is stored, and the wake-up reactivates the grain until the work clears. The
+  component resumes its work on activation.
 
-## Delivery results
+## Delivery and processing
 
-Each receiver returns a `DeliveryResult`:
+`IMessagingExtension.DeliverAsync` delivers a message to a grain's inbox. Accepted inbox
+messages are processed only after the receiver's journal write completes. Each
+receiver returns one `DeliveryResult` case:
 
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.
@@ -117,8 +162,8 @@ Each receiver returns a `DeliveryResult`:
   duplicate of a message that a sink rejected receives that rejection instead.
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages.
 - `HandlerNotFound`: the receiver has no registered handlers.
-- `DeadLettered`: the receiver durably rejected the message and moved it to its
-  dead letters, with a reason and an optional `Code`.
+- `DeadLettered`: an inbox sink durably rejected the message, with a reason and an
+  optional `Code`.
 - `Expired`: the message was sent before the receiver's deduplication window and
   the receiver retains no outcome for it. This attempt stages no message effects;
   an earlier attempt can have been accepted, so the delivery outcome is unknown.
@@ -133,22 +178,22 @@ reuses it. `OutboxRetryTimeout`, six hours by default, bounds delivery attempts
 after that time, including while the receiver is backpressured.
 
 The inbox retains each processed record for `DeduplicationWindow`, seven days by
-default, after the message's `SentAt`, and then removes it. Before removing records,
+default, after its accepted `SentAt`, and then makes it eligible for removal. Before removing records,
 the inbox journals an admission floor: its clock minus `DeduplicationWindow`, which
 only advances. Pending and processed records determine known outcomes first. A
 message the inbox no longer tracks whose `SentAt` is at or below the floor receives
-`Expired` before any sink or handler runs. Recovery and migration preserve the floor.
+`Expired` before any sink or handler runs. Recovery preserves the floor.
 The inbox never accepts a delivered `SentAt` later than its clock plus
-`DeduplicationWindow`. It rejects such a delivery with `ArgumentOutOfRangeException`,
-staging nothing, when the message is untracked and above the admission floor, or the
-time would extend its record, so the sender retries it within its retry budget. A
-tracked message with an equal or earlier `SentAt` still receives its recorded
+`DeduplicationWindow`. It rejects such a delivery of an untracked message above the
+admission floor with `ArgumentOutOfRangeException`, staging nothing, so the sender
+retries it within its retry budget. A tracked message still receives its recorded
 outcome, including after the receiver's clock steps backward, and an untracked
 message at or below the floor still receives `Expired`. A grain's messages to itself
-use its clock, or the first time above the floor after a backward clock jump. Pending
-messages stay until they are processed, and every processed record becomes eligible
-for removal within twice the window, or just after the floor when a self-send follows a
-backward jump.
+use its clock, or the first time above the floor after a backward clock jump.
+Pending messages stay until they are processed, and completed records become eligible
+for removal within twice the window of the receiver's clock, or just after the floor
+when a self-send follows a backward jump.
+
 
 A forward clock jump can expire undelivered work early; a backward jump can delay
 cleanup and prolong retries. The journaled floor keeps removed messages expired in
@@ -174,3 +219,35 @@ original `SentAt` for retries of the same logical send.
 
 Dead-letter retention limits control diagnostic history. The application-owned
 outcome and follow-up work have the lifetime the application gives them.
+Each activation runs one messaging pump on its scheduler, processing inbox batches.
+One durable job per grain wakes the pump while the inbox or a registered wake-up
+callback holds work. Journaled state determines which messages are due, so each wake-up
+processes exactly the ready work. A live activation processes due work as soon as it is
+durable; the job covers a failed activation, so work that is already due resumes within
+about a second of recovery. The job retries indefinitely with backoff while activation
+fails, and every activation re-arms it from recovered state, so committed work always
+keeps a wake-up.
+
+## State
+
+The inbox is an event-sourced journal state named `orleans.messaging.inbox`, and works
+with the JSON and Orleans binary journal formats. It persists alongside the grain's
+other journaled state. After the grain's state is deleted, it starts empty and
+continues working.
+
+Completed message IDs become eligible for removal after `DeduplicationWindow`
+from their accepted `SentAt`. Acknowledged snapshots and recovery reclaim
+eligible records once the admission floor covers their send time. Dead letters are
+retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters`.
+
+## Diagnostics
+
+`IMessagingDiagnostics` exposes `InboxDeadLetters`, with each record's message,
+reason, attempt count, and dead-letter time. `RemoveInboxDeadLetter` removes a record,
+durably at the grain's next journal write.
+
+The `Microsoft.Orleans` meter publishes counters for received and processed messages
+tagged by grain type and status, a histogram for processing duration, and the
+`orleans-messaging-inbox-depth` up-down counter for pending work. A message an inbox
+sink accepts counts as received `accepted` and processed `success`; one which the
+sink rejects counts as received and processed `dead_lettered`.

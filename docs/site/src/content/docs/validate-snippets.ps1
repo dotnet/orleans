@@ -4,7 +4,9 @@
 
 .DESCRIPTION
     This script finds all .csproj files in documentation snippet directories, verifies
-    that they target net10.0 and reference Orleans 10.2.2 packages, then runs
+    that they target the documentation framework (or the exception framework which
+    OrleansDocumentationTargetFrameworkException selects) and reference the approved
+    Orleans packages, then runs
     'dotnet build' on ordinary projects or 'dotnet test' on projects which declare
     IsTestProject=true.
     
@@ -58,6 +60,9 @@ $resolvedProjectPolicyPath = $(if ($ProjectPolicyPath) {
 })
 $projectPolicy = Get-Content -LiteralPath $resolvedProjectPolicyPath -Raw | ConvertFrom-Json
 $requiredOrleansVersion = [string]$projectPolicy.orleansPackageVersion
+$documentationFramework = [string]$projectPolicy.targetFramework
+$exceptionFramework = [string]$projectPolicy.exceptionTargetFramework
+$projectFrameworks = @{}
 
 Write-Host "Orleans Documentation Snippet Validator" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
@@ -100,7 +105,7 @@ function Get-LineNumber {
 function Get-EvaluatedProject {
     param(
         [string]$ProjectPath,
-        [switch]$ForNet10
+        [string]$Framework
     )
 
     $arguments = @(
@@ -111,12 +116,13 @@ function Get-EvaluatedProject {
         "-getProperty:TargetFrameworks",
         "-getProperty:ManagePackageVersionsCentrally",
         "-getProperty:OrleansDocumentationVersionException",
+        "-getProperty:OrleansDocumentationTargetFrameworkException",
         "-getItem:PackageReference",
         "-getItem:PackageVersion",
         "-getItem:Compile"
     )
-    if ($ForNet10) {
-        $arguments += "-property:TargetFramework=net10.0"
+    if ($Framework) {
+        $arguments += "-property:TargetFramework=$Framework"
     }
     $output = @(& dotnet @arguments 2>&1)
     if ($LASTEXITCODE -ne 0) {
@@ -195,18 +201,25 @@ foreach ($project in $snippetProjects) {
         Where-Object { $_ } |
         ForEach-Object { $_ -split ";" } |
         ForEach-Object { $_.Trim() }
-    if ($frameworks -notcontains "net10.0") {
-        $line = Get-LineNumber -Path $project -Pattern "<TargetFramework"
-        $policyIssues += "${relativePath}:${line} [SNIPPET001] Snippet projects must target net10.0. Remediation: set TargetFramework to net10.0 or include net10.0 in TargetFrameworks."
+    $frameworkExceptionReason = ([string]$evaluation.Properties.OrleansDocumentationTargetFrameworkException).Trim()
+    $requiredFramework = $(if ($frameworkExceptionReason) { $exceptionFramework } else { $documentationFramework })
+    if ($frameworkExceptionReason -and $frameworkExceptionReason.Length -lt 20) {
+        $policyIssues += "${relativePath}:1 [SNIPPET001] OrleansDocumentationTargetFrameworkException is missing a meaningful reason. Remediation: explain which APIs require $exceptionFramework."
         continue
     }
+    if ($frameworks -notcontains $requiredFramework) {
+        $line = Get-LineNumber -Path $project -Pattern "<TargetFramework"
+        $policyIssues += "${relativePath}:${line} [SNIPPET001] Snippet projects must target $documentationFramework, or $exceptionFramework with a meaningful OrleansDocumentationTargetFrameworkException. Remediation: set TargetFramework to $requiredFramework or include it in TargetFrameworks."
+        continue
+    }
+    $projectFrameworks[$project] = $requiredFramework
 
     if ($evaluation.Properties.TargetFrameworks) {
         try {
-            $evaluation = Get-EvaluatedProject -ProjectPath $project -ForNet10
+            $evaluation = Get-EvaluatedProject -ProjectPath $project -Framework $requiredFramework
         }
         catch {
-            $policyIssues += "${relativePath}:1 [SNIPPET000] Could not evaluate the net10.0 target with MSBuild. Remediation: fix target-specific project/import evaluation errors. $($_.Exception.Message)"
+            $policyIssues += "${relativePath}:1 [SNIPPET000] Could not evaluate the $requiredFramework target with MSBuild. Remediation: fix target-specific project/import evaluation errors. $($_.Exception.Message)"
             continue
         }
     }
@@ -246,7 +259,7 @@ foreach ($project in $snippetProjects) {
             $line = Get-LineNumber -Path $definitionPath -Pattern ([regex]::Escape($packageName))
             $definitionRelative = [IO.Path]::GetRelativePath($validationRoot, $definitionPath)
             $displayVersion = $(if ($version) { $version } else { "(missing)" })
-            $policyIssues += "${definitionRelative}:${line} [SNIPPET002] Orleans package '$packageName' evaluates to version '$displayVersion' for net10.0. Remediation: update PackageReference, PackageVersion, imported Update, or VersionOverride metadata to exactly $requiredOrleansVersion; an older migration snippet requires a meaningful OrleansDocumentationVersionException project property."
+            $policyIssues += "${definitionRelative}:${line} [SNIPPET002] Orleans package '$packageName' evaluates to version '$displayVersion' for $requiredFramework. Remediation: update PackageReference, PackageVersion, imported Update, or VersionOverride metadata to exactly $requiredOrleansVersion; an older migration snippet requires a meaningful OrleansDocumentationVersionException project property."
             $projectValid = $false
         }
         elseif ($version -ne $requiredOrleansVersion) {
@@ -393,7 +406,7 @@ foreach ($markdownDocument in $renderedMarkdown) {
             $policyIssues += "${directiveRelative}:$($index + 1) [SNIPPET003] C# code directive target '$($attributes.source)' does not specify an id. Remediation: reference a named region so documentation and hidden scaffolding remain separate."
         }
         if ($isCsharp -and -not $compiledSources.Contains($target)) {
-            $policyIssues += "${directiveRelative}:$($index + 1) [SNIPPET003] C# code directive target '$($attributes.source)' is not an evaluated Compile item in any validated net10.0 Orleans 10 snippet project. Remediation: include the file in a validated snippet project (linked Compile items are supported) or use a non-C# source."
+            $policyIssues += "${directiveRelative}:$($index + 1) [SNIPPET003] C# code directive target '$($attributes.source)' is not an evaluated Compile item in any validated snippet project. Remediation: include the file in a validated snippet project (linked Compile items are supported) or use a non-C# source."
         }
     }
 }
@@ -416,7 +429,8 @@ $successCount = 0
 function Invoke-ProjectValidation {
     param(
         [string]$ProjectPath,
-        [bool]$IsTestProject
+        [bool]$IsTestProject,
+        [string]$Framework
     )
     
     $relativePath = [IO.Path]::GetRelativePath($validationRoot, $ProjectPath)
@@ -430,7 +444,7 @@ function Invoke-ProjectValidation {
     
     Write-Host "${action}: $relativePath" -ForegroundColor Yellow -NoNewline
     
-    $output = & dotnet @arguments --framework net10.0 -v q 2>&1
+    $output = & dotnet @arguments --framework $Framework -v q 2>&1
     $exitCode = $LASTEXITCODE
     
     if ($exitCode -eq 0) {
@@ -460,12 +474,14 @@ if ($Parallel) {
         $validationTasks = for ($index = 0; $index -lt $snippetProjects.Count; $index++) {
             @{
                 ProjectPath = $snippetProjects[$index]
+                Framework = $projectFrameworks[$snippetProjects[$index]]
                 ArtifactsPath = Join-Path $artifactsRoot $index.ToString("D3")
             }
         }
         $results = $validationTasks | ForEach-Object -Parallel {
             $ProjectPath = $_.ProjectPath
             $ArtifactsPath = $_.ArtifactsPath
+            $Framework = $_.Framework
             $validationRoot = $using:validationRoot
             $relativePath = [IO.Path]::GetRelativePath($validationRoot, $ProjectPath)
             [xml] $projectXml = Get-Content -LiteralPath $ProjectPath -Raw
@@ -477,7 +493,7 @@ if ($Parallel) {
                 @($command, $ProjectPath)
             }
 
-            $output = & dotnet @arguments --framework net10.0 -v q -p:ArtifactsPath=$ArtifactsPath 2>&1
+            $output = & dotnet @arguments --framework $Framework -v q -p:ArtifactsPath=$ArtifactsPath 2>&1
             $exitCode = $LASTEXITCODE
 
             @{
@@ -498,7 +514,7 @@ if ($Parallel) {
     }
 } else {
     foreach ($project in $snippetProjects) {
-        $result = Invoke-ProjectValidation -ProjectPath $project -IsTestProject (Test-IsTestProject -ProjectPath $project)
+        $result = Invoke-ProjectValidation -ProjectPath $project -IsTestProject (Test-IsTestProject -ProjectPath $project) -Framework $projectFrameworks[$project]
         $results += $result
     }
 }
