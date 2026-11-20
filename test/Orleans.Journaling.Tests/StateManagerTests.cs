@@ -734,6 +734,25 @@ public partial class StateManagerTests : JournalingTestBase
             () => manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
     }
 
+    [Fact]
+    public async Task StateManager_StorageFailureOfPreCommitType_FencesManager()
+    {
+        // Storage reports a failure after capture with the type which preparation failures use. Only preparation
+        // failures leave the manager usable, so this failure fences it.
+        var storage = new CapturingStorage();
+        await using var manager = CreateTestSystem(storage).Manager;
+        var value = new DurableValue<int>("value", manager, CreateValueCodec<int>());
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        value.Value = 42;
+        var expected = new JournaledStatePreCommitException(new IOException("Expected journal operation failure."));
+        storage.NextAppendException = expected;
+
+        Assert.Same(expected, await Assert.ThrowsAsync<JournaledStatePreCommitException>(
+            () => manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -842,7 +861,7 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_WriteStateAsync_DoesNotObserveActiveEntry()
+    public async Task StateManager_WriteStateAsync_WaitsForActiveEntryAndCapturesIt()
     {
         var storage = new CapturingStorage();
         var format = new TrackingJournalFormat(SessionPool);
@@ -850,90 +869,104 @@ public partial class StateManagerTests : JournalingTestBase
         var state = new ManualDirectWriteState();
         sut.Manager.RegisterStateMachine("manual", state);
 
-        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        // The manager's work loop runs on the controlled scheduler. Signaling the write queues the loop on that scheduler,
+        // and the loop runs without leaving it until it reaches the open entry, so running its queued work until none
+        // remains leaves the write either captured or waiting for the entry.
+        var scheduler = new ControlledTaskScheduler();
+        var start = scheduler.Start(() => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken));
+        await scheduler.RunUntilCompletedAsync(start);
 
-        Task writeTask = Task.CompletedTask;
-        using var writeStarted = new ManualResetEventSlim();
         var entry = state.BeginEntry();
-        try
-        {
-            entry.Writer.Write(new byte[] { 1, 2, 3 });
-            writeTask = Task.Run(async () =>
-            {
-                writeStarted.Set();
-                await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
-            }, TestContext.Current.CancellationToken);
-            Assert.True(writeStarted.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        entry.Writer.Write(new byte[] { 1, 2, 3 });
+        var writeTask = scheduler.Start(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        scheduler.RunUntilIdle();
 
-            Assert.True(SpinWait.SpinUntil(() => writeTask.IsCompleted, TimeSpan.FromSeconds(10)));
-            Assert.True(writeTask.IsCompletedSuccessfully, writeTask.Exception?.ToString());
-            Assert.False(state.AppendEntriesObservedOpenEntry);
-            var append = Assert.Single(storage.Appends);
-            Assert.DoesNotContain(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
+        // The write captures every state, so it waits for the entry which occupies the journal buffer.
+        Assert.False(writeTask.IsCompleted);
+        Assert.Empty(storage.Appends);
 
-            state.MarkEntryClosing();
-            entry.Commit();
-        }
-        finally
-        {
-            state.MarkEntryClosing();
-            entry.Dispose();
-        }
-
-        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.Equal(2, storage.Appends.Count);
-        Assert.Contains(ReadBinaryEntries(storage.Appends[1]), entry => entry.StreamId.Value >= 8);
+        state.MarkEntryClosing();
+        entry.Commit();
+        entry.Dispose();
+        await scheduler.RunUntilCompletedAsync(writeTask);
+        Assert.False(state.AppendEntriesObservedOpenEntry);
+        var append = Assert.Single(storage.Appends);
+        Assert.Contains(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
     }
 
     [Fact]
-    public async Task StateManager_SnapshotWrite_DoesNotDiscardActiveEntry()
+    public async Task StateManager_WriteWaitingForActiveEntry_PreparesChangesStagedMeanwhile()
     {
-        var storage = new CapturingStorage { IsCompactionRequested = true, DelayReplace = true };
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var entryState = new ManualDirectWriteState();
+        sut.Manager.RegisterStateMachine("manual", entryState);
+        var prepared = new PreparingValue("prepared", sut.Manager, CreateValueCodec<int>());
+
+        var scheduler = new ControlledTaskScheduler();
+        await scheduler.RunUntilCompletedAsync(scheduler.Start(() => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)));
+
+        var entry = entryState.BeginEntry();
+        entry.Writer.Write(new byte[] { 1, 2, 3 });
+        var writeTask = scheduler.Start(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        scheduler.RunUntilIdle();
+        Assert.False(writeTask.IsCompleted);
+
+        // While the write waits for the entry, a turn changes state which journals its changes when a write captures it,
+        // as DurableValue does. Capture asserts that it captures prepared state.
+        var mutation = scheduler.Start(() =>
+        {
+            ((IDurableValueCommandHandler<int>)prepared).ApplySet(7);
+            return Task.CompletedTask;
+        });
+        scheduler.RunUntilIdle();
+        Assert.True(mutation.IsCompletedSuccessfully);
+        Assert.False(writeTask.IsCompleted);
+
+        entryState.MarkEntryClosing();
+        entry.Commit();
+        entry.Dispose();
+        await scheduler.RunUntilCompletedAsync(writeTask);
+        Assert.Equal(7, prepared.CapturedValue);
+        Assert.Equal(1, prepared.WriteCompletedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_SnapshotWrite_WaitsForActiveEntryAndCapturesIt()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true };
         var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var state = new ManualDirectWriteState();
         sut.Manager.RegisterStateMachine("manual", state);
 
-        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var scheduler = new ControlledTaskScheduler();
+        var start = scheduler.Start(() => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken));
+        await scheduler.RunUntilCompletedAsync(start);
 
-        var writeTask = StartSnapshotAndCommitActiveEntry();
+        var entry = state.BeginEntry();
+        entry.Writer.Write(new byte[] { 1, 2, 3 });
+        var writeTask = scheduler.Start(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        scheduler.RunUntilIdle();
 
-        await writeTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        // The snapshot captures every state, so it waits for the entry which another thread is writing.
+        Assert.False(writeTask.IsCompleted);
+        Assert.Empty(storage.Replaces);
+
+        state.SnapshotPayload = [1, 2, 3];
+        state.MarkEntryClosing();
+        entry.Commit();
+        entry.Dispose();
+        await scheduler.RunUntilCompletedAsync(writeTask);
+
+        // The snapshot captured the state change which the entry completed, so it replaced the entry rather than following it.
         var replacement = Assert.Single(storage.Replaces);
-        Assert.DoesNotContain(ReadBinaryEntries(replacement), entry => entry.StreamId.Value >= 8);
+        Assert.Contains(ReadBinaryEntries(replacement), entry => entry.StreamId.Value >= 8);
         Assert.Empty(storage.Appends);
-
         storage.IsCompactionRequested = false;
-        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
-        Assert.Single(storage.Appends);
-        var append = storage.Appends[0];
-        Assert.Contains(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
-
-        Task StartSnapshotAndCommitActiveEntry()
-        {
-            Task writeTask = Task.CompletedTask;
-            using var entry = state.BeginEntry();
-            try
-            {
-                entry.Writer.Write(new byte[] { 1, 2, 3 });
-                writeTask = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-                Assert.True(SpinWait.SpinUntil(() => storage.ReplaceStarted.Task.IsCompleted, TimeSpan.FromSeconds(10)), writeTask.Exception?.ToString());
-                Assert.False(writeTask.IsCompleted);
-
-                state.MarkEntryClosing();
-                entry.Commit();
-                storage.AllowReplace.SetResult();
-                return writeTask;
-            }
-            finally
-            {
-                state.MarkEntryClosing();
-                entry.Dispose();
-            }
-        }
+        var nextWrite = scheduler.Start(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        await scheduler.RunUntilCompletedAsync(nextWrite);
+        Assert.Empty(storage.Appends);
     }
 
     /// <summary>
@@ -2570,6 +2603,64 @@ public partial class StateManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
+    /// <summary>
+    /// Runs queued tasks only when the test asks, one batch at a time.
+    /// </summary>
+    private sealed class ControlledTaskScheduler : TaskScheduler
+    {
+        private readonly ConcurrentQueue<Task> _tasks = new();
+        private readonly SemaphoreSlim _queued = new(0);
+
+        public Task Start(Func<Task> action) =>
+            Task.Factory.StartNew(action, CancellationToken.None, TaskCreationOptions.None, this).Unwrap();
+
+        /// <summary>
+        /// Runs queued tasks until <paramref name="completion"/> completes, including tasks which other threads queue.
+        /// </summary>
+        public async Task RunUntilCompletedAsync(Task completion)
+        {
+            RunUntilIdle();
+            while (!completion.IsCompleted)
+            {
+                Assert.True(await _queued.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "No work was queued.");
+                RunUntilIdle();
+            }
+
+            await completion;
+        }
+
+        /// <summary>
+        /// Runs queued tasks, including the continuations which they queue, until none remains.
+        /// </summary>
+        public void RunUntilIdle()
+        {
+            // Continuations which capture the context resume on this scheduler, rather than on the test's synchronization context.
+            var context = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(null);
+            try
+            {
+                while (_tasks.TryDequeue(out var task))
+                {
+                    TryExecuteTask(task);
+                }
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(context);
+            }
+        }
+
+        protected override void QueueTask(Task task)
+        {
+            _tasks.Enqueue(task);
+            _queued.Release();
+        }
+
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
+
+        protected override IEnumerable<Task> GetScheduledTasks() => _tasks.ToArray();
+    }
+
     private sealed class ManualDirectWriteState : IStateMachine
     {
         private JournalStreamWriter _writer;
@@ -2594,8 +2685,17 @@ public partial class StateManagerTests : JournalingTestBase
             AppendEntriesObservedOpenEntry |= _entryOpen;
         }
 
-        public void WriteSnapshot(JournalStreamWriter writer) { }
+        public byte[]? SnapshotPayload { get; set; }
 
+        public void WriteSnapshot(JournalStreamWriter writer)
+        {
+            if (SnapshotPayload is { } payload)
+            {
+                using var entry = writer.BeginEntry();
+                entry.Writer.Write(payload);
+                entry.Commit();
+            }
+        }
     }
 
     private sealed class AlwaysWritingState : IStateMachine

@@ -9,6 +9,9 @@ namespace Orleans.Journaling;
 /// Represents a first-in, first-out collection whose mutations are recorded in a journal.
 /// </summary>
 /// <typeparam name="T">The type of elements in the queue.</typeparam>
+/// <remarks>
+/// The queue takes ownership of the elements passed to it, and the journal records each mutation when it is made. To change an element, enqueue a new instance.
+/// </remarks>
 public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 {
     /// <summary>

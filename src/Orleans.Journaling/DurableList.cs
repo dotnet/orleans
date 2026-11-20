@@ -10,6 +10,9 @@ namespace Orleans.Journaling;
 /// Represents a list whose mutations are recorded in a journal.
 /// </summary>
 /// <typeparam name="T">The type of elements in the list.</typeparam>
+/// <remarks>
+/// The list takes ownership of the elements passed to it, and the journal records each mutation when it is made. To change an element, assign a new instance.
+/// </remarks>
 public interface IDurableList<T> : IList<T>
 {
     /// <summary>
