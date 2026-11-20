@@ -14,7 +14,7 @@ internal sealed partial class Inbox
 {
     private readonly Dictionary<MessageId, InboxEntry> _messages = [];
     private readonly Dictionary<MessageId, InboxProcessedEntry> _processed = [];
-    private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
+    private readonly Dictionary<MessageId, InboxDeadLetterRecord> _deadLetters = [];
     private JournalStreamWriter _writer;
 
     // Forgetting an identity requires a durable floor which excludes its send time.
@@ -257,11 +257,11 @@ internal union InboxCommand(
 
     /// <summary>Records a message's processed outcome, replacing any earlier record and dead letter of it.</summary>
     [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Complete")]
-    internal sealed class Complete(MessageId messageId, DateTimeOffset sentAt, InboxDeadLetter? deadLetter, InboxRejection? rejection)
+    internal sealed class Complete(MessageId messageId, DateTimeOffset sentAt, InboxDeadLetterRecord? deadLetter, InboxRejection? rejection)
     {
         [Id(0)] public MessageId MessageId { get; } = messageId;
         [Id(1)] public DateTimeOffset SentAt { get; } = sentAt;
-        [Id(2)] public InboxDeadLetter? DeadLetter { get; } = deadLetter;
+        [Id(2)] public InboxDeadLetterRecord? DeadLetter { get; } = deadLetter;
         [Id(3)] public InboxRejection? Rejection { get; } = rejection;
 
         [JsonPropertyName("kind"), JsonPropertyOrder(-1)]
@@ -279,11 +279,11 @@ internal union InboxCommand(
 
     /// <summary>Replaces the inbox's state.</summary>
     [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand.Snapshot")]
-    internal sealed class Snapshot(InboxEntry[] messages, InboxProcessedEntry[] processed, InboxDeadLetter[] deadLetters, DateTimeOffset admissionFloor, bool stoppedCleanly)
+    internal sealed class Snapshot(InboxEntry[] messages, InboxProcessedEntry[] processed, InboxDeadLetterRecord[] deadLetters, DateTimeOffset admissionFloor, bool stoppedCleanly)
     {
         [Id(0)] public InboxEntry[] Messages { get; } = messages;
         [Id(1)] public InboxProcessedEntry[] Processed { get; } = processed;
-        [Id(2)] public InboxDeadLetter[] DeadLetters { get; } = deadLetters;
+        [Id(2)] public InboxDeadLetterRecord[] DeadLetters { get; } = deadLetters;
         [Id(3)] public DateTimeOffset AdmissionFloor { get; } = admissionFloor;
         [Id(4)] public bool StoppedCleanly { get; } = stoppedCleanly;
 

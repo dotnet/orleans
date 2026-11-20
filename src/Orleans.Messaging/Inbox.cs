@@ -50,7 +50,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
     internal IReadOnlyDictionary<MessageId, InboxEntry> MessageState => _messages;
 
-    internal IReadOnlyDictionary<MessageId, InboxDeadLetter> DeadLetterState => _deadLetters;
+    internal IReadOnlyDictionary<MessageId, InboxDeadLetterRecord> DeadLetterState => _deadLetters;
 
     internal InboxDispatcher Handlers => _handlers;
 
@@ -433,7 +433,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private bool IsCurrent(InboxEntry entry) =>
         _messages.TryGetValue(entry.Message.Envelope.MessageId, out var current) && ReferenceEquals(current, entry);
 
-    private void StageCompletion(InboxMessage message, InboxDeadLetter? deadLetter, InboxRejection? rejection = null) =>
+    private void StageCompletion(InboxMessage message, InboxDeadLetterRecord? deadLetter, InboxRejection? rejection = null) =>
         Emit(new InboxCommand.Complete(message.Envelope.MessageId, message.SentAt, deadLetter, rejection));
 
     private void StageDeadLetter(InboxMessage message, string reason, int attemptCount)
@@ -441,7 +441,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         var now = TimeProvider.GetUtcNow();
         var key = message.Envelope.MessageId;
         CompactDeadLetters(now, reservedCapacity: _deadLetters.ContainsKey(key) ? 0 : 1);
-        StageCompletion(message, new InboxDeadLetter
+        StageCompletion(message, new InboxDeadLetterRecord
         {
             Message = message,
             DeadLetteredAt = now,
@@ -453,7 +453,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private bool CompactDeadLetters(DateTimeOffset now, int reservedCapacity = 0)
     {
         if (_deadLetters.Count == 0) return false;
-        var retained = new Dictionary<MessageId, InboxDeadLetter>(_deadLetters);
+        var retained = new Dictionary<MessageId, InboxDeadLetterRecord>(_deadLetters);
         if (!DeadLetterRetention.Compact(retained, now, Options.DeadLetterRetentionPeriod, Options.MaxRetainedDeadLetters,
             static entry => entry.DeadLetteredAt, reservedCapacity))
         {

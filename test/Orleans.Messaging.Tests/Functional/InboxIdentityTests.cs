@@ -389,7 +389,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1050", "reserve");
         var message = Create(rig, key, "inventory.reserve.v1", "reused");
         InboxCommand DeadLettered() => new InboxCommand.Complete(key, message.SentAt,
-            new InboxDeadLetter { Message = message, DeadLetteredAt = message.SentAt, Reason = "earlier failure" }, null);
+            new InboxDeadLetterRecord { Message = message, DeadLetteredAt = message.SentAt, Reason = "earlier failure" }, null);
 
         await OnTurnAsync(rig.Context, () =>
         {

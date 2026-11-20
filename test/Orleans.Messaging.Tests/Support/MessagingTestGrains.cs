@@ -457,7 +457,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             _diagnostics.OutboxDeadLetters.Select(ToSnapshot).ToArray(),
             InboxTestAccess.GetProcessedCount(_inboxState));
 
-    private DeadLetterSnapshot ToSnapshot(DeadLetter deadLetter) =>
+    private DeadLetterSnapshot ToSnapshot(InboxDeadLetter deadLetter) =>
         new(
             deadLetter.Message.Envelope.MessageId,
             TestApplicationProtocol.Read(_sessions, deadLetter.Message).Route,

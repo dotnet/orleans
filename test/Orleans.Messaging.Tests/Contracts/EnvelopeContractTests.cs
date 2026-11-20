@@ -171,6 +171,7 @@ public sealed class EnvelopeContractTests
     [InlineData("InboxMessage")]
     [InlineData("OutboxMessage")]
     [InlineData("InboxDeadLetter")]
+    [InlineData("InboxDeadLetterRecord")]
     [InlineData("OutboxDeadLetter")]
     [InlineData("OutboxDeadLetterRecord")]
     public void MessageAndDeadLetterCopyPreservesMetadataAndIsolation(string kind)
@@ -212,16 +213,16 @@ public sealed class EnvelopeContractTests
     public void PublicDeadLetterRoundTripsThroughOrleansSerialization()
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var letter = new DeadLetter
+        var letter = new InboxDeadLetter
         {
             Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" }, SentAt = SentAt },
             DeadLetteredAt = DateTimeOffset.UnixEpoch,
             Reason = "failure",
             AttemptCount = 3
         };
-        var serializer = services.GetRequiredService<Serializer<DeadLetter>>();
+        var serializer = services.GetRequiredService<Serializer<InboxDeadLetter>>();
 
-        var result = Assert.IsType<DeadLetter>(serializer.Deserialize(serializer.SerializeToArray(letter)));
+        var result = Assert.IsType<InboxDeadLetter>(serializer.Deserialize(serializer.SerializeToArray(letter)));
 
         Assert.Equal(letter.Message.Envelope.MessageId, result.Message.Envelope.MessageId);
         Assert.Equal(new byte[] { 1, 2 }, result.Message.Envelope.Payload);
