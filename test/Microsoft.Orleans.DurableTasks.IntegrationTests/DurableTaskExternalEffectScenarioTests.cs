@@ -2,8 +2,8 @@ using System.Text.Json.Serialization;
 using DurableWorkflows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;

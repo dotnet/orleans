@@ -2,7 +2,7 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 
