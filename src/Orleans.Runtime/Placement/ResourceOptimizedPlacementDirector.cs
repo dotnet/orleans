@@ -17,7 +17,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private readonly NormalizedWeights _weights;
     private readonly float _localSiloPreferenceMargin;
     private readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
-    private readonly Task<SiloAddress> _cachedLocalSilo;
 
     public ResourceOptimizedPlacementDirector(
         ILocalSiloDetails localSiloDetails,
@@ -25,7 +24,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         IOptions<ResourceOptimizedPlacementOptions> options)
     {
         _localSilo = localSiloDetails.SiloAddress;
-        _cachedLocalSilo = Task.FromResult(_localSilo);
         _weights = NormalizeWeights(options.Value);
         _localSiloPreferenceMargin = (float)options.Value.LocalSiloPreferenceMargin / 100;
         deploymentLoadPublisher.SubscribeToStatisticsChangeEvents(this);
@@ -44,13 +42,17 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 ActivationCountWeight: (float)input.ActivationCountWeight / totalWeight);
     }
 
-    public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+    public async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
     {
-        var compatibleSilos = context.GetCompatibleSilos(target);
+        var compatibleSilos = await context.GetCompatibleSilosAsync(target);
+        return SelectSilo(target, context, compatibleSilos);
+    }
 
+    private SiloAddress SelectSilo(PlacementTarget target, IPlacementContext context, SiloAddress[] compatibleSilos)
+    {
         if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatibleSilos) is { } placementHint)
         {
-            return Task.FromResult(placementHint);
+            return placementHint;
         }
 
         if (compatibleSilos.Length == 0)
@@ -60,12 +62,12 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
         if (compatibleSilos.Length == 1)
         {
-            return Task.FromResult(compatibleSilos[0]);
+            return compatibleSilos[0];
         }
 
         if (_siloStatistics.IsEmpty)
         {
-            return Task.FromResult(compatibleSilos[Random.Shared.Next(compatibleSilos.Length)]);
+            return compatibleSilos[Random.Shared.Next(compatibleSilos.Length)];
         }
 
         // It is good practice not to allocate more than 1[KB] on the stack
@@ -88,10 +90,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         if (!localSiloScore.HasValue || context.LocalSiloStatus != SiloStatus.Active || localSiloScore.Value - _localSiloPreferenceMargin > pick.Score)
         {
             var bestCandidate = compatibleSilos[pick.Index];
-            return Task.FromResult(bestCandidate);
+            return bestCandidate;
         }
 
-        return _cachedLocalSilo;
+        return _localSilo;
 
         (int PickIndex, float PickScore, float? LocalSiloScore) MakePick(scoped Span<(int, ResourceStatistics)> relevantSilos)
         {

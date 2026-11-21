@@ -40,12 +40,49 @@ namespace UnitTests.Runtime
             Assert.Equal(hintedSilo, result);
         }
 
+        [Fact]
+        public async Task PreferLocalPlacementDirector_FallbackQueriesCandidatesOnce()
+        {
+            var localSilo = Silo("127.0.0.1:100@1");
+            var remoteSilo = Silo("127.0.0.1:101@1");
+            var context = CreatePlacementContext(localSilo, SiloStatus.Active, remoteSilo);
+            var result = await new PreferLocalPlacementDirector().OnAddActivation(null!, CreateTarget(localSilo), context);
+            Assert.Equal(remoteSilo, result);
+            await context.Received(1).GetCompatibleSilosAsync(Arg.Any<PlacementTarget>(), Arg.Any<CancellationToken>());
+        }
+
+        [Theory]
+        [InlineData("random")]
+        [InlineData("hash")]
+        [InlineData("local")]
+        [InlineData("stateless")]
+        public async Task PlacementDirector_AwaitsCandidatesBeforeHonoringHint(string strategy)
+        {
+            var localSilo = Silo("127.0.0.1:100@1");
+            var remoteSilo = Silo("127.0.0.1:101@1");
+            var context = CreatePlacementContext(localSilo, SiloStatus.Active, localSilo, remoteSilo);
+            var completion = new TaskCompletionSource<SiloAddress[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            context.GetCompatibleSilosAsync(Arg.Any<PlacementTarget>(), Arg.Any<CancellationToken>()).Returns(completion.Task);
+            IPlacementDirector director = strategy switch
+            {
+                "random" => new RandomPlacementDirector(),
+                "hash" => new HashBasedPlacementDirector(),
+                "local" => new PreferLocalPlacementDirector(),
+                "stateless" => new StatelessWorkerDirector(),
+                _ => throw new InvalidOperationException(),
+            };
+            var pending = director.OnAddActivation(null!, CreateTarget(remoteSilo), context);
+            Assert.False(pending.IsCompleted);
+            completion.SetResult([localSilo, remoteSilo]);
+            Assert.Equal(remoteSilo, await pending.WaitAsync(TestContext.Current.CancellationToken));
+        }
+
         private static IPlacementContext CreatePlacementContext(SiloAddress localSilo, SiloStatus localSiloStatus, params SiloAddress[] compatibleSilos)
         {
             var placementContext = Substitute.For<IPlacementContext>();
             placementContext.LocalSilo.Returns(localSilo);
             placementContext.LocalSiloStatus.Returns(localSiloStatus);
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(compatibleSilos);
+            placementContext.GetCompatibleSilosAsync(Arg.Any<PlacementTarget>(), Arg.Any<CancellationToken>()).Returns(compatibleSilos);
             return placementContext;
         }
 

@@ -33,7 +33,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
     }
 
     [Fact, TestCategory("Functional")]
-    public void CanBeCalled()
+    public async Task CanBeCalled()
     {
         var testLocalSiloAddress = SiloAddress.New(IPAddress.Parse("1.1.1.1"), 1000, 1);
         var director = new PreferredMatchSiloMetadataPlacementFilterDirector(
@@ -44,15 +44,15 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
             {
                 {testLocalSiloAddress, SiloMetadata.Empty}
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(), default,
-                new[] { testLocalSiloAddress }
-        ).ToList();
+        var result = await director.FilterAsync(new PreferredMatchSiloMetadataPlacementFilterStrategy(), default,
+                new[] { testLocalSiloAddress }, TestContext.Current.CancellationToken
+        );
         Assert.NotNull(result);
         Assert.NotEmpty(result);
     }
 
     [Fact, TestCategory("Functional")]
-    public void FiltersToAllWhenNoEntry()
+    public async Task FiltersToAllWhenNoEntry()
     {
         var testLocalSiloAddress = SiloAddress.New(IPAddress.Parse("1.1.1.1"), 1000, 1);
         var testOtherSiloAddress = SiloAddress.New(IPAddress.Parse("1.1.1.1"), 1001, 1);
@@ -67,8 +67,8 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress, SiloMetadata.Empty},
                 {testLocalSiloAddress, siloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 1, 0), default,
-                new[] { testOtherSiloAddress }).ToList();
+        var result = await director.FilterAsync(new PreferredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 1, 0), default,
+                new[] { testOtherSiloAddress }, TestContext.Current.CancellationToken);
         Assert.NotEmpty(result);
     }
 
@@ -84,7 +84,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
     [InlineData(1, 3, "all.match")]
     [InlineData(2, 3, "all.match")]
 
-    public void FiltersOnSingleMetadata(int minCandidates, int expectedCount, string key)
+    public async Task FiltersOnSingleMetadata(int minCandidates, int expectedCount, string key)
     {
         var testLocalSiloAddress = SiloAddress.New(IPAddress.Parse("1.1.1.1"), 1000, 1);
         var testOtherSiloAddress1 = SiloAddress.New(IPAddress.Parse("1.1.1.1"), 1001, 1);
@@ -121,8 +121,8 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress3, otherSiloMetadata3},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy([key], minCandidates, 0), default,
-                new[] { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
+        var result = await director.FilterAsync(new PreferredMatchSiloMetadataPlacementFilterStrategy([key], minCandidates, 0), default,
+                new[] { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }, TestContext.Current.CancellationToken);
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);
     }
@@ -138,7 +138,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
     [InlineData(1, 1, "no.match", "one.match", "all.match")]
     [InlineData(2, 3, "no.match", "one.match", "all.match")]
 
-    public void FiltersOnMultipleMetadata(int minCandidates, int expectedCount, params string[] keys)
+    public async Task FiltersOnMultipleMetadata(int minCandidates, int expectedCount, params string[] keys)
     {
         var testLocalSiloAddress = SiloAddress.New(IPAddress.Parse("1.1.1.1"), 1000, 1);
         var testOtherSiloAddress1 = SiloAddress.New(IPAddress.Parse("1.1.1.1"), 1001, 1);
@@ -175,8 +175,8 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress3, otherSiloMetadata3},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(keys, minCandidates, 0), default,
-                new[] { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
+        var result = await director.FilterAsync(new PreferredMatchSiloMetadataPlacementFilterStrategy(keys, minCandidates, 0), default,
+                new[] { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }, TestContext.Current.CancellationToken);
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);
     }

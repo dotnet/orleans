@@ -14,15 +14,17 @@ namespace Orleans.Runtime.Placement
             this.membershipManager = membershipManager;
         }
 
-        public virtual Task<SiloAddress> OnAddActivation(
+        public virtual async Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             var siloRole = target.GrainIdentity.Key.ToString();
+            var snapshot = membershipManager.CurrentSnapshot;
+            var candidates = await context.GetCompatibleSilosAsync(target);
 
-            var compatibleSilos = membershipManager.CurrentSnapshot.Entries
+            var compatibleSilos = snapshot.Entries
                 .Where(s => s.Value.Status == SiloStatus.Active && s.Value.RoleName == siloRole)
                 .Select(s => s.Key)
-                .Intersect(context.GetCompatibleSilos(target))
+                .Intersect(candidates)
                 .ToArray();
 
             if (compatibleSilos == null || compatibleSilos.Length == 0)
@@ -33,10 +35,10 @@ namespace Orleans.Runtime.Placement
             // If a valid placement hint was specified, use it.
             if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatibleSilos) is { } placementHint)
             {
-                return Task.FromResult(placementHint);
+                return placementHint;
             }
 
-            return Task.FromResult(compatibleSilos[Random.Shared.Next(compatibleSilos.Length)]);
+            return compatibleSilos[Random.Shared.Next(compatibleSilos.Length)];
         }
     }
 }
