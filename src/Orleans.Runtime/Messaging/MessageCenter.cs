@@ -212,6 +212,11 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
+                    if (TryRerouteMessageToDeadSilo(msg))
+                    {
+                        return;
+                    }
+
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);
@@ -219,7 +224,11 @@ namespace Orleans.Runtime.Messaging
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
-                        // Do not try to establish
+                        if (TryRerouteMessageToDeadSilo(msg))
+                        {
+                            return;
+                        }
+
                         if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
                         {
                             this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
@@ -235,23 +244,21 @@ namespace Orleans.Runtime.Messaging
                     else
                     {
                         var connectionTask = this.connectionManager.GetConnection(targetSilo);
-                        if (connectionTask.IsCompletedSuccessfully)
-                        {
-                            var sender = connectionTask.Result;
-                            sender.Send(msg);
-                        }
-                        else
-                        {
-                            _ = SendAsync(this, connectionTask, msg);
+                        _ = SendAsync(this, connectionTask, msg);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                        static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                        {
+                            try
                             {
-                                try
+                                var sender = await connectionTask;
+                                if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
                                 {
-                                    var sender = await connectionTask;
                                     sender.Send(msg);
                                 }
-                                catch (Exception exception)
+                            }
+                            catch (Exception exception)
+                            {
+                                if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
                                 {
                                     messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
                                 }
@@ -260,6 +267,29 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
             }
+        }
+
+        private bool TryRerouteMessageToDeadSilo(Message message)
+        {
+            if (message.Direction is not (Message.Directions.Request or Message.Directions.OneWay)
+                || message.RetryCount != 0
+                || message.TargetGrain.IsSystemTarget()
+                || message.TargetGrain.IsClient()
+                || message.TargetSilo is not { } targetSilo
+                || !siloStatusOracle.IsDeadSilo(targetSilo))
+            {
+                return false;
+            }
+
+            // Connection acquisition and cached placement can outlive the target silo.
+            // Re-address before the first transport attempt; failed writes can have uncertain outcomes.
+            ProcessRequestToInvalidActivation(
+                message,
+                new GrainAddress { GrainId = message.TargetGrain, SiloAddress = targetSilo },
+                forwardingAddress: null,
+                failedOperation: "Target silo is known to be dead",
+                exc: new SiloUnavailableException());
+            return true;
         }
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
