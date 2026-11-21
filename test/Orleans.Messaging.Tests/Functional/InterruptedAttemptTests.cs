@@ -1,8 +1,8 @@
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 /// <summary>
 /// An activation which stops without recording an attempt's outcome, because a handler ended without an outcome or the

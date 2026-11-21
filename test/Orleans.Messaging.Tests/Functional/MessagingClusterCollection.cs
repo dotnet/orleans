@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class MessagingClusterCollection

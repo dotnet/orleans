@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>Tests the rules for the delegates which DurableTask.Run and DurableTask.RunInline receive.</summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]

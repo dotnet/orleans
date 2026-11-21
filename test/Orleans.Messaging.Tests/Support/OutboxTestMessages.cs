@@ -3,7 +3,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 internal static class OutboxTestMessages
 {

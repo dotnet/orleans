@@ -1,4 +1,4 @@
-namespace Orleans.Messaging.Tests;
+namespace Orleans.Durable.Messaging.Tests;
 
 /// <summary>Asserts which case a <see cref="DeliveryResult"/> holds.</summary>
 internal static class DeliveryResultAssert

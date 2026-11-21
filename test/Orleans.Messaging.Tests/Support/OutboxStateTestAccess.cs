@@ -1,4 +1,4 @@
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 internal sealed class OutboxStateTestAccess(IOutbox outbox)
 {

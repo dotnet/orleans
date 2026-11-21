@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace Orleans.DurableTasks.Analyzers;
+namespace Orleans.Durable.Analyzers;
 
 /// <summary>Describes the replay-safety rules for durable task bodies.</summary>
 internal static class DurableTaskDiagnostics

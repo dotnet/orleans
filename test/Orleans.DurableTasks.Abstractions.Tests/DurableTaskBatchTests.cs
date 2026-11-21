@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Verifies scheduled task inspection, <c>ScheduleAll</c>, <c>WhenAllCompleted</c>, deterministic <c>ScheduledTask.WhenAll</c>

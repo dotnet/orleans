@@ -1,8 +1,8 @@
 using System.Reflection;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>
 /// Verifies covered regions, the one mechanism which keeps code that a record covers out of an execution's history:

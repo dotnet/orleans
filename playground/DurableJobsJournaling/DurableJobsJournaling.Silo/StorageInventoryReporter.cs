@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
 
 namespace DurableJobsJournaling.Silo;

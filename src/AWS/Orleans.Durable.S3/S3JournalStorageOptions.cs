@@ -1,0 +1,281 @@
+using System.Diagnostics.CodeAnalysis;
+using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
+
+namespace Orleans.Durable.Journaling;
+
+/// <summary>
+/// Options for configuring the Amazon S3 journal storage provider.
+/// </summary>
+public sealed class S3JournalStorageOptions
+{
+    internal const string WalObjectKeyPrefix = "wal/";
+
+    private IAmazonS3? _s3Client;
+
+    /// <summary>
+    /// Bucket name where journals are stored.
+    /// </summary>
+    public string? BucketName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the delegate used to generate the base object key for a journal.
+    /// </summary>
+    /// <remarks>
+    /// WAL objects use <c>wal/&lt;base-key&gt;</c> and checkpoint objects use
+    /// <c>checkpoints/&lt;base-key&gt;/&lt;snapshot-id&gt;</c>. The delegate must not add these namespaces.
+    /// </remarks>
+    public Func<JournalId, string> GetObjectKey { get; set; } = DefaultGetObjectKey;
+
+    /// <summary>
+    /// Gets or sets the delegate mapping a non-default catalog prefix to a base object-key prefix.
+    /// </summary>
+    /// <remarks>
+    /// The result must be non-empty and include the base object key of every journal whose id
+    /// starts with the supplied raw ordinal prefix, including partial segments. Additional matches
+    /// are filtered by the catalog. When unset, the default identity <see cref="GetObjectKey"/>
+    /// mapping uses the raw journal prefix. Custom object-key mappings must configure this delegate
+    /// to use prefixed listings. Unprefixed listings do not require this delegate.
+    /// The provider prepends <c>wal/</c> to the result; the delegate must not add it.
+    /// When <see cref="UseOrderedListing"/> is false, the mapped prefix is widened to its nearest
+    /// slash-terminated directory boundary to support directory buckets, while retaining <c>wal/</c>.
+    /// </remarks>
+    public Func<JournalId, string>? GetObjectKeyPrefix { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating that the bucket supports lexically ordered
+    /// <see cref="Amazon.S3.Model.ListObjectsV2Request"/> listings. Defaults to false.
+    /// </summary>
+    /// <remarks>
+    /// Enable this only for general-purpose buckets or compatible services which guarantee ordered
+    /// listings and support <see cref="Amazon.S3.Model.ListObjectsV2Request.StartAfter"/>.
+    /// Directory buckets are unordered and must leave this disabled. With the default identity
+    /// object-key mapping, ordered listings can seek to an ASCII lower bound and stop beyond an
+    /// ASCII upper bound. Custom mappings do not use native key-range bounds.
+    /// This capability is independent of <see cref="UseS3ExpressAppend"/>.
+    /// </remarks>
+    public bool UseOrderedListing { get; set; }
+
+    /// <summary>
+    /// Gets or sets the delegate used to parse journal ids from base object keys.
+    /// </summary>
+    /// <remarks>The catalog removes the <c>wal/</c> namespace before invoking this delegate.</remarks>
+    public Func<string, JournalId?> TryParseJournalId { get; set; } = DefaultTryParseJournalId;
+
+    /// <summary>
+    /// Options to use when creating the S3 client, or <see langword="null"/> to use the AWS SDK defaults.
+    /// </summary>
+    public AmazonS3Config? ClientConfig { get; set; }
+
+    /// <summary>
+    /// Gets or sets the client used to access S3.
+    /// </summary>
+    /// <remarks>
+    /// The caller retains ownership of this client and disposes it after the silo stops.
+    /// </remarks>
+    [DisallowNull]
+    public IAmazonS3? S3Client
+    {
+        get => _s3Client;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _s3Client = value;
+            CreateClient = _ => Task.FromResult(value);
+            IsClientExternallyOwned = true;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the configured bucket should be created if it does not exist.
+    /// </summary>
+    /// <remarks>
+    /// This is intended for local emulators. AWS S3 Express One Zone directory buckets should generally be provisioned ahead of time.
+    /// </remarks>
+    public bool CreateBucketIfNotExists { get; set; }
+
+    /// <summary>
+    /// Gets or sets the S3 storage class applied to newly-created WAL and checkpoint objects.
+    /// </summary>
+    public S3StorageClass? StorageClass { get; set; } = S3StorageClass.ExpressOnezone;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether appends use S3 Express <see cref="Amazon.S3.Model.PutObjectRequest.WriteOffsetBytes"/>.
+    /// </summary>
+    /// <remarks>
+    /// Set this to <see langword="false"/> to use conditional-rewrite appends with S3-compatible services such as SeaweedFS.
+    /// </remarks>
+    public bool UseS3ExpressAppend { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether delete requests add S3 Express size and last-modified conditions
+    /// in addition to the WAL ETag condition.
+    /// </summary>
+    /// <remarks>Set this to <see langword="false"/> for S3-compatible emulators which only support ETag conditions.</remarks>
+    public bool UseConditionalDelete { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether obsolete checkpoint objects are deleted after a new checkpoint is published. Defaults to true.
+    /// </summary>
+    public bool DeleteOldCheckpoints { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the maximum number of times Append, Replace, or Delete will refresh its cached WAL ETag
+    /// and retry in place after observing a metadata-only conflict. Defaults to 5.
+    /// </summary>
+    public int MaxMetadataOnlyConflictRetries { get; set; } = DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES;
+
+    /// <summary>
+    /// The default maximum number of metadata-only conflict retries.
+    /// </summary>
+    public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
+
+    /// <summary>
+    /// Gets or sets the initial delay applied before retrying after a metadata-only conflict. Defaults to 10 ms.
+    /// </summary>
+    public TimeSpan MetadataOnlyConflictInitialBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
+
+    /// <summary>
+    /// The default initial delay applied before retrying a metadata-only conflict.
+    /// </summary>
+    public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF = TimeSpan.FromMilliseconds(10);
+
+    /// <summary>
+    /// Gets or sets the upper bound on metadata-only conflict retry backoff. Defaults to 200 ms.
+    /// </summary>
+    public TimeSpan MetadataOnlyConflictMaxBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
+
+    /// <summary>
+    /// The default upper bound on metadata-only conflict retry backoff.
+    /// </summary>
+    public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>
+    /// The optional delegate used to create an <see cref="IAmazonS3"/> instance.
+    /// </summary>
+    internal Func<CancellationToken, Task<IAmazonS3>>? CreateClient { get; private set; }
+
+    internal bool IsClientExternallyOwned { get; private set; }
+
+    internal bool UsesDefaultObjectKey => GetObjectKey == DefaultGetObjectKey;
+
+    internal string? GetObjectKeyPrefixForCatalog(string? prefix)
+    {
+        if (prefix is null)
+        {
+            return null;
+        }
+
+        var mapper = GetObjectKeyPrefix;
+        if (mapper is null && !UsesDefaultObjectKey)
+        {
+            throw new InvalidOperationException(
+                $"Custom {nameof(GetObjectKey)} mappings require {nameof(GetObjectKeyPrefix)} for prefixed journal listings.");
+        }
+
+        var result = mapper is null ? prefix : mapper(new JournalId(prefix));
+        if (string.IsNullOrEmpty(result))
+        {
+            throw new InvalidOperationException(
+                $"{nameof(GetObjectKeyPrefix)} must return a non-empty object-key prefix.");
+        }
+
+        return result;
+    }
+
+    internal string GetObjectKeyForJournal(JournalId journalId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
+        var objectKey = GetObjectKey(journalId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(objectKey);
+        return objectKey;
+    }
+
+    internal static string GetWalObjectKeyForJournal(JournalId journalId, string journalObjectKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(journalObjectKey);
+        return GetDefaultWalObjectKey(journalObjectKey);
+    }
+
+    internal static string GetCheckpointObjectKeyForJournal(JournalId journalId, string journalObjectKey, string snapshotId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(journalObjectKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
+        return GetDefaultCheckpointObjectKey(journalObjectKey, snapshotId);
+    }
+
+    internal static string GetDefaultWalObjectKey(string journalObjectKey) => $"{WalObjectKeyPrefix}{journalObjectKey}";
+
+    internal static string GetDefaultCheckpointObjectKey(string journalObjectKey, string snapshotId) => $"checkpoints/{journalObjectKey}/{snapshotId}";
+
+    internal Func<CancellationToken, Task<IAmazonS3>> GetCreateClient()
+        => CreateClient ?? (_ => Task.FromResult<IAmazonS3>(new AmazonS3Client(ClientConfig ?? new AmazonS3Config())));
+
+    /// <summary>
+    /// Configures the S3 client using the provided callback.
+    /// </summary>
+    /// <remarks>
+    /// The provider owns and disposes the client returned by the callback.
+    /// </remarks>
+    public void ConfigureS3Client(Func<CancellationToken, Task<IAmazonS3>> createClientCallback)
+    {
+        CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
+        _s3Client = null;
+        IsClientExternallyOwned = false;
+    }
+
+    /// <summary>
+    /// Configures the S3 client using the AWS SDK default credential chain and the provided client configuration.
+    /// </summary>
+    public void ConfigureS3Client(AmazonS3Config config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ClientConfig = config;
+        CreateClient = _ => Task.FromResult<IAmazonS3>(new AmazonS3Client(config));
+        _s3Client = null;
+        IsClientExternallyOwned = false;
+    }
+
+    /// <summary>
+    /// Configures the S3 client using the AWS SDK default credential chain and the provided region.
+    /// </summary>
+    public void ConfigureS3Client(RegionEndpoint regionEndpoint)
+    {
+        ArgumentNullException.ThrowIfNull(regionEndpoint);
+        ConfigureS3Client(new AmazonS3Config { RegionEndpoint = regionEndpoint });
+    }
+
+    /// <summary>
+    /// Configures the S3 client using explicit credentials and client configuration.
+    /// </summary>
+    public void ConfigureS3Client(string accessKey, string secretKey, AmazonS3Config config)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accessKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(secretKey);
+        ArgumentNullException.ThrowIfNull(config);
+        ClientConfig = config;
+        var credentials = new BasicAWSCredentials(accessKey, secretKey);
+        CreateClient = _ => Task.FromResult<IAmazonS3>(new AmazonS3Client(credentials, config));
+        _s3Client = null;
+        IsClientExternallyOwned = false;
+    }
+
+    private static string DefaultGetObjectKey(JournalId journalId) => journalId.Value;
+
+    private static JournalId? DefaultTryParseJournalId(string value)
+    {
+        try
+        {
+            return new JournalId(value);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+}

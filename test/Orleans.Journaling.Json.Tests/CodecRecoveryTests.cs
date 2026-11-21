@@ -3,15 +3,15 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
-using Orleans.Journaling.Json;
-using Orleans.Journaling.Tests;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Journaling.Tests;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Xunit;
 
-namespace Orleans.Journaling.Json.Tests;
+namespace Orleans.Durable.Journaling.Json.Tests;
 
 /// <summary>
 /// Tests that verify same-format recovery for JSON journaling and the Orleans binary compatibility baseline.

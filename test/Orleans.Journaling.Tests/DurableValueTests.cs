@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Tests for DurableValue, a simple persistent value wrapper that uses Orleans' journaling

@@ -1,4 +1,4 @@
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;

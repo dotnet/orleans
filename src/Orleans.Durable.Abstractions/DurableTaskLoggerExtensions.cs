@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Provides logging which reports each event of a durable task once.</summary>
 public static class DurableTaskLoggerExtensions

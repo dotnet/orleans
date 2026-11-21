@@ -2,9 +2,9 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Options;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 /// <summary>Stores journals in memory and records the bytes of every successful journal write.</summary>
 public sealed class RecordingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog

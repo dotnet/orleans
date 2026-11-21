@@ -1,4 +1,4 @@
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>
 /// Represents a durable task whose recorded version of a change isn't one which the running code supports, because the
@@ -12,7 +12,7 @@ namespace Orleans.DurableTasks;
 /// attempt's result and keeps the task pending. A later activation, typically on a deployment whose code supports the
 /// recorded version, replays the task. Abort the task to end it instead.
 /// </remarks>
-[Alias("Orleans.DurableTasks.DurableTaskVersionException")]
+[Alias("Orleans.Durable.Tasks.DurableTaskVersionException")]
 public sealed class DurableTaskVersionException : Exception
 {
     /// <summary>Initializes an exception for the recorded version <paramref name="version"/> of <paramref name="name"/>.</summary>

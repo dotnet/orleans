@@ -725,13 +725,13 @@ dotnet_diagnostic.CA1062.severity = warning
 [src/Serializers/Orleans.Serialization.Protobuf/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
-[src/Azure/{Orleans.Clustering.AzureStorage,Orleans.DurableJobs.AzureStorage,Orleans.GrainDirectory.AzureStorage,Orleans.Journaling.AzureStorage,Orleans.Persistence.AzureStorage,Orleans.Reminders.AzureStorage,Orleans.Streaming.AzureStorage,Orleans.Transactions.AzureStorage,Shared}/**.cs]
+[src/Azure/{Orleans.Clustering.AzureStorage,Orleans.Durable.AzureStorage,Orleans.GrainDirectory.AzureStorage,Orleans.Persistence.AzureStorage,Orleans.Reminders.AzureStorage,Orleans.Streaming.AzureStorage,Orleans.Transactions.AzureStorage,Shared}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
 [src/Azure/{Orleans.Clustering.Cosmos,Orleans.Persistence.Cosmos,Orleans.Reminders.Cosmos}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
-[src/AWS/Orleans.Journaling.S3/**.cs]
+[src/AWS/Orleans.Durable.S3/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
 [src/Google/**/*.cs]
@@ -743,7 +743,7 @@ dotnet_diagnostic.CA1062.severity = warning
 [src/Orleans.Serialization/Codecs/{*.cs,**/*.cs}]
 dotnet_diagnostic.CA1062.severity = warning
 
-[src/Orleans.Journaling/Formats/Json/**.cs]
+[src/Orleans.Durable/Journaling/Formats/Json/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
 # CA1815: Override equals and operator equals on value types
@@ -792,7 +792,7 @@ dotnet_diagnostic.CA1305.severity = warning
 dotnet_diagnostic.CA1307.severity = warning
 
 # Journal identifiers, metadata, and provider storage keys retain their exact persisted representation.
-[src/{Orleans.Journaling,Azure/Orleans.Journaling.AzureStorage,Redis/Orleans.Journaling.Redis,AWS/Orleans.Journaling.S3}/**.cs]
+[src/{Orleans.Durable/Journaling,Azure/Orleans.Durable.AzureStorage/Journaling,Redis/Orleans.Durable.Redis,AWS/Orleans.Durable.S3}/**.cs]
 dotnet_diagnostic.CA1305.severity = warning
 dotnet_diagnostic.CA1307.severity = warning
 

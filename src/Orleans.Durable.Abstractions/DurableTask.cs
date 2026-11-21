@@ -4,11 +4,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Defines a deferred, host-scheduled durable asynchronous operation.</summary>
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
-[Alias("Orleans.DurableTasks.DurableTask")]
+[Alias("Orleans.Durable.Tasks.DurableTask")]
 public abstract partial class DurableTask
 {
     /// <summary>Gets the context of the durable task which the calling code runs in.</summary>
@@ -190,7 +190,7 @@ public abstract partial class DurableTask
 
 /// <summary>Defines a deferred durable asynchronous operation with a result.</summary>
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
-[Alias("Orleans.DurableTasks.DurableTask`1")]
+[Alias("Orleans.Durable.Tasks.DurableTask`1")]
 public abstract class DurableTask<TResult> : DurableTask;
 
 internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask<TResult>

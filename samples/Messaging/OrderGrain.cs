@@ -1,6 +1,6 @@
 using Orleans;
-using Orleans.Messaging;
-using Orleans.Journaling;
+using Orleans.Durable.Messaging;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
 namespace Messaging;

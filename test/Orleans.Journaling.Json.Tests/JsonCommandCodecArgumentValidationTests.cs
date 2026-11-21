@@ -1,9 +1,9 @@
 using System.Text;
 using System.Text.Json;
-using Orleans.Journaling.Tests;
+using Orleans.Durable.Journaling.Tests;
 using Xunit;
 
-namespace Orleans.Journaling.Json.Tests;
+namespace Orleans.Durable.Journaling.Json.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

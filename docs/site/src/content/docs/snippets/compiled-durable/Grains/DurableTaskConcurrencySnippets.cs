@@ -1,9 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.DurableTasks;
-using Orleans.Journaling;
-
-#pragma warning disable ORLEANSEXP005
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
 
 namespace Documentation.Grains.DurableTasks;
 

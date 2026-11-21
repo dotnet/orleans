@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Identifies a durable task within a hierarchy.</summary>
 /// <remarks>
@@ -12,7 +12,7 @@ namespace Orleans.DurableTasks;
 /// <see cref="TaskIdJsonConverter"/>.
 /// </remarks>
 [JsonConverter(typeof(TaskIdJsonConverter))]
-[Alias("Orleans.DurableTasks.TaskId")]
+[Alias("Orleans.Durable.Tasks.TaskId")]
 public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanParsable<TaskId>, ISpanFormattable
 {
     private readonly HierarchicalKey? _key;

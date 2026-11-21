@@ -6,7 +6,7 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 // Routes and typed values belong to this test application, not to the messaging transport.
 [GenerateSerializer]

@@ -1,10 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Journaling;
-using Orleans.Messaging.Tests.Functional;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Tests.Functional;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

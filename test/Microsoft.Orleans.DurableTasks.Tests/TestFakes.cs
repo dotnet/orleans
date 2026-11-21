@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using NSubstitute;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
@@ -164,12 +164,12 @@ internal static class DurableTaskGrainRuntimeTestExtensions
 {
     /// <summary>Selects a completion as an attempt of the execution which owns <paramref name="decisionId"/> does.</summary>
     public static ValueTask<TaskId> SelectCompletionAsync(
-        this global::Orleans.DurableTasks.Runtime.DurableTaskGrainRuntime runtime,
+        this global::Orleans.Durable.Tasks.Runtime.DurableTaskGrainRuntime runtime,
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken) =>
         runtime.SelectCompletionAsync(
-            new global::Orleans.DurableTasks.Runtime.GrainDurableTaskContext(decisionId.Parent(), runtime, runtime.GrainContext, TaskScheduler.Current),
+            new global::Orleans.Durable.Tasks.Runtime.GrainDurableTaskContext(decisionId.Parent(), runtime, runtime.GrainContext, TaskScheduler.Current),
             decisionId,
             candidates,
             cancellationToken);
@@ -180,7 +180,7 @@ internal static class DurableTaskGrainRuntimeTestExtensions
     /// callee stores under the runtime's caller scope.
     /// </summary>
     public static void AcceptResponseFromInbox(
-        this global::Orleans.DurableTasks.Runtime.DurableTaskGrainRuntime runtime,
+        this global::Orleans.Durable.Tasks.Runtime.DurableTaskGrainRuntime runtime,
         TaskId taskId,
         DurableTaskResponse response,
         GrainId sender)
@@ -188,7 +188,7 @@ internal static class DurableTaskGrainRuntimeTestExtensions
         var wireId = runtime.GetWireId(taskId);
         runtime.AcceptResponseFromInbox(
             wireId,
-            global::Orleans.DurableTasks.Runtime.CallerScope.GetTaskId(runtime.GrainId, wireId),
+            global::Orleans.Durable.Tasks.Runtime.CallerScope.GetTaskId(runtime.GrainId, wireId),
             response,
             sender);
     }

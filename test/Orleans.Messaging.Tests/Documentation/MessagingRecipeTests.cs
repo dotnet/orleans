@@ -2,13 +2,13 @@ using Documentation.Grains.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
-using Orleans.Journaling;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Documentation;
+namespace Orleans.Durable.Messaging.Tests.Documentation;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

@@ -43,7 +43,7 @@ record, whatever the delivered `SentAt`, including after a receiver clock rollba
 An untracked identity whose send time is at or below the admission floor receives
 `Expired`. Above the floor, the inbox bounds an untracked identity's `SentAt` by the
 receiver's Durable Jobs time plus
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>;
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>;
 equality is admitted, and a later time throws
 <xref:System.ArgumentOutOfRangeException> with no staged change or sink offer. The
 sender retries within its original budget, so diagnose clock skew or an incorrectly
@@ -60,14 +60,14 @@ same subject, body bytes, and `DeliverAt` time; a pending repeat with a differen
 subject, body, or `DeliverAt` fails.
 A completed duplicate returns `Duplicate` while its completion record is retained.
 Pending and completed records retain the ID and the
-<xref:Orleans.Messaging.InboxMessage.SentAt> which the inbox accepted. A repeat
+<xref:Orleans.Durable.Messaging.InboxMessage.SentAt> which the inbox accepted. A repeat
 keeps that accepted time, and the record is durable before the receiver answers
 `Duplicate` or repeats its recorded rejection.
 Applications uphold the immutable command contract; the completion fact
 acknowledges the original execution.
 
 A handler stages its business changes and outgoing messages, then calls
-<xref:Orleans.Messaging.IInboxHandlerContext.Complete*>, which stages the inbox
+<xref:Orleans.Durable.Messaging.IInboxHandlerContext.Complete*>, which stages the inbox
 removal and completion record. One journal write persists them together, and replay
 restores the business effects and completion record together. Effects therefore
 apply once per logical send. A handler can execute
@@ -78,9 +78,9 @@ The sending journal write records `SentAt` from the Durable Jobs clock. Every
 attempt and recovery uses that same time, including after backpressure, and the
 retry budget ends at `SentAt + OutboxRetryTimeout`. Configure `OutboxRetryTimeout`
 shorter than
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>.
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>.
 Each inbox journals a non-decreasing admission floor. The retention period
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>
 controls how far behind the observed Durable Jobs time the floor advances.
 Completed records become eligible for removal once their accepted `SentAt` is at
 or below that durable floor. Snapshot acknowledgement and recovery reclaim them.
@@ -112,19 +112,19 @@ identity keeps the record's accepted send time.
 
 ## Hierarchical business-operation keys
 
-<xref:Orleans.Messaging.MessageId> identifies a message by wrapping a
-<xref:Orleans.Messaging.HierarchicalKey>. Construct it with `new MessageId(key)` or
-<xref:Orleans.Messaging.MessageId.Create*>, and read the key through
-<xref:Orleans.Messaging.MessageId.Key>. Message IDs compare, hash, parse, and format
+<xref:Orleans.Durable.Messaging.MessageId> identifies a message by wrapping a
+<xref:Orleans.Durable.Messaging.HierarchicalKey>. Construct it with `new MessageId(key)` or
+<xref:Orleans.Durable.Messaging.MessageId.Create*>, and read the key through
+<xref:Orleans.Durable.Messaging.MessageId.Key>. Message IDs compare, hash, parse, and format
 through that key.
 
-<xref:Orleans.Messaging.HierarchicalKey> is an immutable value type wrapping its
+<xref:Orleans.Durable.Messaging.HierarchicalKey> is an immutable value type wrapping its
 canonical escaped path. Equality, `==`, `!=`, and hashing compare that path
 ordinally and case-sensitively. The key provides segment-aware navigation through
-<xref:Orleans.Messaging.HierarchicalKey.GetParent*>,
-<xref:Orleans.Messaging.HierarchicalKey.IsParentOf*>,
-<xref:Orleans.Messaging.HierarchicalKey.IsChildOf*>,
-<xref:Orleans.Messaging.HierarchicalKey.IsAncestorOf*>, and a segment enumerator.
+<xref:Orleans.Durable.Messaging.HierarchicalKey.GetParent*>,
+<xref:Orleans.Durable.Messaging.HierarchicalKey.IsParentOf*>,
+<xref:Orleans.Durable.Messaging.HierarchicalKey.IsChildOf*>,
+<xref:Orleans.Durable.Messaging.HierarchicalKey.IsAncestorOf*>, and a segment enumerator.
 `default(HierarchicalKey)` is the unset value, exposed by `IsDefault`; envelope
 validation requires a set ID.
 
@@ -144,11 +144,11 @@ the same leaf. Assign a stable attempt/revision segment once when authorizing a
 new effect. Format numeric components invariantly and normalize business identifiers
 before construction. Key comparison preserves their ordinal spelling.
 
-<xref:Orleans.Messaging.HierarchicalKey.Create*> accepts literal segments,
-and <xref:Orleans.Messaging.HierarchicalKey.CreateChildKey*> appends one literal
+<xref:Orleans.Durable.Messaging.HierarchicalKey.Create*> accepts literal segments,
+and <xref:Orleans.Durable.Messaging.HierarchicalKey.CreateChildKey*> appends one literal
 segment. Both escape slash and backslash characters exactly once. Construct
 `payment/charge` using separate `"payment"` and `"charge"` arguments.
-<xref:Orleans.Messaging.HierarchicalKey.Parse*> reads an already escaped path,
+<xref:Orleans.Durable.Messaging.HierarchicalKey.Parse*> reads an already escaped path,
 and formatting emits that canonical representation.
 
 The following helper constructs command IDs using literal tenant and SKU identifiers:
@@ -161,7 +161,7 @@ The SKU `widget/blue` occupies one literal segment:
 
 Use the same canonical identity across producers, inboxes, logs, result queries,
 and external provider keys.
-<xref:Orleans.Messaging.HierarchicalKey.IsAncestorOf*> matches at segment
+<xref:Orleans.Durable.Messaging.HierarchicalKey.IsAncestorOf*> matches at segment
 boundaries: `orders/42` groups `orders/42/payment`, while `orders/420/payment`
 belongs to another order. A key is its own ancestor; `IsChildOf` tests exactly one
 additional segment. Deduplication always compares the full key.

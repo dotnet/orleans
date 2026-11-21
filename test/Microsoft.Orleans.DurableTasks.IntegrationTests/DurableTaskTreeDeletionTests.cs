@@ -1,10 +1,10 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;

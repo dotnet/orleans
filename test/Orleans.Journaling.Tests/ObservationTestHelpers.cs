@@ -1,7 +1,7 @@
 using System.Buffers;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Test infrastructure for observing journaled state.

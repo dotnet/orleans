@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Xunit;

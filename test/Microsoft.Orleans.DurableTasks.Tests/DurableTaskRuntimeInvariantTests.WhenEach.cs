@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;

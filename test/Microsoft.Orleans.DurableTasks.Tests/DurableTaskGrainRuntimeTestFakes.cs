@@ -2,15 +2,15 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
 using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -25,7 +25,7 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 
 /// <summary>
 /// A recording fake for the internal <see cref="IDurableTaskMessageTransport"/> interface. Records every call so that
-/// tests can assert on the exact arguments passed by <see cref="Orleans.DurableTasks.Runtime.DurableTaskGrainRuntime"/>.
+/// tests can assert on the exact arguments passed by <see cref="Orleans.Durable.Tasks.Runtime.DurableTaskGrainRuntime"/>.
 /// </summary>
 internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
 {

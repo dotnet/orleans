@@ -1,7 +1,7 @@
 using Orleans.Dashboard;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
-using Orleans.Messaging;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Messaging;
 using OrderProcessing;
 using OrderProcessing.Grains;
 

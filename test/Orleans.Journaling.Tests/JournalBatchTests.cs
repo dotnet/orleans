@@ -10,7 +10,7 @@ using Orleans.Serialization.Session;
 using TestExtensions;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("Functional")]
 [TestProvider("AzureStorage")]

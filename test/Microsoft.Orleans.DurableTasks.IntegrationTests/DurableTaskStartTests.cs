@@ -1,8 +1,8 @@
 using Orleans.Concurrency;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
-using Orleans.Journaling;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Journaling;
 using Orleans.Serialization;
 using Xunit;
 

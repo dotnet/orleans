@@ -33,7 +33,7 @@ For storage configuration, see [Journaling configuration](journaling/configurati
 
 ## Capacity, retries, and retention
 
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions> configures both inbox and outbox
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions> configures both inbox and outbox
 behavior through `AddMessaging`, and is validated at startup.
 
 | Setting | Default | Operational effect |
@@ -50,7 +50,7 @@ behavior through `AddMessaging`, and is validated at startup.
 
 Choose the retry budget for tolerated outages and backpressure, and the admission
 retention period for retained-history cost. Each attempt carries the
-original journaled <xref:Orleans.Messaging.InboxMessage.SentAt>. The receiver
+original journaled <xref:Orleans.Durable.Messaging.InboxMessage.SentAt>. The receiver
 deduplicates tracked identities first: a pending or completed record answers
 every repeat and keeps the send time the inbox accepted.
 An untracked send time at or below the floor returns `Expired`.
@@ -141,16 +141,16 @@ investigating unexpected partial effects.
 ## Inspect and replay dead letters
 
 Expose application-authorized diagnostic methods that read
-<xref:Orleans.Messaging.IMessagingDiagnostics.InboxDeadLetters>
-and <xref:Orleans.Messaging.IMessagingDiagnostics.OutboxDeadLetters>.
+<xref:Orleans.Durable.Messaging.IMessagingDiagnostics.InboxDeadLetters>
+and <xref:Orleans.Durable.Messaging.IMessagingDiagnostics.OutboxDeadLetters>.
 Each record includes its message, attempt count, failure reason, and dead-letter time.
 An inbox message sink's rejection is a processed record rather than a dead letter;
 the sender's outbox receives its reason and code. An outbox dead letter for a source-provided message whose
-<xref:Orleans.Messaging.IOutboxMessageSource> failed to provide it carries only the
+<xref:Orleans.Durable.Messaging.IOutboxMessageSource> failed to provide it carries only the
 message ID, with an empty payload and a default receiver; its reason records the
 source's failure.
 
-<xref:Orleans.Messaging.IInboxHandlerContext.Fail*> creates an inbox dead letter
+<xref:Orleans.Durable.Messaging.IInboxHandlerContext.Fail*> creates an inbox dead letter
 for a diagnosed permanent failure and records the message ID as processed, so the
 processed-message counter reports `dead_lettered` and repeats return `Duplicate`
 while the record is retained. Normal business rejections are typed application
@@ -171,9 +171,9 @@ submissions.
 
 ### Guarantee application follow-up
 
-Use an <xref:Orleans.Messaging.IOutboxMessageSource> when terminal delivery
+Use an <xref:Orleans.Durable.Messaging.IOutboxMessageSource> when terminal delivery
 outcomes require application action. In
-<xref:Orleans.Messaging.IOutboxMessageSource.OnRetired*>, synchronously stage the
+<xref:Orleans.Durable.Messaging.IOutboxMessageSource.OnRetired*>, synchronously stage the
 terminal outcome and a self-addressed follow-up message in application journaled
 state, together with payload release. The outbox removal, outcome, and follow-up
 acceptance commit atomically. Recovery before commit retries the pending entry and
@@ -198,13 +198,13 @@ To replay an outbox dead letter:
 1. Repair the receiver availability, handler registration, or payload compatibility
    issue, and query participant business state by the original command ID.
 2. Reconcile the original outcome, then authorize a new submission only when the
-   business protocol permits it. <xref:Orleans.Messaging.IOutbox.Send*> stamps a new staging time after
+   business protocol permits it. <xref:Orleans.Durable.Messaging.IOutbox.Send*> stamps a new staging time after
    the original entry has retired. A tracked original ID answers with its known
    outcome; an admitted new send time can create another
    effect after that identity's retention ends. Use a revision ID when authorizing
    a corrected or repeated effect, and record its relationship to the original.
 3. Record the replay disposition and remove the record with
-   <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. The
+   <xref:Orleans.Durable.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. The
    disposition, removal, and replayed message persist in the next journal write.
 
 To replay an inbox dead letter:
@@ -216,7 +216,7 @@ To replay an inbox dead letter:
    original, for example `{original}/replay/1`, through an authorized grain method.
    Record the relationship between the revision and the original ID.
 4. Record the replay disposition and remove the record with
-   <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>. The
+   <xref:Orleans.Durable.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>. The
    disposition, removal, and outgoing revision persist in the next journal write.
 
 An external provider's retention and query protocol govern whether the original side

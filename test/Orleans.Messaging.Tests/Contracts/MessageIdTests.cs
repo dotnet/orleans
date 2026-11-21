@@ -9,7 +9,7 @@ using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -20,7 +20,7 @@ public class MessageIdTests
     public void SerializationContract_IdentifiesCurrentType()
     {
         var type = typeof(MessageId);
-        Assert.Equal("Orleans.Messaging.MessageId", Assert.Single(type.GetCustomAttributes<AliasAttribute>()).Alias);
+        Assert.Equal("Orleans.Durable.Messaging.MessageId", Assert.Single(type.GetCustomAttributes<AliasAttribute>()).Alias);
         Assert.True(type.IsValueType);
         Assert.Empty(type.GetCustomAttributes<GenerateSerializerAttribute>());
     }

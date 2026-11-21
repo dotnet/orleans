@@ -4,12 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.DurableJobs;
-using Orleans.Messaging;
-using Orleans.Journaling;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Messaging;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
-
-#pragma warning disable ORLEANSEXP005
 
 namespace Documentation.Grains.Messaging;
 

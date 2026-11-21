@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>Tests the rule which reports changes made in place to values which grain state holds.</summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]

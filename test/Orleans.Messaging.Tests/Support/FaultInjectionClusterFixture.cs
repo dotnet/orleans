@@ -1,12 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
-using Orleans.Messaging.Configuration;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Messaging.Configuration;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 /// <summary>
 /// A messaging cluster whose delivery calls, journal writes, Durable Jobs scheduling, and Durable Jobs clock are all

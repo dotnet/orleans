@@ -1,5 +1,5 @@
-using Orleans.Journaling;
-using Orleans.Messaging;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
 
 namespace OrderProcessing.Grains;
 

@@ -3,13 +3,13 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Core.Internal;
 using Orleans.Hosting;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestCategory("BVT")]
 [TestSuite("BVT")]

@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -11,7 +11,7 @@ using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Contracts;
+namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -22,7 +22,7 @@ public class HierarchicalKeyTests
     public void SerializationContract_IdentifiesCurrentType()
     {
         var type = typeof(HierarchicalKey);
-        Assert.Equal("Orleans.Messaging.HierarchicalKey", Assert.Single(type.GetCustomAttributes<AliasAttribute>()).Alias);
+        Assert.Equal("Orleans.Durable.Messaging.HierarchicalKey", Assert.Single(type.GetCustomAttributes<AliasAttribute>()).Alias);
         Assert.True(type.IsValueType);
         Assert.Single(type.GetCustomAttributes<IsReadOnlyAttribute>());
         Assert.Empty(type.GetCustomAttributes<GenerateSerializerAttribute>());

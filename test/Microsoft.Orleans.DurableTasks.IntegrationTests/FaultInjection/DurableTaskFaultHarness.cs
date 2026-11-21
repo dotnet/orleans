@@ -2,9 +2,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Diagnostics;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.Messaging.Configuration;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Messaging.Configuration;
 using Orleans.Runtime;
 using Xunit;
 

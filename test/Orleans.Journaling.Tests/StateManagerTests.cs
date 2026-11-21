@@ -13,7 +13,7 @@ using Orleans.Storage;
 using NSubstitute;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Tests for the state manager, the core component of Orleans' journaling infrastructure.

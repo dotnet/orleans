@@ -1,12 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
-
-#pragma warning disable ORLEANSEXP005
 
 namespace Documentation.Grains.Messaging;
 

@@ -1,8 +1,8 @@
 using Orleans.Configuration;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Diagnostics;
-using Orleans.DurableTasks.Protocol;
-using Orleans.Messaging;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Diagnostics;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Messaging;
 using Orleans.TestingHost.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

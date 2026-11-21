@@ -3,15 +3,15 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Functional;
+namespace Orleans.Durable.Messaging.Tests.Functional;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

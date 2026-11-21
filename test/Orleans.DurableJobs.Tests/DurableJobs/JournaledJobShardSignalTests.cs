@@ -3,8 +3,8 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Xunit;
 

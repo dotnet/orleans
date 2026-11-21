@@ -5,15 +5,15 @@ using NSubstitute;
 using OrderProcessing;
 using OrderProcessing.Grains;
 using Orleans.Configuration;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
-using Orleans.Messaging.Tests.Support;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 using StockSample = global::Messaging;
 
-namespace Orleans.Messaging.Tests.Documentation;
+namespace Orleans.Durable.Messaging.Tests.Documentation;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

@@ -11,7 +11,7 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

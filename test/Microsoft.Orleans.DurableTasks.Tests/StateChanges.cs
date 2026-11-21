@@ -3,7 +3,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.DurableTasks.Diagnostics;
+using Orleans.Durable.Tasks.Diagnostics;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
 

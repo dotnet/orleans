@@ -5,11 +5,11 @@ using Orleans.Serialization.Codecs;
 using Xunit;
 using static VerifyXunit.Verifier;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Snapshot tests pinning the OrleansBinary on-disk wire format produced by the
-/// <c>OrleansBinary*CommandCodec</c> implementations under <see cref="Orleans.Journaling"/>.
+/// <c>OrleansBinary*CommandCodec</c> implementations under <see cref="Orleans.Durable.Journaling"/>.
 /// </summary>
 /// <remarks>
 /// <para>

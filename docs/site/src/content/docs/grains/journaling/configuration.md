@@ -7,19 +7,19 @@ ms.topic: how-to
 
 # Configure Orleans Journaling
 
-Configure the journal storage providers selected by grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager> on every silo that hosts those grain types. Named providers give grain types and standalone journal consumers independent storage namespaces. Grain types without an explicit selection use `Default`. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
+Configure the journal storage providers selected by grains or activation-scoped features using <xref:Orleans.Durable.Journaling.IDurableStateManager> on every silo that hosts those grain types. Named providers give grain types and standalone journal consumers independent storage namespaces. Grain types without an explicit selection use `Default`. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
 
-The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
+`Microsoft.Orleans.Durable` and its storage-provider packages are pre-release alpha packages.
 
 ## Configure grain-scoped composition
 
-The standard <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registration supplies one scoped `IDurableStateManager` per activation, using the existing activation service scope. The manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Inject that manager into an ordinary <xref:Orleans.Grain>, an application-owned grain base, or an activation-scoped feature. Declare states through its `GetOrAdd` helpers or keyed injection during construction or synchronous activation setup. Recovery at <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> then completes before <xref:Orleans.Grain.OnActivateAsync*> and requests.
+The standard <xref:Orleans.Durable.Journaling.JournalingHostingExtensions.AddJournaling*> registration supplies one scoped `IDurableStateManager` per activation, using the existing activation service scope. The manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Inject that manager into an ordinary <xref:Orleans.Grain>, an application-owned grain base, or an activation-scoped feature. Declare states through its `GetOrAdd` helpers or keyed injection during construction or synchronous activation setup. Recovery at <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> then completes before <xref:Orleans.Grain.OnActivateAsync*> and requests.
 
 Storage registration makes these services available across the silo. Per-grain journal reads and writes are triggered by activations which resolve the manager directly or through a durable-state dependency. Unrelated grain activations retain their existing persistence behavior.
 
-<xref:Orleans.Journaling.DurableGrain> provides optional protected helpers for the same scoped manager. The default manager implements both `IDurableStateManager` and the independent <xref:Orleans.Journaling.IJournaledStateManager> contract. Custom grain manager replacements provide both contracts and their registrations as appropriate, and establish lifecycle enrollment in their constructor or registration factory before resolution returns. Reusable features compose their own lifecycle work through a [shared activation setup action](../grain-lifecycle.md#shared-activation-setup).
+<xref:Orleans.Durable.Journaling.DurableGrain> provides optional protected helpers for the same scoped manager. The default manager implements both `IDurableStateManager` and the independent <xref:Orleans.Durable.Journaling.IJournaledStateManager> contract. Custom grain manager replacements provide both contracts and their registrations as appropriate, and establish lifecycle enrollment in their constructor or registration factory before resolution returns. Reusable features compose their own lifecycle work through a [shared activation setup action](../grain-lifecycle.md#shared-activation-setup).
 
-<xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> returns the journal-owner contract for explicitly supplied state machine components. The caller constructs and registers components, initializes the journal, and disposes the owner. Component dependencies and their lifetimes remain caller-owned. Standalone journal owners use no manager-owned DI scope.
+<xref:Orleans.Durable.Journaling.IJournaledStateManagerFactory.CreateStandalone*> returns the journal-owner contract for explicitly supplied state machine components. The caller constructs and registers components, initializes the journal, and disposes the owner. Component dependencies and their lifetimes remain caller-owned. Standalone journal owners use no manager-owned DI scope.
 
 See [Use durable state](durable-state.md) for source-backed constructor injection and feature setup examples, and [Activation and recovery](runtime-behavior.md#activation-and-recovery) for lifecycle ordering.
 
@@ -27,10 +27,10 @@ See [Use durable state](durable-state.md) for source-backed constructor injectio
 
 | Provider | Package | Storage model | Compaction trigger | Largest append |
 | --- | --- | --- | --- | --- |
-| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget | 100 MiB |
-| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes | 2 MiB |
-| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes | Whole journal within the server's string limit (512 MB by default) |
-| Amazon S3 | `Microsoft.Orleans.Journaling.S3` | WAL object plus immutable checkpoint objects | Append part budget | 5 GB |
+| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Durable.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget | 100 MiB |
+| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Durable.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes | 2 MiB |
+| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Durable.Redis` | String journal plus hash metadata | Journal bytes | Whole journal within the server's string limit (512 MB by default) |
+| Amazon S3 | `Microsoft.Orleans.Durable.S3` | WAL object plus immutable checkpoint objects | Append part budget | 5 GB |
 
 Every provider writes each append and replacement all-or-nothing and fails a write which exceeds its limits as a whole; see [Journal storage contract](runtime-behavior.md#journal-storage-contract). Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
 
@@ -51,7 +51,7 @@ use their corresponding named backend options.
 The storage binding name and the backend options name are therefore distinct
 for the default binding.
 
-An unkeyed singleton <xref:Orleans.Journaling.IJournalStorageProvider> customization supplies
+An unkeyed singleton <xref:Orleans.Durable.Journaling.IJournalStorageProvider> customization supplies
 storage for both grain activations and the `Default` keyed factory. The default
 catalog and lifecycle bindings use that provider too, so replacement providers
 implement the catalog and lifecycle contracts declared by the registered provider type.
@@ -94,7 +94,7 @@ The equivalent environment-variable key for the archive client is
 
 ### Select storage per grain type
 
-Apply <xref:Orleans.Journaling.JournalStorageProviderAttribute> to a grain class to
+Apply <xref:Orleans.Durable.Journaling.JournalStorageProviderAttribute> to a grain class to
 select its registered, ordinal, case-sensitive provider name. Orleans publishes
 the selection in grain-type metadata and resolves it when creating the activation's
 shared state manager. An inherited attribute supplies the base class's selection;
@@ -106,7 +106,7 @@ alongside the default container:
 
 :::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="configure_grain_providers":::
 
-Both <xref:Orleans.Journaling.DurableGrain> helpers and constructor injection use
+Both <xref:Orleans.Durable.Journaling.DurableGrain> helpers and constructor injection use
 the selected provider:
 
 :::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="select_grain_providers":::
@@ -141,7 +141,7 @@ sources so their configuration examples use the APIs in the current checkout.
 
 ## Configure the JSON format
 
-JSON Lines is the default write format. <xref:Orleans.Journaling.Json.JsonJournalHostingExtensions.UseJsonJournalFormat*> registers source-generated metadata for application types used as durable keys, values, collection items, persistent state, or durable task results:
+JSON Lines is the default write format. <xref:Orleans.Durable.Journaling.Json.JsonJournalHostingExtensions.UseJsonJournalFormat*> registers source-generated metadata for application types used as durable keys, values, collection items, persistent state, or durable task results:
 
 :::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="configure_json_format":::
 
@@ -151,7 +151,7 @@ Serializer naming policies affect application payload values. Journal command na
 
 ## Migrate a journal format
 
-Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
+Providers expose the persisted format key as <xref:Orleans.Durable.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Durable.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Durable.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
 
 Use this deployment sequence:
 
@@ -177,9 +177,9 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 
 ## Development storage
 
-<xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registers the core services, formats, durable-state factories, and lifecycle integration. Register storage through a provider-specific method or the generic <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournalStorage*> method. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.JournalingHostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
+<xref:Orleans.Durable.Journaling.JournalingHostingExtensions.AddJournaling*> registers the core services, formats, durable-state factories, and lifecycle integration. Register storage through a provider-specific method or the generic <xref:Orleans.Durable.Journaling.JournalingHostingExtensions.AddJournalStorage*> method. Runtime tests and disposable development hosts can use <xref:Orleans.Durable.Journaling.JournalingHostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
 
-<xref:Orleans.Journaling.VolatileJournalStorageOptions> controls the retained append
+<xref:Orleans.Durable.Journaling.VolatileJournalStorageOptions> controls the retained append
 history. The defaults request a snapshot after **100 successful appends or 1 MiB
 (1,048,576 bytes)** of appended data, whichever limit is reached first:
 

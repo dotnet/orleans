@@ -1,9 +1,9 @@
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 public interface IRawPayloadTestGrain : IGrainWithGuidKey
 {

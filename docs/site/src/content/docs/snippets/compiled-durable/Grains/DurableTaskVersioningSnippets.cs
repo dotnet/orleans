@@ -1,9 +1,7 @@
 using Orleans;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Diagnostics;
-using Orleans.Journaling;
-
-#pragma warning disable ORLEANSEXP005
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Diagnostics;
+using Orleans.Durable.Journaling;
 
 namespace Documentation.Grains.DurableTasks.Versioning;
 

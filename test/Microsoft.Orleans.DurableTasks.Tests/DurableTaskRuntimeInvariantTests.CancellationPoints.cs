@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Diagnostics;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
-using Orleans.DurableTasks.Storage;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Diagnostics;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Tasks.Runtime;
+using Orleans.Durable.Tasks.Storage;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;

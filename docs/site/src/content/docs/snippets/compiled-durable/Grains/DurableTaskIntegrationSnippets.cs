@@ -1,11 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using Orleans;
-using Orleans.DurableTasks;
-using Orleans.Journaling;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
-
-#pragma warning disable ORLEANSEXP005
 
 namespace Documentation.Grains.DurableTasks;
 

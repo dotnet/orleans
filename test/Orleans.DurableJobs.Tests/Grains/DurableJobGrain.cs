@@ -1,0 +1,106 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Durable.Jobs;
+using UnitTests.GrainInterfaces;
+
+namespace UnitTests.Grains;
+
+public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
+{
+    private Dictionary<string, TaskCompletionSource> jobRunStatus = new();
+    private Dictionary<string, DateTimeOffset> jobExecutionTimes = new();
+    private Dictionary<string, IJobRunContext> jobContexts = new();
+    private Dictionary<string, bool> cancellationTokenStatus = new();
+    private Dictionary<string, string> jobTraceIds = new();
+    private readonly ILocalDurableJobManager _localDurableJobManager;
+    private readonly ILogger<DurableJobGrain> _logger;
+
+    public DurableJobGrain(ILocalDurableJobManager localDurableJobManager, ILogger<DurableJobGrain> logger)
+    {
+        _localDurableJobManager = localDurableJobManager;
+        _logger = logger;
+    }
+
+    public Task<bool> HasJobRan(string jobId)
+    {
+        return Task.FromResult(jobRunStatus.TryGetValue(jobId, out var taskResult) && taskResult.Task.IsCompleted);
+    }
+
+    public Task ExecuteJobAsync(IJobRunContext ctx, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Job {JobId} received at {ReceivedTime}", ctx.Job.Id, DateTime.UtcNow);
+        jobExecutionTimes[ctx.Job.Id] = DateTimeOffset.UtcNow;
+        jobContexts[ctx.Job.Id] = ctx;
+        cancellationTokenStatus[ctx.Job.Id] = cancellationToken.IsCancellationRequested;
+        jobTraceIds[ctx.Job.Id] = Activity.Current?.TraceId.ToString() ?? string.Empty;
+        jobRunStatus[ctx.Job.Id].SetResult();
+        return Task.CompletedTask;
+    }
+
+    public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        var request = new ScheduleJobRequest
+        {
+            Target = this.GetGrainId(),
+            JobName = jobName,
+            DueTime = scheduledTime,
+            Metadata = metadata
+        };
+        var job = await _localDurableJobManager.ScheduleJobAsync(request, CancellationToken.None);
+        jobRunStatus[job.Id] = new TaskCompletionSource();
+        return job;
+    }
+
+    public async Task WaitForJobToRun(string jobId)
+    {
+        if (!jobRunStatus.TryGetValue(jobId, out var taskResult))
+        {
+            // The job might not have been scheduled on this grain.
+            jobRunStatus[jobId] = new TaskCompletionSource();
+            taskResult = jobRunStatus[jobId];
+        }
+
+        await taskResult.Task;
+    }
+
+    public async Task<bool> CancelAsync(DurableJob job)
+    {
+        return await _localDurableJobManager.CancelAsync(job, CancellationToken.None);
+    }
+
+    public Task<DateTimeOffset> GetJobExecutionTime(string jobId)
+    {
+        if (!jobExecutionTimes.TryGetValue(jobId, out var time))
+        {
+            throw new InvalidOperationException($"Job {jobId} has not executed or was not scheduled on this grain.");
+        }
+
+        return Task.FromResult(time);
+    }
+
+    public Task<IJobRunContext> GetJobRun(string jobId)
+    {
+        if (!jobContexts.TryGetValue(jobId, out var ctx))
+        {
+            throw new InvalidOperationException($"Job {jobId} has not executed or was not scheduled on this grain.");
+        }
+
+        return Task.FromResult(ctx);
+    }
+
+    public Task<bool> WasCancellationTokenCancelled(string jobId)
+    {
+        return Task.FromResult(cancellationTokenStatus.TryGetValue(jobId, out var cancelled) && cancelled);
+    }
+
+    public Task<string> GetJobTraceId(string jobId)
+    {
+        return Task.FromResult(jobTraceIds.TryGetValue(jobId, out var traceId) ? traceId : string.Empty);
+    }
+}

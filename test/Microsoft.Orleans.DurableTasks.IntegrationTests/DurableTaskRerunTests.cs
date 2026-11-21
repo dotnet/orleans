@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -57,8 +57,8 @@ public abstract class DurableTaskRerunTests : IAsyncLifetime
         // The second run's call reaches the callee as a new task, and the run completes.
         Assert.Equal(7, (await second.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).GetResult<int>());
         var secondCreated = await events.WaitForEventAsync(
-            nameof(global::Orleans.DurableTasks.Diagnostics.DurableTaskEvents.TaskCreated),
-            evt => evt.Payload is global::Orleans.DurableTasks.Diagnostics.DurableTaskEvents.TaskCreated payload
+            nameof(global::Orleans.Durable.Tasks.Diagnostics.DurableTaskEvents.TaskCreated),
+            evt => evt.Payload is global::Orleans.Durable.Tasks.Diagnostics.DurableTaskEvents.TaskCreated payload
                 && payload.GrainContext.GrainId == calleeId
                 && payload.TaskId != firstChildId
                 && DurableTaskEventBarriers.IsCallerChild(callerId, callId, payload.TaskId),

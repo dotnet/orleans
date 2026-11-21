@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Durable.Tasks;
 
 /// <summary>Provides the host entry point for running durable definitions.</summary>
 public static class DurableTaskRuntimeHelper

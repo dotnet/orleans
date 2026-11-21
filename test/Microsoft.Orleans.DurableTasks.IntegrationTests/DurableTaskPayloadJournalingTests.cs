@@ -1,11 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.Journaling;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Protocol;
+using Orleans.Durable.Journaling;
 using Xunit;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks.Runtime;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 

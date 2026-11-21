@@ -1,6 +1,6 @@
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Diagnostics;
-using Orleans.DurableTasks.Runtime;
+using Orleans.Durable.Tasks;
+using Orleans.Durable.Tasks.Diagnostics;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Runtime;
 using Orleans.TestingHost.Diagnostics;
 using Xunit;

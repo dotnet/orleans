@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
-using Orleans.DurableTasks;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Tasks;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.TestingHost;
 using Xunit;
 

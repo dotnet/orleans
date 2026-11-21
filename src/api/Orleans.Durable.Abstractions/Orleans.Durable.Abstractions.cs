@@ -6,9 +6,9 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-namespace Orleans.DurableTasks
+namespace Orleans.Durable.Tasks
 {
-    [Alias("Orleans.DurableTasks.CanceledDurableTaskResponse")]
+    [Alias("Orleans.Durable.Tasks.CanceledDurableTaskResponse")]
     public sealed partial class CanceledDurableTaskResponse : DurableTaskResponse
     {
         public CanceledDurableTaskResponse(System.OperationCanceledException exception) { }
@@ -82,7 +82,7 @@ namespace Orleans.DurableTasks
     }
 
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
-    [Alias("Orleans.DurableTasks.DurableTask")]
+    [Alias("Orleans.Durable.Tasks.DurableTask")]
     public abstract partial class DurableTask
     {
         public static DurableTaskContext Current { get { throw null; } }
@@ -249,7 +249,7 @@ namespace Orleans.DurableTasks
         public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskAbortedException")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskAbortedException")]
     public sealed partial class DurableTaskAbortedException : System.Exception
     {
         public DurableTaskAbortedException() { }
@@ -259,7 +259,7 @@ namespace Orleans.DurableTasks
         public DurableTaskAbortedException(string reason) { }
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskAttemptCanceledException")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskAttemptCanceledException")]
     public sealed partial class DurableTaskAttemptCanceledException : System.OperationCanceledException
     {
         public DurableTaskAttemptCanceledException() { }
@@ -275,7 +275,7 @@ namespace Orleans.DurableTasks
         public DurableTaskAttemptCancellationReason Reason { get { throw null; } }
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskAttemptCancellationReason")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskAttemptCancellationReason")]
     public enum DurableTaskAttemptCancellationReason
     {
         ActivationStopping = 0,
@@ -493,7 +493,7 @@ namespace Orleans.DurableTasks
             where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskResponse")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskResponse")]
     public abstract partial class DurableTaskResponse
     {
         internal DurableTaskResponse() { }
@@ -527,7 +527,7 @@ namespace Orleans.DurableTasks
         protected static System.InvalidOperationException Incomplete() { throw null; }
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskResponseKind")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskResponseKind")]
     public enum DurableTaskResponseKind
     {
         None = 0,
@@ -538,7 +538,7 @@ namespace Orleans.DurableTasks
         Failed = 5
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskResponse`1")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskResponse`1")]
     public sealed partial class DurableTaskResponse<TResult> : DurableTaskResponse
     {
         public DurableTaskResponse(TResult result) { }
@@ -562,7 +562,7 @@ namespace Orleans.DurableTasks
     }
 
     [System.Flags]
-    [Alias("Orleans.DurableTasks.DurableTaskStartOptions")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskStartOptions")]
     public enum DurableTaskStartOptions
     {
         None = 0,
@@ -570,7 +570,7 @@ namespace Orleans.DurableTasks
         WaitForAcceptance = 2
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskStatus")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskStatus")]
     public enum DurableTaskStatus
     {
         None = 0,
@@ -580,7 +580,7 @@ namespace Orleans.DurableTasks
         Failed = 4
     }
 
-    [Alias("Orleans.DurableTasks.DurableTaskVersionException")]
+    [Alias("Orleans.Durable.Tasks.DurableTaskVersionException")]
     public sealed partial class DurableTaskVersionException : System.Exception
     {
         public DurableTaskVersionException(TaskId taskId, string name, int version, int minSupported, int maxSupported) { }
@@ -597,7 +597,7 @@ namespace Orleans.DurableTasks
     }
 
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
-    [Alias("Orleans.DurableTasks.DurableTask`1")]
+    [Alias("Orleans.Durable.Tasks.DurableTask`1")]
     public abstract partial class DurableTask<TResult> : DurableTask
     {
     }
@@ -619,7 +619,7 @@ namespace Orleans.DurableTasks
         public override string ToString() { throw null; }
     }
 
-    [Alias("Orleans.DurableTasks.ExceptionDurableTaskResponse")]
+    [Alias("Orleans.Durable.Tasks.ExceptionDurableTaskResponse")]
     public sealed partial class ExceptionDurableTaskResponse : DurableTaskResponse
     {
         public ExceptionDurableTaskResponse(System.Exception exception) { }
@@ -655,7 +655,7 @@ namespace Orleans.DurableTasks
         System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsync(System.Threading.CancellationToken cancellationToken);
     }
 
-    [Alias("Orleans.DurableTasks.PendingDurableTaskResponse")]
+    [Alias("Orleans.Durable.Tasks.PendingDurableTaskResponse")]
     public sealed partial class PendingDurableTaskResponse : DurableTaskResponse
     {
         internal PendingDurableTaskResponse() { }
@@ -671,7 +671,7 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
-    [Alias("Orleans.DurableTasks.PollingOptions")]
+    [Alias("Orleans.Durable.Tasks.PollingOptions")]
     public readonly partial struct PollingOptions : System.IEquatable<PollingOptions>
     {
         private readonly int _dummyPrimitive;
@@ -797,7 +797,7 @@ namespace Orleans.DurableTasks
         public new System.Threading.Tasks.Task<TResult> WaitUntilAsync(System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
-    [Alias("Orleans.DurableTasks.SubscribedDurableTaskResponse")]
+    [Alias("Orleans.Durable.Tasks.SubscribedDurableTaskResponse")]
     public sealed partial class SubscribedDurableTaskResponse : DurableTaskResponse
     {
         internal SubscribedDurableTaskResponse() { }
@@ -813,7 +813,7 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
-    [Alias("Orleans.DurableTasks.SuccessDurableTaskResponse")]
+    [Alias("Orleans.Durable.Tasks.SuccessDurableTaskResponse")]
     public sealed partial class SuccessDurableTaskResponse : DurableTaskResponse
     {
         internal SuccessDurableTaskResponse() { }
@@ -830,7 +830,7 @@ namespace Orleans.DurableTasks
     }
 
     [System.Text.Json.Serialization.JsonConverter(typeof(TaskIdJsonConverter))]
-    [Alias("Orleans.DurableTasks.TaskId")]
+    [Alias("Orleans.Durable.Tasks.TaskId")]
     public readonly partial struct TaskId : System.IEquatable<TaskId>, System.IParsable<TaskId>, System.ISpanParsable<TaskId>, System.ISpanFormattable, System.IFormattable
     {
         private readonly object _dummy;

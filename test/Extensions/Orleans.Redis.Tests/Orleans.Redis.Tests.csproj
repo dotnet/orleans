@@ -4,11 +4,9 @@
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Orleans.Journaling.Tests\JournalStorageContractTests.cs" Link="Journaling\JournalStorageContractTests.cs" />
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
@@ -27,11 +25,6 @@
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Reminders.Tests\Orleans.Reminders.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Journaling.Redis\Orleans.Journaling.Redis.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="$(SourceRoot)test\Orleans.Journaling.Tests\Conformance\JournalStorageConformanceTests.cs" Link="Journaling\JournalStorageConformanceTests.cs" />
   </ItemGroup>
 
 </Project>

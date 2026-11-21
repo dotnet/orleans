@@ -1,4 +1,4 @@
-using Orleans.Messaging.Diagnostics;
+using Orleans.Durable.Messaging.Diagnostics;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 

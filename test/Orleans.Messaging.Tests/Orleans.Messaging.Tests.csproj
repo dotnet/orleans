@@ -4,7 +4,6 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Messaging\Orleans.Messaging.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />

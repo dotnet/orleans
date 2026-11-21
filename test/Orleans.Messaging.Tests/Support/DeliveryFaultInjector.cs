@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 /// <summary>
 /// Injects scripted faults into the outbox's call to the receiver by decorating each silo's outbox transport.

@@ -1,7 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Time.Testing;
-using Orleans.DurableJobs;
-using Orleans.Journaling;
+using Orleans.Durable.Jobs;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Xunit;
 

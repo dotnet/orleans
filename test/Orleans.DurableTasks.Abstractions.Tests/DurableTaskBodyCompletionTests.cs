@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Abstractions.Tests;
+namespace Orleans.Durable.Tasks.Abstractions.Tests;
 
 /// <summary>Tests that bodies report their terminal response to the host in the step which runs their final segment.</summary>
 [TestSuite("BVT")]

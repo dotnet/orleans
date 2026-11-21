@@ -1,17 +1,17 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using Orleans.Journaling.Tests;
+using Orleans.Durable.Journaling.Tests;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Xunit;
 using static VerifyXunit.Verifier;
 
-namespace Orleans.Journaling.Json.Tests;
+namespace Orleans.Durable.Journaling.Json.Tests;
 
 /// <summary>
 /// Snapshot tests pinning the JSONL on-disk wire format produced by the new <c>Json*CommandCodec</c>
-/// implementations under <see cref="Orleans.Journaling.Json"/>.
+/// implementations under <see cref="Orleans.Durable.Journaling.Json"/>.
 /// </summary>
 /// <remarks>
 /// JSONL is the new default journal format (this branch flips the registration). Each test:

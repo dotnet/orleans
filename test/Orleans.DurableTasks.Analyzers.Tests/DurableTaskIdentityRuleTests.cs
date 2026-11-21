@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Orleans.DurableTasks.Analyzers.Tests;
+namespace Orleans.Durable.Analyzers.Tests;
 
 /// <summary>Tests the rule which names unnamed durable operations whose generated identifiers can shift, and its code fix.</summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]

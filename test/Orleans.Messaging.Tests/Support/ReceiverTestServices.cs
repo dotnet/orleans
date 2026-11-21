@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Messaging.Configuration;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Configuration;
 using Orleans.Runtime;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 internal static class ReceiverTestServices
 {

@@ -15,7 +15,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Persistence.TestKit;
 using Orleans.Storage;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("S3")]

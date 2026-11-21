@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Messaging;
+using Orleans.Durable.Messaging;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization;

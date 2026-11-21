@@ -10,26 +10,26 @@ ms.topic: overview
 Orleans Journaling is an experimental persistence model that records mutations to durable values and collections in an ordered per-grain journal. When a grain activates, Orleans replays that journal to reconstruct its in-memory state. A single write can persist changes from multiple durable states owned by the grain.
 
 > [!IMPORTANT]
-> `Microsoft.Orleans.Journaling` and its storage-provider packages are pre-release alpha packages. Their APIs carry diagnostic `ORLEANSEXP005`. Evaluate them with an explicit upgrade, rollback, backup, and recovery plan because APIs and storage formats can change before stabilization.
+> `Microsoft.Orleans.Durable`, which contains Journaling, and its storage-provider packages are pre-release alpha packages which target .NET 11 (`net11.0`). Evaluate them with an explicit upgrade, rollback, backup, and recovery plan because APIs and storage formats can change before stabilization.
 
 ## Programming model
 
-Application code uses <xref:Orleans.Journaling.IDurableStateManager> to declare named durable states during construction or synchronous activation setup and acknowledge their writes. The standard manager enrolls itself in the lifecycle during grain-bound construction, before resolution returns, so declared state recovers before application activation and requests. This works with an ordinary <xref:Orleans.Grain>, an application-owned grain base, or a reusable activation-scoped feature. <xref:Orleans.Journaling.DurableGrain> remains a convenience base exposing the same application manager and a protected write helper. Keyed injection and programmatic access resolve the same named state object.
+Application code uses <xref:Orleans.Durable.Journaling.IDurableStateManager> to declare named durable states during construction or synchronous activation setup and acknowledge their writes. The standard manager enrolls itself in the lifecycle during grain-bound construction, before resolution returns, so declared state recovers before application activation and requests. This works with an ordinary <xref:Orleans.Grain>, an application-owned grain base, or a reusable activation-scoped feature. <xref:Orleans.Durable.Journaling.DurableGrain> remains a convenience base exposing the same application manager and a protected write helper. Keyed injection and programmatic access resolve the same named state object.
 
 Orleans currently provides:
 
-- <xref:Orleans.Journaling.IDurableValue`1>
-- <xref:Orleans.Journaling.IDurableDictionary`2>
-- <xref:Orleans.Journaling.IDurableList`1>
-- <xref:Orleans.Journaling.IDurableQueue`1>
-- <xref:Orleans.Journaling.IDurableSet`1>
-- <xref:Orleans.Journaling.IDurableLog`1>, an append-only log with sequence numbers and streaming drafts
-- <xref:Orleans.Journaling.IDurableTaskCompletionSource`1>
+- <xref:Orleans.Durable.Journaling.IDurableValue`1>
+- <xref:Orleans.Durable.Journaling.IDurableDictionary`2>
+- <xref:Orleans.Durable.Journaling.IDurableList`1>
+- <xref:Orleans.Durable.Journaling.IDurableQueue`1>
+- <xref:Orleans.Durable.Journaling.IDurableSet`1>
+- <xref:Orleans.Durable.Journaling.IDurableLog`1>, an append-only log with sequence numbers and streaming drafts
+- <xref:Orleans.Durable.Journaling.IDurableTaskCompletionSource`1>
 - <xref:Orleans.Runtime.IPersistentState`1> backed by the grain's journal
 
-Declare states with <xref:Orleans.Journaling.IDurableStateManager.GetOrAddState*> or the typed <xref:Orleans.Journaling.DurableStateManagerExtensions> helpers before initialization. After recovery, calls resolve existing states and application methods can use their contents. A request to create a missing state after initialization fails immediately.
+Declare states with <xref:Orleans.Durable.Journaling.IDurableStateManager.GetOrAddState*> or the typed <xref:Orleans.Durable.Journaling.DurableStateManagerExtensions> helpers before initialization. After recovery, calls resolve existing states and application methods can use their contents. A request to create a missing state after initialization fails immediately.
 
-Mutations update the activation's in-memory state and add encoded operations to its pending journal buffer. Await <xref:Orleans.Journaling.IDurableStateManager.WriteStateAsync*> at the application durability point. The returned task completes after the storage provider acknowledges the append or snapshot replacement.
+Mutations update the activation's in-memory state and add encoded operations to its pending journal buffer. Await <xref:Orleans.Durable.Journaling.IDurableStateManager.WriteStateAsync*> at the application durability point. The returned task completes after the storage provider acknowledges the append or snapshot replacement.
 
 Prepare fallible work in operation-local data and stage mutations once they are safe to commit. Interleaved
 calls share the pending journal. A failed journal operation fences the manager and requests grain deactivation;
@@ -64,7 +64,7 @@ Orleans offers two separate journal-oriented programming models:
 
 | Model | Application state model | Persistence coordination |
 | --- | --- | --- |
-| Orleans Journaling | Mutable durable values and collections composed with a grain or feature through `IDurableStateManager` | One per-grain journal managed by `Microsoft.Orleans.Journaling` |
+| Orleans Journaling | Mutable durable values and collections composed with a grain or feature through `IDurableStateManager` | One per-grain journal managed by `Microsoft.Orleans.Durable` |
 | [Orleans Event Sourcing](../event-sourcing/index.md) | Application-defined events applied to `JournaledGrain<TState, TEvent>` | Log-consistency providers confirm, persist, and synchronize events |
 
 Choose Journaling when evaluating operation-based persistence for built-in mutable state structures. Choose Event Sourcing when domain events, event history, and the supported log-consistency programming model are application requirements.

@@ -3,14 +3,14 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Messaging.Configuration;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging.Configuration;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace Orleans.Messaging.Tests.Support;
+namespace Orleans.Durable.Messaging.Tests.Support;
 
 /// <summary>
 /// Hosts an in-process messaging test cluster.

@@ -1,5 +1,5 @@
 using Orleans;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Xunit;
 
 namespace Tester.DurableJobs;

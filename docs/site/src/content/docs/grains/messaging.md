@@ -7,12 +7,13 @@ ms.topic: conceptual
 
 # Messaging
 
-The `Microsoft.Orleans.Messaging` package gives each grain a durable inbox and
+Messaging, in the `Microsoft.Orleans.Durable` package, gives each grain a durable inbox and
 outbox built on Orleans Journaling and Durable Jobs. A grain commits received
 messages, business changes, and outgoing messages in its own journal, so handler
 effects and pending sends survive activation loss.
 
-> `Microsoft.Orleans.Messaging` is a pre-release alpha package. Evaluate it with
+> `Microsoft.Orleans.Durable` is a pre-release alpha package which targets .NET 11
+> (`net11.0`). Evaluate it with
 > an explicit upgrade, rollback, backup, and recovery plan because its APIs and
 > journal formats can change before stabilization.
 
@@ -29,15 +30,15 @@ This page describes the message, commit, and execution model. Continue with:
 
 ## Message and routing model
 
-Each <xref:Orleans.Messaging.Envelope> carries an application-supplied
-<xref:Orleans.Messaging.MessageId>, which wraps a
-<xref:Orleans.Messaging.HierarchicalKey>, a required `byte[]` payload,
+Each <xref:Orleans.Durable.Messaging.Envelope> carries an application-supplied
+<xref:Orleans.Durable.Messaging.MessageId>, which wraps a
+<xref:Orleans.Durable.Messaging.HierarchicalKey>, a required `byte[]` payload,
 an optional ordinal subject, optional named byte-array headers, and an optional
 `DeliverAt` time. Empty payloads are valid.
 
-An <xref:Orleans.Messaging.OutboxMessage> pairs the envelope with its destination
+An <xref:Orleans.Durable.Messaging.OutboxMessage> pairs the envelope with its destination
 (<xref:Orleans.Runtime.GrainId>). Delivery passes an
-<xref:Orleans.Messaging.InboxMessage> carrying the same envelope to that grain's inbox.
+<xref:Orleans.Durable.Messaging.InboxMessage> carrying the same envelope to that grain's inbox.
 The envelope's ID identifies the logical command. Reply destinations, domain
 versions, and other business data travel in the application payload.
 
@@ -54,19 +55,19 @@ and `DeliverAt` time.
 
 ### Register handlers
 
-Inject <xref:Orleans.Messaging.IInbox> into the grain and add handlers with
-<xref:Orleans.Messaging.IInbox.Register*>. An
-<xref:Orleans.Messaging.IInboxHandler> has two members:
-<xref:Orleans.Messaging.IInboxHandler.CanHandle*> receives the
-<xref:Orleans.Messaging.InboxMessage> and selects the messages the handler
-accepts, and <xref:Orleans.Messaging.IInboxHandler.HandleAsync*> processes one message.
+Inject <xref:Orleans.Durable.Messaging.IInbox> into the grain and add handlers with
+<xref:Orleans.Durable.Messaging.IInbox.Register*>. An
+<xref:Orleans.Durable.Messaging.IInboxHandler> has two members:
+<xref:Orleans.Durable.Messaging.IInboxHandler.CanHandle*> receives the
+<xref:Orleans.Durable.Messaging.InboxMessage> and selects the messages the handler
+accepts, and <xref:Orleans.Durable.Messaging.IInboxHandler.HandleAsync*> processes one message.
 The inbox dispatches each message to the first registered handler whose `CanHandle`
 returns `true`, in registration order. The selected handler stages the message's
 terminal outcome from `HandleAsync`.
 
 Typed handlers register through the
-<xref:Orleans.Messaging.InboxExtensions.Register*> extension methods. Each overload
-takes a <xref:Orleans.Messaging.MessageType`1> binding and a delegate, matches the
+<xref:Orleans.Durable.Messaging.InboxExtensions.Register*> extension methods. Each overload
+takes a <xref:Orleans.Durable.Messaging.MessageType`1> binding and a delegate, matches the
 binding's subject ordinally, decodes the payload, and passes the decoded body and the
 handler context to the delegate:
 
@@ -99,9 +100,9 @@ Message bodies are ordinary Orleans-serializable types:
 
 :::code source="../snippets/compiled-durable/Grains/MessagingSnippets.cs" id="messaging_payload" language="csharp":::
 
-A <xref:Orleans.Messaging.MessageType`1> binds a subject to the
+A <xref:Orleans.Durable.Messaging.MessageType`1> binds a subject to the
 <xref:Orleans.Serialization.Serializer`1> for its body type.
-<xref:Orleans.Messaging.MessageType`1.Decode*> verifies the envelope's subject
+<xref:Orleans.Durable.Messaging.MessageType`1.Decode*> verifies the envelope's subject
 before reading its payload. Define an application's bindings in one class which
 constructs them from the <xref:Orleans.Serialization.Serializer> service, register
 that class as a singleton, and inject it into grains:
@@ -115,7 +116,7 @@ Subjects use exact ordinal spelling, for example `inventory.reserve.v1`. Separat
 subjects can bind the same CLR type. When a subject uses a base type, define the
 supported polymorphism in the serialization contract.
 
-<xref:Orleans.Messaging.OutboxExtensions.Send*> takes a binding, a stable command
+<xref:Orleans.Durable.Messaging.OutboxExtensions.Send*> takes a binding, a stable command
 ID, a destination, and a body. The destination is a <xref:Orleans.Runtime.GrainId>
 or an <xref:Orleans.Runtime.IAddressable> grain reference. The helper encodes the
 body and stages the outgoing message. Serialization completes before staging, so a
@@ -123,15 +124,15 @@ serialization error leaves the outbox unchanged. A batch overload encodes every
 message before staging any, so an encoding failure stages nothing, then stages the
 messages in order.
 
-<xref:Orleans.Messaging.OutboxExtensions.SendReply*> takes a binding, the handler
+<xref:Orleans.Durable.Messaging.OutboxExtensions.SendReply*> takes a binding, the handler
 context, a destination, and a result body. It derives the reply ID by appending the
 literal `result` segment to the received command ID. The application supplies the
 reply destination, typically from a field of the request body such as
 `ResponseDestination`.
 
-<xref:Orleans.Messaging.MessageType`1.Create*> builds an outgoing message from a
+<xref:Orleans.Durable.Messaging.MessageType`1.Create*> builds an outgoing message from a
 command ID, a destination, and a body. Use it to deliver a message explicitly
-through its <xref:Orleans.Messaging.OutboxMessage.ToInboxMessage*> view.
+through its <xref:Orleans.Durable.Messaging.OutboxMessage.ToInboxMessage*> view.
 
 <a id="own-and-borrow-payload-slices"></a>
 
@@ -176,10 +177,10 @@ receives the decoded record. For serialization outside messaging, use
 
 ### Schedule processing
 
-Set <xref:Orleans.Messaging.Envelope.DeliverAt> to hold a message in the receiving
+Set <xref:Orleans.Durable.Messaging.Envelope.DeliverAt> to hold a message in the receiving
 inbox until a time on the Durable Jobs clock. The single-message typed
-<xref:Orleans.Messaging.OutboxExtensions.Send*> helpers and
-<xref:Orleans.Messaging.MessageType`1.Create*> accept an optional `deliverAt`
+<xref:Orleans.Durable.Messaging.OutboxExtensions.Send*> helpers and
+<xref:Orleans.Durable.Messaging.MessageType`1.Create*> accept an optional `deliverAt`
 argument. Compute `deliverAt` from the Durable Jobs clock, which a grain injects as
 the keyed <xref:System.TimeProvider> service named
 `DurableJobTimeProviderNames.DurableJobs`. The outbox delivers the message
@@ -195,25 +196,25 @@ By default, a sent payload is journaled by the outbox and a received payload by 
 inbox. When the application's own journaled state already holds a payload, an outbox
 source or an inbox sink keeps that state as the only journaled copy:
 
-- An <xref:Orleans.Messaging.IOutboxMessageSource>, registered with
-  <xref:Orleans.Messaging.IOutbox.Register*>, provides messages sent by ID with
-  <xref:Orleans.Messaging.IOutbox.Send*>. The outbox journals the message ID and
+- An <xref:Orleans.Durable.Messaging.IOutboxMessageSource>, registered with
+  <xref:Orleans.Durable.Messaging.IOutbox.Register*>, provides messages sent by ID with
+  <xref:Orleans.Durable.Messaging.IOutbox.Send*>. The outbox journals the message ID and
   delivery state and applies every delivery guarantee of an ordinary message. It
   materializes the message with
-  <xref:Orleans.Messaging.IOutboxMessageSource.TryGetMessage*> to validate the send and
+  <xref:Orleans.Durable.Messaging.IOutboxMessageSource.TryGetMessage*> to validate the send and
   before each delivery attempt; the source returns the same message while it provides
   it, and returns `false` for a message that isn't its own. The first source that
   returns the message owns it.
-  - **Withdraw.** <xref:Orleans.Messaging.IOutbox.Withdraw*> removes a pending message,
+  - **Withdraw.** <xref:Orleans.Durable.Messaging.IOutbox.Withdraw*> removes a pending message,
     for example one the application timed out. Stage it in the same journal write in
     which the source releases its payload. The outbox makes no further attempt and
     doesn't call `OnRetired`; an attempt already in flight can still deliver the
     message.
   - **Retire.** When the message retires, the outbox calls
-    <xref:Orleans.Messaging.IOutboxMessageSource.OnRetired*> while it stages the
+    <xref:Orleans.Durable.Messaging.IOutboxMessageSource.OnRetired*> while it stages the
     removal, so the source's release, application terminal outcome, and follow-up
     work commit in the same journal write. The
-    <xref:Orleans.Messaging.OutboxMessageRetirement> is one of three cases:
+    <xref:Orleans.Durable.Messaging.OutboxMessageRetirement> is one of three cases:
     `OutboxMessageRetirement.Delivered` when the receiver accepted the message or
     reported it as a duplicate; `OutboxMessageRetirement.Rejected` when an inbox sink
     at the receiver rejected it durably, with the sink's `Reason` and
@@ -244,12 +245,12 @@ source or an inbox sink keeps that state as the only journaled copy:
   and nothing is staged. Sending a pending ID again coalesces; an ID pending as an
   ordinary message throws <xref:System.InvalidOperationException>. A source-provided
   message can't be addressed to the sending grain.
-- An <xref:Orleans.Messaging.IInboxMessageSink>, registered with
-  <xref:Orleans.Messaging.IInbox.Register*>, receives each deduplicated message before
+- An <xref:Orleans.Durable.Messaging.IInboxMessageSink>, registered with
+  <xref:Orleans.Durable.Messaging.IInbox.Register*>, receives each deduplicated message before
   the inbox accepts it, including scheduled messages and messages a grain sends to
   itself. A sink that takes the message returns `true` from
-  <xref:Orleans.Messaging.IInboxMessageSink.TryAccept*> and sets its `out`
-  <xref:Orleans.Messaging.DeliveryResult> to one of these cases; a sink that declines
+  <xref:Orleans.Durable.Messaging.IInboxMessageSink.TryAccept*> and sets its `out`
+  <xref:Orleans.Durable.Messaging.DeliveryResult> to one of these cases; a sink that declines
   returns `false` and sets it to `default`:
   - `DeliveryResult.Accepted.Instance`: the sink staged the message's effects. The
     inbox journals only the processed record in the same write and returns the
@@ -271,7 +272,7 @@ source or an inbox sink keeps that state as the only journaled copy:
   capacity, and the sink honors its `DeliverAt` time. Messages that every sink
   declines follow the ordinary inbox path.
 - A wake-up callback, registered with
-  <xref:Orleans.Messaging.IInbox.RegisterWakeup*>, reports durable work that a
+  <xref:Orleans.Durable.Messaging.IInbox.RegisterWakeup*>, reports durable work that a
   component such as a sink holds in the grain's journal. The callback returns how
   soon a deactivated grain must wake to resume the work, or `null` when none is
   pending. The messaging wake-up then reactivates the grain until the work clears,
@@ -285,7 +286,7 @@ before any sink effects.
 
 ## Commit and delivery guarantees
 
-- <xref:Orleans.Messaging.IOutbox.Send*> stages an outgoing message in the grain's
+- <xref:Orleans.Durable.Messaging.IOutbox.Send*> stages an outgoing message in the grain's
   journaled state. The next journal write persists it together with the grain's
   other staged changes. The outbox delivers a message only after that write
   completes.
@@ -320,7 +321,7 @@ before any sink effects.
   Both records keep the `SentAt` the inbox accepted, whatever a repeat carries.
   Once the record is compacted, an untracked message sent at or before the durable
   floor receives `Expired`, whose earlier acceptance outcome is unknown.
-- A message with <xref:Orleans.Messaging.Envelope.DeliverAt> is delivered and
+- A message with <xref:Orleans.Durable.Messaging.Envelope.DeliverAt> is delivered and
   accepted immediately, then processed once its acceptance is durable and the
   Durable Jobs clock reaches `DeliverAt`. A message the grain sends to itself is
   accepted in the sending write, so a grain can schedule durable work for itself
@@ -338,10 +339,10 @@ as it is durable: journal write completions and finished deliveries signal the p
 directly.
 
 The inbox processes up to
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.InboxBatchSize> durable, due
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.InboxBatchSize> durable, due
 messages per pass, one at a time, then writes the journal once for the batch. The
 outbox keeps up to
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxBatchSize> delivery
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.OutboxBatchSize> delivery
 attempts in flight for the grain. Each attempt completes on its own and frees its slot
 for the next due message, so a slow or unresponsive receiver holds one slot and
 messages to other receivers continue. The outbox never holds messages addressed to
@@ -349,7 +350,7 @@ the grain itself; a handler that sends one stages its acceptance with the batch'
 write, and a later pass processes it.
 
 Deliveries to the grain, through
-<xref:Orleans.Messaging.IMessagingExtension.DeliverAsync*>, interleave with the
+<xref:Orleans.Durable.Messaging.IMessagingExtension.DeliverAsync*>, interleave with the
 grain's other requests. A delivery validates the envelope, recognizes recorded
 outcomes, and validates any newly stored send time before staging the message's
 acceptance synchronously, then waits for that journal write; concurrent deliveries
@@ -392,13 +393,13 @@ the current grain call to finish and excludes other calls while it runs:
 
 ## Handler outcomes
 
-The handler context, <xref:Orleans.Messaging.IInboxHandlerContext>, exposes the
-received <xref:Orleans.Messaging.IInboxHandlerContext.Message> and two terminal
+The handler context, <xref:Orleans.Durable.Messaging.IInboxHandlerContext>, exposes the
+received <xref:Orleans.Durable.Messaging.IInboxHandlerContext.Message> and two terminal
 operations:
 
-- <xref:Orleans.Messaging.IInboxHandlerContext.Complete*> stages the message's
+- <xref:Orleans.Durable.Messaging.IInboxHandlerContext.Complete*> stages the message's
   removal and its completion record.
-- <xref:Orleans.Messaging.IInboxHandlerContext.Fail*> moves the message to the inbox
+- <xref:Orleans.Durable.Messaging.IInboxHandlerContext.Fail*> moves the message to the inbox
   dead letters with a nonblank reason and records its ID as processed.
 
 Each successful handler calls exactly one of them. Repeated `Complete()` calls, or
@@ -454,7 +455,7 @@ own inbox use the local staging time, or the first time above the admission floo
 after a backward clock jump, and follow the local-send path.
 
 When the inbox holds
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.MaxCapacity> pending
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.MaxCapacity> pending
 messages, it answers new messages with `Backpressured`, and the sender retries them
 later. Every pending message, including a scheduled message waiting for its
 `DeliverAt` time, counts toward this limit from its acceptance until it completes.
@@ -463,9 +464,9 @@ is synchronous, and count toward it until they complete. Likewise, the grain's i
 accepts them before a handler is registered and processes them once one is.
 
 Once recovery charges a failed handler attempt, the inbox schedules a retry after
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.RetryInitialInterval> multiplied
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.RetryInitialInterval> multiplied
 by an exponential factor that caps at 64. Retries continue until
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.InboxRetryTimeout> (6 hours by
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.InboxRetryTimeout> (6 hours by
 default) after the first failure, so they span transient faults such as outages and
 deployments that fix a bug. The last attempt runs when the timeout elapses; if it fails,
 the message moves to the inbox dead letters and its ID is recorded as processed. Call
@@ -481,9 +482,9 @@ with the same backoff while other messages continue:
 - Other failures, such as calls which fail without an answer during an infrastructure outage,
   retry like `HandlerNotFound`.
 
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout> starts
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout> starts
 at the staging time recorded in
-<xref:Orleans.Messaging.InboxMessage.SentAt>. Each attempt and recovery preserves
+<xref:Orleans.Durable.Messaging.InboxMessage.SentAt>. Each attempt and recovery preserves
 that time; retry expiration is `SentAt + OutboxRetryTimeout`.
 No attempt starts after the timeout elapses; the outbox then moves the message to its
 dead letters with a reason stating that the retry timeout elapsed. Each attempt
@@ -498,9 +499,9 @@ send. The Durable Jobs clock governs retry scheduling and candidate floor
 advancement; the journaled send time and floor preserve admission decisions across
 clock changes. `OutboxRetryTimeout` must be shorter than `DeduplicationWindow`.
 
-Inspect dead letters through <xref:Orleans.Messaging.IMessagingDiagnostics> and remove
-handled records with <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>
-or <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. Removal
+Inspect dead letters through <xref:Orleans.Durable.Messaging.IMessagingDiagnostics> and remove
+handled records with <xref:Orleans.Durable.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>
+or <xref:Orleans.Durable.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. Removal
 becomes durable with the next journal write. Retention settings bound both
 collections; see [Capacity, retries, and retention](messaging-operations.md#capacity-retries-and-retention).
 
@@ -531,7 +532,7 @@ start empty and continue to accept and send messages.
 Configure Durable Jobs storage and Journaling storage, then enable messaging with
 <xref:Orleans.Hosting.MessagingExtensions.AddMessaging*> on the silo builder or
 service collection. The optional callback configures
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions>, which are validated at startup.
+<xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions>, which are validated at startup.
 Registration adds Durable Jobs and uses an application-supplied
 <xref:System.TimeProvider> when one is registered.
 
@@ -539,8 +540,8 @@ For development, configure in-memory storage and enable messaging:
 
 :::code source="../snippets/compiled-durable/Grains/MessagingSnippets.cs" id="messaging_registration" language="csharp":::
 
-A grain uses messaging by resolving <xref:Orleans.Messaging.IInbox> or
-<xref:Orleans.Messaging.IOutbox> during construction or activation setup, typically
+A grain uses messaging by resolving <xref:Orleans.Durable.Messaging.IInbox> or
+<xref:Orleans.Durable.Messaging.IOutbox> during construction or activation setup, typically
 through constructor injection. Deliveries reach the grain's inbox through its
 messaging extension, and journal recovery restores messaging state with the grain's
 other journaled state.
