@@ -3,6 +3,7 @@
   "packages": {
     "Microsoft.Orleans.Durable": "The consolidated durable state, jobs, messaging, and tasks package is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Durable.Abstractions": "The durable task abstractions package is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Durable.Http": "The durable task HTTP package is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Durable.AzureStorage": "The consolidated Azure Storage providers package is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Durable.Redis": "The Redis journal storage provider package is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Durable.S3": "The Amazon S3 journal storage provider package is awaiting its first NuGet publication."
