@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Durable.Journaling;
 
@@ -19,10 +21,11 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurableValueCommandHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurableValueCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
+    private readonly JournaledStateAccessTarget _accessTarget;
     private T? _value;
     private bool _isDirty;
 
@@ -38,6 +41,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -46,26 +50,43 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
     public T? Value
     {
-        get => _value;
+        get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+            ? context.Read(_accessTarget, JournaledStateOperation.ValueGet, this, static self => self._value)
+            : _value;
         set
         {
-            _value = value;
-            OnModified();
-            if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+            if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
             {
-                topic.PublishStaged(value);
+                context.Write(_accessTarget, JournaledStateOperation.ValueSet, value, (Self: this, Value: value), static state => state.Self.SetValue(state.Value));
+                return;
             }
+
+            SetValue(value);
+        }
+    }
+
+    private void SetValue(T? value)
+    {
+        _value = value;
+        OnModified();
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.PublishStaged(value);
         }
     }
 
     internal bool IsDirty => _isDirty;
 
     internal bool IsValueCaptured => _isValueCaptured;
+
+    /// <summary>Gets the value without running through a context, for observations which report it live.</summary>
+    internal T? LiveValue => _value;
 
     public Action? OnPersisted { get; set; }
 
@@ -134,4 +155,26 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
     }
 
     void IDurableValueCommandHandler<T>.ApplySet(T value) => _value = value;
+
+    // A replica, which has no manager, so its reads run directly.
+    private DurableValue(IDurableValueCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableValue<T>));
+    }
+
+    // A set journals the value at the next write, so until then the journal doesn't hold the value which reads observe.
+    bool IReplicableState.IsReproducibleFromJournal => !_isDirty;
+
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableValue<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        if (operation is not JournaledStateOperation.ValueGet)
+        {
+            throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableValue<T>));
+        }
+
+        JournaledStateReplicaEncoding.WriteResult(serializer, _value, result);
+    }
 }

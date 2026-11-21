@@ -1,7 +1,9 @@
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Durable.Journaling;
 
@@ -68,10 +70,11 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();
+    private readonly JournaledStateAccessTarget _accessTarget;
     private JournalStreamWriter _writer;
 
     public DurableQueue(
@@ -82,6 +85,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableQueueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -89,10 +93,48 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
-    public int Count => _items.Count;
+    // A replica, which has no manager, so its reads run directly.
+    private DurableQueue(IDurableQueueCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableQueue<T>));
+    }
+
+    // The collection journals each change as it makes it.
+    bool IReplicableState.IsReproducibleFromJournal => true;
+
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableQueue<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        switch (operation)
+        {
+            case JournaledStateOperation.QueueCount:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Count, result);
+                break;
+            case JournaledStateOperation.QueuePeek:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Peek(), result);
+                break;
+            case JournaledStateOperation.QueueTryPeek:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.TryPeek(out var item) ? (true, item) : (false, default(T)!), result);
+                break;
+            case JournaledStateOperation.QueueContains:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Contains(JournaledStateReplicaEncoding.ReadArgument<T>(serializer, argument)), result);
+                break;
+            case JournaledStateOperation.QueueSnapshot:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.ToArray(), result);
+                break;
+            default:
+                throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableQueue<T>));
+        }
+    }
+    public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.QueueCount, this, static self => self._items.Count)
+        : _items.Count;
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -115,22 +157,82 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
 
     public void Clear()
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.QueueClear, this, static self => self.ClearCore());
+            return;
+        }
+
+        ClearCore();
+    }
+
+    private void ClearCore()
+    {
         _codec.WriteClear(GetWriter());
         ApplyClear();
     }
 
-    public T Peek() => _items.Peek();
-    public bool TryPeek([MaybeNullWhen(false)] out T item) => _items.TryPeek(out item);
-    public bool Contains(T item) => _items.Contains(item);
-    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
-    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
+    public T Peek() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.QueuePeek, this, static self => self._items.Peek())
+        : _items.Peek();
+
+    public bool TryPeek([MaybeNullWhen(false)] out T item)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            (var found, item) = context.Read(
+                _accessTarget,
+                JournaledStateOperation.QueueTryPeek,
+                this,
+                static self => self._items.TryPeek(out var item) ? (true, item) : (false, default(T)!));
+            return found;
+        }
+
+        return _items.TryPeek(out item);
+    }
+
+    public bool Contains(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.QueueContains, item, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
+        : _items.Contains(item);
+
+    public void CopyTo(T[] array, int arrayIndex)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            ReadSnapshot(context).CopyTo(array, arrayIndex);
+            return;
+        }
+
+        _items.CopyTo(array, arrayIndex);
+    }
+
+    public IEnumerator<T> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? ((IEnumerable<T>)ReadSnapshot(context)).GetEnumerator()
+        : _items.GetEnumerator();
+
     public void Enqueue(T item)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.QueueEnqueue, item, (Self: this, Item: item), static state => state.Self.EnqueueCore(state.Item));
+            return;
+        }
+
+        EnqueueCore(item);
+    }
+
+    private void EnqueueCore(T item)
     {
         _codec.WriteEnqueue(item, GetWriter());
         ApplyEnqueue(item);
     }
 
-    public T Dequeue()
+    // A context records the item before the dequeue removes it, so an item which it can't record stays in the queue.
+    public T Dequeue() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.QueueDequeue, this, static self => self._items.Peek(), static (self, _) => self.DequeueCore())
+        : DequeueCore();
+
+    private T DequeueCore()
     {
         var result = _items.Peek();
         _codec.WriteDequeue(GetWriter());
@@ -139,6 +241,28 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     }
 
     public bool TryDequeue([MaybeNullWhen(false)] out T item)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            (var found, item) = context.Write(
+                _accessTarget,
+                JournaledStateOperation.QueueTryDequeue,
+                this,
+                static self => self._items.TryPeek(out var item) ? (true, item) : (false, default(T)!),
+                static (self, result) =>
+                {
+                    if (result.Item1)
+                    {
+                        _ = self.TryDequeueCore(out _);
+                    }
+                });
+            return found;
+        }
+
+        return TryDequeueCore(out item);
+    }
+
+    private bool TryDequeueCore([MaybeNullWhen(false)] out T item)
     {
         if (!_items.TryPeek(out item))
         {
@@ -150,7 +274,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
         return true;
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    // A context records the items which the code enumerates, so a replay enumerates the same items.
+    private T[] ReadSnapshot(JournaledStateContext context) =>
+        context.Read(_accessTarget, JournaledStateOperation.QueueSnapshot, this, static self => self._items.ToArray());
 
     private void ApplyEnqueue(T item) => _items.Enqueue(item);
     private T ApplyDequeue() => _items.Dequeue();

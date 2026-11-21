@@ -8,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Durable.Journaling;
 
-internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal partial class JournaledStateManager : IJournaledStateManager, IJournaledStateContextHost, IJournalStorageConsumer, IJournalReplayTarget, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
     private readonly Lock _lock = new();
@@ -24,6 +24,48 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateDirectory _journalStreamDirectory;
     private readonly RetiredStateTracker _retirementTracker;
+    private readonly JournalPositionTracker _positions;
+
+    /// <summary>
+    /// Gets or sets the provider of the context in which code accesses this manager's states, which a host installs, or
+    /// <see langword="null"/> when every access runs against the state directly.
+    /// </summary>
+    public JournaledStateContextProvider? ContextProvider { get; set; }
+
+    /// <summary>Gets the depth of the host's work which <see cref="EnterHostAccess"/> marked.</summary>
+    internal int HostAccessDepth { get; private set; }
+
+    /// <inheritdoc/>
+    public void EnterHostAccess() => HostAccessDepth++;
+
+    /// <inheritdoc/>
+    public void ExitHostAccess()
+    {
+        Debug.Assert(HostAccessDepth > 0, "The host exits only the work which it entered.");
+        HostAccessDepth--;
+    }
+
+    // The names of the states whose accesses run through a context, by identifier, which records of accesses store.
+    private Dictionary<int, string>? _accessTargetNames;
+
+    /// <summary>
+    /// Registers a state whose accesses run through this manager's context, which identifies the state by
+    /// <see cref="JournaledStateAccessTarget.Id"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Another state of this manager has the same identifier.</exception>
+    internal void RegisterAccessTarget(JournaledStateAccessTarget target)
+    {
+        _accessTargetNames ??= [];
+        if (_accessTargetNames.TryAdd(target.Id, target.Name)
+            || string.Equals(_accessTargetNames[target.Id], target.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The journaled states '{_accessTargetNames[target.Id]}' and '{target.Name}' have the same identifier, #{target.Id:x8}, "
+            + "which identifies a state in the records of durable task bodies' accesses. Rename one of the states.");
+    }
     private Task? _workLoop;
     private ManagerState _state;
     private long _deletionGeneration;
@@ -74,6 +116,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         // It is not stored in _journalStreamDirectory and does not participate in the general name->id mapping.
         _retirementTracker = new RetiredStateTracker(this, retirementTrackerCodec);
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
+
+        // The journal's compaction barriers are another internal state with a fixed id.
+        _positions = new JournalPositionTracker(this, _journalWriter, journalStreamIdsCodec);
+        _statesMap[JournalBarrierState.Id] = _positions.Barriers;
     }
 
     private static JournalId CreateJournalId(IGrainContext grainContext)
@@ -279,8 +325,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
+                        var isSnapshot = false;
+                        JournalPositionTracker.Resolution? positionResolution = null;
                         if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
                         {
+                            // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
+                            //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
+                            isSnapshot = workItem is WriteSnapshotWorkItem
+                                || _migrationSnapshotRequired
+                                || _storage.IsCompactionRequested;
+                            if (isSnapshot)
+                            {
+                                try
+                                {
+                                    (isSnapshot, positionResolution) = await PlanSnapshotAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+                                catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                                {
+                                    workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                    return;
+                                }
+                            }
+
                             try
                             {
                                 await PrepareStatesAsync().ConfigureAwait(true);
@@ -299,11 +365,17 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             case AppendJournalWorkItem:
                             case WriteSnapshotWorkItem:
                                 {
-                                    // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
-                                    //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
-                                    var isSnapshot = workItem is WriteSnapshotWorkItem
-                                        || _migrationSnapshotRequired
-                                        || _storage.IsCompactionRequested;
+                                    if (isSnapshot)
+                                    {
+                                        // A snapshot replaces the history which positional reads refer to; this decides it
+                                        // in the same synchronous capture as the snapshot, so no read can take a position
+                                        // which the snapshot replaces.
+                                        lock (_lock)
+                                        {
+                                            isSnapshot = _positions.SnapshotPassesBarriers(positionResolution);
+                                        }
+                                    }
+
                                     var operationLabel = isSnapshot
                                         ? JournalingInstruments.OperationSnapshot
                                         : JournalingInstruments.OperationAppend;
@@ -325,6 +397,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
                                     var writeVersion = 0L;
+                                    var capturedEntryCount = 0L;
 
                                     // Each write captures every state, including a change which another thread is writing into an entry
                                     // which it opened before the write. The write waits for that entry to close, whether it appends or
@@ -365,6 +438,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                     statesScanned++;
                                                 }
 
+                                                // Positions continue from the snapshot's entries, which replace storage's content.
+                                                capturedEntryCount = _journalWriter.CommittedEntryCount;
+                                                _positions.OnSnapshotCaptured(snapshotWriter.CommittedEntryCount);
+
                                                 bufferToConsume = _journalWriter.GetCommittedBuffer();
                                                 if (bufferToConsume.Length > 0)
                                                 {
@@ -396,6 +473,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 }
 
                                                 committedBuffer = _journalWriter.GetCommittedBuffer();
+                                                capturedEntryCount = _journalWriter.CommittedEntryCount;
                                                 bufferToConsume = committedBuffer;
                                                 bufferToConsumeIsCommittedBuffer = true;
                                             }
@@ -480,6 +558,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 {
                                                     _journalWriter.Consume(bufferToConsume);
                                                 }
+
+                                                _positions.OnStored(capturedEntryCount);
                                             }
                                         }
                                         finally
@@ -519,6 +599,31 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                             case DeleteStateWorkItem:
                                 {
+                                    // Deletion replaces the history which positional reads refer to: reads record values
+                                    // until it completes, and those already recorded resolve first.
+                                    lock (_lock)
+                                    {
+                                        positionResolution = _positions.OnDeletionStarting();
+                                    }
+
+                                    if (positionResolution is not null)
+                                    {
+                                        try
+                                        {
+                                            await _positions.ReadHistoryAsync(positionResolution, _shutdownCancellation.Token).ConfigureAwait(true);
+                                        }
+                                        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                                        {
+                                            workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                            return;
+                                        }
+
+                                        lock (_lock)
+                                        {
+                                            _positions.Resolve(positionResolution);
+                                        }
+                                    }
+
                                     // Clear storage.
                                     await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
@@ -539,6 +644,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                         }
 
                                         _deletionGeneration++;
+
+                                        // Storage is empty: entries which the writer holds start its new content.
+                                        _positions.OnDeleted();
                                     }
                                     break;
                                 }
@@ -849,6 +957,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
         lock (_lock)
         {
+            // Positions count storage's entries; the writer holds none yet.
+            _positions.OnRecovered();
             foreach (var (name, state) in _states)
             {
                 if (state is not RetiredStateMachine && !_journalStreamDirectory.ContainsKey(name))
@@ -877,6 +987,13 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 }
             }
         }
+
+        // Recovered positional reads need history which the next snapshot could replace, and their executions are about to
+        // replay them: resolve them now, from the history which recovery read.
+        lock (_lock)
+        {
+            _positions.ResolveRecovered();
+        }
     }
 
     private void ResetForRecovery()
@@ -886,6 +1003,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         _statesMap.Clear();
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
+        _statesMap[JournalBarrierState.Id] = _positions.Barriers;
 
         List<string>? retiredNames = null;
         foreach (var (name, state) in _states)
@@ -906,6 +1024,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
         _journalStreamDirectory.ResetVolatileState();
         _retirementTracker.ResetVolatileState();
+        _positions.OnRecoveryStarting();
     }
 
     internal void BindStateForReplay(JournalStreamId streamId, IStateMachine state)
@@ -920,6 +1039,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     internal IStateMachine ResolveStateMachine(JournalStreamId streamId)
     {
+        _positions.OnEntryReplayed();
         if (!_statesMap.TryGetValue(streamId.Value, out var state))
         {
             state = new RetiredStateMachine(streamId);
@@ -929,7 +1049,42 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         return state;
     }
 
-    private IJournalFormat GetJournalFormat(string journalFormatKey)
+    string IJournalReplayTarget.WriteJournalFormatKey => WriteJournalFormatKey;
+
+    IServiceProvider IJournalReplayTarget.ServiceProvider => ServiceProvider;
+
+    IStateMachine IJournalReplayTarget.ResolveStateMachine(JournalStreamId streamId) => ResolveStateMachine(streamId);
+
+    /// <summary>Gets the journal's positions, its compaction barriers, and the resolution of positional reads.</summary>
+    internal JournalPositionTracker Positions => _positions;
+
+    /// <summary>Gets whether the manager can honor positions: it's ready and no format migration is pending.</summary>
+    internal bool AcceptsPositions => _state is ManagerState.Ready && !_migrationSnapshotRequired;
+
+    internal ILogger Logger => _shared.Logger;
+
+    /// <summary>Gets the registered states by name.</summary>
+    /// <remarks>Registration closes when the manager initializes.</remarks>
+    internal IReadOnlyDictionary<string, IStateMachine> States => _states;
+
+    // Decides whether a write which would snapshot does, and reads the history which resolving the barriers' reads first needs.
+    private async ValueTask<(bool IsSnapshot, JournalPositionTracker.Resolution? Resolution)> PlanSnapshotAsync(CancellationToken cancellationToken)
+    {
+        (bool IsSnapshot, JournalPositionTracker.Resolution? Resolution) plan;
+        lock (_lock)
+        {
+            plan = _positions.PlanSnapshot(_migrationSnapshotRequired);
+        }
+
+        if (plan.Resolution is { } resolution)
+        {
+            await _positions.ReadHistoryAsync(resolution, cancellationToken).ConfigureAwait(true);
+        }
+
+        return plan;
+    }
+
+    internal IJournalFormat GetJournalFormat(string journalFormatKey)
     {
         if (string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))
         {
@@ -939,6 +1094,21 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         return JournalFormatServices.GetRequiredJournalFormat(ServiceProvider, journalFormatKey);
     }
 
+    /// <summary>Gets the key of the format in which storage holds journal data which <paramref name="metadata"/> describes.</summary>
+    internal string GetStoredJournalFormatKey(IJournalMetadata? metadata) => metadata?.FormatKey is { } storedFormatKey
+        ? JournalFormatServices.ValidateJournalFormatKey(storedFormatKey)
+        : _shared.JournalFormatKey;
+
+    /// <summary>Replays journal data in the format of <paramref name="journalFormatKey"/> into <paramref name="target"/>.</summary>
+    internal void Replay(JournalBufferReader buffer, string journalFormatKey, IJournalReplayTarget target)
+    {
+        GetJournalFormat(journalFormatKey).Replay(buffer, new JournalReplayContext(target));
+        if (buffer.IsCompleted && buffer.Length > 0)
+        {
+            throw new InvalidOperationException("The journal format did not read the completed journal data.");
+        }
+    }
+
     private void ProcessRecoveryBuffer(JournalBufferReader buffer, IJournalMetadata? metadata)
     {
         if (buffer.Length == 0)
@@ -946,9 +1116,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             return;
         }
 
-        var journalFormatKey = metadata?.FormatKey is { } storedFormatKey
-            ? JournalFormatServices.ValidateJournalFormatKey(storedFormatKey)
-            : _shared.JournalFormatKey;
+        var journalFormatKey = GetStoredJournalFormatKey(metadata);
+        var retained = _positions.RetainsRecoveredHistory ? buffer.Peek(buffer.Length) : default;
+        var length = buffer.Length;
         try
         {
             if (!string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))
@@ -956,18 +1126,23 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 _migrationSnapshotRequired = true;
             }
 
-            var journalFormat = GetJournalFormat(journalFormatKey);
-            var replayContext = new JournalReplayContext(this);
-            journalFormat.Replay(buffer, replayContext);
-
-            if (buffer.IsCompleted && buffer.Length > 0)
+            Replay(buffer, journalFormatKey, this);
+            if (length > buffer.Length && _positions.RetainsRecoveredHistory)
             {
-                throw new InvalidOperationException("The journal format did not read the completed journal data.");
+                // The entries which the format consumed, so resolving positional reads replays them without a second read.
+                _positions.RetainRecoveredHistory(retained.Slice(0, length - buffer.Length), journalFormatKey);
             }
         }
         catch (Exception exception) when (ShouldWrapRecoveryFormatException(exception))
         {
             throw CreateRecoveryFormatException(exception, journalFormatKey);
+        }
+        finally
+        {
+            if (_positions.RetainsRecoveredHistory)
+            {
+                retained.Dispose();
+            }
         }
     }
 
@@ -1055,6 +1230,27 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             throw;
         }
     }
+
+    /// <summary>
+    /// Reads the journal's history into <paramref name="consumer"/>, which must be the content which this manager last read
+    /// or wrote.
+    /// </summary>
+    /// <remarks>
+    /// Recovery's read set storage's write precondition, so this read adopts nothing: when another writer changed the
+    /// journal, storage throws <see cref="Orleans.Storage.InconsistentStateException"/>, which fences the manager.
+    /// </remarks>
+    internal ValueTask ReadHistoryAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) =>
+        ReadStorageAsync(consumer, cancellationToken);
+
+    /// <summary>
+    /// Gets whether the journal's codecs reproduce values exactly as the Orleans serializer encodes them, so a value which a
+    /// replica decodes from the journal and encodes again is the encoding of the value which was journaled.
+    /// </summary>
+    /// <remarks>
+    /// The built-in binary format's codecs encode values with the serializer's field codecs. Other formats, such as JSON,
+    /// can lose runtime types, non-public members, date kinds and exception details.
+    /// </remarks>
+    internal bool HasExactCodecs => _shared.JournalFormat is OrleansBinaryJournalFormat;
 
     private async ValueTask AppendStorageAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {

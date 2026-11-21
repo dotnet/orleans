@@ -355,8 +355,18 @@ internal class Program
         {
             _ = BenchmarkSwitcher.FromTypes([
                 typeof(DurableListJournalBenchmarks),
-                typeof(DurableCommandReaderBenchmarks)
+                typeof(DurableCommandReaderBenchmarks),
+                typeof(JournaledStateContextBenchmarks),
+                typeof(AccessRecordingBenchmarks)
             ]).Run(args);
+        },
+        ["Journaling.AccessBytes"] = _ =>
+        {
+            AccessRecordingBytes.Run();
+        },
+        ["Journaling.PositionResolution"] = args =>
+        {
+            PositionResolutionCost.Run(args);
         },
         ["Journaling.Azure"] = args =>
         {

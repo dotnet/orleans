@@ -32,12 +32,14 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private readonly List<DeliveryOutcome> _outcomes = [];
     private int _running;
     private TaskCompletionSource? _drained;
+    private readonly JournaledStateAccessTarget _accessTarget;
 
     // A grain's messages to itself go to its own inbox, so resolving the outbox resolves the inbox.
     public Outbox(MessagingPump pump, Inbox inbox)
     {
         _pump = pump;
         _inbox = inbox;
+        _accessTarget = new(MessagingStateNames.Outbox, pump.StateManager);
         pump.StateManager.RegisterStateMachine(MessagingStateNames.Outbox, this);
         pump.Register(this);
     }
@@ -63,9 +65,25 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         return this;
     }
 
+    /// <remarks>
+    /// A send runs through the caller's <see cref="JournaledStateContext"/> as a write, so a durable task body's replay
+    /// doesn't send again.
+    /// </remarks>
     public void Send(OutboxMessage message)
     {
+        // Shutdown fails a send before it runs, so no context records the shutdown as the send's outcome.
         _pump.ShutdownToken.ThrowIfCancellationRequested();
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, message.Envelope.MessageId, (Self: this, Message: message), static state => state.Self.SendCore(state.Message));
+            return;
+        }
+
+        SendCore(message);
+    }
+
+    private void SendCore(OutboxMessage message)
+    {
         EnvelopeValidation.Validate(message);
         if (_messages.TryGetValue(message.Envelope.MessageId, out var existing))
         {
@@ -96,9 +114,21 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
+    /// <remarks>A send runs through the caller's <see cref="JournaledStateContext"/> as a write.</remarks>
     public void Send(MessageId messageId)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, messageId, (Self: this, MessageId: messageId), static state => state.Self.SendCore(state.MessageId));
+            return;
+        }
+
+        SendCore(messageId);
+    }
+
+    private void SendCore(MessageId messageId)
+    {
         EnvelopeValidation.ValidateMessageId(messageId);
         if (_messages.TryGetValue(messageId, out var existing))
         {
@@ -128,7 +158,12 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
-    public bool Withdraw(MessageId messageId)
+    /// <remarks>A withdrawal runs through the caller's <see cref="JournaledStateContext"/> as a write.</remarks>
+    public bool Withdraw(MessageId messageId) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.OutboxWithdraw, messageId, (Self: this, MessageId: messageId), static state => state.Self.WithdrawCore(state.MessageId))
+        : WithdrawCore(messageId);
+
+    private bool WithdrawCore(MessageId messageId)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (!_messages.TryGetValue(messageId, out var entry)) return false;
