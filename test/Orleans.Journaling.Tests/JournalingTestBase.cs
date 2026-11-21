@@ -63,7 +63,7 @@ public abstract class JournalingTestBase
     /// Creates a journal manager with in-memory storage
     /// </summary>
     internal (IJournaledStateManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle)
-        CreateTestSystem(IJournalStorage? storage = null, TimeProvider? provider = null, IJournalFormat? journalFormat = null)
+        CreateTestSystem(IJournalStorage? storage = null, TimeProvider? provider = null, IJournalFormat? journalFormat = null, ILogger<JournaledStateManager>? logger = null)
     {
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
@@ -82,7 +82,7 @@ public abstract class JournalingTestBase
         }
 
         var shared = new JournaledStateManagerShared(
-            serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
+            logger ?? serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Options.Create(options),
             provider,
             serviceProvider);

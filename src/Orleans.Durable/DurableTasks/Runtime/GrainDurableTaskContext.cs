@@ -20,9 +20,10 @@ namespace Orleans.Durable.Tasks.Runtime;
 /// <para>
 /// The runtime cancels the attempt when the activation stops, or when the task is aborted or deleted with its execution
 /// tree, through <see cref="EndAttempt"/>. From then on, the attempt's durable operations throw
-/// <see cref="DurableTaskAttemptCanceledException"/>, and the changes which its code makes to the grain's journaled state,
-/// such as cleanup, commit with the grain's next journal write. The runtime discards the canceled attempt's response;
-/// after the activation stops, the next activation replays the task in a new context.
+/// <see cref="DurableTaskAttemptCanceledException"/>. When the task ends with the cancellation, the changes which the
+/// attempt's code makes to the grain's journaled state, such as cleanup, commit with the grain's next journal write. When
+/// the activation stops, the attempt is discarded: its writes to journaled state throw its cancellation, and the next
+/// activation replays the task in a new context. The runtime discards the canceled attempt's response.
 /// </para>
 /// <para>
 /// An attempt which the running code can't replay stalls: the runtime cancels it for
@@ -121,7 +122,43 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _unreached = runtime.GetRecordedOperations(taskId);
         _replaying = _unreached is not null;
         _cancellationPoint = runtime.GetCancellationPoint(taskId);
+        AccessLog = runtime.CreateAccessLog(this, scheduler, Diverge);
     }
+
+    /// <summary>Gets the runtime which runs this attempt.</summary>
+    internal IDurableTaskGrainRuntime Runtime => _runtime;
+
+    /// <summary>
+    /// Gets the log which records the attempt's accesses to journaled state and returns the recorded outcomes of earlier
+    /// attempts' accesses, or <see langword="null"/> when the runtime doesn't record them. The runtime closes it when the
+    /// attempt ends with its task or its body completes, and discards it when the attempt ends otherwise.
+    /// </summary>
+    internal DurableTaskAccessLog? AccessLog { get; }
+
+    /// <summary>
+    /// Gets the attempt's access log for an access to journaled state which the attempt's code makes, discarding it once
+    /// the attempt ended without a record of its end.
+    /// </summary>
+    /// <remarks>
+    /// The runtime discards the log when it ends the attempt. The abstractions end an attempt whose replay departs from a
+    /// recorded result without the runtime, so its code's next access discards the log.
+    /// </remarks>
+    internal DurableTaskAccessLog? GetAccessLogForAccess()
+    {
+        if (AccessLog is { IsOpen: true } log && IsDiscarded)
+        {
+            log.Discard(() => CreateAttemptEndedException());
+        }
+
+        return AccessLog;
+    }
+
+    /// <summary>
+    /// Runs an asynchronous <paramref name="body"/> whose outcome one record of this attempt covers, such as a
+    /// transaction's, as a covered region for its whole flow: the body's accesses to journaled state aren't recorded as the
+    /// attempt's, its effects run directly, and its durable operations throw.
+    /// </summary>
+    internal Task<TResult> RunCoveredAsync<TResult>(Func<Task<TResult>> body) => RunInCoveredFlowAsync(body);
 
     /// <inheritdoc/>
     /// <remarks>The incarnation of the invoked task whose execution tree contains this execution, read once.</remarks>
@@ -143,7 +180,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     internal bool IsDiscarded => AttemptEndReason
         is DurableTaskAttemptCancellationReason.ActivationStopping
         or DurableTaskAttemptCancellationReason.Diverged
-        or DurableTaskAttemptCancellationReason.UnsupportedVersion;
+        or DurableTaskAttemptCancellationReason.UnsupportedVersion
+        or DurableTaskAttemptCancellationReason.TransactionConflict;
 
     /// <summary>Gets whether a segment of the attempt runs or is queued, so the attempt makes progress without a message.</summary>
     /// <remarks>
@@ -218,9 +256,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// Delivers a pending task cancellation once the attempt is at the point where its body observes it, and records that
     /// point when the execution has no record of one.
     /// </summary>
+    /// <remarks>
+    /// Without a recorded point, the attempt observes the cancellation once it replays neither recorded operations nor
+    /// recorded accesses to journaled state (<see cref="IsReplaying"/>): accesses which an earlier attempt recorded after its
+    /// last operation precede the point which this attempt chooses, so their records still replay.
+    /// </remarks>
     private void DeliverPendingCancellation()
     {
-        if (!_cancellationPending || (_cancellationPoint is { } point ? point != _cancellationPoints : _replaying))
+        if (!_cancellationPending || (_cancellationPoint is { } point ? point != _cancellationPoints : IsReplaying))
         {
             return;
         }
@@ -383,19 +426,20 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// and effect records, but not signal values, which senders record, invoked descendants, or cancellations which
     /// arrived before their requests. The attempt reaches an operation when it starts or posts it, looks up its handle,
     /// signals under its marker, selects a completion under its decision, or runs an effect under its name. Starting an
-    /// operation which no earlier attempt recorded ends the replay; reaching an operation again doesn't.
+    /// operation which no earlier attempt recorded ends the replay; reaching an operation again doesn't. The attempt also
+    /// replays while it hasn't consumed every recorded access to journaled state.
     /// </remarks>
-    public override bool IsReplaying => _replaying;
+    public override bool IsReplaying => _replaying || AccessLog?.IsReplaying is true;
 
     /// <summary>
-    /// Gets whether earlier attempts recorded operations which this attempt hasn't reached yet, so an earlier run went
-    /// past the attempt's current point.
+    /// Gets whether earlier attempts recorded operations or accesses to journaled state which this attempt hasn't reached
+    /// yet, so an earlier run went past the attempt's current point.
     /// </summary>
     /// <remarks>
     /// An execution's body runs its durable operations in one logical flow, and concurrent work runs in child executions,
     /// so a deterministic replay reaches the recorded operations in the order in which the earlier run created them.
     /// </remarks>
-    private bool HasUnreachedOperations => _unreached is not null;
+    private bool HasUnreachedOperations => _unreached is not null || AccessLog?.IsReplaying is true;
 
     /// <summary>
     /// Gets the grain which runs this execution, which qualifies the root identifiers of the detached tasks which the
@@ -477,8 +521,11 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <summary>
     /// Ends this attempt for <paramref name="reason"/> at once: from now on, its durable operations throw
-    /// <see cref="DurableTaskAttemptCanceledException"/>, and a discarded attempt isn't resumed.
-    /// <see cref="ApplyCancellation"/> then cancels the attempt's tokens.
+    /// <see cref="DurableTaskAttemptCanceledException"/>. When the task ends with the attempt, because it was aborted or
+    /// deleted, the attempt's later accesses to journaled state, such as its cleanup's, apply to the state unrecorded.
+    /// Otherwise the attempt is discarded and isn't resumed: a later attempt reruns the body, so this attempt's later
+    /// writes to journaled state throw its cancellation, and its reads run unrecorded. <see cref="ApplyCancellation"/>
+    /// then cancels the attempt's tokens.
     /// </summary>
     /// <returns><see langword="true"/> when this call ended the attempt.</returns>
     /// <remarks>
@@ -495,6 +542,15 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         _endReason = reason;
+        if (IsDiscarded)
+        {
+            AccessLog?.Discard(() => CreateAttemptEndedException());
+        }
+        else
+        {
+            AccessLog?.Close();
+        }
+
         if (IsDiscarded && _segment is null)
         {
             _settled.TrySetResult();
@@ -535,6 +591,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <summary>Stalls this attempt because an operation diverged from the execution's record.</summary>
     private DurableTaskAttemptCanceledException Diverge(DurableTaskDivergenceException divergence) =>
         Stall(DurableTaskAttemptCancellationReason.Diverged, divergence);
+
+    /// <summary>
+    /// Stalls this attempt because a recorded access met state which an open transaction holds. The access records
+    /// nothing, and the runtime runs a new attempt of the task once the transaction ends, which replays this attempt's
+    /// records up to the access and then runs it live.
+    /// </summary>
+    internal DurableTaskAttemptCanceledException StallForConflict(Orleans.Durable.Journaling.JournaledStateConflictException conflict) =>
+        Stall(DurableTaskAttemptCancellationReason.TransactionConflict, conflict);
 
     /// <summary>Throws <see cref="DurableTaskAttemptCanceledException"/> when the runtime canceled this attempt.</summary>
     private void ThrowIfAttemptCanceled()
@@ -678,6 +742,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         ThrowIfAttemptCanceled();
         var shielded = SchedulesShieldedChildren;
+
+        // Code which the start runs synchronously, such as a cancellation registration, belongs to the post's record.
+        using var region = EnterCoveredRegion();
         try
         {
             if (options.HasFlag(DurableTaskStartOptions.Detached))
@@ -777,10 +844,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         if (TaskScheduler.Current != _scheduler)
         {
+            AccessLog?.Close();
             return;
         }
 
         VerifyCancellationPointReached();
+
+        // The body never replays once its response commits, so work which outlives it isn't recorded.
+        AccessLog?.Close();
         if (IsAttemptEnded)
         {
             return;
@@ -823,6 +894,111 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             throw Diverge(divergence);
         }
+    }
+
+    /// <summary>
+    /// Gets whether a durable transaction which commits now stages its record: while the attempt records, including after a
+    /// recorded request to cancel the task, its record commits with its changes. Once the attempt's log is closed, because
+    /// the runtime aborted or deleted the task or its body completed, the task never replays and its later changes apply
+    /// live, so the transaction commits without a record.
+    /// </summary>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The runtime discarded the attempt, which never resumes and whose writes throw, so the transaction aborts.
+    /// </exception>
+    private bool StagesTransactionRecord()
+    {
+        if (IsDiscarded)
+        {
+            throw CreateAttemptEndedException();
+        }
+
+        return AccessLog?.IsOpen ?? !IsAttemptEnded;
+    }
+
+    /// <summary>
+    /// Returns the outcome which an earlier run recorded for the transaction named <paramref name="name"/>, or runs
+    /// <paramref name="body"/> as a transaction over the grain's journaled state whose commit records the result together
+    /// with the transaction's changes.
+    /// </summary>
+    /// <remarks>
+    /// The transaction is an effect: it shares <c>RunInline</c>'s identifiers, and a replay returns the recorded result, or
+    /// throws the recorded exception, without running the body. The body runs as a covered region: its accesses aren't
+    /// recorded and its durable operations throw, so it never replays partially. The result's record commits with the
+    /// transaction's changes, and the call returns once a journal write holds both. A transaction which aborts cleanly,
+    /// because its body, a durable operation in it or a nested transaction failed, or its result doesn't serialize, leaves no
+    /// trace, and its failure is recorded. A transaction whose attempt the runtime discarded meanwhile aborts and records
+    /// nothing, and a failed journal records nothing: the next attempt runs the body again. Once the task can't replay,
+    /// as in the cleanup of a task which the runtime aborted or deleted, a transaction commits its changes durably, without a
+    /// record, as the attempt's other writes then apply.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The caller isn't running on the activation's scheduler, or runs within a covered region, such as another
+    /// transaction's body or a <c>RunInline</c> effect.
+    /// </exception>
+    internal async Task<T> RunTransactionAsync<T>(string name, Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ThrowIfInCoveredRegion();
+        if (TaskScheduler.Current != _scheduler)
+        {
+            throw new InvalidOperationException(
+                $"A durable transaction runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with its changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't run one.");
+        }
+
+        if (!StagesTransactionRecord())
+        {
+            // The task never replays, so the transaction applies live, as the attempt's other writes then do, and has no
+            // record to take an identifier for.
+            return await _runtime.RunTransactionAsync(
+                effectId: default,
+                cancellationToken => RunCoveredAsync(() => body(cancellationToken)),
+                static () => false,
+                static _ => { },
+                cancellationToken);
+        }
+
+        var effectId = CreateChildTaskId(name);
+        ObserveOperation(effectId, recordsOperation: true);
+        Task<T> transaction;
+        using (EnterCoveredRegion())
+        {
+            try
+            {
+                if (_runtime.TryGetEffectOutcome(effectId, "a durable transaction") is { } recorded)
+                {
+                    return recorded.GetResult<T>();
+                }
+            }
+            catch (DurableTaskDivergenceException divergence)
+            {
+                throw Diverge(divergence);
+            }
+
+            // The body runs as a covered region: the transaction's record covers it, so its durable operations throw rather
+            // than take identifiers which a replay, which skips the body, wouldn't take. The commit decides by the attempt's
+            // state then, since the runtime can cancel the attempt while the body runs.
+            transaction = _runtime.RunTransactionAsync(
+                effectId,
+                cancellationToken => RunCoveredAsync(() => body(cancellationToken)),
+                StagesTransactionRecord,
+                exception =>
+                {
+                    // A discarded attempt records nothing, and a closed log has no record to stage.
+                    if (exception is DurableTaskAttemptCanceledException || IsAttemptEnded || AccessLog is { IsOpen: false })
+                    {
+                        return;
+                    }
+
+                    // The failure is the transaction's outcome, which a replay throws again.
+                    using (EnterCoveredRegion())
+                    {
+                        _runtime.RecordEffect(effectId, DurableTaskResponse.FromException(exception));
+                    }
+                },
+                cancellationToken);
+        }
+
+        return await transaction;
     }
 
     /// <remarks>
@@ -939,10 +1115,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         string name,
         DurableTaskResponse value,
         bool throwOnRejection,
-        CancellationToken cancellationToken) =>
-        RunOnScheduler(
+        CancellationToken cancellationToken)
+    {
+        ThrowIfInCoveredRegion();
+        return RunOnScheduler(
             _scheduler,
             () => SendSignalCoreAsync(target, taskId, name, value, throwOnRejection, cancellationToken));
+    }
 
     private async ValueTask<DurableSignalResult> SendSignalCoreAsync(
         GrainId target,

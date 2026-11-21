@@ -98,7 +98,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     [FromKeyedServices("$task-logical-times")] IDurableDictionary<TaskId, DateTimeOffset> logicalTimes,
     [FromKeyedServices("$task-invocations")] IDurableDictionary<MessageId, PendingInvocation> invocations,
     DurableTaskGrainRuntimeShared shared,
-    IEnumerable<IDurableTaskMessageTransport> messageTransports) :
+    IEnumerable<IDurableTaskMessageTransport> messageTransports,
+    IJournaledStateManager stateManager) :
     IDurableTaskGrainRuntime,
     IDurableTaskGrainExtension,
     IDurableTaskManager,
@@ -116,6 +117,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly Dictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
     private readonly Dictionary<long, CancellationPropagation> _pendingCancellationPropagations = [];
     private readonly Dictionary<long, Task> _backgroundTasks = [];
+
+    // The activation's journaled state manager, whose context provider records the accesses of durable task bodies.
+    private readonly IJournaledStateManager _stateManager = stateManager;
+
+    // The storage of the access logs which record the accesses of durable task bodies, bound by InitializeForActivation.
+    private IDurableTaskAccessLogStorage? _accessLogStorage;
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
     private readonly IDurableDictionary<TaskId, DateTimeOffset> _logicalTimes = logicalTimes;
@@ -167,8 +174,39 @@ internal sealed partial class DurableTaskGrainRuntime(
     private IDurableTaskMessageTransport MessageTransport => _messageTransport ?? throw new InvalidOperationException(
         "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
 
-    /// <summary>Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs.</summary>
-    internal void InitializeForActivation(IGrainContext grainContext) => _grainContext = grainContext;
+    /// <summary>
+    /// Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs: it records the
+    /// accesses of durable task bodies to the activation's journaled state from now on, which every body's replay depends
+    /// on.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The task storage doesn't store access logs, the journaled state manager doesn't route its states' accesses through
+    /// a host's context, or another host's context already routes them.
+    /// </exception>
+    internal void InitializeForActivation(IGrainContext grainContext)
+    {
+        if (_storage is not IDurableTaskAccessLogStorage accessLogStorage)
+        {
+            throw new InvalidOperationException(
+                $"Durable task storage '{_storage.GetType()}' doesn't store the access logs which record durable task bodies' accesses to journaled state, so a replay would apply them again. Configure the journaled durable task storage which AddDurableTasks registers.");
+        }
+
+        if (_stateManager is not IJournaledStateContextHost host)
+        {
+            throw new InvalidOperationException(
+                $"Journaled state manager '{_stateManager.GetType()}' doesn't route its states' accesses through a host's context, so durable task bodies' accesses to journaled state can't be recorded. Use the journaled state manager which Orleans.Durable.Journaling registers.");
+        }
+
+        if (host.ContextProvider is { } installed and not DurableTaskAccessContextProvider)
+        {
+            throw new InvalidOperationException(
+                $"The accesses to the activation's journaled state already run through '{installed.GetType()}', so durable task bodies' accesses can't be recorded.");
+        }
+
+        host.ContextProvider = new DurableTaskAccessContextProvider(this);
+        _accessLogStorage = accessLogStorage;
+        _grainContext = grainContext;
+    }
 
     /// <summary>
     /// Recovers committed task state during the activation's lifecycle, deferring the recovered executions to
@@ -895,26 +933,9 @@ internal sealed partial class DurableTaskGrainRuntime(
         Func<TState, DurableTaskResponse> effect)
     {
         ThrowIfStopping();
-        if (_storage.TryGetTask(effectId, out var record))
+        if (TryGetEffectOutcome(effectId, "a DurableTask.RunInline effect") is { } outcome)
         {
-            if (!IsEffectRecord(record) || ReadRecordedResult(effectId, record) is not { IsCompleted: true } outcome)
-            {
-                throw CreateDivergenceException(
-                    $"Durable child task '{effectId}' is already associated with a different operation.",
-                    record,
-                    "a DurableTask.RunInline effect");
-            }
-
             return outcome;
-        }
-
-        // A named combinator records only its inputs, beneath its identifier.
-        if (_storage.GetChildren(effectId).FirstOrDefault() is (var inputId, { } input))
-        {
-            throw CreateDivergenceException(
-                $"Durable child task '{effectId}' holds '{inputId}', which an earlier run recorded.",
-                input,
-                "a DurableTask.RunInline effect");
         }
 
         var response = effect(state);
@@ -929,6 +950,82 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="body"/> as a transaction over the grain's journaled state, whose commit stages a record of the
+    /// result under <paramref name="effectId"/> together with the transaction's changes, and returns once a journal write
+    /// holds the commit.
+    /// </summary>
+    /// <remarks>
+    /// A body which fails, a nested transaction whose failure dooms it, or a result which doesn't serialize aborts the
+    /// transaction, which leaves no trace, and <paramref name="onAbort"/> records the failure in its place. A commit whose
+    /// write fails fails the journal, so the next activation runs the body again.
+    /// </remarks>
+    Task<T> IDurableTaskGrainRuntime.RunTransactionAsync<T>(
+        TaskId effectId,
+        Func<CancellationToken, Task<T>> body,
+        Func<bool> stagesRecord,
+        Action<Exception> onAbort,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfStopping();
+        var manager = _stateManager as JournaledStateManager ?? throw new NotSupportedException("Durable transactions require the journaled state manager which Orleans.Durable.Journaling registers.");
+        return manager.RunTransactionAsync(
+            body,
+            onCommit: result =>
+            {
+                if (stagesRecord())
+                {
+                    AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, DurableTaskResponse.FromResult(result));
+                }
+            },
+            onAbort,
+            cancellationToken);
+    }
+
+    /// <summary>Stages a record of an effect's outcome under <paramref name="effectId"/>, without writing.</summary>
+    void IDurableTaskGrainRuntime.RecordEffect(TaskId effectId, DurableTaskResponse response)
+    {
+        ThrowIfStopping();
+        AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, response);
+    }
+
+    /// <summary>Returns the outcome which an effect recorded under <paramref name="effectId"/>, or <see langword="null"/>.</summary>
+    /// <param name="effectId">The effect's identifier.</param>
+    /// <param name="requested">A description of the requested operation, for a divergence.</param>
+    /// <exception cref="DurableTaskDivergenceException">Another kind of operation is recorded under the identifier.</exception>
+    DurableTaskResponse? IDurableTaskGrainRuntime.TryGetEffectOutcome(TaskId effectId, string requested)
+    {
+        ThrowIfStopping();
+        return TryGetEffectOutcome(effectId, requested);
+    }
+
+    private DurableTaskResponse? TryGetEffectOutcome(TaskId effectId, string requested)
+    {
+        if (_storage.TryGetTask(effectId, out var record))
+        {
+            if (!IsEffectRecord(record) || ReadRecordedResult(effectId, record) is not { IsCompleted: true } outcome)
+            {
+                throw CreateDivergenceException(
+                    $"Durable child task '{effectId}' is already associated with a different operation.",
+                    record,
+                    requested);
+            }
+
+            return outcome;
+        }
+
+        // A named combinator records only its inputs, beneath its identifier.
+        if (_storage.GetChildren(effectId).FirstOrDefault() is (var inputId, { } input))
+        {
+            throw CreateDivergenceException(
+                $"Durable child task '{effectId}' holds '{inputId}', which an earlier run recorded.",
+                input,
+                requested);
+        }
+
+        return null;
     }
 
     // Version records are terminal records of their execution, as effect records are, whose result is the version.
@@ -1738,8 +1835,14 @@ internal sealed partial class DurableTaskGrainRuntime(
     void IDurableTaskGrainRuntime.StallAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason, Exception exception)
     {
         Debug.Assert(
-            reason is DurableTaskAttemptCancellationReason.UnsupportedVersion or DurableTaskAttemptCancellationReason.Diverged,
-            "An attempt stalls when the running code can't replay its execution.");
+            reason is DurableTaskAttemptCancellationReason.UnsupportedVersion or DurableTaskAttemptCancellationReason.Diverged or DurableTaskAttemptCancellationReason.TransactionConflict,
+            "An attempt stalls when the running code can't replay its execution, or when it meets an open transaction.");
+        if (reason is DurableTaskAttemptCancellationReason.TransactionConflict)
+        {
+            RestartAfterConflict(context, (JournaledStateConflictException)exception);
+            return;
+        }
+
         if (!CancelAttempt(context, reason))
         {
             return;
@@ -1747,6 +1850,105 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         _stalledExecutions.Add(context.Id);
         ReportStall(context.Id, reason, exception);
+    }
+
+    /// <summary>
+    /// Discards the attempts of the execution tree of the task which <paramref name="context"/>'s execution belongs to, and
+    /// starts the task again once the transaction which the attempt met has ended.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The conflicting access recorded nothing, so the task's records end before it, and a new attempt replays them and
+    /// then runs the access live, against committed state. The invoked task, the nearest ancestor which stores its request,
+    /// restarts rather than the execution itself, because a local child's definition comes from its parent's body: the
+    /// parent's new attempt starts the child again. The tree's other attempts are discarded with it, as deactivation
+    /// discards them, so none of them waits for a child which no attempt runs any more.
+    /// </para>
+    /// <para>
+    /// The task restarts in this activation, once every discarded attempt has settled and no transaction holds the state.
+    /// Meanwhile the restart counts as background work, so the grain's wake-up keeps the task running across a crash.
+    /// </para>
+    /// </remarks>
+    private void RestartAfterConflict(GrainDurableTaskContext context, JournaledStateConflictException conflict)
+    {
+        if (!CancelAttempt(context, DurableTaskAttemptCancellationReason.TransactionConflict))
+        {
+            // The attempt already ended, as part of its tree's restart or for another reason.
+            return;
+        }
+
+        if (FindInvokedTask(context.Id) is not { } invokedId)
+        {
+            // Every execution belongs to a task which stores its request; one which doesn't stalls as diverged.
+            _stalledExecutions.Add(context.Id);
+            ReportStall(context.Id, DurableTaskAttemptCancellationReason.TransactionConflict, conflict);
+            return;
+        }
+
+        List<Task>? settled = null;
+        foreach (var (id, execution) in _executionContexts.ToList())
+        {
+            if (id != invokedId && !id.IsDescendantOf(invokedId))
+            {
+                continue;
+            }
+
+            _executionContexts.Remove(id);
+            CancelAttempt(execution, DurableTaskAttemptCancellationReason.TransactionConflict);
+            if (_runningRequests.Remove(id, out var running))
+            {
+                (settled ??= []).Add(running.Context.Settled);
+                DurableTaskEvents.EmitExecutionStopped(GrainContext, id);
+            }
+
+            // A local child's handle stays, for the attempts which await it; the parent's new attempt starts the child again.
+            if (id != invokedId && _taskHandles.TryGetValue(id, out var handle) && handle is TaskHandle localHandle)
+            {
+                localHandle.IsRunning = false;
+            }
+        }
+
+        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+        {
+            _shared.Logger.LogDebug(conflict, "{Id} durable task '{TaskId}' met an open transaction and restarts once it ends.", GrainId, invokedId);
+        }
+
+        DurableTaskEvents.EmitExecutionStalled(GrainContext, context.Id, DurableTaskAttemptCancellationReason.TransactionConflict, conflict);
+
+        // The restart runs outside the discarded attempt's flow, as the runtime's own work.
+        Task restart;
+        using (ExecutionContext.SuppressFlow())
+        {
+            restart = RestartAsync(invokedId, settled, conflict);
+        }
+
+        TrackBackgroundTask(restart, "restarting a durable task after a transaction conflict");
+
+        async Task RestartAsync(TaskId taskId, List<Task>? attempts, JournaledStateConflictException conflict)
+        {
+            await Task.Yield();
+            await conflict.WaitForReleaseAsync(_deactivationCts.Token);
+            if (attempts is not null)
+            {
+                await Task.WhenAll(attempts);
+            }
+
+            StartRequest(taskId);
+        }
+    }
+
+    /// <summary>Returns the task whose stored request runs <paramref name="executionId"/>'s execution tree.</summary>
+    private TaskId? FindInvokedTask(TaskId executionId)
+    {
+        for (var id = executionId; !id.IsDefault; id = id.Parent())
+        {
+            if (_storage.TryGetTask(id, out var state) && state.HasRequest)
+            {
+                return id;
+            }
+        }
+
+        return null;
     }
 
     private void ReportStall(TaskId taskId, DurableTaskAttemptCancellationReason reason, Exception exception)
@@ -2298,7 +2500,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         DurableTaskResponse? response;
         try
         {
-            response = await DurableTaskRuntimeHelper.RunAsync(createTask(state), context);
+            response = await RunAttemptAsync(createTask, state, context);
         }
         catch (Exception exception)
         {
@@ -2311,6 +2513,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         context.VerifyCancellationPointReached();
+        context.AccessLog?.Close();
 
         // A cancellation which arrives while this attempt still runs, for example while a delay's journal write is in
         // flight, cancels only the attempt's token. The attempt then terminalizes the task, so a pending operation
@@ -2360,6 +2563,34 @@ internal sealed partial class DurableTaskGrainRuntime(
                 DurableTaskEvents.EmitExecutionStopped(GrainContext, context.Id);
             }
         }
+    }
+
+    /// <summary>Runs an attempt's body, whose accesses to journaled state the attempt's access log records.</summary>
+    /// <remarks>
+    /// The body's definition is created within the attempt, so the code which a method that returns a definition without
+    /// being <see langword="async"/> runs belongs to the body.
+    /// </remarks>
+    private static ValueTask<DurableTaskResponse> RunAttemptAsync<TState>(
+        Func<TState, DurableTask> createTask,
+        TState state,
+        GrainDurableTaskContext context)
+    {
+        DurableTask task;
+        using (DurableTaskContext.Enter(context))
+        {
+            task = createTask(state);
+        }
+
+        return DurableTaskRuntimeHelper.RunAsync(task, context);
+    }
+
+    DurableTaskAccessLog IDurableTaskGrainRuntime.CreateAccessLog(
+        DurableTaskContext attempt,
+        TaskScheduler scheduler,
+        Func<DurableTaskDivergenceException, Exception> diverge)
+    {
+        Debug.Assert(_accessLogStorage is not null, "Attempts start once the runtime is bound to its activation.");
+        return new(attempt, _accessLogStorage, _shared.Serializer, scheduler, diverge, attempt is GrainDurableTaskContext context ? context.StallForConflict : null);
     }
 
     private sealed record RunningRequest(
@@ -3378,9 +3609,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>
     /// Deactivation, an abort, and the deletion of a task's tree cancel attempts this way, on the activation's scheduler.
     /// From the cancellation on, the attempt's durable operations throw <see cref="DurableTaskAttemptCanceledException"/>,
-    /// so the runtime records none of them, and the attempt's result is discarded. Journaled state changes which its code
-    /// makes, such as cleanup, commit with the grain's next journal write. Its code observes the cancellation through its
-    /// tokens once they are signaled, outside the runtime's current operation.
+    /// so the runtime records none of them, and the attempt's result is discarded. Journaled state changes which an aborted
+    /// or deleted task's code makes, such as cleanup, commit with the grain's next journal write; those of an attempt which
+    /// a later attempt replays, after deactivation or a stall, throw its cancellation. Its code observes the cancellation
+    /// through its tokens once they are signaled, outside the runtime's current operation.
     /// </remarks>
     private bool CancelAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason)
     {

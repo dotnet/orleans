@@ -564,7 +564,7 @@ public sealed class DurableTaskSubscriptionTests
                     Options.Create(new DurableMessagingOptions()),
                     _journal.Serializer);
                 var transport = new RecordingDurableTaskMessageTransport();
-                var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [transport]);
+                var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [transport], manager);
                 manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
                 TestLocalRequestQueue.Attach(grainContext);
                 runtime.InitializeForActivation(grainContext);
