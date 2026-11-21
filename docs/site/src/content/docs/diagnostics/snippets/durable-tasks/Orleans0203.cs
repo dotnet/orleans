@@ -1,16 +1,18 @@
+using Orleans.Runtime;
+
 namespace Documentation.Diagnostics.DurableTasks;
 
 public sealed class ShipmentGrain : DurableGrain
 {
     private readonly IEmailSender _email;
-    private readonly IDurableValue<OrderStatus> _status;
-    private readonly IDurableValue<int> _notices;
+    private readonly IPersistentState<OrderStatus> _status;
+    private readonly IPersistentState<int> _notices;
 
     public ShipmentGrain(IEmailSender email)
     {
         _email = email;
-        _status = StateManager.GetOrAddValue<OrderStatus>("status");
-        _notices = StateManager.GetOrAddValue<int>("notices");
+        _status = StateManager.GetOrAddPersistentState<OrderStatus>("status");
+        _notices = StateManager.GetOrAddPersistentState<int>("notices");
     }
 
 #pragma warning disable ORLEANS0203
@@ -19,9 +21,9 @@ public sealed class ShipmentGrain : DurableGrain
     {
         // Another journal write can commit this change while the email is sending, without the step's result.
         // The step then runs again and counts the notice twice.
-        _notices.Value++;
+        _notices.State++;
         await _email.SendAsync(customer, "Your order has shipped", DurableTask.Current.CancellationToken);
-        return _notices.Value;
+        return _notices.State;
     }
     // </orleans0203_violation>
 #pragma warning restore ORLEANS0203
@@ -32,16 +34,38 @@ public sealed class ShipmentGrain : DurableGrain
         await _email.SendAsync(customer, "Your order has shipped", DurableTask.Current.CancellationToken);
 
         // The step's final synchronous code: the change commits in the same journal write as the step's result.
-        return ++_notices.Value;
+        return ++_notices.State;
     }
     // </orleans0203_fix_reorder>
 
     // <orleans0203_fix_split>
     public async DurableTask<int> ShipAsync(string customer)
     {
-        DurableTask.RunInline("shipped", () => _status.Value = OrderStatus.Shipped);
+        DurableTask.RunInline("shipped", () => _status.State = OrderStatus.Shipped);
         await DurableTask.Run(ct => _email.SendAsync(customer, "Your order has shipped", ct)).WithId("notify");
-        return DurableTask.RunInline("count", () => ++_notices.Value);
+        return DurableTask.RunInline("count", () => ++_notices.State);
     }
     // </orleans0203_fix_split>
 }
+
+// <orleans0203_journaled>
+public sealed class JournaledShipmentGrain : DurableGrain
+{
+    private readonly IEmailSender _email;
+    private readonly IDurableValue<int> _notices;
+
+    public JournaledShipmentGrain(IEmailSender email)
+    {
+        _email = email;
+        _notices = StateManager.GetOrAddValue<int>("notices");
+    }
+
+    private async DurableTask<int> NotifyShippedAsync(string customer)
+    {
+        // The change commits with its record, so a step which runs again returns the recorded count and doesn't count again.
+        var notices = ++_notices.Value;
+        await _email.SendAsync(customer, "Your order has shipped", DurableTask.Current.CancellationToken);
+        return notices;
+    }
+}
+// </orleans0203_journaled>

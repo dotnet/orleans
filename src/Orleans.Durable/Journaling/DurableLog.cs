@@ -11,6 +11,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
     private readonly List<T> _items = [];
+    private readonly JournaledStateAccessTarget _accessTarget;
     private JournalStreamWriter _writer;
 
     // Identifies the history. Zero until the first change, so a log without an epoch has no entries and is not sealed.
@@ -44,6 +45,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableLogCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -52,29 +54,59 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
-    public int Count => _items.Count;
+    public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.LogCount, this, static self => self._items.Count)
+        : _items.Count;
 
-    public long Epoch => _epoch;
+    public long Epoch => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.LogEpoch, this, static self => self._epoch)
+        : _epoch;
 
-    public long FirstSequence => _firstSequence;
+    public long FirstSequence => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.LogFirstSequence, this, static self => self._firstSequence)
+        : _firstSequence;
 
-    public long NextSequence => _firstSequence + _items.Count;
+    public long NextSequence => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.LogNextSequence, this, static self => self.NextSequenceCore)
+        : NextSequenceCore;
 
-    public long CommittedSequence => _committed.NextSequence;
+    private long NextSequenceCore => _firstSequence + _items.Count;
 
-    public bool IsSealed => _isSealed;
+    public long CommittedSequence => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.LogCommittedSequence, this, static self => self._committed.NextSequence)
+        : _committed.NextSequence;
 
-    public T this[long sequence] => TryGetIndex(sequence, out var index)
+    public bool IsSealed => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.LogIsSealed, this, static self => self._isSealed)
+        : _isSealed;
+
+    public T this[long sequence] => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.LogGet, sequence, (Self: this, Sequence: sequence), static state => state.Self.GetCore(state.Sequence))
+        : GetCore(sequence);
+
+    private T GetCore(long sequence) => TryGetIndex(sequence, out var index)
         ? _items[index]
         : throw new ArgumentOutOfRangeException(nameof(sequence), sequence, "The log does not retain an entry with this sequence number.");
 
-    private Boundary Current => new(NextSequence, _firstSequence, _resetSequence, _isSealed, _draftCommitCount);
+    private Boundary Current => new(NextSequenceCore, _firstSequence, _resetSequence, _isSealed, _draftCommitCount);
 
     public bool TryGet(long sequence, [MaybeNullWhen(false)] out T item)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            (var found, item) = context.Read(
+                _accessTarget,
+                JournaledStateOperation.LogTryGet,
+                sequence,
+                (Self: this, Sequence: sequence),
+                static state => state.Self.TryGetIndex(state.Sequence, out var index) ? (true, state.Self._items[index]) : (false, default(T)!));
+            return found;
+        }
+
         if (TryGetIndex(sequence, out var index))
         {
             item = _items[index];
@@ -85,10 +117,14 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         return false;
     }
 
-    public long Append(T item)
+    public long Append(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.LogAppend, item, (Self: this, Item: item), static state => state.Self.AppendCore(state.Item))
+        : AppendCore(item);
+
+    private long AppendCore(T item)
     {
         ThrowIfSealed();
-        var sequence = NextSequence;
+        var sequence = NextSequenceCore;
         if (!TryBeginHistory([item], firstSequence: 0, isSealed: false, draftCommits: []))
         {
             _codec.WriteAppend(new ReadOnlySpan<T>(in item), GetWriter());
@@ -100,8 +136,19 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     public void TrimBefore(long sequence)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.LogTrimBefore, sequence, (Self: this, Sequence: sequence), static state => state.Self.TrimBeforeCore(state.Sequence));
+            return;
+        }
+
+        TrimBeforeCore(sequence);
+    }
+
+    private void TrimBeforeCore(long sequence)
+    {
         ArgumentOutOfRangeException.ThrowIfNegative(sequence);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(sequence, NextSequence);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(sequence, NextSequenceCore);
         if (sequence <= _firstSequence)
         {
             return;
@@ -113,6 +160,17 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     }
 
     public void Clear()
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.LogClear, this, static self => self.ClearCore());
+            return;
+        }
+
+        ClearCore();
+    }
+
+    private void ClearCore()
     {
         ThrowIfSealed();
 
@@ -127,6 +185,27 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     public void Seal()
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.LogSeal, this, static self => self.SealCore());
+        }
+        else
+        {
+            SealCore();
+        }
+
+        // Every successful attempt closes its own drafts, including when the context replays the durable seal.
+        if (_drafts is { } drafts)
+        {
+            while (drafts.Open.Count > 0)
+            {
+                CloseDraft(drafts.Open[^1], DraftOutcome.Abandoned(LogDraftAbandonReason.Sealed, message: null));
+            }
+        }
+    }
+
+    private void SealCore()
+    {
         if (_isSealed)
         {
             return;
@@ -138,18 +217,29 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         }
 
         _isSealed = true;
-        if (_drafts is { } drafts)
-        {
-            while (drafts.Open.Count > 0)
-            {
-                CloseDraft(drafts.Open[^1], DraftOutcome.Abandoned(LogDraftAbandonReason.Sealed, message: null));
-            }
-        }
     }
 
     public IDurableLogDraft<T> BeginDraft()
     {
-        ThrowIfSealed();
+        // A draft can't begin on a sealed log. The check and its failure are one read through the context, so a replay
+        // begins the draft exactly when the recording attempt did.
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Read(
+                _accessTarget,
+                JournaledStateOperation.LogBeginDraft,
+                this,
+                static self =>
+                {
+                    self.ThrowIfSealed();
+                    return default(JournaledStateAccessNoResult);
+                });
+        }
+        else
+        {
+            ThrowIfSealed();
+        }
+
         var drafts = _drafts ??= new DraftTable();
         var draft = new Draft(this, new LogDraftId(drafts.InstanceId, ++drafts.LastNumber));
         drafts.Open.Add(draft);
@@ -172,9 +262,29 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             cancellationToken);
     }
 
-    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
+    public IEnumerator<T> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? ((IEnumerable<T>)context.Read(_accessTarget, JournaledStateOperation.LogSnapshot, this, static self => self._items.ToArray())).GetEnumerator()
+        : _items.GetEnumerator();
 
-    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    // A replayed commit returns its recorded sequence without committing again, so its outcome is the retained commit record
+    // of its draft. A trimmed record precedes every retained one, so the latest record's durability implies its durability.
+    private DraftOutcome GetCommittedOutcome(LogDraftId draftId, long sequence, int count)
+    {
+        if (_draftCommits is { } commits)
+        {
+            for (var i = commits.Count - 1; i >= 0; i--)
+            {
+                if (commits[i].Commit.DraftId == draftId)
+                {
+                    return DraftOutcome.Committed(_epoch, commits[i]);
+                }
+            }
+        }
+
+        return DraftOutcome.Committed(_epoch, new(new(draftId, sequence, count), _draftCommitCount));
+    }
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -237,11 +347,11 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         // Recorded commits end at or before the next sequence, and a commit begins at or after the end of the previous one,
         // so comparing the commit's count with the entries after its start cannot overflow, as its end could.
         var previousEnd = _draftCommits is { Count: > 0 } commits ? commits[^1].Commit.Sequence + commits[^1].Commit.Count : _firstSequence;
-        if (commit.Count < 0 || commit.Sequence < previousEnd || commit.Count > NextSequence - commit.Sequence)
+        if (commit.Count < 0 || commit.Sequence < previousEnd || commit.Count > NextSequenceCore - commit.Sequence)
         {
             throw new InvalidOperationException(
                 $"Malformed durable log entry: a draft commit of {commit.Count} entries at sequence {commit.Sequence} is outside "
-                + $"the uncommitted entries from sequence {previousEnd} to {NextSequence}.");
+                + $"the uncommitted entries from sequence {previousEnd} to {NextSequenceCore}.");
         }
 
         (_draftCommits ??= []).Add(new(commit, ++_draftCommitCount));
@@ -249,10 +359,10 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     void IDurableLogCommandHandler<T>.ApplyTrimBefore(long sequence)
     {
-        if (sequence < 0 || sequence > NextSequence)
+        if (sequence < 0 || sequence > NextSequenceCore)
         {
             throw new InvalidOperationException(
-                $"Malformed durable log entry: cannot trim before sequence {sequence} when the next sequence is {NextSequence}.");
+                $"Malformed durable log entry: cannot trim before sequence {sequence} when the next sequence is {NextSequenceCore}.");
         }
 
         ApplyTrimBefore(sequence);
@@ -301,7 +411,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
                 $"Malformed durable log entry: {command} command for a log which {(_isSealed ? "is sealed" : "has no epoch")}.");
         }
 
-        if (NextSequence == long.MaxValue)
+        if (NextSequenceCore == long.MaxValue)
         {
             throw new InvalidOperationException($"Malformed durable log entry: {command} command for a log whose next sequence is the maximum sequence.");
         }
@@ -317,7 +427,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return false;
         }
 
-        Debug.Assert(NextSequence == 0 && !_isSealed && _draftCommits is not { Count: > 0 }, "A log without an epoch has no history.");
+        Debug.Assert(NextSequenceCore == 0 && !_isSealed && _draftCommits is not { Count: > 0 }, "A log without an epoch has no history.");
         var epoch = Random.Shared.NextInt64(1, long.MaxValue);
         _codec.WriteSnapshot(epoch, firstSequence, resetSequence: firstSequence, isSealed, items, draftCommits, GetWriter());
         _epoch = epoch;
@@ -328,7 +438,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     private DraftOutcome CommitDraft(LogDraftId draftId, ReadOnlySpan<T> items)
     {
         Debug.Assert(!_isSealed, "Sealing closes open drafts.");
-        var sequence = NextSequence;
+        var sequence = NextSequenceCore;
         var commit = new LogDraftCommit(draftId, sequence, items.Length);
         if (!TryBeginHistory(items.ToArray(), firstSequence: 0, isSealed: false, draftCommits: [commit]))
         {
@@ -344,7 +454,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     // The clear consumes one sequence number, so a reader's position shows whether it observed the replaced entries.
     private void ApplyClear()
     {
-        var sequence = NextSequence + 1;
+        var sequence = NextSequenceCore + 1;
         _items.Clear();
         _draftCommits?.Clear();
         _firstSequence = sequence;
@@ -377,7 +487,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     private bool TryGetIndex(long sequence, out int index)
     {
-        if (sequence >= _firstSequence && sequence < NextSequence)
+        if (sequence >= _firstSequence && sequence < NextSequenceCore)
         {
             index = (int)(sequence - _firstSequence);
             return true;
@@ -521,7 +631,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
-        if (reader.Cursor > NextSequence || reader.Cursor < _committed.ResetSequence)
+        if (reader.Cursor > NextSequenceCore || reader.Cursor < _committed.ResetSequence)
         {
             logEvent = ResetReader(reader);
             return true;
@@ -571,7 +681,8 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         if (_committed.IsSealed && reader.Cursor >= _committed.NextSequence)
         {
-            Debug.Assert(reader.IsCaughtUp && _drafts is not { Open.Count: > 0 });
+            // A replaying durable task body can hold a draft open on a sealed log until its recorded commit closes it.
+            Debug.Assert(reader.IsCaughtUp);
             logEvent = new() { Kind = LogEventKind.Sealed, Sequence = _committed.NextSequence };
             return true;
         }
@@ -778,10 +889,39 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
         public long Commit(params ReadOnlySpan<T> entries)
         {
+            if (!JournaledStateContext.TryGetCurrent(log._accessTarget, out var context))
+            {
+                ThrowIfClosed();
+                var outcome = log.CommitDraft(Id, entries);
+                log.CloseDraft(this, outcome);
+                return outcome.Sequence;
+            }
+
+            // Validation and append share one recorded outcome, and each attempt closes its own draft. A replayed seal can
+            // already have closed it, and a replayed failure closes the draft which the recording attempt found closed.
+            long sequence;
+            try
+            {
+                sequence = context.Write(log._accessTarget, JournaledStateOperation.LogCommitDraft, (Self: this, Entries: entries.ToArray()), static state => state.Self.CommitCore(state.Entries));
+            }
+            catch when (IsOpen)
+            {
+                log.CloseDraft(this, DraftOutcome.Abandoned(log._isSealed ? LogDraftAbandonReason.Sealed : LogDraftAbandonReason.Unknown, message: null));
+                throw;
+            }
+
+            if (IsOpen)
+            {
+                log.CloseDraft(this, log.GetCommittedOutcome(Id, sequence, entries.Length));
+            }
+
+            return sequence;
+        }
+
+        private long CommitCore(ReadOnlySpan<T> entries)
+        {
             ThrowIfClosed();
-            var outcome = log.CommitDraft(Id, entries);
-            log.CloseDraft(this, outcome);
-            return outcome.Sequence;
+            return log.CommitDraft(Id, entries).Sequence;
         }
 
         public void Abandon(string? message = null)

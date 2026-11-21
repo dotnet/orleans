@@ -9,10 +9,10 @@ internal static class DurableTaskDiagnostics
 
     public static readonly DiagnosticDescriptor GrainStateInReplayedCode = Create(
         "ORLEANS0200",
-        "Access grain state in recorded effects or after the last durable operation",
+        "Access persistent grain state in recorded effects or after the last durable operation",
         "Access '{0}' in a DurableTask.RunInline effect or a step, or after the body's last durable operation: a replay re-runs this code with the state which later operations committed",
         DiagnosticSeverity.Warning,
-        "Grain state holds every committed change, so code which a replay re-runs reads state which later operations wrote and applies its writes again. Read and change state in a DurableTask.RunInline effect, in a local step, or after the body's last durable operation, each of which runs once.");
+        "A persistent state's value holds every committed change and changes in place, so code which a replay re-runs reads state which later operations wrote and applies its writes again. Read and change it in a DurableTask.RunInline effect, in a local step, or after the body's last durable operation, each of which runs once. Journaled state, such as IDurableValue<T> and the durable collections, records the accesses of durable task bodies, so a replay returns their recorded outcomes.");
 
     public static readonly DiagnosticDescriptor NonDeterministicValueInReplayedCode = Create(
         "ORLEANS0201",
@@ -30,10 +30,10 @@ internal static class DurableTaskDiagnostics
 
     public static readonly DiagnosticDescriptor StateChangeBeforeExternalAwait = Create(
         "ORLEANS0203",
-        "Change grain state after the last external await",
+        "Change persistent grain state after the last external await",
         "Change '{0}' after the external await which follows it, or in a DurableTask.RunInline effect: the change commits without the body's result",
         DiagnosticSeverity.Warning,
-        "A body's result commits with the state changes which its final synchronous code makes. A change followed by an external await can commit in an earlier journal write than the result, so a run which ends before the result commits applies the change again. Change state after the last external await, or in a DurableTask.RunInline effect.");
+        "A body's result commits with the state changes which its final synchronous code makes. A change to a persistent state followed by an external await can commit in an earlier journal write than the result, so a run which ends before the result commits applies the change again. Change the state after the last external await, or in a DurableTask.RunInline effect. Changes to journaled state, such as IDurableValue<T> and the durable collections, commit with their records.");
 
     public static readonly DiagnosticDescriptor RunInlineAssignsCapturedVariable = Create(
         "ORLEANS0204",

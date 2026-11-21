@@ -8,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Durable.Journaling;
 
-internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal partial class JournaledStateManager : IJournaledStateManager, IJournaledStateContextHost, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
     private readonly Lock _lock = new();
@@ -24,6 +24,47 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateDirectory _journalStreamDirectory;
     private readonly RetiredStateTracker _retirementTracker;
+
+    /// <summary>
+    /// Gets or sets the provider of the context in which code accesses this manager's states, which a host installs, or
+    /// <see langword="null"/> when every access runs against the state directly.
+    /// </summary>
+    public JournaledStateContextProvider? ContextProvider { get; set; }
+
+    /// <summary>Gets the depth of the host's work which <see cref="EnterHostAccess"/> marked.</summary>
+    internal int HostAccessDepth { get; private set; }
+
+    /// <inheritdoc/>
+    public void EnterHostAccess() => HostAccessDepth++;
+
+    /// <inheritdoc/>
+    public void ExitHostAccess()
+    {
+        Debug.Assert(HostAccessDepth > 0, "The host exits only the work which it entered.");
+        HostAccessDepth--;
+    }
+
+    // The names of the states whose accesses run through a context, by identifier, which records of accesses store.
+    private Dictionary<int, string>? _accessTargetNames;
+
+    /// <summary>
+    /// Registers a state whose accesses run through this manager's context, which identifies the state by
+    /// <see cref="JournaledStateAccessTarget.Id"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Another state of this manager has the same identifier.</exception>
+    internal void RegisterAccessTarget(JournaledStateAccessTarget target)
+    {
+        _accessTargetNames ??= [];
+        if (_accessTargetNames.TryAdd(target.Id, target.Name)
+            || string.Equals(_accessTargetNames[target.Id], target.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The journaled states '{_accessTargetNames[target.Id]}' and '{target.Name}' have the same identifier, #{target.Id:x8}, "
+            + "which identifies a state in the records of durable task bodies' accesses. Rename one of the states.");
+    }
     private Task? _workLoop;
     private ManagerState _state;
     private long _deletionGeneration;

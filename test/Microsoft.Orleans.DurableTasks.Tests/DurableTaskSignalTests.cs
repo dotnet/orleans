@@ -538,7 +538,7 @@ public sealed partial class DurableTaskSignalTests
                 Options.Create(new DurableTaskOptions { ResultRetentionPeriod = TimeSpan.FromHours(1) }),
                 Options.Create(new DurableMessagingOptions()),
                 MessagingTestHelpers.Serializer);
-            Runtime = new DurableTaskGrainRuntime(Storage, Storage.LogicalTimes, Storage.Invocations, shared, [Transport]);
+            Runtime = new DurableTaskGrainRuntime(Storage, Storage.LogicalTimes, Storage.Invocations, shared, [Transport], manager);
             TestLocalRequestQueue.Attach(context);
             Runtime.InitializeForActivation(context);
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, Runtime);
@@ -615,8 +615,16 @@ public sealed partial class DurableTaskSignalTests
         }
     }
 
-    private sealed class Storage(StateManager manager, TimeProvider timeProvider) : IDurableTaskGrainStorage
+    private sealed class Storage(StateManager manager, TimeProvider timeProvider) : IDurableTaskGrainStorage, IDurableTaskAccessLogStorage
     {
+        private readonly Dictionary<TaskId, byte[]> _accessLogs = [];
+
+        public byte[] GetAccessLog(TaskId taskId) => _accessLogs.GetValueOrDefault(taskId) ?? [];
+
+        public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records) => _accessLogs[taskId] = [.. GetAccessLog(taskId), .. records];
+
+        public void AddPendingRecords(IDurableTaskPendingAccessRecords source) => source.Flush();
+
         private readonly Dictionary<TaskId, State> _states = [];
         private readonly DurableTaskHierarchy _hierarchy = new();
 
@@ -757,8 +765,18 @@ public sealed partial class DurableTaskSignalTests
         where TKey : notnull;
 
     /// <summary>Runs the journal write protocol: preparation, capture, an optional storage delay, and completion.</summary>
-    private sealed class StateManager : IJournaledStateManager
+    private sealed class StateManager : IJournaledStateManager, IJournaledStateContextHost
     {
+        public JournaledStateContextProvider? ContextProvider { get; set; }
+
+        public void EnterHostAccess()
+        {
+        }
+
+        public void ExitHostAccess()
+        {
+        }
+
         private readonly Dictionary<string, IStateMachine> _stateMachines = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _writeGate = new(1, 1);
 

@@ -98,7 +98,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     [FromKeyedServices("$task-logical-times")] IDurableDictionary<TaskId, DateTimeOffset> logicalTimes,
     [FromKeyedServices("$task-invocations")] IDurableDictionary<MessageId, PendingInvocation> invocations,
     DurableTaskGrainRuntimeShared shared,
-    IEnumerable<IDurableTaskMessageTransport> messageTransports) :
+    IEnumerable<IDurableTaskMessageTransport> messageTransports,
+    IJournaledStateManager stateManager) :
     IDurableTaskGrainRuntime,
     IDurableTaskGrainExtension,
     IDurableTaskManager,
@@ -116,6 +117,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly Dictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
     private readonly Dictionary<long, CancellationPropagation> _pendingCancellationPropagations = [];
     private readonly Dictionary<long, Task> _backgroundTasks = [];
+
+    // The activation's journaled state manager, whose context provider records the accesses of durable task bodies.
+    private readonly IJournaledStateManager _stateManager = stateManager;
+
+    // The storage of the access logs which record the accesses of durable task bodies, bound by InitializeForActivation.
+    private IDurableTaskAccessLogStorage? _accessLogStorage;
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
     private readonly IDurableDictionary<TaskId, DateTimeOffset> _logicalTimes = logicalTimes;
@@ -167,8 +174,39 @@ internal sealed partial class DurableTaskGrainRuntime(
     private IDurableTaskMessageTransport MessageTransport => _messageTransport ?? throw new InvalidOperationException(
         "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
 
-    /// <summary>Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs.</summary>
-    internal void InitializeForActivation(IGrainContext grainContext) => _grainContext = grainContext;
+    /// <summary>
+    /// Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs: it records the
+    /// accesses of durable task bodies to the activation's journaled state from now on, which every body's replay depends
+    /// on.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The task storage doesn't store access logs, the journaled state manager doesn't route its states' accesses through
+    /// a host's context, or another host's context already routes them.
+    /// </exception>
+    internal void InitializeForActivation(IGrainContext grainContext)
+    {
+        if (_storage is not IDurableTaskAccessLogStorage accessLogStorage)
+        {
+            throw new InvalidOperationException(
+                $"Durable task storage '{_storage.GetType()}' doesn't store the access logs which record durable task bodies' accesses to journaled state, so a replay would apply them again. Configure the journaled durable task storage which AddDurableTasks registers.");
+        }
+
+        if (_stateManager is not IJournaledStateContextHost host)
+        {
+            throw new InvalidOperationException(
+                $"Journaled state manager '{_stateManager.GetType()}' doesn't route its states' accesses through a host's context, so durable task bodies' accesses to journaled state can't be recorded. Use the journaled state manager which Orleans.Durable.Journaling registers.");
+        }
+
+        if (host.ContextProvider is { } installed and not DurableTaskAccessContextProvider)
+        {
+            throw new InvalidOperationException(
+                $"The accesses to the activation's journaled state already run through '{installed.GetType()}', so durable task bodies' accesses can't be recorded.");
+        }
+
+        host.ContextProvider = new DurableTaskAccessContextProvider(this);
+        _accessLogStorage = accessLogStorage;
+        _grainContext = grainContext;
+    }
 
     /// <summary>
     /// Recovers committed task state during the activation's lifecycle, deferring the recovered executions to
@@ -2298,7 +2336,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         DurableTaskResponse? response;
         try
         {
-            response = await DurableTaskRuntimeHelper.RunAsync(createTask(state), context);
+            response = await RunAttemptAsync(createTask, state, context);
         }
         catch (Exception exception)
         {
@@ -2311,6 +2349,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         context.VerifyCancellationPointReached();
+        context.AccessLog?.Close();
 
         // A cancellation which arrives while this attempt still runs, for example while a delay's journal write is in
         // flight, cancels only the attempt's token. The attempt then terminalizes the task, so a pending operation
@@ -2360,6 +2399,34 @@ internal sealed partial class DurableTaskGrainRuntime(
                 DurableTaskEvents.EmitExecutionStopped(GrainContext, context.Id);
             }
         }
+    }
+
+    /// <summary>Runs an attempt's body, whose accesses to journaled state the attempt's access log records.</summary>
+    /// <remarks>
+    /// The body's definition is created within the attempt, so the code which a method that returns a definition without
+    /// being <see langword="async"/> runs belongs to the body.
+    /// </remarks>
+    private static ValueTask<DurableTaskResponse> RunAttemptAsync<TState>(
+        Func<TState, DurableTask> createTask,
+        TState state,
+        GrainDurableTaskContext context)
+    {
+        DurableTask task;
+        using (DurableTaskContext.Enter(context))
+        {
+            task = createTask(state);
+        }
+
+        return DurableTaskRuntimeHelper.RunAsync(task, context);
+    }
+
+    DurableTaskAccessLog IDurableTaskGrainRuntime.CreateAccessLog(
+        DurableTaskContext attempt,
+        TaskScheduler scheduler,
+        Func<DurableTaskDivergenceException, Exception> diverge)
+    {
+        Debug.Assert(_accessLogStorage is not null, "Attempts start once the runtime is bound to its activation.");
+        return new(attempt, _accessLogStorage, _shared.Serializer, scheduler, diverge);
     }
 
     private sealed record RunningRequest(
@@ -3378,9 +3445,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>
     /// Deactivation, an abort, and the deletion of a task's tree cancel attempts this way, on the activation's scheduler.
     /// From the cancellation on, the attempt's durable operations throw <see cref="DurableTaskAttemptCanceledException"/>,
-    /// so the runtime records none of them, and the attempt's result is discarded. Journaled state changes which its code
-    /// makes, such as cleanup, commit with the grain's next journal write. Its code observes the cancellation through its
-    /// tokens once they are signaled, outside the runtime's current operation.
+    /// so the runtime records none of them, and the attempt's result is discarded. Journaled state changes which an aborted
+    /// or deleted task's code makes, such as cleanup, commit with the grain's next journal write; those of an attempt which
+    /// a later attempt replays, after deactivation or a stall, throw its cancellation. Its code observes the cancellation
+    /// through its tokens once they are signaled, outside the runtime's current operation.
     /// </remarks>
     private bool CancelAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason)
     {

@@ -53,6 +53,41 @@ public sealed class DurableTaskStorageTests
         Assert.Equal(journalFormatKey, await harness.GetStoredJournalFormatKeyAsync(cancellationToken));
     }
 
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task AccessLogRecoversFromJournalUntilTheTaskCompletes(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
+        var taskId = TaskId.Parse("root/access-log");
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var logs = (IDurableTaskAccessLogStorage)storage;
+            _ = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
+            logs.AppendAccessLog(taskId, [1, 2, 3]);
+            await storage.WriteAsync(cancellationToken);
+
+            // Each write journals the records which earlier writes didn't.
+            logs.AppendAccessLog(taskId, [4]);
+            logs.AppendAccessLog(taskId, [5]);
+            await storage.WriteAsync(cancellationToken);
+        }
+
+        await using (var recovery = await harness.ActivateAsync(cancellationToken))
+        {
+            var logs = (IDurableTaskAccessLogStorage)recovery.Storage;
+            Assert.Equal([1, 2, 3, 4, 5], logs.GetAccessLog(taskId));
+            Assert.True(recovery.Storage.TryGetTask(taskId, out var state));
+            recovery.Storage.SetResponse(taskId, state, DurableTaskResponse.Completed);
+            Assert.Empty(logs.GetAccessLog(taskId));
+            await recovery.Storage.WriteAsync(cancellationToken);
+        }
+
+        await using var completed = await harness.ActivateAsync(cancellationToken);
+        Assert.Empty(((IDurableTaskAccessLogStorage)completed.Storage).GetAccessLog(taskId));
+    }
+
     [Fact]
     public void MutationRejectsStateOwnedByDifferentTaskId()
     {
@@ -501,14 +536,22 @@ public sealed class DurableTaskStorageTests
         return request;
     }
 
-    private static DurableTaskGrainStorage CreateStorage() =>
-        new(
+    private static DurableTaskGrainStorage CreateStorage()
+    {
+        var manager = new TestStateManager();
+        var serializer = CreateSerializer();
+        var codecs = serializer.SessionPool.CodecProvider;
+        return new(
             new TestDurableDictionary<TaskId, DurableTaskState>(),
             new TestDurableDictionary<TaskId, byte[]>(),
             new TestDurableDictionary<TaskId, byte[]>(),
-            new TestStateManager(),
+            manager,
             TimeProvider.System,
-            CreateSerializer());
+            serializer,
+            new DurableTaskAccessLogs(
+                manager,
+                new OrleansBinaryDurableDictionaryCommandCodec<TaskId, byte[]>(codecs.GetCodec<TaskId>(), codecs.GetCodec<byte[]>(), serializer.SessionPool)));
+    }
 
     private static Serializer CreateSerializer()
     {

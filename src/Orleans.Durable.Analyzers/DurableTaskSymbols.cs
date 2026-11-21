@@ -328,6 +328,13 @@ internal sealed class DurableTaskSymbols
         && !SymbolEqualityComparer.Default.Equals(method.ReturnType.OriginalDefinition, method.ContainingType.OriginalDefinition)
         && method.ContainingNamespace?.ToDisplayString() != "System.Collections.Immutable";
 
+    /// <summary>
+    /// Returns whether a type is persistent grain state (<c>IPersistentState&lt;T&gt;</c>), or implements it. Durable task bodies
+    /// access journaled state, such as <c>IDurableValue&lt;T&gt;</c> and the durable collections, through recorded operations, so
+    /// a replay returns their outcomes; a persistent state's value changes in place, so its accesses aren't recorded.
+    /// </summary>
+    public bool IsPersistentState(ITypeSymbol? type) => type is not null && Implements(type, _persistentState);
+
     /// <summary>Returns whether a type is journaled or persistent grain state, or implements one of those types.</summary>
     public bool IsGrainState(ITypeSymbol? type)
     {

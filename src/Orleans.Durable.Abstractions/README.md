@@ -60,8 +60,10 @@ them, also reference `Microsoft.Orleans.Durable`.
   delays, handle operations, and combinators. A wait which the attempt's cancellation ends throws it
   too. The host discards the attempt's response; a stopping activation's task replays in a new
   attempt, and a task whose attempt can't replay its record stays pending until code which can
-  replay it runs. Changes which the attempt's code makes to journaled grain state, such as cleanup,
-  commit with the grain's next journal write.
+  replay it runs. The Orleans grain host commits the changes which an aborted or deleted task's
+  code makes to journaled grain state, such as cleanup, with the grain's next journal write; the
+  writes of an attempt which a later attempt reruns, after its activation stops or it stalls, throw
+  its cancellation and leave the state unchanged.
 - `DurableTask.Current.CancellationToken` is canceled by task cancellation and by attempt
   cancellation, so the calls which ordinary task code makes end promptly in both cases.
   `DurableTask.Current.AttemptCancellationToken` is canceled only by attempt cancellation. Code which
@@ -393,12 +395,15 @@ method body runs again from the start, and every recorded operation returns its 
 workflow resumes correctly when each replay schedules the same operations, with the same
 identifiers and arguments, in the same order.
 
-Replay doesn't rebuild the grain's journaled state, which holds the latest committed changes,
-including changes which later operations made. A durable body therefore has three kinds of code:
+A grain's persistent state, `IPersistentState<T>`, holds the latest committed value, including
+changes which later operations made, and a replay observes that value. The Orleans grain host
+records a body's accesses to journaled state, so a replay returns their recorded outcomes. A durable
+body therefore has three kinds of code:
 
 - **Recorded operations** run once per execution, and a replay returns their recorded outcomes:
   children such as durable grain calls, `async DurableTask` methods, `DurableTask.Run` delegates,
-  and delays, as well as signal waits, detached and posted starts, and `DurableTask.RunInline` effects.
+  and delays, as well as signal waits, detached and posted starts, `DurableTask.RunInline` effects,
+  and, on the Orleans grain host, accesses to journaled state.
 - **Re-executed code** precedes the body's last recorded operation and runs again in every replay.
   It computes values from the method's arguments, recorded results, `DurableTask.Current.UtcNow`,
   the cancellation state, and configuration which stays the same while executions are pending.
@@ -412,12 +417,15 @@ Follow these rules in re-executed code:
 - Put each side effect in a recorded operation, or in the synchronous tail. Change grain state, read
   grain state whose value decides later operations, and produce random values, identifiers, and
   clock and environment values in `DurableTask.RunInline`, in a child, or in the tail, so a replay
-  observes the values the first run recorded. Read logical time from `DurableTask.Current.UtcNow`. A
-  tail whose result didn't commit runs again, together with the effects in it, so derive a value which
-  the tail sends to an external service, such as an idempotency key, from the task's identity and its
-  run, such as `$"{grainId}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}"`. The
-  incarnation distinguishes a later run of the same task identifier, so that run's operations get new
-  keys. Call external services in children, whose external effects need their own idempotency.
+  observes the values the first run recorded. The Orleans grain host records each access of a durable
+  task body to journaled state, such as `IDurableValue<T>`, the durable collections, and sends through
+  the Messaging outbox, so the body accesses them directly and a replay returns the recorded outcomes.
+  Read logical time from `DurableTask.Current.UtcNow`. A tail whose result didn't commit runs again,
+  together with the effects in it, so derive a value which the tail sends to an external service, such
+  as an idempotency key, from the task's identity and its run, such as
+  `$"{grainId}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}"`. The incarnation
+  distinguishes a later run of the same task identifier, so that run's operations get new keys. Call
+  external services in children, whose external effects need their own idempotency.
 - Store immutable values, such as records and immutable collections, in journaled grain state, and
   assign a new value to change one. The state's API records each assignment, and a change made in
   place to an object which the state holds bypasses it.
@@ -455,16 +463,18 @@ the body, including a replay, returns the recorded result, or throws the recorde
 running the effect:
 
 ```csharp
-var summary = DurableTask.RunInline("pay", () => SetStatus(OrderStatus.Paid));
 var paymentId = DurableTask.RunInline("payment-id", Guid.NewGuid);
+var authorizedAt = DurableTask.RunInline("authorized-at", () => DateTimeOffset.UtcNow);
 ```
 
 - The record commits with the task's next durable write, together with the state changes which the
   effect made, such as journaled grain state, so the effect's changes and its result commit together
   and apply once. It adds no write and no await. A run which ends before that write loses both, and
   the next run runs the effect again.
-- The effect passes data to the body through its result. It reads state which later steps change,
-  changes state, and produces values such as identifiers and random numbers.
+- The effect passes data to the body through its result. It produces values such as identifiers,
+  random numbers, and wall-clock times, and reads and changes state which the host doesn't record.
+  The Orleans grain host records a body's accesses to journaled state, so the body reads and changes
+  that state directly; an effect records state such as `IPersistentState<T>`.
 - A `DurableTask.RunInline` call within the effect runs as part of it, and the effect's record holds its
   outcome. Durable operations, such as starting a step or a child, posting, and `DurableTask.GetVersion`,
   run in the body: within an effect they throw `InvalidOperationException`, which the effect records as
