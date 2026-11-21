@@ -112,6 +112,18 @@ public sealed class CassandraMembershipStatementTests
     }
 
     [Fact]
+    public async Task TableExistsProbe_PreservesExternallySuppliedKeyspaceCasing()
+    {
+        var queries = await OrleansQueries.CreateInstance(Substitute.For<ISession>());
+        var statement = Assert.IsType<SimpleStatement>(
+            queries.CheckIfTableExists("StateKeyspace", ConsistencyLevel.LocalOne));
+
+        Assert.Equal(
+            "SELECT * FROM system_schema.tables WHERE keyspace_name = 'StateKeyspace' AND table_name = 'membership';",
+            statement.QueryString);
+    }
+
+    [Fact]
     public async Task GatewayQuery_UsesQuorum_WhileMembershipReadsRemainSerial()
     {
         var backend = new Backend();

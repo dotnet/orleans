@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Cassandra;
+using Orleans.Cassandra;
 using Orleans.Runtime;
 
 namespace Orleans.Clustering.Cassandra;
@@ -135,12 +136,12 @@ internal sealed class OrleansQueries
 
     public IStatement CheckIfClusterVersionExists(string clusterIdentifier, ConsistencyLevel consistencyLevel) =>
         new SimpleStatement(
-                $"SELECT version FROM membership WHERE partition_key = '{clusterIdentifier}' LIMIT 1;")
+                $"SELECT version FROM membership WHERE partition_key = {CassandraIdentifier.QuoteLiteral(clusterIdentifier)} LIMIT 1;")
             .SetConsistencyLevel(consistencyLevel);
 
     public IStatement CheckIfTableExists(string keyspace, ConsistencyLevel consistencyLevel) =>
         new SimpleStatement(
-                $"SELECT * FROM system_schema.tables WHERE keyspace_name = '{keyspace}' AND table_name = 'membership';")
+                $"SELECT * FROM system_schema.tables WHERE keyspace_name = {CassandraIdentifier.QuoteLiteral(keyspace)} AND table_name = 'membership';")
             .SetConsistencyLevel(consistencyLevel);
 
     /// <remarks>

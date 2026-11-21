@@ -50,6 +50,7 @@ public class CassandraClusteringOptions
     {
         ArgumentException.ThrowIfNullOrEmpty(connectionString);
         ArgumentNullException.ThrowIfNull(keyspace);
+        Keyspace = keyspace;
         OwnsSession = true;
         CreateSessionAsync = async sp =>
         {
@@ -89,4 +90,6 @@ public class CassandraClusteringOptions
     internal Func<IServiceProvider, Task<ISession>> CreateSessionAsync { get; private set; } = default!;
 
     internal bool OwnsSession { get; private set; }
+
+    internal string? Keyspace { get; private set; }
 }

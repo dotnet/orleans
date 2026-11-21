@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>Microsoft.Orleans.Persistence.Cassandra</PackageId>
+    <Title>Microsoft Orleans Cassandra Persistence Provider</Title>
+    <Description>Microsoft Orleans persistence provider backed by Cassandra</Description>
+    <PackageTags>$(PackageTags) Cassandra Persistence</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Persistence.Cassandra</AssemblyName>
+    <RootNamespace>Orleans.Persistence.Cassandra</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_PERSISTENCE_CASSANDRA</DefineConstants>
+    <Nullable>enable</Nullable>
+    <!-- This new package has no published baseline. Enable validation after its first release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)src\Cassandra\Shared\CassandraIdentifier.cs" Link="CassandraIdentifier.cs" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="CassandraCSharpDriver" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Persistence.Cassandra.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
