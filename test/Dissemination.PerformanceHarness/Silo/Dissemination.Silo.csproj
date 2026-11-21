@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <!-- Reuse the existing test friend identity, in an isolated publish directory/process only. -->
+    <AssemblyName>Orleans.Runtime.Tests</AssemblyName>
+    <RootNamespace>Orleans.Dissemination.PerformanceHarness</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants Condition="'$(HarnessRuntime)' == 'New'">$(DefineConstants);NEW_RUNTIME</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <Compile Include="..\Shared\Protocol.cs" Link="Protocol.cs" />
+    <Compile Include="..\Shared\PublisherApi.cs" Link="PublisherApi.cs" />
+    <Compile Include="..\Shared\AggregationFanout.cs" Link="AggregationFanout.cs" />
+    <Compile Include="..\Shared\OpenLoopProducer.cs" Link="OpenLoopProducer.cs" />
+    <AssemblyMetadata Include="HarnessRuntime" Value="$(HarnessRuntime)" />
+    <AssemblyMetadata Include="HarnessSourceRevision" Value="$(SourceRevisionId)" />
+  </ItemGroup>
+  <Target Name="RequireSelectedRuntime" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(HarnessRuntime)' != 'Old' and '$(HarnessRuntime)' != 'New'"
+           Text="Build this worker in an explicitly selected runtime checkout using dissemination-performance.ps1." />
+  </Target>
+</Project>
