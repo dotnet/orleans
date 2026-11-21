@@ -38,9 +38,18 @@ namespace Orleans.Runtime
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
         private readonly Lock lockable = new();
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
+            Justification = "Has no timer or linked tokens to release, and a start may still observe it while the silo is disposed.")]
+        private readonly CancellationTokenSource stopRequested = new();
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
+            Justification = "Has no timer or linked tokens to release, and a stop may still observe it while the silo is disposed.")]
+        private readonly CancellationTokenSource stopEscalation = new();
+        private Task? startTask;
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly List<GrainService> grainServices = new List<GrainService>();
+        private Task? grainServiceInit;
+        private bool grainServicesStarting;
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed",
             Justification = "The host service container owns this service and disposes it after silo shutdown.")]
         private readonly ILoggerFactory loggerFactory;
@@ -144,15 +153,45 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="cancellationToken">A cancellation token which can be used to cancel the operation.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
-        public async Task StartAsync(CancellationToken cancellationToken)
+        /// <remarks>
+        /// If the start fails or is cancelled, the lifecycle stages which had already started are stopped before this
+        /// method rethrows, and <see cref="SiloTerminated"/> completes. A silo can only be started once.
+        /// </remarks>
+        public Task StartAsync(CancellationToken cancellationToken)
         {
+            lock (lockable)
+            {
+                if (startTask is not null || !this.SystemStatus.Equals(SystemStatus.Created))
+                {
+                    throw new InvalidOperationException($"Calling Silo.Start() on a silo which is not in the {nameof(SystemStatus.Created)} state or has already been started. This silo is in the {this.SystemStatus} state.");
+                }
+
+                // Run on the thread pool so that the start never runs, or rolls back, while this lock is held.
+                // A start whose token is already cancelled does not run at all, as before.
+                return startTask = Task.Run(() => StartCoreAsync(cancellationToken), cancellationToken);
+            }
+        }
+
+        private async Task StartCoreAsync(CancellationToken cancellationToken)
+        {
+            // StopAsync cancels the start through stopRequested, so that a silo which is still starting can be stopped.
+            using var startCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopRequested.Token);
             try
             {
-                await Task.Run(() => this.siloLifecycle.OnStart(cancellationToken), cancellationToken);
+                await this.siloLifecycle.OnStart(startCancellation.Token);
             }
             catch (Exception exc)
             {
                 LogErrorSiloStart(logger, exc);
+
+                // Stop the stages which had already started (for example, the silo listener and the membership row),
+                // unless StopAsync was called during the start: it waits for the start to end and then stops the silo.
+                // The stop is graceful, but a later StopAsync or DisposeAsync whose token is cancelled hurries it through stopEscalation.
+                if (TryBeginStop(gracefully: true))
+                {
+                    await StopCoreAsync(gracefully: true, stopEscalation.Token);
+                }
+
                 throw;
             }
         }
@@ -200,7 +239,7 @@ namespace Orleans.Runtime
 
             // Load and init grain services before silo becomes active.
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
-                () => CreateGrainServices(), stopWatch);
+                () => CreateGrainServices(ct), stopWatch);
 
             try
             {
@@ -218,37 +257,48 @@ namespace Orleans.Runtime
 
         private Task OnBecomeActiveStart(CancellationToken ct)
         {
-            this.SystemStatus = SystemStatus.Running;
+            lock (lockable)
+            {
+                // A stop requested during the start has already moved the silo past Starting; keep that status.
+                if (this.SystemStatus.Equals(SystemStatus.Starting))
+                {
+                    this.SystemStatus = SystemStatus.Running;
+                }
+            }
+
             return Task.CompletedTask;
         }
 
         private async Task OnActiveStart(CancellationToken ct)
         {
+            grainServicesStarting = true;
             foreach (var grainService in grainServices)
             {
-                await StartGrainService(grainService);
+                await StartGrainService(grainService, ct);
             }
         }
 
-        private async Task CreateGrainServices()
+        private async Task CreateGrainServices(CancellationToken cancellationToken)
         {
             var grainServices = this.Services.GetServices<IGrainService>();
             foreach (var grainService in grainServices)
             {
-                await RegisterGrainService(grainService);
+                await RegisterGrainService(grainService, cancellationToken);
             }
         }
 
-        private async Task RegisterGrainService(IGrainService service)
+        private async Task RegisterGrainService(IGrainService service, CancellationToken cancellationToken)
         {
             var grainService = (GrainService)service;
             var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
             activationDirectory.RecordNewTarget(grainService);
             grainServices.Add(grainService);
 
+            // Kept so that a stop can wait for an Init whose wait timed out or was cancelled; Inits run one at a time.
+            var init = grainServiceInit = grainService.QueueTask(() => grainService.Init(Services));
             try
             {
-                await grainService.QueueTask(() => grainService.Init(Services)).WaitAsync(this.initTimeout);
+                await init.WaitAsync(this.initTimeout, cancellationToken);
             }
             catch (TimeoutException exception)
             {
@@ -259,13 +309,13 @@ namespace Orleans.Runtime
             LogInfoGrainServiceRegistered(logger, service.GetType().FullName!);
         }
 
-        private async Task StartGrainService(IGrainService service)
+        private async Task StartGrainService(IGrainService service, CancellationToken cancellationToken)
         {
             var grainService = (GrainService)service;
 
             try
             {
-                await grainService.QueueTask(grainService.Start).WaitAsync(this.initTimeout);
+                await grainService.QueueTask(grainService.Start).WaitAsync(this.initTimeout, cancellationToken);
             }
             catch (TimeoutException exception)
             {
@@ -293,47 +343,76 @@ namespace Orleans.Runtime
         /// A cancellation token which can be used to promptly terminate the silo.
         /// </param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        /// <remarks>
+        /// A silo which is still starting is stopped too: the start is cancelled, and once it has ended, the stages
+        /// which had started are stopped. If a stop is already in progress, this method waits for it to complete,
+        /// or until <paramref name="cancellationToken"/> is cancelled.
+        /// </remarks>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             bool gracefully = !cancellationToken.IsCancellationRequested;
-            bool stopAlreadyInProgress = false;
+            if (!TryBeginStop(gracefully))
+            {
+                LogDebugSiloStopInProgress(logger);
+
+                // A caller whose token is cancelled hurries the stop in progress, for example the rollback of a failed start.
+                using var escalation = cancellationToken.UnsafeRegister(static state => ((CancellationTokenSource)state!).Cancel(), stopEscalation);
+                await this.SiloTerminated.WaitAsync(cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            Task? pendingStart;
+            lock (lockable)
+            {
+                pendingStart = startTask;
+            }
+
+            try
+            {
+                if (pendingStart is { IsCompleted: false })
+                {
+                    // Stopping the stages while they are still starting would race with their start, so cancel the start
+                    // and wait for it to end first. It does not roll back by itself, since this stop has begun.
+                    // The silo's own start waits observe the cancellation; other lifecycle participants are expected to.
+                    stopRequested.Cancel();
+                }
+            }
+            finally
+            {
+                // This caller owns the stop, so it must run even if a cancellation callback registered by a start
+                // participant throws; the callback's exception propagates once the silo has terminated.
+                if (pendingStart is not null)
+                {
+                    await pendingStart.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                }
+
+                using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopEscalation.Token);
+                await StopCoreAsync(gracefully, stopCancellation.Token).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Moves the silo to <see cref="SystemStatus.ShuttingDown"/> or <see cref="SystemStatus.Stopping"/>, unless a stop has already begun.
+        /// </summary>
+        /// <returns><see langword="true"/> if the caller owns the stop and must run <see cref="StopCoreAsync"/>.</returns>
+        private bool TryBeginStop(bool gracefully)
+        {
             lock (lockable)
             {
                 if (this.SystemStatus.Equals(SystemStatus.Stopping) ||
                     this.SystemStatus.Equals(SystemStatus.ShuttingDown) ||
                     this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
-                    stopAlreadyInProgress = true;
-                    // Drop through to wait below
+                    return false;
                 }
-                else if (!this.SystemStatus.Equals(SystemStatus.Running))
-                {
-                    throw new InvalidOperationException($"Attempted to shutdown a silo which is not in the {nameof(SystemStatus.Running)} state. This silo is in the {this.SystemStatus} state.");
-                }
-                else
-                {
-                    if (gracefully)
-                        this.SystemStatus = SystemStatus.ShuttingDown;
-                    else
-                        this.SystemStatus = SystemStatus.Stopping;
-                }
+
+                this.SystemStatus = gracefully ? SystemStatus.ShuttingDown : SystemStatus.Stopping;
+                return true;
             }
+        }
 
-            if (stopAlreadyInProgress)
-            {
-                LogDebugSiloStopInProgress(logger);
-                var pause = TimeSpan.FromSeconds(1);
-
-                while (!this.SystemStatus.Equals(SystemStatus.Terminated))
-                {
-                    LogDebugSiloStopStillInProgress(logger);
-                    await Task.Delay(pause, cancellationToken).ConfigureAwait(false);
-                }
-
-                await this.SiloTerminated.ConfigureAwait(false);
-                return;
-            }
-
+        private async Task StopCoreAsync(bool gracefully, CancellationToken cancellationToken)
+        {
             if (gracefully)
             {
                 LogSiloShuttingDown(logger, LogLevel.Debug, "graceful");
@@ -359,8 +438,41 @@ namespace Orleans.Runtime
                     LogSiloShutDown(logger, LogLevel.Warning, "non-graceful");
                 }
 
+                // The RuntimeInitialize stage sets Terminated when it stops; a silo stopped before that stage started does not reach it.
+                this.SystemStatus = SystemStatus.Terminated;
+
                 // signal to all awaiters that the silo has terminated.
                 await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
+            }
+        }
+
+        private async Task OnRuntimeGrainServicesStop(CancellationToken ct)
+        {
+            // The Active stage stops the grain services once it has started. A start which ended before that stage
+            // leaves them to this stage, and an Init whose wait was cancelled or timed out may still be running: stop the
+            // services, so that the Init can observe the stop through the service's stopped token, and wait for it.
+            // Like the Active stage, a non-graceful stop skips this.
+            if (grainServicesStarting || ct.IsCancellationRequested)
+                return;
+
+            foreach (var grainService in grainServices)
+            {
+                try
+                {
+                    await grainService.QueueTask(grainService.Stop).WaitAsync(ct);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorStoppingGrainService(logger, grainService, exception);
+                    continue;
+                }
+
+                LogDebugGrainServiceStopped(logger, grainService.GetType().FullName!, grainService.GetGrainId());
+            }
+
+            if (grainServiceInit is { } init)
+            {
+                await init.WaitAsync(ct).SuppressThrowing();
             }
         }
 
@@ -468,7 +580,7 @@ namespace Orleans.Runtime
         {
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, RunOnRuntimeInitializeStart, RunOnRuntimeInitializeStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, RunOnRuntimeServicesStart, RunOnRuntimeServicesStop);
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, RunOnRuntimeGrainServicesStart);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, RunOnRuntimeGrainServicesStart, RunOnRuntimeGrainServicesStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, RunOnBecomeActiveStart);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.GrainDeactivation, NoOpStart, RunOnBecomeActiveStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, RunOnActiveStart, RunOnActiveStop);
@@ -481,6 +593,7 @@ namespace Orleans.Runtime
             Task RunOnRuntimeServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStart(ct), CancellationToken.None);
             Task RunOnRuntimeServicesStop(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStop(ct), CancellationToken.None);
             Task RunOnRuntimeGrainServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct), CancellationToken.None);
+            Task RunOnRuntimeGrainServicesStop(CancellationToken ct) => Task.Run(() => OnRuntimeGrainServicesStop(ct), CancellationToken.None);
             Task RunOnBecomeActiveStart(CancellationToken ct) => Task.Run(() => OnBecomeActiveStart(ct), CancellationToken.None);
             Task RunOnBecomeActiveStop(CancellationToken ct) => Task.Run(() => OnBecomeActiveStop(ct), CancellationToken.None);
             Task RunOnActiveStart(CancellationToken ct) => Task.Run(() => OnActiveStart(ct), CancellationToken.None);
@@ -488,27 +601,30 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public async ValueTask DisposeAsync()
-        {
-            using var cts = new CancellationTokenSource();
-            cts.Cancel();
-            await StopAsync(cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        }
+        public ValueTask DisposeAsync() => new(StopForDisposalAsync());
 
         /// <inheritdoc/>
         public void Dispose()
         {
-            try
-            {
-                using var cts = new CancellationTokenSource();
-                cts.Cancel();
 #pragma warning disable RS0030 // IDisposable requires synchronously completing silo shutdown.
-                StopAsync(cts.Token).Wait();
+            StopForDisposalAsync().Wait();
 #pragma warning restore RS0030
-            }
-            catch
-            {
-            }
+        }
+
+        /// <summary>
+        /// Stops the silo non-gracefully and completes once it has terminated, including when another stop, or the
+        /// rollback of a failed start, owns the shutdown.
+        /// </summary>
+        private async Task StopForDisposalAsync()
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // The cancelled token makes the stop non-graceful and hurries a stop which is already in progress. When
+            // another caller owns that stop, StopAsync stops waiting for it as soon as the token is cancelled, so wait
+            // for termination here: the services must not be released while the stop is still using them.
+            await StopAsync(cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await this.SiloTerminated.ConfigureAwait(false);
         }
 
         [LoggerMessage(
@@ -635,13 +751,6 @@ namespace Orleans.Runtime
             Message = "Silo shutdown in progress. Waiting for shutdown to be completed."
         )]
         private static partial void LogDebugSiloStopInProgress(ILogger logger);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            EventId = (int)ErrorCode.SiloStopInProgress,
-            Message = "Silo shutdown still in progress."
-        )]
-        private static partial void LogDebugSiloStopStillInProgress(ILogger logger);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.SiloShuttingDown,
