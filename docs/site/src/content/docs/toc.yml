@@ -128,6 +128,8 @@ items:
             href: grains/messaging-operations.md
       - name: Durable tasks
         items:
+          - name: Run a durable order workflow
+            href: grains/durable-tasks-onboarding.md
           - name: Programming model and guarantees
             href: grains/durable-tasks.md
           - name: Task identity and references
