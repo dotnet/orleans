@@ -2,9 +2,9 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
-using Orleans.DurableTasks;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Tasks;
 using Orleans.Hosting;
-using Orleans.Journaling;
 
 namespace Documentation.Grains.DurableOnboarding;
 

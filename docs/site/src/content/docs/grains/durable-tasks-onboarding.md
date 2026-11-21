@@ -61,13 +61,13 @@ ships. A successful result means all three steps completed.
 
 ### Connect the contract, implementation, and host
 
-The order entry point returns a <xref:Orleans.DurableTasks.DurableTask`1>. Request and
+The order entry point returns a <xref:Orleans.Durable.Tasks.DurableTask`1>. Request and
 result types have Orleans serializers because they cross grain calls and enter the
 journal. These compiled declarations mirror the sample's order contracts:
 
 :::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_contract" language="csharp":::
 
-In the sample, `WorkflowGrain` derives from <xref:Orleans.Journaling.DurableGrain> and
+In the sample, `WorkflowGrain` derives from <xref:Orleans.Durable.Journaling.DurableGrain> and
 implements this method. `InventoryGrain` and `PaymentGrain` keep effects in durable
 dictionaries by operation ID. Read their implementation in the sample alongside
 `Contracts.cs`, `WorkflowGrain.cs`, and `ActivityGrains.cs`.
@@ -98,7 +98,7 @@ then waits:
 
 :::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_submit" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTaskExtensions.ScheduleAsync*> returns after the
+<xref:Orleans.Durable.Tasks.DurableTaskExtensions.ScheduleAsync*> returns after the
 target has durably accepted the root invocation. Completion is a later boundary:
 `WaitAsync` returns its recorded result. The sample's order HTTP endpoint combines
 both waits into one response.
@@ -153,7 +153,7 @@ a reference using the same grain and root ID, without scheduling new work:
 :::code source="../snippets/compiled-durable/Grains/DurableOnboardingSnippets.cs" id="durable_onboarding_observe" language="csharp":::
 
 A missing or expired root raises
-<xref:Orleans.DurableTasks.DurableTaskNotFoundException>. Preserve the business identity
+<xref:Orleans.Durable.Tasks.DurableTaskNotFoundException>. Preserve the business identity
 and consult the application's retained state before choosing to start again.
 
 For an HTTP acceptance-and-status example in the same running application, start the
