@@ -451,11 +451,37 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Reroute a message coming in through a gateway
         /// </summary>
+        /// <remarks>
+        /// The target silo of a relocatable request is the client's location hint for the target grain.
+        /// This silo's own placement cache takes precedence over the hint, and a hint which does not refer to an active silo is re-addressed.
+        /// Generation-zero gateway addresses from older clients use normal placement directly.
+        /// </remarks>
         /// <param name="message"></param>
         internal void RerouteMessage(Message message)
         {
+            if (message.TargetSilo is { Generation: not 0 } hint && message.IsRelocatableRequest)
+            {
+                var hintStatus = siloStatusOracle.GetApproximateSiloStatus(hint);
+                if (hintStatus == SiloStatus.Active && !HasLiveCachedAddress(message.TargetGrain))
+                {
+                    SendMessage(message);
+                    return;
+                }
+
+                if (hintStatus == SiloStatus.Dead)
+                {
+                    // Remove the hint from the client's cache.
+                    message.AddToCacheInvalidationHeader(new GrainAddress { GrainId = message.TargetGrain, SiloAddress = hint }, validAddress: null);
+                }
+            }
+
             ResendMessageImpl(message);
         }
+
+        private bool HasLiveCachedAddress(GrainId grainId)
+            => _grainLocator.TryLookupInCache(grainId, out var cached)
+                && cached.SiloAddress is { } cachedSilo
+                && !siloStatusOracle.IsDeadSilo(cachedSilo);
 
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
         {

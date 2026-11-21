@@ -207,6 +207,20 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Gets a value indicating whether this message is an application request to a grain whose activation can reside on any silo.
+        /// </summary>
+        /// <remarks>
+        /// An external client sets the <see cref="TargetSilo"/> of such a request to its cached location of the target grain, if any,
+        /// and the gateway uses that location as a routing hint.
+        /// </remarks>
+        internal bool IsRelocatableRequest => Direction == Directions.Request
+            && !IsSystemMessage
+            && !IsLocalOnly
+            && !TargetGrain.IsDefault
+            && !TargetGrain.IsSystemTarget()
+            && !TargetGrain.IsClient();
+
+        /// <summary>
         /// Whether the message is allowed to activate a grain and/or extend its lifetime.
         /// </summary>
         /// <remarks>

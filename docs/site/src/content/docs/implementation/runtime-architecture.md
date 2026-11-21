@@ -46,7 +46,7 @@ An external client has no activation catalog or placement service. `ClusterClien
 1. The source generator emits a proxy method and an invokable request type for each grain interface method.
 1. The proxy passes the invokable to `GrainReferenceRuntime`. Outgoing call filters can inspect or replace the invocation.
 1. The runtime creates a `Message`, assigns its correlation identity and target grain, registers a response callback, and sends it through `MessageCenter`.
-1. A client sends through a gateway. A silo can route directly to the target silo when the activation address is known.
+1. A client sends through a gateway. The client includes the grain's cached location, learned from the cache updates on earlier responses, and the gateway routes to that silo when the silo is active and the gateway's own cache has no live address for the grain. A silo can route directly to the target silo when the activation address is known.
 1. The receiving `MessageCenter` resolves the activation address. A cache hit can avoid a directory round trip. A stale address can be invalidated and rerouted.
 1. If no activation exists, the directory and `PlacementService` coordinate creation on a compatible silo.
 1. `Catalog` creates an `ActivationData`; activation runs before queued application requests are dispatched.

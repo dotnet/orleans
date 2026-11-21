@@ -102,18 +102,26 @@ namespace Orleans.Runtime.Messaging
 
         protected override bool PrepareMessageForSend(Message msg)
         {
+            // A relocatable request's target silo is a location hint for the target grain, which the gateway routes with.
+            // For other messages, the target silo selects the gateway.
             // Check to make sure we're not stopped
             if (!this.IsValid)
             {
-                // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
-                msg.TargetSilo = null;
+                // Recycle the message we've dequeued, letting the message center select another gateway.
+                // Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
+                if (msg.TargetSilo is not null && !msg.IsRelocatableRequest)
+                {
+                    msg.TargetSilo = null;
+                }
+
                 this.messageCenter.SendMessage(msg);
                 return false;
             }
 
-            if (msg.TargetSilo != null) return true;
-
-            msg.TargetSilo = this.RemoteSiloAddress;
+            if (msg.TargetSilo is null && !msg.IsRelocatableRequest)
+            {
+                msg.TargetSilo = this.RemoteSiloAddress;
+            }
 
             return true;
         }
