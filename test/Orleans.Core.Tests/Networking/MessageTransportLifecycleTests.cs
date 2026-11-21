@@ -154,6 +154,95 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public void MessageSerializer_EmptyRequestContext_PreservesBodyAndNextFrame()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        using var serializer = new MessageSerializer(serviceProvider.GetRequiredService<SerializerSessionPool>(), new SiloMessagingOptions());
+        using var shared = CreateMessageHandlerShared(serviceProvider);
+        using var first = new Message
+        {
+            Id = new CorrelationId(1),
+            Direction = Message.Directions.Request,
+            RequestContextData = [],
+            BodyObject = "body after zero-count request context",
+        };
+        var source = SiloAddress.New(IPAddress.Loopback, 10_001, 1);
+        using var next = new Message
+        {
+            Id = new CorrelationId(2),
+            Direction = Message.Directions.Request,
+            RequestContextData = new() { ["next-context"] = "next-value" },
+            GatewayRequestAttempt = 42,
+            GatewayForwardingSource = source,
+            GatewayResponseRoutingHistory = [source],
+            BodyObject = "next frame body",
+        };
+        using var writeRequest = new MessageWriteRequest(shared);
+        Assert.True(first.Headers.HasFlag(Message.MessageFlags.HasRequestContextData));
+        writeRequest.WriteMessage(first);
+        var firstFrameLength = writeRequest.Length;
+        writeRequest.WriteMessage(next);
+        writeRequest.CompleteWriting();
+        var nextFrameLength = writeRequest.Length - firstFrameLength;
+
+        using var decodedFirst = ReadFrame(firstFrameLength, nextFrameLength);
+        Assert.Equal(first.Id, decodedFirst.Id);
+        Assert.Null(decodedFirst.RequestContextData);
+        Assert.Equal(0, decodedFirst.GatewayRequestAttempt);
+        Assert.Null(decodedFirst.GatewayForwardingSource);
+        Assert.Null(decodedFirst.GatewayResponseRoutingHistory);
+        Assert.Equal(first.BodyObject, decodedFirst.BodyObject);
+
+        using var decodedNext = ReadFrame(nextFrameLength, remainingLength: 0);
+        Assert.Equal(next.Id, decodedNext.Id);
+        var context = Assert.Single(Assert.IsType<Dictionary<string, object>>(decodedNext.RequestContextData));
+        Assert.Equal("next-context", context.Key);
+        Assert.Equal("next-value", Assert.IsType<string>(context.Value));
+        Assert.Equal(42, decodedNext.GatewayRequestAttempt);
+        Assert.Equal(source, decodedNext.GatewayForwardingSource);
+        Assert.NotNull(decodedNext.GatewayResponseRoutingHistory);
+        Assert.Equal([source], decodedNext.GatewayResponseRoutingHistory);
+        Assert.Equal(next.BodyObject, decodedNext.BodyObject);
+        Assert.Equal(0, writeRequest.Buffers.Length);
+
+        Message ReadFrame(int frameLength, int remainingLength)
+        {
+            var framing = new byte[Message.LENGTH_HEADER_SIZE];
+            writeRequest.Buffers.Consume(framing);
+            var headerLength = BinaryPrimitives.ReadInt32LittleEndian(framing);
+            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(framing.AsSpan(sizeof(int)));
+            Assert.True(headerLength > 0);
+            Assert.True(bodyLength > 0);
+            Assert.Equal(frameLength, Message.LENGTH_HEADER_SIZE + headerLength + bodyLength);
+            var readRequest = shared.GetReceiveMessageHandler();
+            try
+            {
+                readRequest.Headers = writeRequest.Buffers.ConsumeSlice(headerLength);
+                Assert.Equal(headerLength, readRequest.Headers.Length);
+                Assert.Equal(bodyLength + remainingLength, writeRequest.Buffers.Length);
+                readRequest.Body = writeRequest.Buffers.ConsumeSlice(bodyLength);
+                Assert.Equal(bodyLength, readRequest.Body.Length);
+                Assert.Equal(remainingLength, writeRequest.Buffers.Length);
+                typeof(MessageReadRequest).GetField("_headerLength", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(readRequest, headerLength);
+                typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(readRequest, bodyLength);
+
+                serializer.ReadHeaders(readRequest, out var decoded);
+                Assert.Equal(0, readRequest.Headers.Length);
+                Assert.Equal(bodyLength, readRequest.Body.Length);
+                serializer.ReadBodyObject(decoded, readRequest);
+                Assert.Equal(remainingLength, writeRequest.Buffers.Length);
+                return decoded;
+            }
+            finally
+            {
+                readRequest.Reset();
+            }
+        }
+    }
+
+    [Fact]
     public void MessageSerializer_ReadCacheInvalidationHeaders_ConsumesAllEntriesAndRetainsLimit()
     {
         using var serviceProvider = CreateServiceProvider();
