@@ -91,6 +91,10 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public IJournaledStateManager StateManager { get; }
 
+    /// <summary>Begins recording whether the calling asynchronous flow stages a change.</summary>
+    /// <remarks>Call it from the async method whose flow the scope covers.</remarks>
+    public StagedChangeScope BeginStagedChangeScope() => ((JournaledStateManager)StateManager).BeginStagedChangeScope();
+
     public MessagingShared Shared { get; }
 
     /// <summary>Gets the metric tag for this activation's grain type.</summary>
@@ -383,6 +387,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             LogDeactivationFailed(Shared.PumpLogger, deactivationException);
         }
     }
+
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Messaging processing pass failed for grain {GrainId}")]
     private static partial void LogPassFailed(ILogger logger, Exception exception, GrainId grainId);

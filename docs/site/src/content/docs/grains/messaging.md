@@ -425,20 +425,25 @@ Route each failure by whether it can ever succeed:
   Call `Fail(reason)`, or send a typed rejection reply and call `Complete()` when the
   protocol has a reply. The message leaves the inbox at once and frees its capacity
   slot.
-- **Transient fault**, such as an unavailable dependency. Throw. The grain deactivates,
-  and after recovery the message retries with backoff until `InboxRetryTimeout`,
-  keeping its capacity slot meanwhile.
+- **Transient fault**, such as an unavailable dependency. Throw. The message retries
+  with backoff until `InboxRetryTimeout`, keeping its capacity slot meanwhile. Throw
+  before the attempt's first change, so the grain stays active.
 
 The following outcomes cover the remaining cases:
 
 | Handler outcome | Result |
 | --- | --- |
-| Exception, or return without a terminal operation | The outcome is unknown. The grain deactivates, recovery from the journal discards the attempt's staged changes and charges the attempt, and the message retries with backoff until `InboxRetryTimeout`, then moves to the dead letters. |
+| Exception, or return without a terminal operation | The outcome is unknown. The message retries with backoff until `InboxRetryTimeout`, then moves to the dead letters with the handler's error. |
 | Exception after a terminal operation | The exception is logged and the staged outcome persists. |
 | Conflicting terminal operations | Contract error: messaging stops and the grain deactivates. |
 
-An attempt's staged changes share the grain's pending journal write, so every unknown
-outcome fails the activation rather than committing a retry alongside them.
+An attempt which staged no journaled changes records its retry in place, and the grain
+stays active. Changes which requests and other turns stage while the handler awaits
+belong to those turns. An attempt which staged changes can't commit a retry alongside
+them, because they share the grain's pending journal write: the grain deactivates,
+recovery from the journal discards them, and recovery charges the attempt. A grain
+with state which can't report its changes, such as journaled `IPersistentState`,
+recovers this way after every failed attempt.
 
 ## Backpressure, retries, and dead letters
 
@@ -463,7 +468,7 @@ Messages a grain sends to itself are admitted regardless of the limit, because `
 is synchronous, and count toward it until they complete. Likewise, the grain's inbox
 accepts them before a handler is registered and processes them once one is.
 
-Once recovery charges a failed handler attempt, the inbox schedules a retry after
+After a failed handler attempt, the inbox schedules a retry after
 <xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.RetryInitialInterval> multiplied
 by an exponential factor that caps at 64. Retries continue until
 <xref:Orleans.Durable.Messaging.Configuration.DurableMessagingOptions.InboxRetryTimeout> (6 hours by

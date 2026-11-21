@@ -22,7 +22,7 @@ namespace Orleans.Durable.Messaging;
 /// Accepted messages are processed only after their acceptance is durable and their <see cref="Envelope.DeliverAt"/>,
 /// if any, has passed.
 /// </remarks>
-internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine, IDurableValueCommandHandler<InboxCommand>
+internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<InboxCommand>
 {
     private readonly MessagingPump _pump;
     private readonly InboxDispatcher _handlers = new([]);
@@ -156,6 +156,18 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         LogMessageAccepted(Logger, key, GrainContext.GrainId);
         return DeliveryResult.Accepted.Instance;
     }
+
+    /// <summary>
+    /// Runs the handlers in a flow whose staged changes the attempt owns. Requests and other turns which interleave
+    /// while a handler awaits run in their own flows, so the attempt never treats their changes as its own.
+    /// </summary>
+    private async ValueTask HandleAsync(InboxEntry entry, HandlerExecution execution, CancellationToken cancellationToken)
+    {
+        execution.StagedChanges = _pump.BeginStagedChangeScope();
+        await _handlers.HandleAsync(new InboxHandlerContext(entry.Message, execution), cancellationToken).ConfigureAwait(true);
+    }
+
+    private static bool StagedDuring(HandlerExecution execution) => execution.StagedChanges!.HasStagedChanges;
 
     /// <summary>
     /// Stages acceptance of a message which this grain sends to itself, for the caller's next journal write.
@@ -360,9 +372,10 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
         var start = Stopwatch.GetTimestamp();
         var execution = new HandlerExecution(this, entry) { Active = true };
+        Exception? error = null;
         try
         {
-            await _handlers.HandleAsync(new InboxHandlerContext(entry.Message, execution), cancellationToken).ConfigureAwait(true);
+            await HandleAsync(entry, execution, cancellationToken).ConfigureAwait(true);
             execution.ThrowIfRejected();
             if (!execution.Completed)
             {
@@ -378,45 +391,69 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         {
             LogHandlerException(Logger, exception, entry.Message.Envelope.MessageId, GrainContext.GrainId);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (StagedDuring(execution))
         {
-            // The attempt ended without an outcome. Pending changes share one journal buffer, so any write would commit
-            // what the attempt staged; failing the activation discards it, and recovery charges the attempt and runs the
-            // message again.
+            // The attempt ended without an outcome after it staged changes. Pending changes share one journal buffer, so a
+            // retry record would commit them; failing the activation discards them, and the message runs again after
+            // recovery from the journal.
+            LogHandlerException(Logger, exception, entry.Message.Envelope.MessageId, GrainContext.GrainId);
             var failure = new InvalidOperationException(
-                $"The inbox handler for message '{entry.Message.Envelope.MessageId}' ended without an outcome, so the activation discards its changes.",
+                $"The inbox handler for message '{entry.Message.Envelope.MessageId}' failed after staging changes, so the activation discards them.",
                 exception);
-            _pump.Fail(failure, "An inbox handler ended without an outcome.");
+            _pump.Fail(failure, "An inbox handler failed after staging changes.");
             if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
             throw failure;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            error = exception;
+            LogHandlerException(Logger, exception, entry.Message.Envelope.MessageId, GrainContext.GrainId);
         }
         finally
         {
             execution.Active = false;
         }
 
-        var status = execution.DeadLetterReason is null ? "success" : "dead_lettered";
+        string status;
+        if (error is not null)
+        {
+            if (!IsCurrent(entry))
+            {
+                return;
+            }
+
+            status = StageFailedAttempt(entry, error.Message, Shared.JobTimeProvider.GetUtcNow());
+        }
+        else
+        {
+            status = execution.DeadLetterReason is null ? "success" : "dead_lettered";
+        }
+
         Shared.Instruments.OnInboxMessageProcessed(_pump.GrainTypeTag, status);
         Shared.Instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), _pump.GrainTypeTag);
     }
 
     /// <summary>
-    /// Stages an interrupted attempt's outcome: a retry with backoff, or a dead letter once <c>InboxRetryTimeout</c> has
-    /// elapsed since the message's first failure. Returns the processing status for metrics.
+    /// Stages a failed attempt's outcome: a retry with backoff, or a dead letter once <c>InboxRetryTimeout</c> has elapsed
+    /// since the message's first failure. Returns the processing status for metrics.
     /// </summary>
     /// <remarks>
-    /// The last attempt runs when the timeout elapses, and <c>Fail(reason)</c> dead-letters a message at once. Retry
-    /// deadlines follow the Durable Jobs clock, which schedules the next wake-up. Recovery can't tell a failed attempt from
-    /// one which a crash interrupted before it ran, so a charge dead-letters only a message whose window an earlier
-    /// charge started.
+    /// An unknown outcome retries until the timeout; the last attempt runs when it elapses, and <c>Fail(reason)</c>
+    /// dead-letters a message at once. Retry deadlines follow the Durable Jobs clock, which schedules the next wake-up.
+    /// An interrupted attempt starts the retry window but dead-letters only a message whose window an earlier failure
+    /// started, so one unclean stop never dead-letters a message by itself.
     /// </remarks>
-    private string StageInterruptedAttempt(InboxEntry entry, DateTimeOffset now)
+    private string StageFailedAttempt(InboxEntry entry, string reason, DateTimeOffset now, bool interrupted = false)
     {
         var attempts = checked(entry.State.AttemptCount + 1);
         var expirationTime = entry.State.ExpirationTime ?? MessagingTime.AddClamped(now, Options.InboxRetryTimeout);
-        if (expirationTime <= now && entry.State.ExpirationTime is not null)
+        if (expirationTime <= now && (!interrupted || entry.State.ExpirationTime is not null))
         {
-            StageDeadLetter(entry.Message, InterruptedAttemptReason, attempts);
+            StageDeadLetter(entry.Message, reason, attempts);
             return "dead_lettered";
         }
 
@@ -540,7 +577,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// whether it staged anything.
     /// </summary>
     /// <remarks>
-    /// An activation whose handler ends without an outcome, or whose silo crashes, stops without recording the
+    /// An activation which fails after a handler staged changes, or whose silo crashes, stops without recording the
     /// attempt's outcome. Charging it at recovery keeps backoff and <c>InboxRetryTimeout</c> bounding every failure path
     /// without a journal write on the happy path. A crash also charges due messages which hadn't been dispatched, so
     /// attempts can overcount by one per unclean stop; a charge alone never dead-letters a message whose retry window
@@ -562,7 +599,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         {
             // A message which isn't due couldn't have been in an attempt.
             if (GetDelay(entry, now) != TimeSpan.Zero) continue;
-            var status = StageInterruptedAttempt(entry, now);
+            var status = StageFailedAttempt(entry, InterruptedAttemptReason, now, interrupted: true);
             Shared.Instruments.OnInboxMessageProcessed(_pump.GrainTypeTag, status);
             charged++;
         }
@@ -577,8 +614,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// Journals that this activation stopped with no handler attempt interrupted, so recovery charges none.
     /// </summary>
     /// <remarks>
-    /// The pump calls this after its loop ends. A messaging failure, such as a handler which ended without an outcome,
-    /// records nothing, so recovery charges the attempt. A failed write leaves the stop unclean, which charges
+    /// The pump calls this after its loop ends. A messaging failure, such as a handler which failed after staging
+    /// changes, records nothing, so recovery charges the attempt. A failed write leaves the stop unclean, which charges
     /// at most one extra attempt.
     /// </remarks>
     internal async Task RecordCleanStopAsync()
@@ -634,6 +671,9 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     internal sealed class HandlerExecution(Inbox owner, InboxEntry entry)
     {
         public bool Active { get; set; }
+
+        /// <summary>Gets or sets the scope which records whether the attempt's own flow staged a change.</summary>
+        public StagedChangeScope? StagedChanges { get; set; }
 
         public bool Completed { get; private set; }
 

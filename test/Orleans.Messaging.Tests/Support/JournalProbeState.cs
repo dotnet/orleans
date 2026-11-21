@@ -4,7 +4,7 @@ namespace Orleans.Durable.Messaging.Tests.Support;
 
 // An empty journal state which lets tests fail write preparation or observe write acknowledgement. It never stages a
 // change, so it doesn't hide handler changes from failure detection.
-internal sealed class JournalProbeState : IStateMachine
+internal sealed class JournalProbeState : IStateMachine, IReportsStagedChanges
 {
     public const string Name = "test-journal-probe";
 

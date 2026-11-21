@@ -47,10 +47,9 @@ public sealed class InboxStateProtocolTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task HandlerFailureBeforeComplete_FailsActivationAndRecoveryRunsTheMessageAgain()
+    public async Task HandlerFailureBeforeComplete_AccountsPreparationOutcomeWithoutMutationInference()
     {
         var receiver = NewGrain();
-        var before = await receiver.GetSnapshotAsync();
         const string route = "messages/no-earlier-write";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var envelope = CreateEnvelope(receiver, NewMessage(203, "no-earlier-write"), route);
@@ -68,23 +67,22 @@ public sealed class InboxStateProtocolTests : MessagingBehaviorTestBase
             grain.NextApplyFailure = failure;
         });
 
-        // The attempt ends without an outcome, so it fails the activation without a write, although it staged nothing.
         handler.Release();
-        var error = Assert.IsType<InvalidOperationException>(
-            await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
-        Assert.Same(failure, error.InnerException);
-        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-
-        // Recovery charges the attempt, which starts its retry window without dead-lettering the message, even with this
-        // fixture's zero InboxRetryTimeout, and the rerun succeeds.
-        _ = await receiver.GetSnapshotAsync();
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.NotEqual(before.ActivationId, completed.ActivationId);
-        Assert.Equal(1, Assert.Single(completed.Effects).Count);
-        Assert.Empty(completed.InboxDeadLetters);
+        var completed = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
+        Assert.Contains(failure.Message, Assert.Single(completed.InboxDeadLetters).Reason, StringComparison.Ordinal);
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Empty(completed.Effects);
         Assert.Equal(0, completed.InboxCount);
         Assert.Equal(1, completed.ProcessedMessageCount);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
+        await receiver.RequestDeactivationAsync();
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var recovered = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(completed.InboxDeadLetters, recovered.InboxDeadLetters);
+        Assert.Equal(1, recovered.ProcessedMessageCount);
+        Assert.Equal(0, recovered.InboxCount);
     }
 
     private static Task OnTurnAsync(IGrainContext context, Action action)

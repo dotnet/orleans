@@ -62,6 +62,117 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StagedChangeScope_RecordsChangesWhichItsFlowStagesAndNotWritesWhichCaptureThem()
+    {
+        var sut = CreateTestSystem();
+        var manager = Assert.IsType<JournaledStateManager>(sut.Manager);
+        var codec = CodecProvider.GetCodec<int>();
+        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(CodecProvider.GetCodec<string>(), codec, SessionPool));
+        var value = new DurableValue<int>("value1", manager, new OrleansBinaryDurableValueCommandCodec<int>(codec, SessionPool));
+        var log = new DurableLog<int>("log1", manager, new OrleansBinaryDurableLogCommandCodec<int>(codec, SessionPool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        Assert.False((await InScopeAsync(manager, static () => Task.CompletedTask)).HasStagedChanges);
+
+        // A collection journals at mutation time; a value journals when a write captures it, so it reports at mutation.
+        Assert.True((await InScopeAsync(manager, () => { dictionary.Add("key1", 1); return Task.CompletedTask; })).HasStagedChanges);
+        Assert.True((await InScopeAsync(manager, () => { value.Value = 7; return Task.CompletedTask; })).HasStagedChanges);
+        Assert.True((await InScopeAsync(manager, () => { log.Append(1); return Task.CompletedTask; })).HasStagedChanges);
+
+        // A write captures changes which other flows staged in the manager's own flow.
+        dictionary.Add("key2", 2);
+        value.Value = 8;
+        Assert.False((await InScopeAsync(manager, async () => await manager.WriteStateAsync(CancellationToken.None))).HasStagedChanges);
+    }
+
+    [Fact]
+    public async Task StagedChangeScope_ExcludesChangesWhichInterleavedFlowsStage()
+    {
+        var sut = CreateTestSystem();
+        var manager = Assert.IsType<JournaledStateManager>(sut.Manager);
+        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        // A scope ends with the method which began it, even when that method completes synchronously.
+        var completed = await InScopeAsync(manager, static () => Task.CompletedTask);
+        dictionary.Add("after", 0);
+        Assert.False(completed.HasStagedChanges);
+
+        // Another flow stages a change while the scope's flow awaits.
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var interleaved = InScopeAsync(manager, () => resume.Task);
+        dictionary.Add("other", 1);
+        resume.SetResult();
+        Assert.False((await interleaved).HasStagedChanges);
+
+        // The scope covers its flow's continuations.
+        var resumeOwn = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var own = InScopeAsync(manager, async () =>
+        {
+            await resumeOwn.Task;
+            dictionary.Add("own", 2);
+        });
+        resumeOwn.SetResult();
+        Assert.True((await own).HasStagedChanges);
+    }
+
+    [Fact]
+    public async Task StagedChangeScope_RecordsNothingWhenRecoveryReplaysCompletedOrFaultedTaskCompletionSources()
+    {
+        var initial = CreateTestSystem();
+        var (completed, faulted) = CreateTaskCompletionSources(initial.Manager);
+        await initial.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Assert.True(completed.TrySetResult(17));
+        Assert.True(faulted.TrySetException(new InvalidOperationException("faulted")));
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystem(storage: initial.Storage);
+        var manager = Assert.IsType<JournaledStateManager>(recovered.Manager);
+        var (recoveredCompleted, recoveredFaulted) = CreateTaskCompletionSources(manager);
+        var scope = await InScopeAsync(manager, () => recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken));
+
+        // Replay restores durable state rather than staging changes.
+        Assert.Equal(DurableTaskCompletionSourceStatus.Completed, recoveredCompleted.State.Status);
+        Assert.Equal(DurableTaskCompletionSourceStatus.Faulted, recoveredFaulted.State.Status);
+        Assert.False(scope.HasStagedChanges);
+
+        (DurableTaskCompletionSource<int> Completed, DurableTaskCompletionSource<int> Faulted) CreateTaskCompletionSources(IJournaledStateManager stateManager) =>
+            (CreateTaskCompletionSource("completed", stateManager), CreateTaskCompletionSource("faulted", stateManager));
+
+        DurableTaskCompletionSource<int> CreateTaskCompletionSource(string key, IJournaledStateManager stateManager) => new(
+            key,
+            stateManager,
+            new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<Exception>(), SessionPool),
+            ServiceProvider.GetRequiredService<Orleans.Serialization.DeepCopier<int>>(),
+            ServiceProvider.GetRequiredService<Orleans.Serialization.DeepCopier<Exception>>());
+    }
+
+    [Fact]
+    public async Task StagedChangeScope_ReportsStagedChangesWhileAStateJournalsChangesItCannotObserve()
+    {
+        var sut = CreateTestSystem();
+        var manager = Assert.IsType<JournaledStateManager>(sut.Manager);
+        _ = new JournaledPersistentState<List<int>>(
+            "persistent",
+            manager,
+            new OrleansBinaryPersistentStateCommandCodec<List<int>>(CodecProvider.GetCodec<List<int>>(), SessionPool),
+            CodecProvider.GetActivator<List<int>>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        // A persistent state's object is mutated in place and serialized whole at capture, so no scope can show whether
+        // its flow staged a change; every scope reports that it may have.
+        Assert.True((await InScopeAsync(manager, static () => Task.CompletedTask)).HasStagedChanges);
+    }
+
+    // A scope covers the async method which begins it, so begin it in its own method.
+    private static async Task<StagedChangeScope> InScopeAsync(JournaledStateManager manager, Func<Task> action)
+    {
+        var scope = manager.BeginStagedChangeScope();
+        await action();
+        return scope;
+    }
+
+    [Fact]
     public async Task StateManager_Initialize_UsesStreamingStorageRead()
     {
         var storage = new StreamingOnlyStorage();

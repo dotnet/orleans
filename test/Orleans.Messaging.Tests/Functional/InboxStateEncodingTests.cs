@@ -48,7 +48,7 @@ public sealed class InboxStateEncodingTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task InterruptedAttemptCodecFailure_FailsRecoveryAndALaterActivationReplaysTheMessage()
+    public async Task HandlerErrorOutcomeCodecFailure_DeactivatesAndReplaysAcceptedMessage()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
@@ -61,22 +61,14 @@ public sealed class InboxStateEncodingTests : MessagingBehaviorTestBase
         await handler.WaitUntilEnteredAsync();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
-
-        // The failed attempt stages no inbox command, so the next one is the charge which recovery stages for it.
-        var faulting = (FaultingInboxCodecFixture)Fixture;
-        faulting.NextFailure = new IOException("Interrupted attempt command failed.");
+        var failure = new IOException("Handler error outcome command failed.");
+        ((FaultingInboxCodecFixture)Fixture).NextFailure = failure;
         handler.Release();
-        var failure = Assert.IsType<InvalidOperationException>(
-            await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
-        Assert.Contains("ended without an outcome", failure.Message, StringComparison.Ordinal);
+        Assert.Same(failure, await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-
-        // The activation whose charge fails to encode fails to start, and a later one charges the attempt and replays the
-        // accepted message, which succeeds.
+        _ = await receiver.GetSnapshotAsync();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.False(faulting.FailedSnapshot);
-        Assert.Null(faulting.NextFailure);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);
         Assert.Empty(completed.InboxDeadLetters);

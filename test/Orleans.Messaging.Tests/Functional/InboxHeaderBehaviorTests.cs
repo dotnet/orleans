@@ -106,15 +106,13 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
             ["future.number"] = new Serializer<int>(Sessions).SerializeToArray(8675309)
         };
         var message = application with { Envelope = application.Envelope with { Headers = headers } };
-        _ = await receiver.GetSnapshotAsync();
-        var previous = Fixture.GetGrainContext(receiver);
-
-        // Each failed attempt fails its activation, and the next activation recovers the message and charges the attempt.
         var retry = Fixture.Metrics.WaitForCountAsync("orleans-messaging-inbox-messages-processed", 1, "retry");
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, message));
+        await retry;
+        var previous = Fixture.GetGrainContext(receiver);
+        await receiver.RequestDeactivationAsync();
         await WaitAsync(previous.Deactivated);
         _ = await receiver.GetSnapshotAsync();
-        await retry;
         var current = Fixture.GetGrainContext(receiver);
         Assert.NotSame(previous, current);
         var pending = await receiver.GetSnapshotAsync();
@@ -129,10 +127,8 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
             Assert.True(metadata.TryGetValue("future.number", out var number));
             Assert.Equal(8675309, new Serializer<int>(Sessions).Deserialize(number));
         });
-
-        // The retry runs once its window has closed and fails again, so the next recovery dead-letters the message.
         Fixture.Clock.Advance(TimeSpan.FromHours(1));
-        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, message));
+        await receiver.RequestDeactivationAsync();
         await WaitAsync(current.Deactivated);
         _ = await receiver.GetSnapshotAsync();
         current = Fixture.GetGrainContext(receiver);

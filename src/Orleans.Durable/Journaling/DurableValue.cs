@@ -19,12 +19,13 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurableValueCommandHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
     private T? _value;
     private bool _isDirty;
+    private JournalStreamWriter _writer;
 
     // Whether the write in flight captured the value. A completed write acknowledges only the value it captured.
     private bool _isValueCaptured;
@@ -69,7 +70,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
 
     private void OnValuePersisted() => OnPersisted?.Invoke();
 
-    public void OnModified() => _isDirty = true;
+    public void OnModified()
+    {
+        _isDirty = true;
+        _writer.MarkModified();
+    }
 
     internal IAsyncEnumerable<ValueChange<T>> WatchAsync(CancellationToken cancellationToken) =>
         DurableStateObservation.WatchValue(_manager, this, cancellationToken);
@@ -94,6 +99,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _writer = writer;
         _value = default;
         _isDirty = false;
         _isValueCaptured = false;

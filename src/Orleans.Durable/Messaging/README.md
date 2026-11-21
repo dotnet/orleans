@@ -71,16 +71,21 @@ A handler finishes each message with `IInboxHandlerContext.Complete()` or
 - `Complete()` stages the message's removal and completion record.
 - `Fail(reason)` moves the message to the inbox dead letters and records its ID as
   processed.
-- A handler exception, or a return without either call, leaves the outcome unknown.
-  Changes staged by the attempt share the grain's pending journal write, so the grain
-  deactivates and recovery from the journal discards them.
+- A handler exception, or a return without either call, leaves the outcome unknown,
+  so the message retries with exponential backoff until `InboxRetryTimeout` (6 hours)
+  after its first failure, then moves to the dead letters.
+- If the attempt's own code staged journaled changes before failing, they can't commit
+  with the retry: the grain deactivates, and recovery from the journal discards them.
+  Changes which requests and other turns stage while the handler awaits belong to
+  those turns, so the attempt records its retry as usual. A grain whose state can't
+  report its changes, such as journaled `IPersistentState`, recovers this way after
+  every failed attempt.
 - Recovery after an activation stops without recording an attempt's outcome, through
-  such a failure or a crash, charges one attempt to each due message. The message
-  retries with exponential backoff until `InboxRetryTimeout` (6 hours) after its first
-  failure, then moves to the dead letters. A graceful deactivation journals a clean
-  stop when messages are pending, so it charges nothing. A crash can charge a message
-  that hadn't run, so attempts overcount by at most one per crash, and a charge alone
-  never dead-letters a message whose retries hadn't started.
+  such a failure or a crash, charges one attempt to each due message, so backoff and
+  `InboxRetryTimeout` still apply. A graceful deactivation journals a clean stop when
+  messages are pending, so it charges nothing. A crash can charge a message that hadn't
+  run, so attempts overcount by at most one per crash, and a charge alone never
+  dead-letters a message whose retries hadn't started.
 - `Fail(reason)` after `Complete()`, or after `Fail` with a different reason, deactivates
   the grain. `Complete()` after `Fail(reason)` keeps the dead letter.
 

@@ -68,16 +68,14 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         var accepted = await DeliverAsync(receiver, envelope);
         var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
-        // Each failed attempt fails its activation without staging anything. With this fixture's zero
-        // InboxRetryTimeout, the first recovery starts the retry window and the second dead-letters the message.
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(accepted);
         Assert.Empty(state.Effects);
         Assert.Equal(0, state.InboxCount);
         Assert.Equal(0, state.OutboxCount);
         var deadLetter = Assert.Single(state.InboxDeadLetters);
         Assert.Equal(envelope.Envelope.MessageId, deadLetter.MessageId);
-        Assert.Equal(2, deadLetter.AttemptCount);
-        Assert.Equal(InboxTestAccess.InterruptedAttemptReason, deadLetter.Reason);
+        Assert.Equal(1, deadLetter.AttemptCount);
+        Assert.Contains("Injected handler preparation failure", deadLetter.Reason, StringComparison.Ordinal);
         Assert.Empty(Fixture.GetStagedOutput(receiver));
         await receiver.RequestDeactivationAsync();
         var recovered = await receiver.GetSnapshotAsync();
@@ -134,30 +132,22 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task InterruptedAttemptChargeWriteFailure_RecoversInFreshActivation()
+    public async Task PreparationFailureAccountingWriteFailure_RecoversInFreshActivation()
     {
         var receiver = NewGrain();
         var before = await receiver.GetSnapshotAsync();
-        const string route = "messages/charge-write-failure";
-        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
-        var envelope = CreateEnvelope(receiver, NewMessage(79, "charge-write-failure") with { ThrowDuringPreparation = true }, route);
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/failure-accounting");
+        var envelope = CreateEnvelope(receiver, NewMessage(79, "failure-accounting") with { ThrowDuringPreparation = true }, "messages/failure-accounting");
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
         await handler.WaitUntilEnteredAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
-
-        // The failed attempt writes nothing, so the next write is the charge which recovery stages for it.
-        using var chargeWrite = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         handler.Release();
-        await chargeWrite.WaitUntilEnteredAsync();
-        var charging = Assert.IsAssignableFrom<IGrainContext>(chargeWrite.EntryContext);
-        Assert.NotSame(oldContext, charging);
-        chargeWrite.Fail();
-        await charging.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        _ = await receiver.GetSnapshotAsync();
         var completed = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.NotEqual(before.ActivationId, completed.ActivationId);
-        // The uncommitted charge doesn't count: a later recovery charges the first attempt again, starting the retry
-        // window, and the recovery after the rerun's failure dead-letters the message at its second attempt.
+        // Recovery charges the attempt whose failure record didn't commit, so the rerun is the second attempt.
         Assert.Equal(2, Assert.Single(completed.InboxDeadLetters).AttemptCount);
         Assert.Empty(completed.Effects);
         Assert.Empty(Fixture.GetStagedOutput(receiver));

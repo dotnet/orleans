@@ -179,8 +179,9 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
             DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, queued));
             await receiver.ConfigureHandlerAsync(false);
 
-            // Deactivation cancels the in-flight attempt, which ends without an outcome and fails messaging, so the
-            // activation journals no clean stop, as if the process had died mid-attempt.
+            // Deactivation cancels the in-flight attempt, which staged nothing, so the activation would journal a clean
+            // stop. Failing that write leaves the stop unclean, as if the process had died mid-attempt.
+            Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
             await _cluster.CrashAsync(receiver);
         }
 

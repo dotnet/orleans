@@ -122,8 +122,7 @@ public class DurableMessagingOptions
     /// schedules the wake-up for each retry.
     /// </remarks>
     /// <value>
-    /// Must be greater than or equal to <see cref="TimeSpan.Zero"/>, which dead-letters a message at its second failure:
-    /// recovery can't tell a failed attempt from one which a crash interrupted before it ran.
+    /// Must be greater than or equal to <see cref="TimeSpan.Zero"/>, which dead-letters a message at its first failure.
     /// Defaults to 6 hours.
     /// </value>
     public TimeSpan InboxRetryTimeout { get; set; } = TimeSpan.FromHours(6);

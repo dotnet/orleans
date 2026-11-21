@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Durable.Journaling;
 
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
-internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>
+internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsStagedChanges, IDurableLogCommandHandler<T>
 {
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;

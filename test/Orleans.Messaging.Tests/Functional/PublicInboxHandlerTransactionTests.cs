@@ -199,9 +199,9 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
         Assert.Equal(0, state.OutboxCount);
         var deadLetter = Assert.Single(state.InboxDeadLetters);
         Assert.Equal(envelope.Envelope.MessageId, deadLetter.MessageId);
-        // The failed attempt fails the activation; recovery charges it, and the second failure dead-letters the message.
-        Assert.Equal(2, deadLetter.AttemptCount);
-        Assert.Equal(InboxTestAccess.InterruptedAttemptReason, deadLetter.Reason);
+        // The attempt staged nothing, so it records its failure in place; this fixture's zero InboxRetryTimeout dead-letters it.
+        Assert.Equal(1, deadLetter.AttemptCount);
+        Assert.Contains("Injected handler preparation failure", deadLetter.Reason, StringComparison.Ordinal);
         Assert.Empty((await sink.GetSnapshotAsync()).Effects);
     }
     [Fact]

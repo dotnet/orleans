@@ -28,16 +28,12 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         var rejected = TestApplicationProtocol.CreateInbox(sessions, sender, "messages/capacity", new TestMessage(TestApplicationProtocol.NewMessageId(), 32, "accepted-after-capacity"), fixture.JobNow);
         const string processedInstrument = "orleans-messaging-inbox-messages-processed";
         var firstRetryAcknowledged = fixture.Metrics.WaitForCountAsync(processedInstrument, 1, "retry");
-        _ = await receiver.GetSnapshotAsync();
-        var failed = fixture.GetGrainContext(receiver);
 
-        // The poison's attempt fails its activation, and recovery charges it; the message keeps the only slot.
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, poison));
-        await failed.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await DeliverAsync(receiver, rejected));
-        var full = await receiver.GetSnapshotAsync();
-        Assert.Equal(1, full.InboxCount);
+        var full = await fixture.WaitForInboxCountAsync(receiver, 1);
         Assert.Empty(full.Effects);
+        DeliveryResultAssert.IsCase<DeliveryResult.Backpressured>(await DeliverAsync(receiver, rejected));
+        Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
 
         await firstRetryAcknowledged;
         Assert.Equal(1, fixture.Metrics.GetCount(processedInstrument, "retry"));
@@ -46,17 +42,32 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         Assert.Equal(1, state.AttemptCount);
         var nextAttempt = Assert.IsType<DateTimeOffset>(state.NextAttemptAt);
         Assert.Equal(fixture.Clock.GetUtcNow() + TimeSpan.FromHours(1), nextAttempt);
-
-        // The retry runs after its window closes and fails again; the recovery which charges it dead-letters the message.
         fixture.Clock.Advance(TimeSpan.FromHours(2));
-        failed = fixture.GetGrainContext(receiver);
-        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, poison));
-        await failed.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.True(nextAttempt <= fixture.Clock.GetUtcNow());
+        var previous = fixture.GetGrainContext(receiver);
+        await receiver.RequestDeactivationAsync();
+        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        _ = await receiver.GetSnapshotAsync();
+        Assert.NotSame(previous, fixture.GetGrainContext(receiver));
+        var current = fixture.GetGrainContext(receiver);
+        var currentGrain = Assert.IsType<MessagingTestGrain>(current.GrainInstance);
+        try
+        {
+            await fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
+                snapshot => snapshot.ActivationId == currentGrain.GetSnapshotForTest().ActivationId
+                    && snapshot.InboxDeadLetters.Count == 1);
+        }
+        catch (TimeoutException exception)
+        {
+            var snapshot = await receiver.GetSnapshotAsync();
+            throw new TimeoutException(
+                $"Recovered retry did not complete. Activation={snapshot.ActivationId}, inbox={snapshot.InboxCount}, " +
+                $"processed={snapshot.ProcessedMessageCount}, deadLetters={snapshot.InboxDeadLetters.Count}, " +
+                $"nextAttempt={nextAttempt:O}, now={fixture.Clock.GetUtcNow():O}, " +
+                $"failureCompleted={currentGrain.DeactivationFailure.Task.IsCompleted}.", exception);
+        }
 
         DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, rejected));
-        var deadLettered = await receiver.GetSnapshotAsync();
-        Assert.Equal(0, deadLettered.InboxCount);
-        Assert.Equal(2, Assert.Single(deadLettered.InboxDeadLetters).AttemptCount);
         rejected = rejected with { SentAt = fixture.JobNow };
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, rejected));
         var recovered = await fixture.WaitForEffectCountAsync(receiver, 1);

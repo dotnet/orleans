@@ -95,23 +95,25 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     public sealed class InboxPermanentFailureTests() : MessagingBehaviorTestBase(new PermanentFailureClusterFixture())
     {
         [Fact]
-        public async Task DeadLetter_AfterChargedRetryTerminatesBeforeLimitAndCountsCurrentAttempt()
+        public async Task DeadLetter_AfterPreparationRetryTerminatesBeforeLimitAndCountsCurrentAttempt()
         {
             var receiver = NewGrain();
             await receiver.GetSnapshotAsync();
-            var failed = Fixture.GetGrainContext(receiver);
+            var context = Fixture.GetGrainContext(receiver);
+            var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
             var handler = new PermanentHandler();
-            await InstallAsync(failed, handler);
+            var installed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            context.Scheduler.QueueAction(() =>
+            {
+                grain.HandlerOverride = handler;
+                installed.SetResult();
+            });
+            await installed.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
             var input = CreateEnvelope(receiver, NewMessage(901, "permanent input"), "permanent/input");
             const string counter = "orleans-messaging-inbox-messages-processed";
             var retried = Fixture.Metrics.WaitForCountAsync(counter, 1, "retry");
-
-            // The first attempt ends without an outcome, which fails its activation; recovery charges it.
             DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, input));
-            await failed.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-            await receiver.GetSnapshotAsync();
             await retried;
-            await InstallAsync(Fixture.GetGrainContext(receiver), handler);
             Assert.Equal(1, handler.Attempts);
             Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
 
@@ -132,19 +134,6 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
             Assert.Equal(1, Fixture.Metrics.GetCount(counter, "dead_lettered"));
             DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, input));
             Assert.Equal(2, handler.Attempts);
-        }
-
-        // Handler overrides belong to one activation, so each recovered activation needs the handler installed again.
-        private static async Task InstallAsync(IGrainContext context, IInboxHandler handler)
-        {
-            var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
-            var installed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            context.Scheduler.QueueAction(() =>
-            {
-                grain.HandlerOverride = handler;
-                installed.SetResult();
-            });
-            await installed.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         }
 
         private sealed class PermanentHandler : IInboxHandler
@@ -376,44 +365,60 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         var finished = FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(finished);
-        if (!completed)
+        if (completed)
         {
-            // Without an outcome, the attempt fails the activation, and recovery runs the message again.
-            var failure = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
-            Assert.Same(error, failure.InnerException);
+            AssertSuccess(rig, input, outputCount: 1);
+            DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
+        }
+        else
+        {
             Assert.Empty(rig.Effects);
             Assert.Empty(rig.Outbox);
-            await AssertFailureReplayAsync(rig, input);
-            return;
+            Assert.Equal(input.Envelope.MessageId, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters).MessageId);
         }
-
-        AssertSuccess(rig, input, outputCount: 1);
-        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(rig.Receiver, input));
         await AssertHealthyAsync(rig);
         await DeactivateAsync(rig);
         var replay = await rig.Receiver.GetSnapshotAsync();
-        Assert.Single(replay.Effects);
+        Assert.Equal(completed ? 1 : 0, replay.Effects.Count);
         Assert.Equal(1, replay.ProcessedMessageCount);
-        Assert.Empty(replay.InboxDeadLetters);
+        Assert.Equal(completed ? 0 : 1, replay.InboxDeadLetters.Count);
+    }
+
+    [Fact]
+    public async Task SuccessfulReturnWithoutCompleteOrStaging_FailsLikeAnException()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (_, _) => ValueTask.CompletedTask;
+        var input = await DeliverAsync(rig);
+        var finished = FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+
+        // This fixture's InboxRetryTimeout is zero, so the first failure dead-letters the message.
+        var letter = Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters);
+        Assert.Equal(input.Envelope.MessageId, letter.MessageId);
+        Assert.Contains("must call Complete", letter.Reason, StringComparison.Ordinal);
+        Assert.Empty(rig.Inbox);
+        Assert.Empty(rig.Effects);
+        await AssertHealthyAsync(rig);
     }
 
     [Theory]
-    [InlineData(false, "none")]
     [InlineData(true, "mutate")]
     [InlineData(false, "mutate")]
     [InlineData(true, "self-send")]
-    public async Task AttemptWithoutOutcome_FailsActivationDiscardsItsChangesAndRunsAgainAfterRecovery(bool throws, string change)
+    public async Task AttemptWithoutOutcomeAfterStaging_DiscardsItsChangesAndRunsAgainAfterRecovery(bool throws, string change)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         var selfSent = CreateEnvelope(rig.Receiver, NewMessage(503, "handler-self-send"));
-        var thrown = new InvalidOperationException("A downstream call failed.");
         handler.Body = (self, _) =>
         {
             // A message which the handler sends to itself is the attempt's change, like its other effects.
             if (change == "mutate") self.Mutate();
-            else if (change == "self-send") rig.InboxState.StageLocal(selfSent);
-            if (throws) throw thrown;
+            else rig.InboxState.StageLocal(selfSent);
+            if (throws) throw new InvalidOperationException("A downstream call failed after staging.");
             return ValueTask.CompletedTask;
         };
         var input = await DeliverAsync(rig);
@@ -421,23 +426,52 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         handler.Release.TrySetResult();
 
         var error = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
-        Assert.Contains("ended without an outcome", error.Message, StringComparison.Ordinal);
-        if (throws) Assert.Same(thrown, error.InnerException);
-        else Assert.Contains("must call Complete", Assert.IsType<InvalidOperationException>(error.InnerException).Message, StringComparison.Ordinal);
+        Assert.Contains("after staging changes", error.Message, StringComparison.Ordinal);
         await WaitAsync(rig.Context.Deactivated);
         Assert.Equal(writes, Writes(rig));
 
-        // The retried wake-up recovers the grain from the journal without the first attempt's changes, charges the
-        // attempt, and runs the message again. This fixture's replay handler doesn't know the message's route, so the
-        // rerun fails too, and with the fixture's zero InboxRetryTimeout the next recovery dead-letters the message.
+        // The retried wake-up recovers the grain from the journal without the first attempt's effect, and the message
+        // runs again: this fixture's replay handler dead-letters it.
         var recovered = await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1);
         Assert.NotEqual(rig.Grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
         Assert.Empty(recovered.Effects);
         Assert.Equal(0, recovered.InboxCount);
-        var letter = Assert.Single(recovered.InboxDeadLetters);
-        Assert.Equal(input.Envelope.MessageId, letter.MessageId);
-        Assert.Equal(InboxTestAccess.InterruptedAttemptReason, letter.Reason);
-        Assert.Equal(2, letter.AttemptCount);
+        Assert.Equal(input.Envelope.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
+    }
+    [Theory]
+    [InlineData("delivery")]
+    [InlineData("request")]
+    [InlineData("self-send")]
+    public async Task AttemptFailure_WhileAnotherTurnStagesChanges_DoesNotTreatThemAsItsOwn(string turn)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (_, _) => throw new InvalidOperationException("A downstream call failed.");
+        var input = await DeliverAsync(rig);
+        var finished = FinishedAsync(rig);
+
+        // Another turn interleaves while the attempt awaits and stages its own change, without writing it.
+        var interleaved = CreateEnvelope(rig.Receiver, NewMessage(502, "interleaved"));
+        switch (turn)
+        {
+            case "delivery":
+                DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, interleaved));
+                break;
+            case "request":
+                await OnTurnAsync(rig.Context, () => rig.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "interleaved");
+                break;
+            case "self-send":
+                await OnTurnAsync(rig.Context, () => rig.InboxState.StageLocal(interleaved));
+                break;
+        }
+
+        // The attempt staged nothing itself, so it records its failure as usual: this fixture's zero InboxRetryTimeout
+        // dead-letters the message at once, and the activation stays.
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+
+        Assert.Contains(input.Envelope.MessageId, rig.Grain.GetSnapshotForTest().InboxDeadLetters.Select(static letter => letter.MessageId));
+        await AssertHealthyAsync(rig);
     }
 
     [Fact]
@@ -496,13 +530,11 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         await WaitAsync(finished);
         using var second = new TestHandler(rig.Effects, rig.Context);
         InvalidOperationException? rejection = null;
-        second.Body = (self, _) =>
+        second.Body = (_, _) =>
         {
             try { InvokeContextOperation(first, operation); }
             catch (InvalidOperationException error) { rejection = error; }
-            self.Mutate();
-            self.Context.Complete();
-            return ValueTask.CompletedTask;
+            throw new IOException("Replacement failure.");
         };
         await OnTurnAsync(rig.Context, () =>
             rig.Grain.HandlerOverride = second);
@@ -510,13 +542,12 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(rig.Receiver, two));
         await WaitAsync(second.Entered.Task);
         second.Release.TrySetResult();
-        var snapshot = await Fixture.WaitForEffectCountAsync(rig.Receiver, 2);
+        var snapshot = await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1);
         Assert.Contains("inactive or different attempt", Assert.IsType<InvalidOperationException>(rejection).Message, StringComparison.Ordinal);
-        Assert.Equal(
-            new HashSet<MessageId> { one.Envelope.MessageId, two.Envelope.MessageId },
-            snapshot.Effects.Select(static effect => effect.LogicalId).ToHashSet());
-        Assert.Empty(snapshot.InboxDeadLetters);
-        Assert.Equal(2, snapshot.ProcessedMessageCount);
+        var letter = Assert.Single(snapshot.InboxDeadLetters);
+        Assert.Equal(two.Envelope.MessageId, letter.MessageId);
+        Assert.Equal("Replacement failure.", letter.Reason);
+        Assert.Equal(one.Envelope.MessageId, Assert.Single(rig.Effects).Key);
         await AssertHealthyAsync(rig);
     }
 

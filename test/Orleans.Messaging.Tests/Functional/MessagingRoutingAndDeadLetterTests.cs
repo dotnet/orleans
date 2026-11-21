@@ -72,15 +72,11 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
         var malformed = CreateEnvelope(receiver, "wrong-body", "typed");
 
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, malformed));
-
-        // Each attempt fails its activation, so with this fixture's zero InboxRetryTimeout the second recovery
-        // dead-letters the message.
         var poisoned = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Empty(poisoned.Effects);
         var deadLetter = Assert.Single(poisoned.InboxDeadLetters);
         Assert.Equal(malformed.Envelope.MessageId, deadLetter.MessageId);
-        Assert.Equal(InboxTestAccess.InterruptedAttemptReason, deadLetter.Reason);
-        Assert.Equal(2, deadLetter.AttemptCount);
+        Assert.Contains(nameof(TestMessage), deadLetter.Reason, StringComparison.Ordinal);
 
         var valid = CreateEnvelope(receiver, NewMessage(41, "valid-after-poison"), "typed");
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, valid));

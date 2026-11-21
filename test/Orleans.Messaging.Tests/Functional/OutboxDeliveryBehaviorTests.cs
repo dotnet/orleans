@@ -21,7 +21,8 @@ public sealed class OutboxDeliveryBehaviorTests : MessagingBehaviorTestBase
     [Fact]
     public async Task HandlerFailureAfterAnOutboxSend_DiscardsTheSendThroughRecovery()
     {
-        // A handler which ends without an outcome fails the activation, so recovery from the journal discards its send.
+        // A handler which ends without an outcome after staging a send fails the activation, so recovery from the journal
+        // discards the send.
         // Each recovery charges the interrupted attempt, and the second dead-letters the message.
         var receiver = NewGrain();
         var target = NewGrain();
