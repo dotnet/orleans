@@ -1,7 +1,8 @@
 namespace Orleans.Runtime;
 
 /// <summary>
-/// Opens exclusive sections, which hold an activation's requests back while code runs on the activation.
+/// Answers how an activation admits a request relative to the calling code, such as its activation code or the request
+/// which it belongs to, and opens exclusive sections, which hold requests back while code runs on the activation.
 /// </summary>
 /// <remarks>
 /// The activation implements this component, which <c>IGrainContext.GetComponent</c> returns. Members
@@ -12,6 +13,48 @@ namespace Orleans.Runtime;
 /// </remarks>
 internal interface IGrainRequestAdmission
 {
+    /// <summary>
+    /// Returns whether the calling code is this activation's activation code, such as its lifecycle's start or the grain's
+    /// <c>OnActivateAsync</c>, which the activation runs before it invokes any request.
+    /// </summary>
+    /// <remarks>
+    /// While the activation is being created or activated, it invokes no request, so code which runs on its scheduler then
+    /// is activation code, or code which activation code started. Code which waits there for one of the activation's own
+    /// requests waits until activation completes.
+    /// </remarks>
+    bool IsCurrentCodeActivating();
+
+    /// <summary>
+    /// Makes activations of this grain's type record, for the code which each request they invoke from now on runs, the
+    /// request it belongs to, and, for the code which requests an exclusive section, that section.
+    /// </summary>
+    /// <remarks>
+    /// Recording costs one <see cref="AsyncLocal{T}"/> write per request, and one per exclusive section, on activations of
+    /// this type. Call it before the activation invokes requests whose code may call <see cref="IsBlockedByCurrentRequest"/>,
+    /// such as while the activation activates.
+    /// </remarks>
+    void TrackCurrentRequest();
+
+    /// <summary>
+    /// Returns whether the activation holds <paramref name="request"/>, received with <paramref name="options"/>, until the
+    /// calling code's own request completes or its own exclusive section closes.
+    /// </summary>
+    /// <param name="request">The local request, which this call evaluates without receiving it.</param>
+    /// <param name="options">The options with which the activation would receive <paramref name="request"/>.</param>
+    /// <param name="holdsSuchRequest">
+    /// Whether the calling code itself runs within a running request like <paramref name="request"/>, which it holds while it
+    /// waits, such as a durable task's segment.
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/> when the calling code holds this activation's open exclusive section, or belongs to a request on
+    /// the section holder's call chain, and the section excludes <paramref name="request"/>; when the calling code belongs to
+    /// a running request of this activation and that request excludes <paramref name="request"/>; or when
+    /// <paramref name="holdsSuchRequest"/> is set and such a request excludes <paramref name="request"/>. Otherwise <see langword="false"/>, including when another flow's section or another
+    /// request holds <paramref name="request"/> back, since those end without the calling code, and for code which belongs
+    /// to no running request and holds no section.
+    /// </returns>
+    bool IsBlockedByCurrentRequest(ILocalRequest request, LocalRequestOptions options, bool holdsSuchRequest);
+
     /// <summary>
     /// Opens an exclusive section for code which runs on the activation's scheduler, such as a transaction. While the section
     /// is open, the activation starts requests which always interleave and requests on the section holder's call chain; all

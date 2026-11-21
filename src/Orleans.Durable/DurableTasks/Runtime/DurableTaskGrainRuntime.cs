@@ -168,7 +168,15 @@ internal sealed partial class DurableTaskGrainRuntime(
         "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
 
     /// <summary>Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs.</summary>
-    internal void InitializeForActivation(IGrainContext grainContext) => _grainContext = grainContext;
+    /// <remarks>
+    /// The activation records the request which each request's code belongs to, so a wait for a task of this grain which
+    /// that request holds the task's segments behind fails at once; see <see cref="EnsureWaitCanEndAsync"/>.
+    /// </remarks>
+    internal void InitializeForActivation(IGrainContext grainContext)
+    {
+        _grainContext = grainContext;
+        grainContext.GetComponent<IGrainRequestAdmission>()?.TrackCurrentRequest();
+    }
 
     /// <summary>
     /// Recovers committed task state during the activation's lifecycle, deferring the recovered executions to
@@ -366,11 +374,18 @@ internal sealed partial class DurableTaskGrainRuntime(
     private async Task WaitForAnyAsync(GrainDurableTaskContext attempt, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var waits = new Task<DurableTaskResponse>[candidates.Count];
-        for (var index = 0; index < waits.Length; index++)
-        {
-            waits[index] = GetCompletionCandidateHandle(candidates[index]).WaitAsync(waitCancellation.Token).AsTask();
-        }
+        var waits = attempt.StartParkedWait(
+            (Runtime: this, Candidates: candidates, Token: waitCancellation.Token),
+            static state =>
+            {
+                var waits = new Task<DurableTaskResponse>[state.Candidates.Count];
+                for (var index = 0; index < waits.Length; index++)
+                {
+                    waits[index] = state.Runtime.GetCompletionCandidateHandle(state.Candidates[index]).WaitAsync(state.Token).AsTask();
+                }
+
+                return waits;
+            });
 
         try
         {
