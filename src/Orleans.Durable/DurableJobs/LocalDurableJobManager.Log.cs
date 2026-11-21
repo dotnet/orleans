@@ -6,6 +6,9 @@ namespace Orleans.Durable.Jobs;
 
 internal partial class LocalDurableJobManager
 {
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Execution of retired shard {ShardId} failed. Releasing it for discovery.")]
+    private static partial void LogRetiredShardExecutionFailed(ILogger logger, Exception exception, string shardId);
+
     [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Scheduling job '{JobName}' for grain {TargetGrain} at {DueTime}"

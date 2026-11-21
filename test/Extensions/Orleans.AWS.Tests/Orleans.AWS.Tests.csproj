@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.AdvancedReminders.DynamoDB\Orleans.AdvancedReminders.DynamoDB.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />
@@ -23,5 +24,8 @@
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Reminders.Tests\Orleans.Reminders.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">
+    <Compile Remove="AdvancedReminders\**\*.cs" />
   </ItemGroup>
 </Project>

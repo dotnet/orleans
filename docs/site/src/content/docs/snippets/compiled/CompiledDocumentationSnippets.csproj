@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- The advanced reminders snippets use the .NET 11 Durable package. -->
+    <TargetFramework>net11.0</TargetFramework>
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\'))</RepositoryRoot>
   </PropertyGroup>
 
@@ -26,5 +28,10 @@
     <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Streaming.Kinesis\Orleans.Streaming.Kinesis.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.AdvancedReminders.AzureStorage\Orleans.AdvancedReminders.AzureStorage.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Redis\Orleans.AdvancedReminders.Redis\Orleans.AdvancedReminders.Redis.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.AdvancedReminders.DynamoDB\Orleans.AdvancedReminders.DynamoDB.csproj" />
   </ItemGroup>
 </Project>

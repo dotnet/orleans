@@ -6,6 +6,8 @@ namespace Orleans.Clustering.Cosmos;
 namespace Orleans.Persistence.Cosmos;
 #elif ORLEANS_REMINDERS
 namespace Orleans.Reminders.Cosmos;
+#elif ADVANCED_REMINDERS_COSMOS
+namespace Orleans.AdvancedReminders.Cosmos;
 #elif ORLEANS_STREAMING
 namespace Orleans.Streaming.Cosmos;
 #elif ORLEANS_DIRECTORY

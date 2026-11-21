@@ -40,6 +40,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.AzureStorage\Orleans.Durable.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />

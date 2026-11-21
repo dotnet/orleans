@@ -32,6 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Dashboard.AdvancedReminders" />
     <InternalsVisibleTo Include="Orleans.Dashboard.TestGrains" />
     <InternalsVisibleTo Include="Orleans.Dashboard.UnitTests" />
     <InternalsVisibleTo Include="Benchmarks" />

@@ -1,5 +1,34 @@
 # Microsoft Orleans Durable Jobs
 
+## Owner turns
+
+Implement `IDurableJobTurnHandler` when a durable job updates state on a non-reentrant owner. The
+job executor delivers each bounded step as an ordinary grain request and waits for it to finish.
+Return `DurableJobRunResult.ContinueOnOwnerTurn` for another immediate step on the same attempt,
+or `InProgress(delay)` to wait before requesting the next step. Both keep the current attempt
+and its concurrency slot. Keep each step within the ordinary response deadline.
+
+When the owner-turn request times out in Orleans messaging, the executor durably defers
+delivery by `DurableJobsOptions.JobStatusPollInterval` and releases the concurrency slot. An
+applied deferral preserves the previous dequeue count and sets the activity tag
+`orleans.durable_job.status` to `delivery_deferred`. Redelivery uses the same job ID and a new
+run ID. The timed-out step may already have run, so make effects idempotent using the job ID or
+a stable application operation ID. Exceptions thrown by the handler, including a handler-thrown
+`TimeoutException`, follow `ShouldRetry`.
+
+If the final step commits state and an external notification must run after it returns, return
+`DurableJobRunResult.Completed` and implement `IDurableJobTurnCompletionHandler`. Its interleaving
+completion reads the committed result and performs the notification. A completion failure goes
+through `ShouldRetry`, and redelivery can repeat steps and completion.
+
+Registered feature handlers take precedence and use interleaving delivery, as do ordinary
+`IDurableJobHandler` implementations. During a mixed-version upgrade, a new receiver returns
+a durable reschedule one minute in the future when the executor does not advertise owner-turn
+support. An older executor that supports the durable reschedule result resets the dequeue count
+and frees its concurrency slot when it applies the reschedule.
+The shard retains ownership until it is released or reassigned. Upgrade all executors before
+enabling handlers that require owner turns if jobs must run during the rollout.
+
 ## Introduction
 Microsoft Orleans Durable Jobs provides a distributed, scalable system for scheduling one-time jobs that execute at a specific time. Unlike Orleans Reminders which are designed for recurring tasks, Durable Jobs are ideal for one-time future events such as appointment notifications, delayed processing, scheduled workflow steps, and time-based triggers.
 
@@ -247,6 +276,9 @@ open canceled by its initiating caller after that attempt finishes cleanup.
 Persistent journal providers enforce conditional content mutations; ordinary metadata annotations and
 same-owner closure retain their metadata-only retry behavior.
 
+`CancelAsync` checks local ownership and routes a request for a remote shard to its owner's job
+manager. It returns `true` when the owner records removal. An already-running attempt can finish.
+
 Catalog providers apply raw-prefix and range constraints using their storage capabilities.
 The timestamp representation also supports narrower day/hour prefixes and inclusive `MinId`
 and `MaxId` intervals for callers selecting a specific time window. Recovery starts at the
@@ -272,6 +304,12 @@ Shorter lookahead periods reduce early loading of recovered shards. Shorter chec
 increase sweep frequency and reduce the wait for newly inserted or newly eligible shards.
 The public `JobShardManager.AssignJobShardsAsync` method collects the same ordered discovery
 stream into its full-result list.
+
+When a journal write fails, the shard stops dequeuing jobs and rejects further
+mutations. After execution drains, the provider releases ownership so discovery
+can replay the journal and execute the remaining persisted jobs. Cleanup deletes
+a journal only after accepted mutations finish and the durable job count is
+known to be zero.
 
 ## Shutdown lifecycle
 
@@ -590,10 +628,10 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 ## How It Works
 
 ### Architecture Overview
-1. **Job Sharding**: Jobs are partitioned into time-based shards (default: 1-minute windows)
+1. **Job Sharding** partitions jobs into time-based shards (one hour by default).
 2. **Shard Ownership**: Each shard is owned by a single silo for execution
 3. **Automatic Rebalancing**: When a silo fails, its shards are automatically reassigned to healthy silos
-4. **Ordered Execution**: Within a shard, jobs are processed in order of their due time
+4. **Due-time order** governs dequeue within a shard. Execution of dequeued jobs can overlap.
 5. **Concurrency Control**: The `MaxConcurrentJobsPerSilo` setting limits concurrent job execution
 
 ### Job Lifecycle
@@ -614,9 +652,11 @@ public class WorkflowGrain : Grain, IDurableJobHandler
       │
       ├──▶ Success ──▶ Job is removed
       │
-      └──▶ Failure ──▶ Retry policy decides:
-                        • Retry: Job is re-queued with new due time
-                        • No Retry: Job is removed
+      ├──▶ Owner-turn delivery timeout ──▶ Defer with previous dequeue count
+      │
+      └──▶ Handler or completion failure
+              ├──▶ Retry policy supplies a due time ──▶ Requeue the job
+              └──▶ Retry policy returns null ──▶ Report failed attempt
 ```
 
 ## Configuration Reference
@@ -625,9 +665,10 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ShardDuration` | `TimeSpan` | 1 minute | Duration of each job shard. Smaller values reduce latency but increase overhead. |
-| `MaxConcurrentJobsPerSilo` | `int` | 100 | Maximum number of jobs that can execute simultaneously on a silo. |
-| `ShouldRetry` | `Func<IJobRunContext, Exception, DateTimeOffset?>` | 3 retries with exp. backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
+| `ShardDuration` | `TimeSpan` | 1 hour | Duration of each job shard. |
+| `MaxConcurrentJobsPerSilo` | `int` | 10,000 × processor count | Maximum number of jobs that can execute simultaneously on a silo. |
+| `JobStatusPollInterval` | `TimeSpan` | 1 second | Poll delay for asynchronous handlers and delay before redelivery after an owner-turn messaging timeout. |
+| `ShouldRetry` | `Func<IJobRunContext, Exception, DateTimeOffset?>` | Exponential backoff while `DequeueCount` is below 5 | Determines when a failed job should be retried. Return the new due time or `null` to stop retrying. |
 
 ## Best Practices
 

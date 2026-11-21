@@ -152,7 +152,8 @@
     <PackageVersion Update="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageVersion Update="Azure.Storage.Queues" Version="12.27.1" />
     <PackageVersion Update="Google.Protobuf" Version="3.36.1" />
-    <PackageVersion Update="Grpc.Tools" Version="2.83.0" />
+    <!-- Grpc.Tools 2.84 provides native build tools on Apple Silicon. -->
+    <PackageVersion Update="Grpc.Tools" Version="2.84.0" />
     <PackageVersion Update="Microsoft.Data.Sqlite" Version="10.0.3" />
     <PackageVersion Update="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
     <PackageVersion Update="Microsoft.Extensions.Configuration.Binder" Version="10.0.14" />

@@ -12,9 +12,13 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">
+    <Compile Remove="AdvancedReminderFeatureTests.Admission.cs;AdvancedReminderFeatureTests.Cancellation.cs;AdvancedReminderFeatureTests.ConcurrentDelivery.cs;AdvancedReminderFeatureTests.DeliveryFailure.cs;AdvancedReminderFeatureTests.OneShotRecovery.cs;AdvancedReminderFeatureTests.RecurringRecovery.cs;AdvancedReminderFeatureTests.Waits.cs;AdvancedReminderFeatureTests.cs;AdvancedReminderInMemoryTests.cs" />
   </ItemGroup>
 </Project>

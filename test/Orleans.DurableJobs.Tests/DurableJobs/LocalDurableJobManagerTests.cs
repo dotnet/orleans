@@ -1715,7 +1715,7 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
-    public async Task FaultedRunner_WithFencedJournalPreservesPersistedJobsAndLogsCleanupFailure()
+    public async Task FaultedRunner_WithFencedJournalReleasesPersistedJobsForRediscovery()
     {
         var token = TestContext.Current.CancellationToken;
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -1752,11 +1752,11 @@ public class LocalDurableJobManagerTests
         fault.SetResult();
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => runner!.WaitAsync(TimeSpan.FromSeconds(5), token)));
         AssertSchedulingCacheEmpty(accessor);
-        var cleanupFailure = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Error);
-        Assert.Same(writeFailure, Assert.IsType<InvalidOperationException>(cleanupFailure.Exception).InnerException);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
         Assert.Equal(0, interceptedStorage.DeleteCount);
 
-        await using var recovered = Assert.Single(await shardManager.AssignJobShardsAsync(now, 0, token));
+        Assert.Empty(await shardManager.AssignJobShardsAsync(now, 0, token));
+        await using var recovered = Assert.Single(await shardManager.AssignJobShardsAsync(now, 1, token));
         Assert.NotSame(original, recovered);
         Assert.Equal(1, await recovered.GetJobCountAsync());
         Assert.Equal(DurableJobMutationResult.Applied, await recovered.RemoveJobAsync(job.Id, token));

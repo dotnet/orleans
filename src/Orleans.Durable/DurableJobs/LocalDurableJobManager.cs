@@ -76,6 +76,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _logger = logger;
         _options = options.Value;
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     /// <inheritdoc/>
@@ -700,6 +701,10 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             catch (OperationCanceledException) when (_cts.IsCancellationRequested)
             {
                 // Execution cancellation leaves ownership cleanup with this runner.
+            }
+            catch (Exception exception) when (!_cts.IsCancellationRequested && shard is JournaledJobShard { ExecutionRetired: true })
+            {
+                LogRetiredShardExecutionFailed(_logger, exception, shard.Id);
             }
         }
         finally
