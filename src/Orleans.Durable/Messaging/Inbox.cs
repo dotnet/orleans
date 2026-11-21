@@ -320,7 +320,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </summary>
     internal async ValueTask<bool> ProcessReadyAsync(CancellationToken cancellationToken)
     {
-        if (_handlers.IsEmpty || _messages.Count == 0)
+        if (Shared.HoldsRecordedState || _handlers.IsEmpty || _messages.Count == 0)
         {
             return false;
         }
@@ -526,10 +526,13 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var compacted = CompactDeadLetters(TimeProvider.GetUtcNow());
-        if (ChargeInterruptedAttempts() | compacted)
+        if (!Shared.HoldsRecordedState)
         {
-            await PersistAsync().ConfigureAwait(true);
+            var compacted = CompactDeadLetters(TimeProvider.GetUtcNow());
+            if (ChargeInterruptedAttempts() | compacted)
+            {
+                await PersistAsync().ConfigureAwait(true);
+            }
         }
 
         _recovered = true;
@@ -583,7 +586,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </remarks>
     internal async Task RecordCleanStopAsync()
     {
-        if (!_recovered || _pump.IsFailed || _stoppedCleanly || _messages.Count == 0) return;
+        if (!_recovered || Shared.HoldsRecordedState || _pump.IsFailed || _stoppedCleanly || _messages.Count == 0) return;
         try
         {
             Emit(InboxCommand.CleanStop.Instance);

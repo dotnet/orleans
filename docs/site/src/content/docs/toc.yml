@@ -140,6 +140,8 @@ items:
             href: grains/durable-tasks-replay-rules.md
           - name: Versioning
             href: grains/durable-tasks-versioning.md
+          - name: Test workflow changes
+            href: grains/durable-tasks-testing.md
           - name: Integrate with other systems
             href: grains/durable-tasks-integrations.md
           - name: Practical recipes
