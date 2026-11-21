@@ -35,6 +35,7 @@ If you are learning Orleans from an empty directory, start with the [tutorials a
 
 ## Use Orleans features
 
+- [Model collections of grains](model-grain-collections.md)
 - [Persist grain state](../grains/grain-persistence/index.md)
 - [Configure experimental Journaling](../grains/journaling/configuration.md)
 - [Implement messaging workflows](../grains/messaging-recipes.md)
