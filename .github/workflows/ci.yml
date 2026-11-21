@@ -608,7 +608,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net10.0", "net11.0"]
+        # The S3 provider's tests cover Orleans.Durable.S3, which targets only net11.0.
+        framework: ["net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Pre-pull S3 test images

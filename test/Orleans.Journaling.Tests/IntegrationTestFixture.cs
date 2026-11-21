@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Base class for journaling tests with common setup using InProcessTestCluster

@@ -6,7 +6,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

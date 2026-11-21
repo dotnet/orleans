@@ -2,13 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
+    <OrleansDocumentationTargetFrameworkException>The durable packages target net11.0 only.</OrleansDocumentationTargetFrameworkException>
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\..\'))</RepositoryRoot>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="$(RepositoryRoot)src\Redis\Orleans.Journaling.Redis\Orleans.Journaling.Redis.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Redis\Orleans.Durable.Redis\Orleans.Durable.Redis.csproj" />
   </ItemGroup>
 
 </Project>

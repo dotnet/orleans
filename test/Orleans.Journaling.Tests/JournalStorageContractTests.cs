@@ -2,7 +2,7 @@ using System.Buffers;
 using Orleans.Storage;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 internal static class JournalStorageTestExtensions
 {

@@ -4,7 +4,7 @@ using CsCheck;
 using Orleans.Storage;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Verifies the <see cref="IJournalStorage"/> contract. Every journal storage

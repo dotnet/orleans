@@ -7,7 +7,7 @@ ms.topic: reference
 
 # Orleans NuGet packages
 
-All official packages use the `Microsoft.Orleans` prefix and are published on [NuGet.org](https://www.nuget.org/profiles/Orleans). Keep Orleans package versions aligned within an application.
+Official packages use the `Microsoft.Orleans` prefix. Find released packages on [NuGet.org](https://www.nuget.org/profiles/Orleans). Keep Orleans package versions aligned within an application.
 
 ## Start with a metapackage
 
@@ -63,7 +63,7 @@ File storage for local, single-silo development and testing is included in [Micr
 
 Memory persistence distributes records across cluster storage grains but isn't durable or replicated. Use it only when losing records with a hosting process is acceptable.
 
-## Reminders and durable jobs
+## Reminders
 
 | Package | Purpose |
 | --- | --- |
@@ -74,10 +74,21 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.DynamoDB) | Amazon DynamoDB reminders. |
 | [Microsoft.Orleans.Reminders.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Firestore) | Google Cloud Firestore reminders. |
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
-| [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
-| [Microsoft.Orleans.DurableJobs.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs.AzureStorage) | Azure Blob Storage for durable jobs. |
 
-Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Grain timers are activation-scoped and use the core runtime rather than a provider package.
+Use reminders for recurring durable callbacks. Grain timers are activation-scoped and use the core runtime rather than a provider package.
+
+## Durable state, jobs, messaging, and tasks
+
+| Package | Purpose |
+| --- | --- |
+| `Microsoft.Orleans.Durable` | Pre-release alpha journaled durable state, durable jobs, inbox and outbox messaging, and the durable grain RPC runtime; see the [Journaling overview](../grains/journaling/index.md). Awaiting first NuGet publication. |
+| `Microsoft.Orleans.Durable.Abstractions` | Pre-release alpha programming model abstractions and analyzers for durable asynchronous operations. Awaiting first NuGet publication. |
+| `Microsoft.Orleans.Durable.Http` | Pre-release alpha ASP.NET Core integration which serves durable tasks as idempotent HTTP operations. Awaiting first NuGet publication. |
+| `Microsoft.Orleans.Durable.AzureStorage` | Pre-release alpha Azure Blob and Azure Table providers for journaling and durable jobs. Awaiting first NuGet publication. |
+| `Microsoft.Orleans.Durable.Redis` | Pre-release alpha Redis journal storage provider. Awaiting first NuGet publication. |
+| `Microsoft.Orleans.Durable.S3` | Pre-release alpha Amazon S3 Express One Zone journal storage provider. Awaiting first NuGet publication. |
+
+Use durable jobs for scheduled one-time work. Messaging composes Durable Jobs with Journaling for recoverable, at-least-once grain messages. Each feature registers independently on the silo builder. These packages target .NET 11 (`net11.0`).
 
 ## Streams and broadcast channels
 
@@ -111,10 +122,6 @@ These packages don't replace the cluster membership provider.
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.EventSourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing) | Event-sourced grain base types and log-consistency abstractions. |
-| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Pre-release alpha durable journaled collections and values with experimental diagnostic `ORLEANSEXP005`; see the [Journaling overview](../grains/journaling/index.md). |
-| [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Pre-release alpha Azure Blob and Azure Table providers for Orleans Journaling. |
-| [Microsoft.Orleans.Journaling.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) | Pre-release alpha Redis provider for Orleans Journaling. |
-| [Microsoft.Orleans.Journaling.S3](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.S3) | Pre-release alpha Amazon S3 Express One Zone provider for Orleans Journaling. |
 | [Microsoft.Orleans.Transactions](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) | Distributed transaction runtime. |
 | [Microsoft.Orleans.Transactions.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AzureStorage) | Azure Storage transaction state. |
 | [Microsoft.Orleans.Transactions.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.DynamoDB) | Amazon DynamoDB transaction state. |

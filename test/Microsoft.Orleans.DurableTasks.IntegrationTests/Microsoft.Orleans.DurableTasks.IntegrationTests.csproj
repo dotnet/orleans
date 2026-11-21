@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsCheck" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Linked sample hosting code uses the web SDK's dependency-injection implicit using. -->
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Compile Include="..\..\docs\site\src\content\docs\diagnostics\snippets\durable-tasks\GlobalUsings.cs" Link="Documentation\GlobalUsings.cs" />
+    <Compile Include="..\..\docs\site\src\content\docs\diagnostics\snippets\durable-tasks\Orleans0219.cs" Link="Documentation\Orleans0219.cs" />
+    <Compile Include="..\..\docs\site\src\content\docs\diagnostics\snippets\durable-tasks\Shared.cs" Link="Documentation\Shared.cs" />
+    <Compile Include="..\..\playground\DurableOrderProcessing\CatalogData.cs" Link="OrderProcessing\CatalogData.cs" />
+    <Compile Include="..\..\playground\DurableOrderProcessing\Contracts.cs" Link="OrderProcessing\Contracts.cs" />
+    <Compile Include="..\..\playground\DurableOrderProcessing\Grains\CatalogItemGrain.cs" Link="OrderProcessing\CatalogItemGrain.cs" />
+    <Compile Include="..\..\samples\DurableWorkflows\DurableWorkflows.Service\ExternalEffects.cs" Link="ExternalEffects\ExternalEffects.cs" />
+    <Compile Include="..\..\samples\DurableWorkflows\DurableWorkflows.Service\ExternalEffectHosting.cs" Link="ExternalEffects\ExternalEffectHosting.cs" />
+    <Compile Include="..\..\samples\DurableWorkflows\DurableWorkflows.Service\ExternalEffectGrain.cs" Link="ExternalEffects\ExternalEffectGrain.cs" />
+    <Compile Include="..\..\samples\DurableWorkflows\DurableWorkflows.Service\RecipeEffectProviderGrain.cs" Link="ExternalEffects\RecipeEffectProviderGrain.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+</Project>

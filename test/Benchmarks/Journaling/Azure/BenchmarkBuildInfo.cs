@@ -1,6 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 namespace Benchmarks.Journaling.Azure;
 

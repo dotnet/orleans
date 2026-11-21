@@ -1,7 +1,7 @@
 using TestExtensions;
 using Xunit;
 
-namespace Orleans.DurableJobs.Tests;
+namespace Orleans.Durable.Jobs.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

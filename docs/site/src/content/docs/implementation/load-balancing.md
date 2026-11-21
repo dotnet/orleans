@@ -83,9 +83,11 @@ Moving an activation has a cost: dehydrate and rehydrate work, directory updates
 
 Valid activations continue running on their current silos across membership changes. A joining silo receives activations through later creation or opt-in migration. During graceful shutdown, ordinary activations on the departing silo deactivate; later calls create replacements on remaining compatible silos.
 
-## Experimental activation rebalancer
+<a id="experimental-activation-rebalancer"></a>
 
-<xref:Orleans.Hosting.ActivationRebalancerExtensions.AddActivationRebalancer*?displayProperty=nameWithType> enables the resource rebalancer and produces compiler warning **`ORLEANSEXP002`**. A worker observes cluster statistics in sessions, estimates imbalance using entropy, and asks source silos to migrate random activations toward underloaded silos. A monitor can wake or relocate the worker after failure.
+## Activation rebalancer
+
+<xref:Orleans.Hosting.ActivationRebalancerExtensions.AddActivationRebalancer*?displayProperty=nameWithType> enables the resource rebalancer. A worker observes cluster statistics in sessions, estimates imbalance using entropy, and asks source silos to migrate random activations toward underloaded silos. A monitor can wake or relocate the worker after failure.
 
 The protocol optimizes distribution of activation count and memory use. The activation repartitioner complements it by optimizing the communication graph and cross-silo hot paths.
 
@@ -102,9 +104,11 @@ The entropy quantum, allowed deviation, and cycle and silo weights control conve
 
 Implementation: [`ActivationRebalancerWorker`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/Rebalancing/ActivationRebalancerWorker.cs).
 
-## Experimental activation repartitioner
+<a id="experimental-activation-repartitioner"></a>
 
-<xref:Orleans.Hosting.ActivationRepartitioningExtensions.AddActivationRepartitioner*?displayProperty=nameWithType> enables communication-aware repartitioning and produces compiler warning **`ORLEANSEXP001`**. The repartitioner samples fully addressed request messages and constructs a weighted graph:
+## Activation repartitioner
+
+<xref:Orleans.Hosting.ActivationRepartitioningExtensions.AddActivationRepartitioner*?displayProperty=nameWithType> enables communication-aware repartitioning. The repartitioner samples fully addressed request messages and constructs a weighted graph:
 
 - vertices represent migratable activations;
 - edge weights represent observed calls;
@@ -135,4 +139,4 @@ Implementation: [`ActivationRepartitioner`](https://github.com/dotnet/orleans/bl
 | Activation repartitioner | Opt-in exchange rounds | Grain call graph and tolerance rule | Communication-aware activations |
 | Load shedding | CPU or memory threshold exceeded | Local CPU and memory use | Rejects gateway requests, controls stream queue reads using CPU, and marks the silo overloaded |
 
-Resource-optimized placement is the default and is usually the first mechanism to tune. Add the activation rebalancer for persistent count or memory skew and the repartitioner for call-locality problems after measuring the workload. Enable load shedding for overload protection. The experimental movement protocols use [activation migration](activation-lifecycle.md). Apply capacity planning, admission control, and deployment health monitoring alongside these runtime mechanisms. Operational guidance belongs in the [deployment section](../deployment/index.md).
+Resource-optimized placement is the default and is usually the first mechanism to tune. Add the activation rebalancer for persistent count or memory skew and the repartitioner for call-locality problems after measuring the workload. Enable load shedding for overload protection. The movement protocols use [activation migration](activation-lifecycle.md). Apply capacity planning, admission control, and deployment health monitoring alongside these runtime mechanisms. Operational guidance belongs in the [deployment section](../deployment/index.md).

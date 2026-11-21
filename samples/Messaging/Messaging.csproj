@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <OrleansDocumentationTargetFrameworkException>The durable packages target net11.0 only.</OrleansDocumentationTargetFrameworkException>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <NoWarn>$(NoWarn);ORLEANSEXP003</NoWarn>
+    <OrleansDocumentationVersionException>The Microsoft.Orleans.Durable packages require locally built packages until they are published.</OrleansDocumentationVersionException>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Durable" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+  </ItemGroup>
+</Project>

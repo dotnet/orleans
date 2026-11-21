@@ -3,8 +3,8 @@ using Azure.Storage.Blobs;
 using DurableJobsJournaling;
 using DurableJobsJournaling.Silo;
 using Orleans.Dashboard;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 

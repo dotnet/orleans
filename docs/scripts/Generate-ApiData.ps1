@@ -273,11 +273,18 @@ try {
             @($evaluation.Properties.TargetFramework)
         }
 
-        if ($TargetFramework -notin $frameworks) {
+        # A project which targets only net11.0 documents its net11.0 build.
+        if ($TargetFramework -in $frameworks) {
+            $projectFramework = $TargetFramework
+        }
+        elseif ("net11.0" -in $frameworks) {
+            $projectFramework = "net11.0"
+        }
+        else {
             continue
         }
 
-        $targetEvaluation = Get-ProjectProperties -ProjectPath $project.FullName -Framework $TargetFramework -PropertyNames @(
+        $targetEvaluation = Get-ProjectProperties -ProjectPath $project.FullName -Framework $projectFramework -PropertyNames @(
             "AssemblyName",
             "PackageId",
             "PackageVersion",
@@ -291,12 +298,13 @@ try {
             PackageId = $targetEvaluation.Properties.PackageId
             PackageVersion = $targetEvaluation.Properties.PackageVersion
             ProjectPath = $project.FullName
+            TargetFramework = $projectFramework
             TargetPath = [IO.Path]::GetFullPath($targetEvaluation.Properties.TargetPath)
         })
     }
 
     if ($apiProjects.Count -eq 0) {
-        throw "No packable source projects with build output target '$TargetFramework'."
+        throw "No packable source projects with build output target '$TargetFramework' or net11.0."
     }
 
     $duplicatePackages = $apiProjects | Group-Object PackageId | Where-Object Count -gt 1
@@ -309,7 +317,8 @@ try {
         throw "Multiple projects produce the same assembly: $($duplicateAssemblies.Name -join ', ')."
     }
 
-    Write-Host "Selected $($apiProjects.Count) package projects for $TargetFramework."
+    $frameworkSummary = ($apiProjects | Group-Object TargetFramework | Sort-Object Name | ForEach-Object { "$($_.Count) for $($_.Name)" }) -join ", "
+    Write-Host "Selected $($apiProjects.Count) package projects: $frameworkSummary."
     if (-not $SkipBuild) {
         foreach ($project in $apiProjects) {
             Write-Host "Building $($project.PackageId)"
@@ -319,7 +328,7 @@ try {
                 "--configuration",
                 $Configuration,
                 "--framework",
-                $TargetFramework,
+                $project.TargetFramework,
                 "--verbosity",
                 "quiet"
             )
@@ -347,7 +356,7 @@ try {
     }
 
     $dotNetRoot = Get-DotNetRoot
-    $frameworkReferences = Get-FrameworkReferences -DotNetRoot $dotNetRoot -Framework $TargetFramework
+    $frameworkReferences = @{}
     $allProjectAssemblies = @($apiProjects.TargetPath | Sort-Object)
 
     New-Item -ItemType Directory -Force $artifactRoot, $OutputDirectory | Out-Null
@@ -369,11 +378,15 @@ try {
             }
         }
 
-        foreach ($packageAssembly in Get-PackageCompileReferences -AssetsFile $project.AssetsFile -Framework $TargetFramework) {
+        foreach ($packageAssembly in Get-PackageCompileReferences -AssetsFile $project.AssetsFile -Framework $project.TargetFramework) {
             Add-Reference -References $references -Path $packageAssembly -Kind "package"
         }
 
-        foreach ($frameworkAssembly in $frameworkReferences) {
+        if (-not $frameworkReferences.ContainsKey($project.TargetFramework)) {
+            $frameworkReferences[$project.TargetFramework] = @(Get-FrameworkReferences -DotNetRoot $dotNetRoot -Framework $project.TargetFramework)
+        }
+
+        foreach ($frameworkAssembly in $frameworkReferences[$project.TargetFramework]) {
             Add-Reference -References $references -Path $frameworkAssembly -Kind "framework"
         }
 
@@ -394,7 +407,7 @@ try {
             sourceCommit = "main"
             sourceRoot = $repositoryRoot
             sourceFileManifest = $sourceFileManifestPath
-            targetFramework = $TargetFramework
+            targetFramework = $project.TargetFramework
         })
     }
 
@@ -455,7 +468,7 @@ try {
         $document = Get-Content $outputPath -Raw | ConvertFrom-Json
         if ($document.package.name -ne $project.PackageId -or
             $document.package.version -ne $project.PackageVersion -or
-            $document.package.targetFramework -ne $TargetFramework -or
+            $document.package.targetFramework -ne $project.TargetFramework -or
             $document.package.sourceRepository -ne "https://github.com/dotnet/orleans" -or
             $document.package.sourceCommit -ne "main") {
             throw "Package metadata validation failed for '$outputPath'."

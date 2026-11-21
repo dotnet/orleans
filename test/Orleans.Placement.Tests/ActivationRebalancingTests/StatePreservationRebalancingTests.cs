@@ -190,7 +190,6 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
             builder.Options.InitialSilosCount = 4;
             builder.Options.UseRealEnvironmentStatistics = true;
             builder.ConfigureSilo((options, siloBuilder)
-#pragma warning disable ORLEANSEXP002
                 => siloBuilder
                     .Configure<SiloMessagingOptions>(o =>
                     {
@@ -204,7 +203,6 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
                         o.SessionCyclePeriod = SessionCyclePeriod;
                     })
                     .AddActivationRebalancer());
-#pragma warning restore ORLEANSEXP002
         }
     }
 }

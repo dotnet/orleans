@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Durable</PackageId>
+    <Title>Microsoft Orleans Durable</Title>
+    <Description>Durable state, jobs, messaging, and tasks for Microsoft Orleans: journaled grain state with a default System.Text.Json journal format, durable jobs, inbox and outbox messaging, and the durable task runtime.</Description>
+    <PackageTags>$(PackageTags) Durable Persistence States JSON Jobs Messaging Inbox Outbox Tasks</PackageTags>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
+    <!-- Validate framework assets while the first release establishes a package baseline. -->
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Benchmarks" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.IntegrationTests" />
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.Tests" />
+    <InternalsVisibleTo Include="Orleans.Durable.AzureStorage" />
+    <InternalsVisibleTo Include="Orleans.Durable.Redis" />
+    <InternalsVisibleTo Include="Orleans.Durable.S3" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs.AzureStorage.Tests" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
+    <InternalsVisibleTo Include="Orleans.Messaging.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <!-- These packages share internals with this package, so it depends on their exact versions. -->
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Abstractions\Orleans.Durable.Abstractions.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" PackExactVersion="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Orleans.Runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

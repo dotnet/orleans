@@ -129,7 +129,6 @@ $runtimeLog = Join-Path $ResultsDirectory 'runtime.log'
 $publishArguments = @(
     'publish', (Join-Path $projectDirectory 'Orleans.NativeAotSmoke.csproj'),
     '--configuration', 'Release',
-    '--framework', 'net10.0',
     '--runtime', $RuntimeIdentifier,
     '--self-contained', 'true',
     '--output', $output,

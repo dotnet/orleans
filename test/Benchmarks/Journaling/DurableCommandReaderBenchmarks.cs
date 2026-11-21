@@ -1,5 +1,5 @@
 using BenchmarkDotNet.Attributes;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Microsoft.Extensions.DependencyInjection;

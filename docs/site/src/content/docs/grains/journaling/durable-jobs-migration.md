@@ -35,7 +35,7 @@ Keep one authoritative location for each shard throughout its lifetime.
 
 Named journal providers resolve storage, catalog, and state-manager factory
 from the same binding. The default provider used by grain-owned
-<xref:Orleans.Journaling.IDurableStateManager> instances remains independent of explicitly named
+<xref:Orleans.Durable.Journaling.IDurableStateManager> instances remains independent of explicitly named
 Durable Jobs providers. The in-memory and Azure Durable Jobs convenience
 methods compose the same common registration path for the default binding.
 
@@ -84,7 +84,7 @@ retries, rescheduling, cancellation, snapshots, and deletion retain that binding
 Draining shards stay closed to new schedules.
 
 Shard IDs retain their timestamp/GUID representation, and journal IDs remain
-`jobs/shards/<id>`. Serialized <xref:Orleans.DurableJobs.DurableJob> handles keep
+`jobs/shards/<id>`. Serialized <xref:Orleans.Durable.Jobs.DurableJob> handles keep
 their existing provider-independent shape.
 Application code can keep using a previously saved handle after cutover.
 
@@ -120,10 +120,10 @@ govern pending request attempts.
 
 ## Verify retirement
 
-Resolve <xref:Orleans.DurableJobs.IDurableJobsStorageInspector> from the host's
-services and call its <xref:Orleans.DurableJobs.IDurableJobsStorageInspector.InspectAsync*>
+Resolve <xref:Orleans.Durable.Jobs.IDurableJobsStorageInspector> from the host's
+services and call its <xref:Orleans.Durable.Jobs.IDurableJobsStorageInspector.InspectAsync*>
 method with A's configured name and a cancellation token.
-The returned <xref:Orleans.DurableJobs.DurableJobsStorageStatus> describes a full
+The returned <xref:Orleans.Durable.Jobs.DurableJobsStorageStatus> describes a full
 `jobs/shards/` catalog snapshot through the caller using read-only catalog and
 metadata operations. It includes future shards outside lookahead and poisoned
 shards requiring operator recovery.

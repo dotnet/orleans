@@ -10,7 +10,7 @@ pwsh ./docs/scripts/Generate-ApiData.ps1
 
 The default output is `docs/site/src/data/pkgs`. Pass `-OutputDirectory` to generate into a staging directory, `-TargetFramework` to select another supported TFM, or `-SkipBuild` when all selected package projects have already been built.
 
-Projects are discovered from `src/**/*.csproj` using evaluated MSBuild properties. A project is included when it targets the selected framework and has both `IsPackable=true` and `IncludeBuildOutput=true`. This excludes test projects, implementation-only projects, analyzers, code generators, and assembly-free meta-packages without maintaining a package list.
+Projects are discovered from `src/**/*.csproj` using evaluated MSBuild properties. A project is included when it has both `IsPackable=true` and `IncludeBuildOutput=true`, and is documented from its build for the selected framework, or from its `net11.0` build when it targets only `net11.0`. This excludes test projects, implementation-only projects, analyzers, code generators, and assembly-free meta-packages without maintaining a package list.
 
 Each output file is named `{PackageId}.{PackageVersion}.json`. Only public types and members declared by that package assembly are emitted; project, package, and framework dependencies are resolution-only Roslyn references. Portable PDB paths are resolved against the verified local repository tree and a tracked-file allowlist from the advertised commit, avoiding network-dependent output and broken generated/inferred links. The script validates XML documentation, package metadata, source repository/commit information, and duplicate type identities before removing stale generator-owned JSON files.
 

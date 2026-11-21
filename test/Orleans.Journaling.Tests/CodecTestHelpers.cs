@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 public static class CodecTestHelpers
 {
@@ -84,6 +84,7 @@ public static class CodecTestHelpers
         AssertCommandCodec<IDurableListCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IDurableQueueCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IDurableSetCommandCodec<int>>(serviceProvider, journalFormatKey);
+        AssertCommandCodec<IDurableLogCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IDurableValueCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IPersistentStateCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IDurableTaskCompletionSourceCommandCodec<int>>(serviceProvider, journalFormatKey);
@@ -96,6 +97,7 @@ public static class CodecTestHelpers
         AssertCommandCodecService<IDurableListCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IDurableQueueCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IDurableSetCommandCodec<int>>(serviceProvider, journalFormatKey);
+        AssertCommandCodecService<IDurableLogCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IDurableValueCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IPersistentStateCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IDurableTaskCompletionSourceCommandCodec<int>>(serviceProvider, journalFormatKey);

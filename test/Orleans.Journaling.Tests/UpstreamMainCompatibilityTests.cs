@@ -9,7 +9,7 @@ using Orleans.Serialization.Codecs;
 using Xunit;
 using static VerifyXunit.Verifier;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Cross-version recovery test: feeds a pre-canned journal blob captured from <c>upstream/main</c>

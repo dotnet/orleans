@@ -90,7 +90,7 @@ Implement <xref:Orleans.Runtime.IGrainMigrationParticipant> for custom activatio
 
 Persistent-state components supplied by Orleans participate automatically. Migration isn't a replacement for durable storage: migrated state is still lost if the source process fails before transfer completes.
 
-Automatic activation repartitioning and rebalancing use migration to improve locality or cluster balance. Both are experimental. See [Grain placement](grain-placement.md) for their status and configuration.
+Automatic activation repartitioning and rebalancing use migration to improve locality or cluster balance. See [Grain placement](grain-placement.md) for their configuration.
 
 Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain type from automatic migration. It doesn't block an explicit <xref:Orleans.Grain.MigrateOnIdle> request.
 

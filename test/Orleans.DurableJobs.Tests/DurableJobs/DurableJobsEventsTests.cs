@@ -1,6 +1,6 @@
 using System.Net;
-using Orleans.DurableJobs.Diagnostics;
-using Orleans.Journaling;
+using Orleans.Durable.Jobs.Diagnostics;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Xunit;
 

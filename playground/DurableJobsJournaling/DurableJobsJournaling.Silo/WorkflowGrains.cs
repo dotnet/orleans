@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using DurableJobsJournaling.Abstractions;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace DurableJobsJournaling.Silo;
 
