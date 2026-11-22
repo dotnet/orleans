@@ -501,4 +501,4 @@ Use `RepairAsync` when the definition is valid but its next due state needs reca
 - Measure first and later pages with both distributed registrations and a heavily populated grain or hash bucket. Include recovery scans and cron queries over both cached local dates and dates around time-zone transitions.
 - Validate rolling upgrades against the same provider data and use compatible reminder and job serialization contracts. If your application also uses Durable Jobs handlers that require ordinary owner turns, upgrade the executors before enabling those handlers. Older executors which support durable rescheduling defer these jobs during the rollout.
 
-For package names, see [Orleans NuGet packages](../resources/nuget-packages.md#reminders-and-durable-jobs).
+For package names, see [Orleans NuGet packages](../resources/nuget-packages.md#reminders).
