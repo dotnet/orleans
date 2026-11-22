@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime.Hosting;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
@@ -35,11 +36,27 @@ public static class SiloBuilderReminderExtensions
             }
 
             var clock = services.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs) ?? TimeProvider.System;
+            var reminderOptions = services.GetRequiredService<IOptions<ReminderOptions>>();
             options.ShouldRetry = (context, failure) =>
             {
-                var due = shouldRetry(context, failure);
+                if (shouldRetry(context, failure) is { } due)
+                {
+                    return due;
+                }
+
                 // The dispatcher reports this failure only while a limited reminder has attempts left.
-                return due ?? (failure is ReminderDeliveryException ? clock.GetUtcNow().AddSeconds(1) : null);
+                if (failure is ReminderDeliveryException)
+                {
+                    return clock.GetUtcNow().AddSeconds(1);
+                }
+
+                // A failure can occur before the dispatcher reads or advances the occurrence.
+                // Retain its existing carrier when the backend's normal retry budget is exhausted.
+                var retention = reminderOptions.Value;
+                return retention.DeliveryRetryPolicy is { RetainsFailedDeliveries: true }
+                    && AdvancedReminderService.IsReminderJob(context.Job)
+                    ? clock.GetUtcNow().Add(retention.MinimumReminderPeriod)
+                    : null;
             };
         });
         services.TryAddSingleton(TimeProvider.System);

@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
+using NSubstitute;
 using Orleans.AdvancedReminders.Runtime.Hosting;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.AdvancedReminders.Timers;
@@ -182,6 +184,54 @@ public class SiloBuilderReminderExtensionsTests
             .Single();
 
         validator.ValidateConfiguration();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AddAdvancedReminders_FallsBackOnlyForRetainedReminderJobs(bool untilSuccess)
+    {
+        var clock = new FakeTimeProvider();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, clock);
+        var retryDelay = TimeSpan.FromSeconds(17);
+        services.AddAdvancedReminders(options =>
+        {
+            options.DeliveryRetryPolicy = untilSuccess
+                ? Orleans.AdvancedReminders.ReminderRetryPolicy.UntilSuccess
+                : Orleans.AdvancedReminders.ReminderRetryPolicy.Limited(3);
+            options.MinimumReminderPeriod = retryDelay;
+        });
+        DateTimeOffset? configuredRetry = null;
+        services.Configure<DurableJobsOptions>(options => options.ShouldRetry = (_, _) => configuredRetry);
+
+        using var provider = services.BuildServiceProvider();
+        var shouldRetry = provider.GetRequiredService<IOptions<DurableJobsOptions>>().Value.ShouldRetry;
+        var context = Substitute.For<IJobRunContext>();
+        var recipient = GrainId.Create("test", "recipient");
+        var dispatcher = GrainId.Create(AdvancedReminderDispatcherGrain.GrainTypeName, recipient.ToString());
+        var failure = new InvalidOperationException("Injected dispatcher failure.");
+        context.Job.Returns(CreateJob(dispatcher));
+        Assert.Equal(untilSuccess ? clock.GetUtcNow() + retryDelay : null, shouldRetry(context, failure));
+
+        configuredRetry = clock.GetUtcNow().AddSeconds(23);
+        Assert.Equal(configuredRetry, shouldRetry(context, failure));
+
+        configuredRetry = null;
+        context.Job.Returns(CreateJob(GrainId.Create("otherjob", recipient.ToString())));
+        Assert.Null(shouldRetry(context, failure));
+        context.Job.Returns(CreateJob(GrainId.Create(AdvancedReminderDispatcherGrain.GrainTypeName, "different-recipient")));
+        Assert.Null(shouldRetry(context, failure));
+
+        DurableJob CreateJob(GrainId target) => new()
+        {
+            Id = "job",
+            Name = "advanced-reminder:test",
+            ShardId = "test-shard",
+            TargetGrainId = target,
+            DueTime = clock.GetUtcNow(),
+            Metadata = new Dictionary<string, string> { ["grain-id"] = recipient.ToString(), ["reminder-name"] = "test" },
+        };
     }
 
     private sealed class TestSiloBuilder(IServiceCollection? services = null) : ISiloBuilder

@@ -459,7 +459,7 @@ Select <xref:Orleans.AdvancedReminders.ReminderRetryPolicy.UntilSuccess> when sc
 
 :::code language="csharp" source="../snippets/compiled-durable/Grains/RetainedReminderDeliverySnippets.cs" id="configure_advanced_reminder_retained_delivery":::
 
-With `UntilSuccess`, each failure persists a new occurrence identity and schedules a new Durable Job at least <xref:Orleans.AdvancedReminders.ReminderOptions.MinimumReminderPeriod> after the failed delivery completes. Each job has its own dequeue count, so the backend's retry limit does not cap these application delivery attempts. Persistent failures continue until delivery succeeds or the registration is explicitly removed.
+With `UntilSuccess`, a callback failure persists a new occurrence identity and schedules a new Durable Job at least <xref:Orleans.AdvancedReminders.ReminderOptions.MinimumReminderPeriod> after the failed delivery completes. Infrastructure failures in dispatch, preparation, or completion can retry the existing job. When Durable Jobs declines a retry for that job, the reminder uses `MinimumReminderPeriod` as the retry delay.
 
 The default is `ReminderRetryPolicy.Limited(3)`. A limited policy includes the initial attempt and retries the same Durable Job occurrence. Configuration binding accepts the strings `NoRetries`, `Limited(3)`, and `UntilSuccess` for `DeliveryRetryPolicy`; the count in `Limited` must be positive.
 

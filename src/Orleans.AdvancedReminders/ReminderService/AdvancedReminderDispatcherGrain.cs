@@ -1,8 +1,12 @@
 namespace Orleans.AdvancedReminders.Runtime.ReminderService;
 
+[GrainType(AdvancedReminderDispatcherGrain.GrainTypeName)]
 internal sealed class AdvancedReminderDispatcherGrain(
     AdvancedReminderService reminderService) : Grain, IAdvancedReminderDispatcherGrain
 {
+    internal const string GrainTypeName = "advancedreminderdispatcher";
+    internal static readonly GrainType DispatcherGrainType = GrainType.Create(GrainTypeName);
+
     private readonly AdvancedReminderService _reminderService = reminderService;
     // Even interleaved requests access this dictionary on the activation scheduler.
     private readonly Dictionary<Guid, DeliveryObservation> _deliveryObservations = new();

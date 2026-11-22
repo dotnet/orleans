@@ -328,7 +328,7 @@ public static class RetainedReminderDelivery
 }
 ```
 
-With `UntilSuccess`, each failure persists a fresh occurrence and schedules a new Durable Job after `MinimumReminderPeriod`, measured from completion of the failed delivery. The new job has its own dequeue count, so repeated failures can outlive the backend's per-job retry limit. Monitor repeated errors and overdue work; persistent failure continues until success or explicit removal.
+With `UntilSuccess`, a callback failure persists a fresh occurrence and schedules a new Durable Job after `MinimumReminderPeriod`, measured from completion of the failed delivery. Infrastructure failures in dispatch, preparation, or completion can retry the existing job. When Durable Jobs declines a retry for that job, the reminder uses `MinimumReminderPeriod` as the retry delay.
 
 One-shots preserve the original `StartAt` deadline and move `NextDueUtc` to the retry time. Successful delivery removes them. Interval and cron schedules retain their logical `NextDueUtc` while the native job waits for its retry time. After success, they advance to the next future slot on the original interval anchor or cron calendar, coalescing elapsed slots.
 

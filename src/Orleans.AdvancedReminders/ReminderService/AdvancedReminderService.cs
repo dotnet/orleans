@@ -224,6 +224,11 @@ internal sealed partial class AdvancedReminderService : IReminderService, IAttri
     private IAdvancedReminderDispatcherGrain GetDispatcher(GrainId grainId)
         => _grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString());
 
+    internal static bool IsReminderJob(DurableJob job)
+        => job.TargetGrainId.Type == AdvancedReminderDispatcherGrain.DispatcherGrainType
+            && TryGetReminderMetadata(job.Metadata, out var recipient, out _, out _)
+            && job.TargetGrainId.Key == IdSpan.Create(recipient.ToString());
+
     internal static bool TryGetReminderMetadata(
         IReadOnlyDictionary<string, string>? metadata,
         out GrainId grainId,

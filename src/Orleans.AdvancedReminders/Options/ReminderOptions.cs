@@ -39,11 +39,13 @@ public sealed class ReminderOptions
     /// <remarks>
     /// The default is <c>ReminderRetryPolicy.Limited(3)</c>, including the initial delivery.
     /// Limited policies retry the same Durable Job occurrence and remove the registration at the limit.
-    /// The Durable Jobs retry policy must permit at least that many attempts.
+    /// Durable Jobs uses a one-second fallback delay when its retry policy declines a remaining attempt.
     /// <see cref="ReminderRetryPolicy.NoRetries"/> advances a failed recurring occurrence or removes a one-shot.
-    /// <see cref="ReminderRetryPolicy.UntilSuccess"/> retains failures, including those before callback entry,
-    /// and schedules a fresh delivery after <see cref="MinimumReminderPeriod"/>. Recurring schedules retain
-    /// their original occurrence and calendar anchor until success. Successful one-shots are removed.
+    /// <see cref="ReminderRetryPolicy.UntilSuccess"/> retains failures, including those before callback entry.
+    /// Callback failures schedule a fresh delivery after <see cref="MinimumReminderPeriod"/>. Infrastructure
+    /// failures can retry the existing job, using that same delay when Durable Jobs declines a retry.
+    /// Recurring schedules retain their original occurrence and calendar anchor until success.
+    /// Successful one-shots are removed.
     /// Application effects must remain idempotent because delivery can be uncertain.
     /// </remarks>
     public ReminderRetryPolicy DeliveryRetryPolicy { get; set; } = ReminderRetryPolicy.Limited(ReminderOptionsDefaults.MaximumDeliveryAttempts);
