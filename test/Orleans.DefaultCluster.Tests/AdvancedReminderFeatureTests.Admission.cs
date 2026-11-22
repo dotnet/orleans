@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Runtime;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -20,7 +21,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
         original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
-        var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
+        var service = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>();
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, TestContext.Current.CancellationToken));
@@ -55,7 +56,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
         original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
-        var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
+        var service = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>();
         var first = service.ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, TestContext.Current.CancellationToken);
         try
         {
@@ -89,7 +90,7 @@ public sealed partial class AdvancedReminderFeatureTests
         var original = Assert.IsType<ReminderEntry>(await table.ReadRow(grain.GetGrainId(), name));
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
         original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
-        var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
+        var service = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var delivery = service.ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, cancellation.Token);
         try

@@ -192,8 +192,9 @@ internal sealed class AdvancedReminderDispatcherGrain(
             return;
         }
 
-        // The interleaving adapter waits for normal delivery preparation, so
-        // registration and durable-job handle persistence finish before a tick.
+        // The receiver calls this handler on an interleaved turn. Start an independent
+        // dispatcher request so admission and completion run as ordinary owner turns
+        // and admission waits for registration to persist the durable-job handle.
         using var reentrancy = RequestContext.SuppressCallChainReentrancy();
         await _reminderService.ProcessDueReminderAsync(
             grainId,

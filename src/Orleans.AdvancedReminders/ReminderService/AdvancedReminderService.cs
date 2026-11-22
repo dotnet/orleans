@@ -111,19 +111,12 @@ internal sealed partial class AdvancedReminderService : IReminderService, IAttri
         return result;
     }
 
-    public Task ProcessDueReminderAsync(
-        GrainId grainId,
-        string reminderName,
-        string? expectedScheduleId,
-        CancellationToken cancellationToken)
-        => GetDispatcher(grainId).ProcessDueReminderAsync(grainId, reminderName, expectedScheduleId, 0, cancellationToken);
-
     internal Task ProcessDueReminderAsync(
         GrainId grainId,
         string reminderName,
         string? expectedScheduleId,
         CancellationToken cancellationToken,
-        int durableJobDequeueCount)
+        int durableJobDequeueCount = 0)
         => GetDispatcher(grainId).ProcessDueReminderAsync(grainId, reminderName, expectedScheduleId, durableJobDequeueCount, cancellationToken);
 
     internal Task<string> UpsertAndScheduleEntryAsync(ReminderEntry entry, CancellationToken cancellationToken)

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Time.Testing;
 using Orleans;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Durable.Jobs;
 using Orleans.TestingHost;
 using Xunit;
@@ -46,7 +47,7 @@ public sealed partial class AdvancedReminderFeatureTests
             if (gate.StalledRequest is { } request)
             {
                 Assert.True(gate.RequestToken.IsCancellationRequested);
-                var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
+                var service = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>();
                 await AwaitPhase(service.ProcessDueReminderAsync(
                     grain.GetGrainId(), name, request.Metadata!["schedule-id"], TestContext.Current.CancellationToken),
                     "a job created by the abandoned request is fenced");
@@ -149,8 +150,55 @@ public sealed partial class AdvancedReminderFeatureTests
         }
     }
 
-    private static Task<InProcessTestCluster> CreateClusterWithGateAsync(ReminderDependencyGate gate, TimeProvider clock)
-        => CreateClusterAsync(reminderClock: clock, configureServices: services =>
+    [Fact]
+    public async Task ImmediatelyDueDurableJobs_WaitForHandlePersistence_AndDeliverOnce()
+    {
+        var clock = new ReminderWaitClock(DateTimeOffset.UtcNow);
+        var gate = new ReminderDependencyGate(StalledDependency.Scheduling, afterPersistence: true);
+        var barrier = new AdvancedReminderDeliveryBarrier { HoldCallback = true };
+        await using var cluster = await CreateClusterWithGateAsync(gate, clock, barrier);
+        var grain = cluster.Client.GetGrain<IAdvancedReminderConcurrentFeatureGrain>(Guid.NewGuid());
+        gate.Target = barrier.Target = grain.GetGrainId();
+        var name = Guid.NewGuid().ToString("N");
+        using var completion = new ReminderCompletions(name);
+        var registration = grain.Register(name, clock.GetUtcNow());
+        try
+        {
+            await AwaitPhase(gate.Started.Task, "the due job is persisted and the scheduling reply is held");
+            await AwaitPhase(barrier.PreparationRequested.Task, "the due job requests admission while registration owns the turn");
+            var pending = Assert.IsType<ReminderEntry>(await gate.Table.ReadRow(gate.Target, name));
+            Assert.Empty(pending.JobId);
+            Assert.False(barrier.CallbackSent.Task.IsCompleted);
+
+            gate.Release.TrySetResult();
+            await AwaitPhase(registration, "registration persists the handle and leaves the dispatcher turn");
+            await AwaitPhase(barrier.CallbackStarted.Task, "the admitted job reaches the callback");
+            var persisted = Assert.IsType<ReminderEntry>(await gate.Table.ReadRow(gate.Target, name));
+            Assert.Equal(pending.ScheduleId, persisted.ScheduleId);
+            Assert.NotEmpty(persisted.JobId);
+
+            var duplicate = await gate.Jobs.ScheduleJobAsync(
+                gate.StalledRequest!.Value, TestContext.Current.CancellationToken);
+            await AwaitPhase(barrier.DuplicateWaiting.Task, "the duplicate job observes the admitted callback");
+            barrier.ReleaseCallback.TrySetResult();
+
+            Assert.Equal(ActivityStatusCode.Ok, await completion.NextAsync());
+            Assert.Equal(ActivityStatusCode.Ok, await completion.NextAsync());
+            Assert.Contains(persisted.JobId, completion.JobIds);
+            Assert.Contains(duplicate.Id, completion.JobIds);
+            Assert.Equal(1, await grain.GetTickCount());
+            Assert.Null(await gate.Table.ReadRow(gate.Target, name));
+        }
+        finally
+        {
+            gate.Release.TrySetResult();
+            barrier.ReleaseCallback.TrySetResult();
+        }
+    }
+
+    private static Task<InProcessTestCluster> CreateClusterWithGateAsync(
+        ReminderDependencyGate gate, TimeProvider clock, AdvancedReminderDeliveryBarrier? deliveryBarrier = null)
+        => CreateClusterAsync(reminderClock: clock, deliveryBarrier: deliveryBarrier, configureServices: services =>
         {
             var table = services.Last(static descriptor => descriptor.ServiceType == typeof(Orleans.AdvancedReminders.IReminderTable));
             var jobs = services.Last(static descriptor => descriptor.ServiceType == typeof(ILocalDurableJobManager));

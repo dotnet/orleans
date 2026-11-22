@@ -33,7 +33,7 @@ public sealed partial class AdvancedReminderFeatureTests
         try
         {
             await AwaitPhase(barrier.OwnerTurnStarted.Task, "recipient normal turn acquired");
-            var delivery = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>()
+            var delivery = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>()
                 .ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, TestContext.Current.CancellationToken);
             await AwaitPhase(barrier.CallbackSent.Task, "callback sent behind the recipient normal turn");
             await AwaitPhase(mutation, "independent registration mutation completed while callback is queued");
@@ -77,7 +77,7 @@ public sealed partial class AdvancedReminderFeatureTests
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
         original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         barrier.Target = grain.GetGrainId();
-        var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
+        var service = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>();
 
         var first = service.ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, TestContext.Current.CancellationToken);
         try
@@ -194,7 +194,7 @@ public sealed partial class AdvancedReminderFeatureTests
         original.NextDueUtc = DateTime.UtcNow.AddSeconds(-1);
         original.ETag = await table.UpsertRow(original, TestContext.Current.CancellationToken);
         barrier.Target = grain.GetGrainId();
-        var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
+        var service = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var delivery = service.ProcessDueReminderAsync(grain.GetGrainId(), name, original.ScheduleId, cancellation.Token);
         try
@@ -244,6 +244,7 @@ public sealed class AdvancedReminderDeliveryBarrier : IOutgoingGrainCallFilter, 
     public int FailedPreparationResponseNumber { get; init; } = 1;
     public bool PausePreparationResponse { get; init; }
     public int PausedPreparationResponseNumber { get; init; } = 1;
+    public TaskCompletionSource PreparationRequested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource PreparationReady { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource ReleasePreparationResponse { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _preparationResponses;
@@ -265,9 +266,15 @@ public sealed class AdvancedReminderDeliveryBarrier : IOutgoingGrainCallFilter, 
             CallbackSent.TrySetResult();
         }
 
+        var isPreparation = context.InterfaceMethod.DeclaringType == typeof(IAdvancedReminderDispatcherGrain)
+            && context.MethodName == nameof(IAdvancedReminderDispatcherGrain.PrepareDeliveryAsync);
+        if (isPreparation)
+        {
+            PreparationRequested.TrySetResult();
+        }
+
         await invocation;
-        if (context.InterfaceMethod.DeclaringType?.FullName == "Orleans.AdvancedReminders.Runtime.ReminderService.IAdvancedReminderDispatcherGrain"
-            && context.MethodName == "PrepareDeliveryAsync")
+        if (isPreparation)
         {
             var preparationResponse = Interlocked.Increment(ref _preparationResponses);
             if (PausePreparationResponse && preparationResponse == PausedPreparationResponseNumber)

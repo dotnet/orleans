@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -22,10 +20,4 @@ public interface IReminderService
     Task<IGrainReminder?> GetReminder(GrainId grainId, string reminderName);
 
     Task<List<IGrainReminder>> GetReminders(GrainId grainId);
-
-    Task ProcessDueReminderAsync(
-        GrainId grainId,
-        string reminderName,
-        string? expectedScheduleId,
-        CancellationToken cancellationToken);
 }

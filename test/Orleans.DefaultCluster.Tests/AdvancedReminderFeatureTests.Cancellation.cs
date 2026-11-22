@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Durable.Jobs;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -61,7 +62,7 @@ public sealed partial class AdvancedReminderFeatureTests
 
             // A stale durable job can still arrive after its best-effort cleanup
             // expires. The committed removal or replacement must fence it.
-            var service = cluster.GetSiloServiceProvider().GetRequiredService<Orleans.AdvancedReminders.IReminderService>();
+            var service = cluster.GetSiloServiceProvider().GetRequiredService<AdvancedReminderService>();
             await AwaitPhase(service.ProcessDueReminderAsync(
                 grain.GetGrainId(), name, original.ScheduleId, TestContext.Current.CancellationToken),
                 "the old occurrence is rejected after the mutation commits");
