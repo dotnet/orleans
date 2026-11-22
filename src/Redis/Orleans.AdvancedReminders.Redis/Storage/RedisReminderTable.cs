@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Configuration;
 
 using StackExchange.Redis;
@@ -90,10 +91,11 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
         try
         {
             var (from, to) = GetFilter(grainId, reminderName, eTag);
-            long removed = await _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to);
+            long removed = await WaitForMutationAsync(
+                _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to), cancellationToken);
             return removed > 0;
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
         }
@@ -155,10 +157,11 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
             var expiryMilliseconds = expires
                 ? Math.Max(1, (long)Math.Ceiling(expiry.TotalMilliseconds))
                 : 0;
-            var result = await _db.ScriptEvaluateAsync(
+            var mutation = _db.ScriptEvaluateAsync(
                 UpsertScript,
                 keys: new[] { _hashSetKey },
                 values: new RedisValue[] { expectedFrom, expectedTo, allFrom, allTo, value, entry.ETag, expires ? "expire" : "persist", expiryMilliseconds });
+            var result = await WaitForMutationAsync(mutation, cancellationToken);
             if ((long)result != 1)
             {
                 throw new Runtime.ReminderException(
@@ -167,9 +170,28 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
 
             return newETag.ToString();
         }
-        catch (Exception exception) when (exception is not Runtime.ReminderException)
+        catch (Exception exception) when (exception is not Runtime.ReminderException and not OperationCanceledException)
         {
             throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
+        }
+    }
+
+    private static async Task<T> WaitForMutationAsync<T>(Task<T> mutation, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await mutation.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            mutation.Ignore();
+            if (mutation.IsCompleted)
+            {
+                throw;
+            }
+
+            // StackExchange.Redis can still execute a submitted command after the wait ends.
+            throw new ReminderTableMutationCanceledException(mutation, cancellationToken);
         }
     }
 

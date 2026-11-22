@@ -80,27 +80,49 @@ public sealed class ReminderManagementGrain(
 
         var cursor = ReminderCursor.Parse(continuationToken);
         var now = GetUtcNow();
-        var candidates = await SelectPageAsync(filter, cursor, pageSize + 1, now);
-        var hasMore = candidates.Count > pageSize;
-        if (hasMore)
+        var reminders = new List<ReminderEntry>(pageSize);
+        var providerToken = cursor?.ProviderToken;
+        // Some providers require the original limit when resuming their continuation.
+        var providerPageSize = cursor?.PageSize ?? Math.Min(pageSize, ProviderPageSize);
+        var offset = cursor?.Offset ?? 0;
+        for (var bucket = cursor?.Bucket ?? 0; bucket < ScanBucketCount; bucket++)
         {
-            candidates.RemoveRange(pageSize, candidates.Count - pageSize);
+            var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
+            var end = (uint)((ulong)(bucket + 1) * ScanBucketWidth - 1);
+            do
+            {
+                var page = await ReminderTableRead.WaitAsync(
+                    _reminderTable.ReadRows(begin, end, providerPageSize, providerToken), _timeProvider);
+                // A replayed provider page can contain fewer rows than its original response.
+                var start = Math.Min(offset, page.Reminders.Count);
+                offset -= start;
+                for (var index = start; index < page.Reminders.Count; index++)
+                {
+                    var reminder = page.Reminders[index];
+                    if (!MatchesFilter(reminder, filter, now))
+                    {
+                        continue;
+                    }
+
+                    if (reminders.Count == pageSize)
+                    {
+                        return new ReminderManagementPage
+                        {
+                            Reminders = reminders,
+                            ContinuationToken = ReminderCursor.Create(bucket, providerPageSize, index, providerToken),
+                        };
+                    }
+
+                    reminders.Add(reminder);
+                }
+
+                providerToken = page.ContinuationToken;
+            } while (providerToken is not null);
+
+            offset = 0;
         }
 
-        var reminders = new List<ReminderEntry>(candidates.Count);
-        foreach (var candidate in candidates)
-        {
-            reminders.Add(candidate.Entry);
-        }
-
-        var nextToken = hasMore && candidates.Count > 0
-            ? ReminderCursor.Create(candidates[^1].Entry, candidates[^1].Bucket)
-            : null;
-        return new ReminderManagementPage
-        {
-            Reminders = reminders,
-            ContinuationToken = nextToken,
-        };
+        return new ReminderManagementPage { Reminders = reminders };
     }
 
     public async Task<IEnumerable<ReminderEntry>> ListForGrainAsync(GrainId grainId)
@@ -166,63 +188,6 @@ public sealed class ReminderManagementGrain(
         var serviceProvider = _serviceProvider ?? ServiceProvider;
         return serviceProvider?.GetService(typeof(Runtime.ReminderService.AdvancedReminderService))
             as Runtime.ReminderService.AdvancedReminderService;
-    }
-
-    private async Task<List<BucketedReminder>> SelectPageAsync(ReminderQueryFilter filter, ReminderCursor? cursor, int take, DateTime now)
-    {
-        var result = new List<BucketedReminder>(take);
-        var startBucket = cursor?.Bucket ?? 0;
-        for (var bucket = startBucket; bucket < ScanBucketCount && result.Count < take; bucket++)
-        {
-            var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
-            var end = (uint)((ulong)(bucket + 1) * ScanBucketWidth - 1);
-            var remaining = take - result.Count;
-            var candidates = new PriorityQueue<ReminderEntry, ReminderEntry>(
-                remaining,
-                ReverseReminderEntryComparer.Instance);
-            string? providerContinuationToken = null;
-            do
-            {
-                var providerPage = await ReminderTableRead.WaitAsync(
-                    _reminderTable.ReadRows(begin, end, ProviderPageSize, providerContinuationToken), _timeProvider);
-                foreach (var reminder in providerPage.Reminders)
-                {
-                    if (MatchesFilter(reminder, filter, now)
-                        && (cursor is null || bucket != cursor.Bucket || IsAfterCursor(reminder, cursor)))
-                    {
-                        if (candidates.Count < remaining)
-                        {
-                            candidates.Enqueue(reminder, reminder);
-                        }
-                        else if (ReminderEntryComparer.Instance.Compare(reminder, candidates.Peek()) < 0)
-                        {
-                            candidates.Dequeue();
-                            candidates.Enqueue(reminder, reminder);
-                        }
-                    }
-                }
-
-                providerContinuationToken = providerPage.ContinuationToken;
-            } while (providerContinuationToken is not null);
-
-            var orderedCandidates = new List<ReminderEntry>(candidates.Count);
-            while (candidates.TryDequeue(out var reminder, out _))
-            {
-                orderedCandidates.Add(reminder);
-            }
-
-            orderedCandidates.Sort(ReminderEntryComparer.Instance);
-            foreach (var reminder in orderedCandidates)
-            {
-                result.Add(new BucketedReminder(bucket, reminder));
-                if (result.Count == take)
-                {
-                    break;
-                }
-            }
-        }
-
-        return result;
     }
 
     private bool MatchesFilter(ReminderEntry reminder, ReminderQueryFilter filter, DateTime now)
@@ -336,9 +301,6 @@ public sealed class ReminderManagementGrain(
 
     private DateTime GetUtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
 
-    private static bool IsAfterCursor(ReminderEntry reminder, ReminderCursor? cursor)
-        => cursor is null || ReminderCursor.Compare(reminder, cursor) > 0;
-
     private static DateTime GetDueTime(ReminderEntry reminder) => reminder.NextDueUtc ?? reminder.StartAt;
 
     private static Runtime.ReminderScheduleKind GetScheduleKind(ReminderEntry reminder)
@@ -346,26 +308,16 @@ public sealed class ReminderManagementGrain(
             ? Runtime.ReminderScheduleKind.Interval
             : Runtime.ReminderScheduleKind.Cron;
 
-    private sealed class ReminderCursor
+    private sealed record ReminderCursor(int Bucket, int PageSize, int Offset, string? ProviderToken)
     {
-        private ReminderCursor(int bucket, GrainId grainId, string reminderName)
+        public static string Create(int bucket, int pageSize, int offset, string? providerToken)
         {
-            Bucket = bucket;
-            GrainId = grainId;
-            ReminderName = reminderName;
-        }
+            var payload = string.Create(CultureInfo.InvariantCulture, $"4\n{bucket}\n{pageSize}\n{offset}");
+            if (providerToken is not null)
+            {
+                payload = string.Concat(payload, "\n", providerToken);
+            }
 
-        public int Bucket { get; }
-
-        public GrainId GrainId { get; }
-
-        public string ReminderName { get; }
-
-        public static string Create(ReminderEntry entry, int bucket)
-        {
-            var payload = string.Create(
-                CultureInfo.InvariantCulture,
-                $"3\n{bucket}\n{Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.GrainId.ToString()))}\n{Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.ReminderName))}");
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
         }
 
@@ -379,50 +331,26 @@ public sealed class ReminderManagementGrain(
             try
             {
                 var payload = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
-                var parts = payload.Split('\n', 4);
-                if (parts.Length != 4 || parts[0] != "3")
+                var parts = payload.Split('\n', 5);
+                if (parts.Length < 4 || parts[0] != "4"
+                    || !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var bucket)
+                    || bucket < 0 || bucket >= ScanBucketCount
+                    || !int.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var pageSize)
+                    || pageSize is <= 0 or > ProviderPageSize
+                    || !int.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out var offset)
+                    || offset < 0 || offset >= pageSize)
                 {
-                    throw new FormatException("Continuation token payload is incomplete.");
+                    throw new FormatException("Continuation token version or provider position is invalid.");
                 }
 
-                if (!int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var bucket)
-                    || bucket < 0
-                    || bucket >= ScanBucketCount)
-                {
-                    throw new FormatException("Continuation token scan bucket is invalid.");
-                }
-
-                var grainId = Encoding.UTF8.GetString(Convert.FromBase64String(parts[2]));
-                var reminderName = Encoding.UTF8.GetString(Convert.FromBase64String(parts[3]));
-                if (string.IsNullOrEmpty(grainId) || string.IsNullOrEmpty(reminderName))
-                {
-                    throw new FormatException("Continuation token identity is invalid.");
-                }
-
-                return new ReminderCursor(
-                    bucket,
-                    GrainId.Parse(grainId),
-                    reminderName);
+                return new ReminderCursor(bucket, pageSize, offset, parts.Length == 5 ? parts[4] : null);
             }
-            catch (Exception exception) when (exception is FormatException or ArgumentException)
+            catch (FormatException exception)
             {
                 throw new ArgumentException("Invalid continuation token.", nameof(continuationToken), exception);
             }
         }
-
-        public static int Compare(ReminderEntry reminder, ReminderCursor cursor)
-        {
-            var grainCompare = reminder.GrainId.CompareTo(cursor.GrainId);
-            if (grainCompare != 0)
-            {
-                return grainCompare;
-            }
-
-            return string.CompareOrdinal(reminder.ReminderName, cursor.ReminderName);
-        }
     }
-
-    private readonly record struct BucketedReminder(int Bucket, ReminderEntry Entry);
 
     private sealed class ReminderEntryComparer : IComparer<ReminderEntry>
     {
@@ -453,13 +381,5 @@ public sealed class ReminderManagementGrain(
 
             return string.CompareOrdinal(x.ReminderName, y.ReminderName);
         }
-    }
-
-    private sealed class ReverseReminderEntryComparer : IComparer<ReminderEntry>
-    {
-        public static ReverseReminderEntryComparer Instance { get; } = new();
-
-        public int Compare(ReminderEntry? x, ReminderEntry? y)
-            => ReminderEntryComparer.Instance.Compare(y, x);
     }
 }

@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.AdvancedReminders.AzureStorage\Orleans.AdvancedReminders.AzureStorage.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Redis\Orleans.AdvancedReminders.Redis\Orleans.AdvancedReminders.Redis.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.AdvancedReminders.DynamoDB\Orleans.AdvancedReminders.DynamoDB.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable.Http\Orleans.Durable.Http.csproj" />

@@ -56,6 +56,7 @@ public interface IReminderTable
 
     /// <summary>
     /// Returns a bounded page of rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (begin, end].
+    /// Resume the provider's traversal with the same range and page size.
     /// </summary>
     /// <param name="begin">The exclusive lower bound.</param>
     /// <param name="end">The inclusive upper bound.</param>

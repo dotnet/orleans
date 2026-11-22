@@ -166,6 +166,34 @@ public class AdvancedReminderWaitTests : AdvancedReminderServiceTestBase
         }
     }
 
+    [Fact]
+    public async Task CanceledProviderWait_KeepsTheRowReservedForTheSubmittedCommand()
+    {
+        var table = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        var clock = new FakeTimeProvider();
+        var mutations = new ReminderTableMutations(table, clock);
+        var entry = CreateDueEntry(clock.GetUtcNow(), "canceled-provider-wait");
+        var command = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        table.UpsertRow(entry, Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromException<string>(
+                new ReminderTableMutationCanceledException(command.Task, call.Arg<CancellationToken>())));
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => mutations.UpsertAsync(entry, TestContext.Current.CancellationToken));
+            Assert.False(command.Task.IsCompleted);
+            await Assert.ThrowsAsync<Orleans.AdvancedReminders.Runtime.ReminderException>(
+                () => mutations.RemoveAsync(entry.GrainId, entry.ReminderName, entry.ETag, TestContext.Current.CancellationToken));
+            await table.DidNotReceive().RemoveRow(
+                Arg.Any<GrainId>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            command.TrySetResult("committed");
+        }
+    }
+
     private static async Task AssertBoundedMutationAsync(
         Task operation, FakeTimeProvider clock, CancellationTokenSource cancellation, bool cancel)
     {

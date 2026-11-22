@@ -54,15 +54,34 @@ internal sealed class ReminderTableMutations(IReminderTable table, TimeProvider 
 
         async Task<T> ExecuteAsync()
         {
+            Task? pendingMutation = null;
             try
             {
                 return await mutate(providerCancellation.Token).ConfigureAwait(false);
             }
+            catch (ReminderTableMutationCanceledException exception)
+            {
+                pendingMutation = exception.PendingMutation;
+                throw;
+            }
             finally
             {
-                _pending.TryRemove(key, out _);
+                if (pendingMutation is null)
+                {
+                    _pending.TryRemove(key, out _);
+                }
+                else
+                {
+                    ReleaseWhenSettledAsync(pendingMutation, key).Ignore();
+                }
             }
         }
+    }
+
+    private async Task ReleaseWhenSettledAsync(Task mutation, (GrainId GrainId, string Name) key)
+    {
+        await mutation.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        _pending.TryRemove(key, out _);
     }
 
     private static async Task CancelAndDisposeAsync(CancellationTokenSource cancellation, Task operation)

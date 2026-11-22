@@ -16,7 +16,7 @@ namespace UnitTests.AdvancedReminders;
 public class ReminderStressTests
 {
     [Fact]
-    public async Task ListAllAsync_Skewed200KBucket_SmallPublicPageUsesBoundedProviderPages()
+    public async Task ListAllAsync_Skewed200KBucket_ResumesWithoutDrainingTheBucket()
     {
         const int totalReminders = 200_000;
         const int pageSize = 1;
@@ -26,14 +26,18 @@ public class ReminderStressTests
         var table = new SingleSegmentReminderTable(reminders);
         var grain = new ReminderManagementGrain(table);
 
-        var page = await grain.ListAllAsync(pageSize);
+        var first = await grain.ListAllAsync(pageSize);
+        Assert.Equal("r-0", Assert.Single(first.Reminders).ReminderName);
+        Assert.NotNull(first.ContinuationToken);
+        Assert.Equal(2, table.PagedBucketReadCallCount);
 
-        Assert.Single(page.Reminders);
-        Assert.NotNull(page.ContinuationToken);
+        var second = await grain.ListAllAsync(pageSize: 2, first.ContinuationToken);
+        Assert.Equal(new[] { "r-1", "r-2" }, second.Reminders.Select(reminder => reminder.ReminderName));
+        Assert.NotNull(second.ContinuationToken);
         Assert.Equal(0, table.CompleteRangeReadCallCount);
-        Assert.Equal(256, table.MaxRequestedRows);
-        Assert.InRange(table.MaxReturnedRows, 0, 256);
-        Assert.True(table.PagedRangeReadCallCount >= (int)Math.Ceiling(totalReminders / 256d));
+        Assert.Equal(1, table.MaxRequestedRows);
+        Assert.Equal(1, table.MaxReturnedRows);
+        Assert.Equal(5, table.PagedBucketReadCallCount);
     }
 
     [Fact]
@@ -90,7 +94,7 @@ public class ReminderStressTests
 
         public int CompleteRangeReadCallCount { get; private set; }
 
-        public int PagedRangeReadCallCount { get; private set; }
+        public int PagedBucketReadCallCount { get; private set; }
 
         public int MaxRequestedRows { get; private set; }
 
@@ -106,7 +110,6 @@ public class ReminderStressTests
 
         public Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
         {
-            PagedRangeReadCallCount++;
             MaxRequestedRows = Math.Max(MaxRequestedRows, maxRows);
             var range = RangeFactory.CreateRange(begin, end);
             if (reminders.Count == 0 || !range.InRange(reminders[0].GrainId))
@@ -114,6 +117,7 @@ public class ReminderStressTests
                 return Task.FromResult(new ReminderTableData());
             }
 
+            PagedBucketReadCallCount++;
             var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
             var rows = reminders.Skip(offset).Take(maxRows).ToList();
             MaxReturnedRows = Math.Max(MaxReturnedRows, rows.Count);

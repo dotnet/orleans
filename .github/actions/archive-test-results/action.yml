@@ -24,8 +24,10 @@ runs:
       name: ${{ inputs.name }}
       if-no-files-found: warn
       retention-days: ${{ inputs['retention-days'] }}
+      # The reporter consumes each module's TRX. The SDK's merged copy duplicates those results.
       path: |
         **/TestResults/*
+        !**/TestResults/merged/merged-*.trx
         !TestResults/*.cobertura.xml
         !TestResults/*.coverage.json
         **/logs/*

@@ -62,6 +62,49 @@ public class ReminderManagementGrainTests
     }
 
     [Fact]
+    public async Task ListFilteredAsync_ContinuesAcrossPagesWithoutMatches()
+    {
+        var grainId = GrainId.Create("test", "sparse-matches");
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry { GrainId = grainId, ReminderName = "first", Action = MissedReminderAction.Notify },
+            new ReminderEntry { GrainId = grainId, ReminderName = "skip-1" },
+            new ReminderEntry { GrainId = grainId, ReminderName = "skip-2" },
+            new ReminderEntry { GrainId = grainId, ReminderName = "last", Action = MissedReminderAction.Notify },
+            new ReminderEntry { GrainId = grainId, ReminderName = "skip-3" });
+        var grain = new ReminderManagementGrain(table);
+        var filter = new ReminderQueryFilter { Action = MissedReminderAction.Notify };
+
+        var first = await grain.ListFilteredAsync(filter, pageSize: 1);
+        Assert.Equal("first", Assert.Single(first.Reminders).ReminderName);
+        Assert.NotNull(first.ContinuationToken);
+
+        var second = await grain.ListFilteredAsync(filter, pageSize: 1, first.ContinuationToken);
+        Assert.Equal("last", Assert.Single(second.Reminders).ReminderName);
+        Assert.Null(second.ContinuationToken);
+        Assert.Equal(6, table.PagedRowsRead);
+    }
+
+    [Fact]
+    public async Task ListAllAsync_ContinuationResumesWithinAProviderPageWhenThePublicPageSizeChanges()
+    {
+        var grainId = GrainId.Create("test", "provider-page-offset");
+        var entries = Enumerable.Range(1, 5)
+            .Select(i => new ReminderEntry { GrainId = grainId, ReminderName = $"r{i}" })
+            .ToArray();
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable(entries));
+
+        var first = await grain.ListAllAsync(2);
+        Assert.NotNull(first.ContinuationToken);
+        var second = await grain.ListAllAsync(1, first.ContinuationToken);
+        Assert.NotNull(second.ContinuationToken);
+        var last = await grain.ListAllAsync(2, second.ContinuationToken);
+
+        Assert.Null(last.ContinuationToken);
+        Assert.Equal(entries.Select(entry => entry.ReminderName), first.Reminders.Concat(second.Reminders)
+            .Concat(last.Reminders).Select(entry => entry.ReminderName));
+    }
+
+    [Fact]
     public async Task ListAllAsync_ContinuationDoesNotRepeatReminderWhenDueTimeAdvances()
     {
         var grainId = GrainId.Create("test", "mutable-due");
@@ -630,6 +673,10 @@ public class ReminderManagementGrainTests
 
     private sealed class InMemoryManagementReminderTable(params ReminderEntry[] reminders) : Orleans.AdvancedReminders.IReminderTable
     {
+        private const string CursorPrefix = "position\n";
+
+        public int PagedRowsRead { get; private set; }
+
         public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         private readonly Dictionary<(GrainId GrainId, string ReminderName), ReminderEntry> _entries =
@@ -650,7 +697,13 @@ public class ReminderManagementGrainTests
         public async Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
         {
             var all = await ReadRows(begin, end);
-            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var offset = 0;
+            if (continuationToken is not null)
+            {
+                var position = continuationToken[CursorPrefix.Length..].Split(':');
+                Assert.Equal(maxRows, int.Parse(position[0], CultureInfo.InvariantCulture));
+                offset = int.Parse(position[1], CultureInfo.InvariantCulture);
+            }
             var rows = all.Reminders.Skip(offset).Take(maxRows + 1).ToList();
             var hasMore = rows.Count > maxRows;
             if (hasMore)
@@ -658,7 +711,9 @@ public class ReminderManagementGrainTests
                 rows.RemoveAt(maxRows);
             }
 
-            return new ReminderTableData(rows, hasMore ? (offset + rows.Count).ToString(CultureInfo.InvariantCulture) : null);
+            PagedRowsRead += rows.Count;
+            var nextToken = hasMore ? string.Create(CultureInfo.InvariantCulture, $"{CursorPrefix}{maxRows}:{offset + rows.Count}") : null;
+            return new ReminderTableData(rows, nextToken);
         }
 
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)

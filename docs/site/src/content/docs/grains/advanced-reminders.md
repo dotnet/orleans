@@ -73,11 +73,11 @@ The ADO.NET schema includes a composite `(ServiceId, GrainHash)` index used by r
 
 <xref:Orleans.AdvancedReminders.Redis.RedisReminderTableOptions.TableExpiry> defaults to <xref:Orleans.AdvancedReminders.Redis.ReminderTableExpiry.Never>. Initialization and successful upserts remove any existing TTL from the service's table:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_redis_expiry":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_redis_expiry":::
 
 For ephemeral environments, select a positive inactivity period:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_redis_inactivity_expiry":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_redis_inactivity_expiry":::
 
 The expiry belongs to the entire service-scoped Redis key. Initialization applies the policy to an existing table, and each successful upsert refreshes its deadline. Expiration deletes every reminder in that table together. Reads, removals, and failed compare-and-exchange writes do not refresh it. Configuration binding accepts `Never` and `AfterInactivity(01:00:00)`, using the invariant `TimeSpan` format.
 
@@ -87,11 +87,11 @@ Migrate the former `EntryExpiry = null` to `ReminderTableExpiry.Never`, and a po
 
 <xref:Orleans.AdvancedReminders.DynamoDB.DynamoDBReminderStorageOptions.Capacity> defaults to provisioned capacity with 10 read and 5 write units. One immutable policy applies those values to the table and each global secondary index:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_dynamodb_provisioned":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_dynamodb_provisioned":::
 
 Select on-demand billing as a named policy:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_dynamodb_on_demand":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedReminderProviderPolicySnippets.cs" id="configure_advanced_reminder_dynamodb_on_demand":::
 
 Both provisioned unit counts must be positive. Configuration binding accepts `OnDemand` or `Provisioned(10,5)` for `Capacity`; connection strings use `Capacity=OnDemand` or `Capacity=Provisioned(10,5)`. `CreateIfNotExists` and `UpdateIfExists` continue to control whether the provider creates or changes table infrastructure. An infrastructure-managed table can disable both operations.
 
@@ -128,11 +128,11 @@ Durable Jobs manages time and silo partitioning and per-shard persistence. Advan
 
 Use in-memory storage only for local development and tests:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="configure_in_memory_advanced_reminders":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="configure_in_memory_advanced_reminders":::
 
 For Azure Storage, configure both service clients. Prefer workload identity or managed identity over account keys and connection strings:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="configure_azure_advanced_reminders":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="configure_azure_advanced_reminders":::
 
 The example also configures a missed-occurrence grace period and a delivery-attempt safety limit. Every silo in the cluster must use the same provider and compatible options.
 
@@ -140,7 +140,7 @@ The example also configures a missed-occurrence grace period and a delivery-atte
 
 The target grain implements <xref:Orleans.AdvancedReminders.IRemindable>. Advanced APIs include `AdvancedReminder` in their names so that classic and advanced reminder extension methods remain unambiguous in the same project.
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="advanced_reminder_grain":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="advanced_reminder_grain":::
 
 Use `GetAdvancedReminder`, `GetAdvancedReminders`, and `UnregisterAdvancedReminder` to inspect or remove registrations owned by the current grain. Store the reminder name rather than a returned handle across activations.
 
@@ -171,11 +171,11 @@ Use <xref:Orleans.AdvancedReminders.ReminderSchedule.OneShot*> to describe work 
 
 For an absolute timestamp, prefer `DateTimeOffset`. This example registers a one-shot reminder for April 15, 2030 at 16:30 UTC:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminder_one_shot_date":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminder_one_shot_date":::
 
 The delay and UTC-date forms use the same registration path:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminder_one_shot_delay_and_utc":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminder_one_shot_delay_and_utc":::
 
 These overloads are available for both `Grain` and `IGrainBase`. Registry and service callers can use <xref:Orleans.AdvancedReminders.ReminderOneShotRegistrationExtensions.RegisterOrUpdateReminder*> with a grain ID. Each overload delegates to `ReminderSchedule.OneShot`, preserving the reminder name and selected missed-occurrence policy. The default policy is `Skip`; choose `FireImmediately` when an overdue one-shot should still invoke the grain.
 
@@ -196,7 +196,7 @@ Registering the same grain and reminder name again creates a new schedule ID and
 
 Prefer the strongly typed <xref:Orleans.AdvancedReminders.ReminderCronBuilder> factories over hand-written cron strings. The builder validates arguments and makes the intended calendar schedule visible in code:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_cron_schedules":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_cron_schedules":::
 
 The examples cover every minute, hourly, daily, weekdays, weekends, one weekday, the first and last day of each month, one annual date, and leap day. The factory families accept <xref:System.TimeOnly>, <xref:System.TimeSpan>, <xref:System.DateOnly>, or <xref:System.TimeZoneInfo>. A time-zone-aware cron keeps the selected local wall-clock time through daylight-saving changes. Pass the resulting builder directly to `RegisterOrUpdateAdvancedReminder`, as shown in the grain example.
 
@@ -206,7 +206,7 @@ Cron expressions support five fields (minute through weekday) or six fields (sec
 
 <xref:Orleans.AdvancedReminders.ReminderCronBuilder.GetNextOccurrence*> and <xref:Orleans.AdvancedReminders.ReminderCronBuilder.GetOccurrences*> accept both UTC `DateTime` and `DateTimeOffset`. The corresponding <xref:Orleans.AdvancedReminders.ReminderCronExpression> methods accept the same inputs. `DateTimeOffset` range endpoints can use different offsets: comparisons use their UTC instants, and returned values have offset zero. An input offset identifies the starting instant; the builder's configured time zone determines the recurring calendar schedule. An expression queried directly uses UTC.
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="query_advanced_reminder_cron_offsets":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="query_advanced_reminder_cron_offsets":::
 
 The next-occurrence query excludes its starting instant by default. Range queries include the start and exclude the end by default; the inclusion flags can change either boundary. A reversed range throws `ArgumentException`, and a valid expression with no future calendar match returns no occurrence. Cron uses whole-second precision and Gregorian leap-year rules, including the century exceptions: 2100 has no February 29, while 2400 does.
 
@@ -254,11 +254,11 @@ The hour/minute forms also have second-aware overloads. The time-of-day forms ac
 
 For example, register a reminder for 09:00 every weekday in the selected time zone without writing a cron expression:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminder_cron":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminder_cron":::
 
 Advanced calendar rules also have typed helpers, so these schedules don't require hand-written expressions:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_cron_rules":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_cron_rules":::
 
 | Requirement | Builder call | Generated expression |
 | --- | --- | --- |
@@ -277,7 +277,7 @@ The helpers validate interval, second, day, occurrence, offset, and month ranges
 
 For schedules beyond the named recipes, `FromFields` exposes the complete supported field grammar without string concatenation. Its five-field overload uses minute, hour, day-of-month, month, and day-of-week. Its six-field overload adds `ReminderCronSecond` first:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_cron_fields":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_cron_fields":::
 
 Each field has its own type, so an hour can't accidentally be passed as a month or day-of-week. The base operations map directly to cron syntax:
 
@@ -324,7 +324,7 @@ Steps operate on positions inside one calendar field; they aren't elapsed-time i
 
 `ReminderCronBuilder.FromExpression(...)` remains available for configuration-provided expressions and direct interoperability. Call `Build()` or `ToCronExpression()` during startup to validate the value before registering production work:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_raw_cron":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_raw_cron":::
 
 Raw expressions accept five fields or six fields with seconds:
 
@@ -353,7 +353,7 @@ Supported macros are `@every_second`, `@every_minute`, `@hourly`, `@daily`, `@mi
 
 Cron calendar fields don't have a stable epoch for “every other Monday”, don't expose ISO week parity, and can't select only even years. Don't approximate those schedules with day-of-month steps because month and year boundaries change the sequence. For a fixed elapsed 14-day cadence, use an absolute first occurrence and an interval:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_biweekly_schedule":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="build_advanced_reminder_biweekly_schedule":::
 
 That interval is anchored in UTC, so its local clock time can move across daylight-saving transitions. If the requirement is instead “09:00 local time on qualifying calendar weeks or years”, calculate the next qualifying local occurrence in application code, convert it to UTC, register a one-shot reminder, and register the following occurrence from the callback.
 
@@ -361,7 +361,7 @@ That interval is anchored in UTC, so its local clock time can move across daylig
 
 Use <xref:Orleans.AdvancedReminders.RegisterReminderAttribute> when every instance of a grain type needs the same fixed interval or UTC cron registration. The attribute can be applied more than once to the concrete grain class:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminders_with_attributes":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="register_advanced_reminders_with_attributes":::
 
 Attribute registration is lazy and applies to a specific grain identity, not to every possible key of the grain type at silo startup. When a client call, reminder delivery, or another Orleans operation activates a grain identity, Orleans runs an activation-stage hook which:
 
@@ -404,13 +404,13 @@ Reminder delivery can occur after its nominal due time and can be retried after 
 
 For a local silo, JSON console logging makes the records available to the console and any collector reading its output:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="configure_advanced_reminder_missed_logging":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="configure_advanced_reminder_missed_logging":::
 
 Use the same logging configuration with your production hosting and storage setup. Filter retained records by category, message, and reminder or grain identity to diagnose missed work or create alerts. Notification is a log record: it doesn't call `ReceiveReminder` or expose a separate subscription API or persistent event stream.
 
 To inspect reminders which are **currently missed**, page a management query:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="query_advanced_reminder_missed":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="query_advanced_reminder_missed":::
 
 <xref:Orleans.AdvancedReminders.ReminderQueryFilter.MissedBy> is the query's threshold, independent of the service's delivery grace period. A match has a due time overdue by at least that threshold and an absent last-fire time or one earlier than its due time. This query reads current registrations, not historical notifications. When a recurring schedule advances, its old missed occurrence disappears from the query; a skipped or notified one-shot is removed altogether. Use retained logs for those past notifications.
 
@@ -418,17 +418,17 @@ To inspect reminders which are **currently missed**, page a management query:
 
 Get the singleton <xref:Orleans.AdvancedReminders.IReminderManagementGrain> through `GetReminderManagementGrain()`. Page results instead of materializing the whole reminder table:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="query_advanced_reminders":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="query_advanced_reminders":::
 
-Continuation tokens are opaque and belong to the query which produced them. Paging order is stable storage-hash-bucket order, then immutable grain ID and reminder name inside each bucket. Due-time filters are evaluated against current row values without making mutable due timestamps part of the cursor.
+Continuation tokens are opaque and belong to the query and provider that produced them. Pages traverse hash buckets in order and use the provider's ordering within each bucket. Due-time filters use current row values.
 
 Install `Microsoft.Orleans.Dashboard.AdvancedReminders` on each silo that hosts the Dashboard grain. Configure the Dashboard and an Advanced Reminders provider there, then call <xref:Orleans.Dashboard.AdvancedReminderDashboardExtensions.AddAdvancedReminderDashboard*> on the silo builder. A separate Dashboard web host only needs the base Dashboard package. The Dashboard displays the total number of advanced reminder registrations from the configured store and caches it for 30 seconds across page requests.
 
 The in-memory table maintains a count as rows are created or removed and reconstructs it from the rows when table state migrates. Redis uses its sorted set's native count. ADO.NET and Cosmos DB use aggregate queries. DynamoDB counts all query pages for the configured service through its service index, and Azure Table counts projected keys in bounded pages. Counts follow the provider's read consistency and can change during concurrent registrations or deletions; the count and displayed page are separate reads. Capacity-plan the count reads for Azure Table, DynamoDB, and Cosmos DB. Custom providers inherit a bounded page-count implementation and can override <xref:Orleans.AdvancedReminders.IReminderTable.GetCountAsync*> with a native count. Existing ADO.NET deployments must install the `AdvancedRemindersCountKey` query from the updated database script in `OrleansQuery` before upgrading the provider.
 
-The management grain consumes provider continuation pages of at most 256 rows and retains only the best `pageSize + 1` candidates needed for the public response. A skewed bucket therefore increases provider reads without increasing retained reminder memory. A subsequent public continuation page rescans that bucket after the management cursor so ordering remains stable without caching the full bucket. Capacity-plan administrative scans against provider throughput and use narrow filters when possible.
+The management grain reads provider pages of at most 256 rows. Once the response is full, it looks ahead for another matching row. The continuation records the provider query's original page size and the position of the next match. The next request can reread a provider page to resume there. Selective filters can require scanning additional rows.
 
-The in-memory provider also bounds each range query to one page of candidates. It can skip entire grain groups which fall before the cursor or after the current page boundary. Azure Table keeps the storage continuation token even when conversion skips a row. Redis decodes each row once and derives the continuation boundary from the last decoded row. Provider and management cursors retain their existing formats.
+The in-memory provider also bounds each range query to one page of candidates. It can skip entire grain groups which fall before the cursor or after the current page boundary. Azure Table keeps the storage continuation token even when conversion skips a row. Redis decodes each row once and derives the continuation boundary from the last decoded row.
 
 Management APIs can list all, overdue, due-range, per-grain, or filtered registrations; update missed-occurrence action; repair next-due state; and delete selected registrations. Use `ListDueInRangeAsync` with the current UTC time and a future upper bound for an upcoming-reminder query. The former unpaged `UpcomingAsync` shape is intentionally absent because an `IEnumerable` result would require materializing every match. A grain-type filter is evaluated during storage paging but still scans storage because providers don't index reminder definitions by grain type.
 
@@ -441,7 +441,7 @@ Configure target retirement and delivery failure independently:
 
 Configure the grace threshold and cleanup guards deliberately. The grace period decides when an occurrence becomes missed; the per-registration `MissedReminderAction` shown above decides what happens next:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="configure_advanced_reminder_cleanup":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="configure_advanced_reminder_cleanup":::
 
 The recovery service repairs incomplete registrations in batches of 32. Missing handles are repaired regardless of due time. With `UntilSuccess`, overdue one-shot and recurring occurrences are requeued after the missed-occurrence grace period. Reconciliation leaves an active delivery in place and measures each retry or replacement's grace period from its persisted delivery deadline. Requeuing preserves the original due time and fences the earlier carrier. The caller observes registration failures, and the singleton reconciliation cursor repairs persisted rows with missing handles. A forced repair rotates the occurrence token before replacing the job, so an older job becomes a harmless no-op if it later runs.
 
@@ -457,7 +457,7 @@ A canceled or timed-out write can still commit. Providers use conditional writes
 
 Select <xref:Orleans.AdvancedReminders.ReminderRetryPolicy.UntilSuccess> when scheduled work must remain eligible after a delivery failure, including a failure before the target grain enters its callback:
 
-:::code language="csharp" source="../snippets/compiled/Grains/RetainedReminderDeliverySnippets.cs" id="configure_advanced_reminder_retained_delivery":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/RetainedReminderDeliverySnippets.cs" id="configure_advanced_reminder_retained_delivery":::
 
 With `UntilSuccess`, each failure persists a new occurrence identity and schedules a new Durable Job at least <xref:Orleans.AdvancedReminders.ReminderOptions.MinimumReminderPeriod> after the failed delivery completes. Each job has its own dequeue count, so the backend's retry limit does not cap these application delivery attempts. Persistent failures continue until delivery succeeds or the registration is explicitly removed.
 
@@ -488,7 +488,7 @@ Deletion occurs only through a defined policy or an explicit administrative acti
 
 For explicit retirement, query one grain type through <xref:Orleans.AdvancedReminders.ReminderQueryFilter>, inspect each page, and delete only confirmed registrations:
 
-:::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="repair_or_delete_advanced_reminders":::
+:::code language="csharp" source="../snippets/compiled-durable/Grains/AdvancedSchedulingSnippets.cs" id="repair_or_delete_advanced_reminders":::
 
 Use `RepairAsync` when the definition is valid but its next due state needs recalculation. Use `DeleteAsync` only after the application has established that the grain type or registration is retired or irreparable. Both methods use the reminder service and concurrency checks; don't delete provider rows directly. Prefer this bounded administrative workflow to an unfiltered cluster-wide scan.
 
