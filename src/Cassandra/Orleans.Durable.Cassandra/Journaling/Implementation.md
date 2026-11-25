@@ -151,13 +151,14 @@ After the LWT reports success, cleanup is not part of the commit. Failure of
 the post-publication delete is logged and does not cause `ReplaceAsync` to
 fail.
 
-Delete compares the freshly read header's `content_revision` with the content
-revision last observed by that storage handle, when one exists. A content
-change (including deletion and recreation) or a header appearing after the
-handle observed absence is reported as a stale-state error. Metadata-only
-changes are allowed because they do not change `content_revision`; the delete
-uses the fresh header revision in its LWT to fence changes which race after
-the read. A handle with no observed state can delete the current journal.
+The handle first reads or creates the journal to establish its write
+precondition. Delete compares the freshly read header's `content_revision`
+with the content revision last observed by that handle, when one exists. A
+content change (including deletion and recreation) or a header appearing
+after the handle observed absence is reported as a stale-state error.
+Metadata-only changes are allowed because they do not change
+`content_revision`; the delete uses the fresh header revision in its LWT to
+fence changes which race after the read.
 Delete removes the header with an LWT and only then deletes the active
 generation. Removing the header makes the journal absent to new readers. Unlike
 replacement cleanup, a failure to delete the active generation is surfaced by
