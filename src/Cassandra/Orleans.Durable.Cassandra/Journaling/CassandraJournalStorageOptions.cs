@@ -11,13 +11,13 @@ public sealed class CassandraJournalStorageOptions
     private Func<IServiceProvider, Task<ISession>>? _createSession;
 
     /// <summary>
-    /// Gets or sets the Cassandra table name.
+    /// Gets or sets the Cassandra table name, an unquoted CQL identifier beginning with an ASCII letter.
     /// </summary>
     public string TableName { get; set; } = "orleans_journal";
 
     /// <summary>
-    /// Gets or sets the Cassandra catalog table name. Defaults to the storage table name with
-    /// <c>_catalog</c> appended.
+    /// Gets or sets the Cassandra catalog table name, an unquoted CQL identifier beginning with an ASCII letter.
+    /// Defaults to the storage table name with <c>_catalog</c> appended.
     /// </summary>
     public string? CatalogTableName { get; set; }
 
@@ -96,13 +96,13 @@ public sealed class CassandraJournalStorageOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(TableName);
         if (!IsValidIdentifier(TableName))
         {
-            throw new ArgumentException("The Cassandra table name must be a simple CQL identifier.", nameof(TableName));
+            throw new ArgumentException("The Cassandra table name must be an unquoted CQL identifier beginning with an ASCII letter.", nameof(TableName));
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(EffectiveCatalogTableName);
         if (!IsValidIdentifier(EffectiveCatalogTableName))
         {
-            throw new ArgumentException("The Cassandra catalog table name must be a simple CQL identifier.", nameof(CatalogTableName));
+            throw new ArgumentException("The Cassandra catalog table name must be an unquoted CQL identifier beginning with an ASCII letter.", nameof(CatalogTableName));
         }
 
         if (string.Equals(TableName, EffectiveCatalogTableName, StringComparison.OrdinalIgnoreCase))
@@ -121,7 +121,7 @@ public sealed class CassandraJournalStorageOptions
 
     private static bool IsValidIdentifier(string value)
     {
-        if (!(value[0] is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or '_'))
+        if (!(value[0] is >= 'a' and <= 'z' or >= 'A' and <= 'Z'))
         {
             return false;
         }

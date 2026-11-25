@@ -2,9 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Durable.Jobs;
-using Orleans.Hosting;
 using Orleans.Durable.Journaling;
 using Orleans.Durable.Journaling.Json;
+using Orleans.Hosting;
 using TestExtensions;
 using Xunit;
 
@@ -17,6 +17,28 @@ namespace Tester.Cassandra.Journaling;
 [TestCategory("Cassandra")]
 public sealed class CassandraDurableJobsConfigurationTests
 {
+    [Theory]
+    [InlineData("_journal", "catalog", nameof(CassandraJournalStorageOptions.TableName))]
+    [InlineData("journal", "_catalog", nameof(CassandraJournalStorageOptions.CatalogTableName))]
+    public void CassandraJournalStorageOptions_RejectsTableNamesStartingWithUnderscore(
+        string tableName,
+        string catalogTableName,
+        string expectedParameter)
+    {
+        var options = new CassandraJournalStorageOptions { TableName = tableName, CatalogTableName = catalogTableName };
+
+        var exception = Assert.Throws<ArgumentException>(options.Validate);
+        Assert.Equal(expectedParameter, exception.ParamName);
+    }
+
+    [Fact]
+    public void CassandraJournalStorageOptions_AcceptsEmbeddedUnderscoresAndDigits()
+    {
+        var options = new CassandraJournalStorageOptions { TableName = "Journal_1", CatalogTableName = "Catalog_2" };
+
+        options.Validate();
+    }
+
     [Fact]
     public void CassandraJournalStorageOptions_RejectsCatalogTableNameResolvingToJournalTable()
     {
