@@ -2,10 +2,13 @@ using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Orleans.Clustering.AzureStorage;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Tester.AzureUtils;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 public sealed class AzureTableLoggingTests
 {
     [Fact]
