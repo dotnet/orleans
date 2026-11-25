@@ -797,6 +797,44 @@ public sealed class CassandraJournalStorageTests
     }
 
     [Fact]
+    public async Task ReplaceAsync_PreservesPublishedGenerationWhenPublicationIsReplayed()
+    {
+        ReplayPublicationSessionProxy? replayProxy = null;
+        await using var harness = await CreateHarnessAsync(
+            rowSizeBytes: 1,
+            sessionDecorator: session => ReplayPublicationSessionProxy.Create(session, out replayProxy));
+        var id = NewJournalId();
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
+            new ReadOnlySequence<byte>([1]),
+            TestContext.Current.CancellationToken);
+        var storage = await CreateWriterAsync(harness, id);
+        var oldGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        replayProxy!.Arm();
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.ReplaceAsync(
+                new ReadOnlySequence<byte>([2, 3]),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal(1, replayProxy.ReplayCount);
+        var activeGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        Assert.NotEqual(oldGeneration, activeGeneration);
+        var sequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, activeGeneration);
+        Assert.Equal([0L, 1L], sequences);
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([2, 3], consumer.Bytes.ToArray());
+        Assert.True(consumer.IsCompleted);
+
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
+            new ReadOnlySequence<byte>([4]),
+            TestContext.Current.CancellationToken);
+        consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([2, 3, 4], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
     public async Task UpdateMetadataAsync_UsesLwtEtagAndPreservesAppendState()
     {
         await using var harness = await CreateHarnessAsync();
@@ -1304,6 +1342,52 @@ public sealed class CassandraJournalStorageTests
             NullLogger<CassandraJournalStorage>.Instance);
         await provider.InitializeAsync(TestContext.Current.CancellationToken);
         return new ProviderHarness(provider, options, session, decoratedSession);
+    }
+
+    private class ReplayPublicationSessionProxy : DispatchProxy
+    {
+        private ISession? _inner;
+        private int _replayPending;
+        private int _replayCount;
+
+        public int ReplayCount => Volatile.Read(ref _replayCount);
+
+        public static ISession Create(ISession inner, out ReplayPublicationSessionProxy proxy)
+        {
+            var session = DispatchProxy.Create<ISession, ReplayPublicationSessionProxy>();
+            proxy = (ReplayPublicationSessionProxy)(object)session;
+            proxy._inner = inner;
+            return session;
+        }
+
+        public void Arm() => Volatile.Write(ref _replayPending, 1);
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(ISession.ExecuteAsync)
+                && args is { Length: > 0 }
+                && args[0] is BoundStatement statement
+                && statement.PreparedStatement.QueryString.Contains("SET active_generation", StringComparison.Ordinal)
+                && Interlocked.Exchange(ref _replayPending, 0) == 1)
+            {
+                return ExecuteWithReplayAsync(statement);
+            }
+
+            return targetMethod!.Invoke(_inner, args);
+        }
+
+        private async Task<RowSet> ExecuteWithReplayAsync(BoundStatement statement)
+        {
+            var original = await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
+            if (!CassandraJournalStorageQueries.WasApplied(original))
+            {
+                throw new InvalidOperationException("The original replacement publication did not commit.");
+            }
+
+            var replay = await _inner.ExecuteAsync(statement).ConfigureAwait(false);
+            Interlocked.Increment(ref _replayCount);
+            return replay;
+        }
     }
 
     private class DeleteHeaderRaceSessionProxy : DispatchProxy

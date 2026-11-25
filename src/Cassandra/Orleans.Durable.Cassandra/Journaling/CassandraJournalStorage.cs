@@ -345,9 +345,19 @@ internal sealed class CassandraJournalStorage : IJournalStorage
                     return;
                 }
 
-                publicationStarted = false;
                 cancellationToken.ThrowIfCancellationRequested();
                 var current = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
+                // A replay can report a conflict after publishing. Retain the staged generation
+                // until a serial read proves that it is no longer active.
+                if (current is { } published && published.Generation == generation)
+                {
+                    throw CreateInconsistentStateException(
+                        "Cassandra journal replacement may have been published; recovery is required.",
+                        state.Revision,
+                        published.Revision);
+                }
+
+                publicationStarted = false;
                 if (current is null || current.Value.ContentRevision != state.ContentRevision)
                 {
                     throw CreateInconsistentStateException("Cassandra journal changed while replacing it; recovery is required.", state.Revision, current?.Revision);

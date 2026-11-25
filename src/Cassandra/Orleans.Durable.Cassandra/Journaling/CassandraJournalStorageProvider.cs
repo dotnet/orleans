@@ -340,6 +340,8 @@ internal sealed class CassandraJournalStorageQueries
     public BoundStatement CreateHeader(string journalId, Guid generation, string format, Dictionary<string, string> metadata, Guid revision, Guid contentRevision)
     {
         var statement = Get(_createHeader).Bind(journalId, CassandraJournalStorageOptions.HeaderGenerationId, -1L, generation, format, metadata, revision, contentRevision);
+        // A replay can return a failed condition after the first execution succeeded.
+        statement.SetIdempotence(false);
         statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
         statement.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         return statement;
@@ -488,6 +490,7 @@ internal sealed class CassandraJournalStorageQueries
         header.SetConsistencyLevel(_options.WriteConsistencyLevel);
         header.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         batch.Add(header);
+        batch.SetIdempotence(false);
         batch.SetConsistencyLevel(_options.WriteConsistencyLevel);
         batch.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         return batch;
@@ -507,6 +510,7 @@ internal sealed class CassandraJournalStorageQueries
             generation, nextSequence, totalLength, format, revision, contentRevision,
             journalId, CassandraJournalStorageOptions.HeaderGenerationId, -1L,
             expectedRevision, expectedGeneration, expectedNextSequence);
+        statement.SetIdempotence(false);
         statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
         statement.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         return statement;
@@ -515,6 +519,7 @@ internal sealed class CassandraJournalStorageQueries
     public BoundStatement UpdateMetadata(string journalId, Dictionary<string, string> metadata, Guid revision, Guid expectedRevision)
     {
         var statement = Get(_updateMetadata).Bind(metadata, revision, journalId, CassandraJournalStorageOptions.HeaderGenerationId, -1L, expectedRevision);
+        statement.SetIdempotence(false);
         statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
         statement.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         return statement;
@@ -523,6 +528,7 @@ internal sealed class CassandraJournalStorageQueries
     public BoundStatement DeleteHeader(string journalId, Guid expectedRevision)
     {
         var statement = Get(_deleteHeader).Bind(journalId, CassandraJournalStorageOptions.HeaderGenerationId, -1L, expectedRevision);
+        statement.SetIdempotence(false);
         statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
         statement.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         return statement;

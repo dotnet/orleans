@@ -127,9 +127,18 @@ contents from prior contents.
 
 If staging fails before publication, the provider attempts to delete the
 staged generation. If that cleanup also fails, both failures are reported.
-If the publication LWT returns a conflict, the provider reads the header:
-metadata-only changes can be retried, while a content change fails the
-replacement and triggers staged-generation cleanup.
+Conditional statements declare their non-idempotence so the driver's
+speculative execution honors their one-shot applied result, including when a
+session uses an idempotent default.
+
+If the publication LWT returns a conflict, the provider performs a serial
+header read. A replay can return a conflict after an earlier execution
+published the generation, so a generation still referenced by the header is
+retained and the operation fails for recovery. When the read proves the
+staged generation is inactive, metadata-only changes can be retried, while a
+content change fails the replacement and triggers staged-generation cleanup.
+If cancellation or a read failure prevents that determination, the staged
+generation is retained for recovery.
 
 If the publication request fails without a definitive LWT result, the
 operation's outcome is ambiguous: Cassandra may have committed the header
