@@ -23,6 +23,7 @@ namespace Orleans.Hosting
         /// <param name="location">The store location to load the certificate from.</param>
         /// <param name="configureOptions">An Action to configure the <see cref="TlsOptions"/>.</param>
         /// <returns>The builder.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
         public static IClientBuilder UseTls(
             this IClientBuilder builder,
             StoreName storeName,
@@ -31,6 +32,7 @@ namespace Orleans.Hosting
             StoreLocation location,
             Action<TlsOptions> configureOptions)
         {
+            ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(configureOptions);
 
             return builder.UseTls(
@@ -45,11 +47,13 @@ namespace Orleans.Hosting
         /// <param name="certificate">The server certificate.</param>
         /// <param name="configureOptions">An Action to configure the <see cref="TlsOptions"/>.</param>
         /// <returns>The builder.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
         public static IClientBuilder UseTls(
             this IClientBuilder builder,
             X509Certificate2 certificate,
             Action<TlsOptions> configureOptions)
         {
+            ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(certificate);
             ArgumentNullException.ThrowIfNull(configureOptions);
 
@@ -71,10 +75,12 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder to configure.</param>
         /// <param name="certificate">The server certificate.</param>
         /// <returns>The builder.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
         public static IClientBuilder UseTls(
             this IClientBuilder builder,
             X509Certificate2 certificate)
         {
+            ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(certificate);
 
             if (!certificate.HasPrivateKey)
@@ -94,10 +100,12 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder to configure.</param>
         /// <param name="configureOptions">An Action to configure the <see cref="TlsOptions"/>.</param>
         /// <returns>The builder.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
         public static IClientBuilder UseTls(
             this IClientBuilder builder,
             Action<TlsOptions> configureOptions)
         {
+            ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(configureOptions);
 
             builder.Configure<TlsOptions>(configureOptions);

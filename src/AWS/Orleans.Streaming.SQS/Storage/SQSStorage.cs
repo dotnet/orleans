@@ -79,7 +79,7 @@ namespace OrleansAWSUtils.Storage
 
             var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
-            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
+            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
                 var value = serviceConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
@@ -87,7 +87,7 @@ namespace OrleansAWSUtils.Storage
                     service = value[1];
             }
 
-            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
+            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
                 var value = secretKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
@@ -95,7 +95,7 @@ namespace OrleansAWSUtils.Storage
                     secretKey = value[1];
             }
 
-            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
+            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
                 var value = accessKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
@@ -103,7 +103,7 @@ namespace OrleansAWSUtils.Storage
                     accessKey = value[1];
             }
 
-            var sessionTokenConfig = parameters.Where(p => p.Contains(SessionTokenPropertyName)).FirstOrDefault();
+            var sessionTokenConfig = parameters.Where(p => p.Contains(SessionTokenPropertyName, StringComparison.Ordinal)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(sessionTokenConfig))
             {
                 var value = sessionTokenConfig.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);

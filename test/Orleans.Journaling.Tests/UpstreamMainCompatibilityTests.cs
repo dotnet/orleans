@@ -9,7 +9,7 @@ using Orleans.Serialization.Codecs;
 using Xunit;
 using static VerifyXunit.Verifier;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Cross-version recovery test: feeds a pre-canned journal blob captured from <c>upstream/main</c>
@@ -35,7 +35,7 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
     public async Task OrleansBinary_RecoversUpstreamMainWrittenJournal()
     {
         var journalBytes = LoadUpstreamMainJournal();
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>(journalBytes), TestContext.Current.CancellationToken);
 
         var states = CreateStates(storage);

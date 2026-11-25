@@ -27,6 +27,7 @@ public sealed class FileGrainStorage(
     private readonly string _rootDirectory = Path.GetFullPath(options.RootDirectory);
 
     /// <inheritdoc />
+    /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
     public Task ClearStateAsync<T>(
         string stateName,
         GrainId grainId,
@@ -47,6 +48,7 @@ public sealed class FileGrainStorage(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(grainState);
         var path = GetRecordPath(stateName, grainId);
         var record = await TryReadRecordAsync(path, cancellationToken).ConfigureAwait(false);
         if (record is not null)
@@ -60,6 +62,7 @@ public sealed class FileGrainStorage(
     }
 
     /// <inheritdoc />
+    /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
     public Task ReadStateAsync<T>(
         string stateName,
         GrainId grainId,
@@ -80,6 +83,7 @@ public sealed class FileGrainStorage(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(grainState);
         var record = await TryReadRecordAsync(
             GetRecordPath(stateName, grainId),
             cancellationToken).ConfigureAwait(false);
@@ -96,6 +100,7 @@ public sealed class FileGrainStorage(
     }
 
     /// <inheritdoc />
+    /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
     public Task WriteStateAsync<T>(
         string stateName,
         GrainId grainId,
@@ -116,6 +121,7 @@ public sealed class FileGrainStorage(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(grainState);
         var path = GetRecordPath(stateName, grainId);
         var existingRecord = await TryReadRecordAsync(path, cancellationToken).ConfigureAwait(false);
         if (existingRecord is not null)

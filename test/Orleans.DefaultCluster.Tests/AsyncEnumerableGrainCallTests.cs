@@ -777,7 +777,6 @@ public class AsyncEnumerableGrainCallTests
                 siloBuilder
                     .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
                     .UseInMemoryReminderService()
-                    .UseInMemoryDurableJobs()
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("MemoryStore");
 

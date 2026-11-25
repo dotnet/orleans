@@ -1,4 +1,8 @@
-CREATE TABLE OrleansStorage
+-- Apply this script for setup and repeatable upgrades after the shared Main script creates OrleansQuery.
+-- Stop all silos using this database before applying it, then restart them to reload the queries.
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS OrleansStorage
 (
     grainidhash integer NOT NULL,
     grainidn0 bigint NOT NULL,
@@ -9,10 +13,13 @@ CREATE TABLE OrleansStorage
     serviceid character varying(150)  NOT NULL,
     payloadbinary bytea,
     modifiedon timestamptz NOT NULL,
+    -- The next version wraps from 2147483647 back to 1 so a frequently written grain never overflows.
+    -- Orleans compares versions only for equality, so the version must change on every write but does not need to increase forever.
+    -- A stale version can only match again after 2147483647 further writes to the same grain.
     version integer
 );
 
-CREATE INDEX ix_orleansstorage
+CREATE INDEX IF NOT EXISTS ix_orleansstorage
     ON orleansstorage USING btree
     (grainidhash, graintypehash);
 
@@ -59,7 +66,7 @@ AS $function$
         SET
             PayloadBinary = _PayloadBinary,
             ModifiedOn = now(),
-            Version = Version + 1
+            Version = Version % 2147483647 + 1
 
         WHERE
             GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
@@ -74,7 +81,7 @@ AS $function$
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
         IF RowCountVar > 0
         THEN
-            _newGrainStateVersion := _GrainStateVersion + 1;
+            _newGrainStateVersion := _GrainStateVersion % 2147483647 + 1;
         END IF;
     END IF;
 
@@ -139,7 +146,8 @@ VALUES
     'WriteToStorageKey','
 
         select * from WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary);
-');
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -159,7 +167,8 @@ VALUES
         AND GrainTypeString = @GrainTypeString AND GrainTypeString IS NOT NULL
         AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
-');
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -168,7 +177,7 @@ VALUES
     UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
-        Version = Version + 1
+        Version = Version % 2147483647 + 1
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -179,7 +188,8 @@ VALUES
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
     Returning Version as NewGrainStateVersion
-');
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -195,5 +205,8 @@ VALUES
         AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
-    Returning Version + 1 as NewGrainStateVersion
-');
+    Returning Version % 2147483647 + 1 as NewGrainStateVersion
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
+
+COMMIT;

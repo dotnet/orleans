@@ -135,6 +135,35 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
         Assert.Equal([(7, "original")], ReadRows());
     }
 
+    [Fact]
+    public void ReapplyingScriptsRefreshesTriggerOnExistingConnection()
+    {
+        var legacyWrite = GetQuery("WriteToStorageKey")
+            .Replace("_11_0", "_10_4", StringComparison.Ordinal)
+            .Replace(" % 2147483647", "", StringComparison.Ordinal);
+        using (var command = _connection.CreateCommand())
+        {
+            command.CommandText = "UPDATE OrleansQuery SET QueryText = @QueryText WHERE QueryKey = 'WriteToStorageKey';";
+            command.Parameters.AddWithValue("QueryText", legacyWrite);
+            Assert.Equal(1, command.ExecuteNonQuery());
+        }
+
+        Assert.Equal([1], ExecuteQuery("WriteToStorageKey", null));
+        using (var command = _connection.CreateCommand())
+        {
+            command.CommandText = "UPDATE OrleansStorage SET Version = 2147483647;";
+            Assert.Equal(1, command.ExecuteNonQuery());
+        }
+
+        InitializeDatabase(_connection);
+        InitializeDatabase(_connection);
+
+        Assert.Equal([1], ExecuteQuery("WriteToStorageKey", int.MaxValue));
+        Assert.Equal([(1, "updated")], ReadRows());
+        Assert.Equal([2], ExecuteQuery("WriteToStorageKey", 1));
+        Assert.Equal([(2, "updated")], ReadRows());
+    }
+
     private static void AssertStoredState(string connectionString, int version, string? payload)
     {
         using var connection = new SqliteConnection(connectionString);

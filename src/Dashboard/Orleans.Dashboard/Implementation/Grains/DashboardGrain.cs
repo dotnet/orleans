@@ -143,7 +143,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
 
             await Task.WhenAll(activationCountTask, simpleGrainStatsTask, siloDetailsTask).WaitAsync(cancellationToken);
 
-            RecalculateCounters(activationCountTask.Result, siloDetailsTask.Result, simpleGrainStatsTask.Result);
+            RecalculateCounters(await activationCountTask, await siloDetailsTask, await simpleGrainStatsTask);
 
             _lastRefreshTime = now;
         }

@@ -27,11 +27,7 @@ internal static class TestCompilationHelper
         var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["build_property.TargetFrameworkIdentifier"] = ".NETCoreApp",
-#if NET8_0
-            ["build_property.TargetFrameworkVersion"] = "v8.0",
-#else
             ["build_property.TargetFrameworkVersion"] = "v10.0",
-#endif
         };
 
         if (globalOptions is not null)

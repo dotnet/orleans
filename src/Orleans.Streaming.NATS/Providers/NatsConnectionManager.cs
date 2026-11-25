@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Unicode;
@@ -13,20 +14,23 @@ using NATS.Client.Serializers.Json;
 namespace Orleans.Streaming.NATS;
 
 /// <summary>
-/// Wrapper around NATS and JetStream APIs
+/// Owns the root and producer connections for one adapter. The provider factory owns this manager's lifetime.
 /// </summary>
-internal sealed partial class NatsConnectionManager
+internal sealed partial class NatsConnectionManager : IAsyncDisposable
 {
     private static readonly byte[] AckPayload = "+ACK"u8.ToArray();
     private readonly string _providerName;
     private readonly NatsOpts _natsClientOptions;
-    private readonly NatsConnection _natsConnection;
+    private NatsConnection _natsConnection = null!;
     private readonly string _natsServer;
     private readonly ILogger _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly NatsOptions _options;
     private readonly NatsJSContext[] _producerNatsContexts;
-    private readonly NatsJSContext _natsContext;
+    private NatsJSContext _natsContext = null!;
+    private readonly object _lifecycleLock = new();
+    private Task? _initializationTask;
+    private Task? _disposalTask;
 
     [GeneratedActivatorConstructor]
     public NatsConnectionManager(string providerName, ILoggerFactory loggerFactory, NatsOptions options)
@@ -60,26 +64,44 @@ internal sealed partial class NatsConnectionManager
 
         this._natsClientOptions = this._options.NatsClientOptions;
         this._natsServer = GetLogSafeServerDescription(this._natsClientOptions.Url);
-        this._natsConnection = new NatsConnection(this._natsClientOptions);
-        this._natsContext = new NatsJSContext(this._natsConnection);
-
         this._producerNatsContexts = new NatsJSContext[this._options.ProducerCount];
-
-        for (var i = 0; i < this._options.ProducerCount; i++)
-        {
-            var producerOptions = this._natsClientOptions with { Name = $"Orleans-{this._providerName}-Producer-{i}" };
-            var producerConnection = new NatsConnection(producerOptions);
-            this._producerNatsContexts[i] = new NatsJSContext(producerConnection);
-        }
     }
 
     /// <summary>
     /// Initialize the connection to the NATS server and check if JetStream is available
     /// </summary>
-    public async Task Initialize(CancellationToken cancellationToken = default)
+    public Task Initialize(CancellationToken cancellationToken = default)
+    {
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposalTask is not null, this);
+            return _initializationTask ??= InitializeCore(cancellationToken);
+        }
+    }
+
+    private async Task InitializeCore(CancellationToken cancellationToken)
     {
         try
         {
+            this._natsConnection = new NatsConnection(this._natsClientOptions);
+            this._natsContext = new NatsJSContext(this._natsConnection);
+            for (var i = 0; i < this._producerNatsContexts.Length; i++)
+            {
+                var producerOptions = this._natsClientOptions with { Name = $"Orleans-{this._providerName}-Producer-{i}" };
+#pragma warning disable CA2000 // The context retains the connection for DisposeCore; construction failure disposes it below.
+                var producerConnection = new NatsConnection(producerOptions);
+#pragma warning restore CA2000
+                try
+                {
+                    this._producerNatsContexts[i] = new NatsJSContext(producerConnection);
+                }
+                catch
+                {
+                    await producerConnection.DisposeAsync();
+                    throw;
+                }
+            }
+
             await this._natsConnection.ConnectAsync();
 
             if (this._natsConnection.ConnectionState != NatsConnectionState.Open)
@@ -134,6 +156,38 @@ internal sealed partial class NatsConnectionManager
         }
     }
 
+    public ValueTask DisposeAsync()
+    {
+        lock (_lifecycleLock)
+        {
+            return new(_disposalTask ??= DisposeCore());
+        }
+    }
+
+    private async Task DisposeCore()
+    {
+        var disposals = new List<Task>(_producerNatsContexts.Length + 1);
+        if (_natsConnection is not null)
+        {
+            disposals.Add(_natsConnection.DisposeAsync().AsTask());
+        }
+
+        foreach (var context in _producerNatsContexts)
+        {
+            if (context is not null)
+            {
+                disposals.Add(context.Connection.DisposeAsync().AsTask());
+            }
+        }
+
+        await Task.WhenAll(disposals).ConfigureAwait(false);
+        if (_initializationTask is { } initialization)
+        {
+            // Closing the connections interrupts initial-connect retries. The creating caller observes initialization failures.
+            await initialization.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+    }
+
     internal static string GetLogSafeServerDescription(string connectionUrls)
         => string.Join(
             ',',
@@ -184,7 +238,7 @@ internal sealed partial class NatsConnectionManager
 
         var subject = $"{this._providerName}.{ns}.{id}";
 
-        var context = this._producerNatsContexts[GetProducerIndex(id.GetHashCode(), this._producerNatsContexts.Length)];
+        var context = this._producerNatsContexts[GetProducerIndex(id.GetHashCode(StringComparison.Ordinal), this._producerNatsContexts.Length)];
 
         var ack = await context.TryPublishAsync(
             subject,

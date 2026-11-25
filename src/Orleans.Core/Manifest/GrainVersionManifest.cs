@@ -11,11 +11,7 @@ namespace Orleans.Runtime.Versions
     /// </summary>
     internal sealed class GrainVersionManifest
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
-#else
-        private readonly object _lockObj = new();
-#endif
         private readonly ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType> _genericInterfaceMapping = new ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType>();
         private readonly ConcurrentDictionary<GrainType, GrainType> _genericGrainTypeMapping = new ConcurrentDictionary<GrainType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;

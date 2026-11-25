@@ -1,7 +1,7 @@
 import React from 'react';
 import Panel from '../components/panel';
 
-interface Counter {
+export interface Counter {
   name: string;
   value: string | number;
   delta: string | number | null;

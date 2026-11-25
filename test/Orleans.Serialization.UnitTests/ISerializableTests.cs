@@ -153,6 +153,42 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(2, result.Contexts.Count);
         }
 
+        [Fact]
+        public void ISerializableStructWithoutDeserializationCallback_RestoresState()
+        {
+            var input = new PlainISerializableStruct("ordinary struct", 37);
+
+            var result = Assert.IsType<PlainISerializableStruct>(SerializationLoop(input));
+
+            Assert.Equal(input.Payload, result.Payload);
+            Assert.Equal(input.Revision, result.Revision);
+        }
+
+        [Serializable]
+        private readonly struct PlainISerializableStruct : ISerializable
+        {
+            public PlainISerializableStruct(string payload, int revision)
+            {
+                Payload = payload;
+                Revision = revision;
+            }
+
+            private PlainISerializableStruct(SerializationInfo info, StreamingContext context)
+            {
+                Payload = info.GetString(nameof(Payload))!;
+                Revision = info.GetInt32(nameof(Revision));
+            }
+
+            public string Payload { get; }
+            public int Revision { get; }
+
+            public void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                info.AddValue(nameof(Payload), Payload);
+                info.AddValue(nameof(Revision), Revision);
+            }
+        }
+
         private class BaseException : Exception
         {
             public BaseException() { }

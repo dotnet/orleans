@@ -44,6 +44,18 @@ public class ServiceCollectionExtensionsRoutingTests
 {
     private const string AuthorizationPolicy = "dashboard-reader";
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("/dashboard")]
+    public void MapOrleansDashboard_NullEndpoints_ThrowsArgumentNullException(string? routePrefix)
+    {
+        IEndpointRouteBuilder endpoints = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => endpoints.MapOrleansDashboard(routePrefix));
+
+        Assert.Equal("endpoints", exception.ParamName);
+    }
+
     [Fact]
     public void MapOrleansDashboard_WithoutDashboardRegistration_ThrowsActionableInvalidOperationException()
     {

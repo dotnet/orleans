@@ -45,7 +45,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
 
     /// <summary>
     /// Creates the pair of system targets that replace <see cref="RemoteGrainDirectory"/> when
-    /// <see cref="DistributedGrainDirectory"/> is active: one for <see cref="Constants.DirectoryServiceType"/>
+    /// <see cref="DistributedGrainDirectory"/> is the default directory: one for <see cref="Constants.DirectoryServiceType"/>
     /// and one for <see cref="Constants.DirectoryCacheValidatorType"/>.
     /// </summary>
     internal static (DistributedRemoteGrainDirectory DirectoryService, DistributedRemoteGrainDirectory CacheValidator)

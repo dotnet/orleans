@@ -16,12 +16,14 @@ function evaluation({
   framework = 'net10.0',
   packages = [],
   versionException = '',
+  frameworkException = '',
 } = {}) {
   return {
     Properties: {
       TargetFramework: framework,
       TargetFrameworks: '',
       OrleansDocumentationVersionException: versionException,
+      OrleansDocumentationTargetFrameworkException: frameworkException,
     },
     Items: {
       PackageReference: packages.map(([Identity, Version]) => ({ Identity, Version })),
@@ -103,6 +105,26 @@ describe('documentation project policy', () => {
         expect.objectContaining({ rule: 'PROJECT005' }),
       ]),
     );
+  });
+
+  test('requires the exception framework exactly when a reasoned framework exception selects it', () => {
+    const validate = (framework, frameworkException) =>
+      validateProjectEvaluations({
+        projectEvaluations: [
+          { project: 'docs/durable.csproj', evaluation: evaluation({ framework, frameworkException }) },
+        ],
+        targetFramework: 'net10.0',
+        exceptionTargetFramework: 'net11.0',
+        orleansPackageVersion: '10.2.2',
+      }).issues;
+    const reason = 'Documents packages which target only net11.0.';
+
+    expect(validate('net11.0', reason)).toEqual([]);
+    expect(validate('net10.0', reason)).toEqual([expect.objectContaining({ rule: 'PROJECT004' })]);
+    expect(validate('net11.0', '')).toEqual([expect.objectContaining({ rule: 'PROJECT004' })]);
+    expect(validate('net11.0', 'net11 only')).toEqual([
+      expect.objectContaining({ rule: 'PROJECT004', message: expect.stringContaining('meaningful reason') }),
+    ]);
   });
 
   test('uses evaluated central package versions', () => {

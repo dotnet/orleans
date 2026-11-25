@@ -300,7 +300,7 @@ gracefulTermination:
             }
             else
             {
-                error ??= exception;
+                error = exception;
                 isGracefulTermination = false;
             }
         }

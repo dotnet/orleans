@@ -9,7 +9,7 @@ namespace Orleans.Serialization.TypeSystem;
 /// </summary>
 public static class RuntimeTypeNameParser
 {
-    internal const int MaxAllowedGenericArity = 64;
+    internal const int MaxAllowedGenericArity = IdentityNameValidator.MaxGenericArity;
     internal const char CompoundAliasStartIndicator = '(';
     internal const char CompoundAliasEndIndicator = ')';
     internal const char CompoundAliasElementSeparator = ',';

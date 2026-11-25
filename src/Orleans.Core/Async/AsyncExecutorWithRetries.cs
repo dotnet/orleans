@@ -38,6 +38,7 @@ namespace Orleans.Internal
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="action"/> is <see langword="null"/>.</exception>
         public static Task ExecuteWithRetries(
             Func<int, Task> action,
             int maxNumErrorTries,
@@ -45,6 +46,8 @@ namespace Orleans.Internal
             TimeSpan maxExecutionTime,
             IBackoffProvider? onErrorBackOff)
         {
+            ArgumentNullException.ThrowIfNull(action);
+
             async Task<bool> function(int i) { await action(i); return true; }
             return ExecuteWithRetriesHelper<bool>(
                 function,
@@ -82,6 +85,7 @@ namespace Orleans.Internal
         /// <returns>
         /// The value returned from the successful invocation of the provided function.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="function"/> is <see langword="null"/>.</exception>
         public static Task<T> ExecuteWithRetries<T>(
             Func<int, Task<T>> function,
             int maxNumErrorTries,
@@ -140,6 +144,7 @@ namespace Orleans.Internal
         /// <returns>
         /// The value returned from the successful invocation of <paramref name="function"/>.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="function"/> is <see langword="null"/>.</exception>
         public static Task<T> ExecuteWithRetries<T>(
             Func<int, Task<T>> function,
             int maxNumSuccessTries,
@@ -217,6 +222,9 @@ namespace Orleans.Internal
             IBackoffProvider? onErrorBackOff = null,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(function);
+
             T result = default!;
             ExceptionDispatchInfo? lastExceptionInfo = null;
             bool retry;

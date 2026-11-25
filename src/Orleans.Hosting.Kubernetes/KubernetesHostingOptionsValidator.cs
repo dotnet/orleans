@@ -13,7 +13,7 @@ namespace Orleans.Hosting.Kubernetes
             List<string>? failures = default;
             if (string.IsNullOrWhiteSpace(options.Namespace))
             {
-                failures ??= new List<string>();
+                failures = new List<string>();
                 failures.Add($"{nameof(KubernetesHostingOptions)}.{nameof(KubernetesHostingOptions.Namespace)} is not set. Set it via the {KubernetesHostingOptions.PodNamespaceEnvironmentVariable} environment variable");
             }
 

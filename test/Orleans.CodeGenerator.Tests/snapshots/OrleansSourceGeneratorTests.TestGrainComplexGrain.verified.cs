@@ -99,6 +99,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override bool IsCancellable => true;
+        public override bool MayHaveGrainCancellationToken => false;
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]

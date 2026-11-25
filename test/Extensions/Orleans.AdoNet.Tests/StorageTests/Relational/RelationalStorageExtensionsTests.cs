@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using NSubstitute;
 using Orleans.Persistence.AdoNet.Storage;
 using UnitTests.StorageTests.Relational.Fakes;
 
@@ -304,6 +305,103 @@ public sealed class RelationalStorageExtensionsTests
         Assert.Equal(payload, await ReadAllBytesAsync(stream));
     }
 
+    [Fact]
+    public async Task ChunkedCopyReportsPreCanceledTokenBeforeReading()
+    {
+        var payload = new byte[] { 1, 2, 3, 4 };
+        using var reader = CreateTable(("Payload", typeof(byte[]), payload)).CreateDataReader();
+        Assert.True(reader.Read());
+        await using var stream = new OrleansRelationalDownloadStream(reader, 0);
+        using var destination = new MemoryStream();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => stream.CopyToAsync(destination, 16, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, stream.Position);
+        Assert.Empty(destination.ToArray());
+    }
+
+    [Fact]
+    public async Task ChunkedCopyReportsCancellationBetweenWrites()
+    {
+        var payload = Enumerable.Range(0, 4_500).Select(value => (byte)(value % 251)).ToArray();
+        using var reader = CreateTable(("Payload", typeof(byte[]), payload)).CreateDataReader();
+        Assert.True(reader.Read());
+        await using var stream = new OrleansRelationalDownloadStream(reader, 0);
+        using var cancellation = new CancellationTokenSource();
+        using var destination = new CancelAfterWriteStream(cancellation);
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => stream.CopyToAsync(destination, 16, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(1, destination.WriteCount);
+        Assert.InRange(destination.Length, 1, payload.Length - 1);
+        Assert.Equal(destination.Length, stream.Position);
+        Assert.Equal(payload.Take((int)destination.Length), destination.ToArray());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ChunkedCopyRejectsInvalidBufferSizeBeforeReading(int bufferSize)
+    {
+        using var reader = CreateTable(("Payload", typeof(byte[]), new byte[] { 1 })).CreateDataReader();
+        Assert.True(reader.Read());
+        using var stream = new OrleansRelationalDownloadStream(reader, 0);
+        using var destination = new MemoryStream();
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => { _ = stream.CopyToAsync(destination, bufferSize, TestContext.Current.CancellationToken); });
+
+        Assert.Equal("bufferSize", exception.ParamName);
+        Assert.Equal(0, stream.Position);
+    }
+
+    [Fact]
+    public async Task ChunkedReadReusesOnlyCompletedEqualLengthResults()
+    {
+        using var reader = CreateTable(("Payload", typeof(byte[]), new byte[] { 1, 2, 3, 4, 5 })).CreateDataReader();
+        Assert.True(reader.Read());
+        await using var stream = new OrleansRelationalDownloadStream(reader, 0);
+        var buffer = new byte[2];
+
+        var first = stream.ReadAsync(buffer, 0, 2, TestContext.Current.CancellationToken);
+        Assert.True(first.IsCompletedSuccessfully);
+        Assert.Equal(2, await first);
+        Assert.Equal([1, 2], buffer);
+        var second = stream.ReadAsync(buffer, 0, 2, TestContext.Current.CancellationToken);
+        Assert.Same(first, second);
+        Assert.Equal(2, await second);
+        Assert.Equal([3, 4], buffer);
+        var final = stream.ReadAsync(buffer, 0, 2, TestContext.Current.CancellationToken);
+        Assert.True(final.IsCompletedSuccessfully);
+        Assert.NotSame(first, final);
+        Assert.Equal(1, await final);
+        Assert.Equal(5, buffer[0]);
+        Assert.Equal(5, stream.Position);
+    }
+
+    [Fact]
+    public async Task ChunkedReadReportsProviderFailureThroughReturnedTask()
+    {
+        using var reader = Substitute.For<DbDataReader>();
+        reader.GetBytes(0, 0, null, 0, 0).Returns(5L);
+        await using var stream = new OrleansRelationalDownloadStream(reader, 0);
+        var buffer = new byte[2];
+        var expected = new InvalidOperationException("Provider read failed.");
+        reader.GetBytes(0, 0, buffer, 0, 2).Returns(_ => throw expected);
+
+        var read = stream.ReadAsync(buffer, 0, 2, TestContext.Current.CancellationToken);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => read);
+
+        Assert.Same(expected, exception);
+        Assert.Equal(0, stream.Position);
+    }
+
     private static RecordingDbParameter AssertParameter(RecordedStorageCall call) =>
         Assert.IsType<RecordingDbParameter>(Assert.Single(call.Command.Parameters.Cast<object>()));
 
@@ -329,6 +427,19 @@ public sealed class RelationalStorageExtensionsTests
         using var destination = new MemoryStream();
         await stream.CopyToAsync(destination, TestContext.Current.CancellationToken);
         return destination.ToArray();
+    }
+
+    private sealed class CancelAfterWriteStream(CancellationTokenSource cancellation) : MemoryStream
+    {
+        public int WriteCount { get; private set; }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var result = base.WriteAsync(buffer, cancellationToken);
+            WriteCount++;
+            cancellation.Cancel();
+            return result;
+        }
     }
 
     private sealed class ReadProjection

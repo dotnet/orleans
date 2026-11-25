@@ -509,8 +509,13 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void Write(Utf8JsonWriter writer, UniqueKey value, JsonSerializerOptions options)
-            => writer.WriteStringValue(value.ToHexString());
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WriteStringValue(value.ToHexString());
+        }
 
         /// <inheritdoc />
         public override UniqueKey ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -520,8 +525,11 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] UniqueKey value, JsonSerializerOptions options)
         {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
             writer.WritePropertyName(value.ToHexString());
         }
     }

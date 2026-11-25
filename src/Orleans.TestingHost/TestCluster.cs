@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -45,6 +46,8 @@ namespace Orleans.TestingHost
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
         private readonly InMemoryTransportConnectionHub _transportHub = new();
+        [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+            Justification = "DisposeAsync awaits the cleanup delegate which disposes this observer after the client and silos; Dispose delegates to DisposeAsync.")]
         private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
         private Func<string, IConfiguration, Task<SiloHandle>> _createSiloAsync;
         private Func<string, IConfiguration, CancellationToken, Task<SiloHandle>> _createSiloAsyncWithCancellation;

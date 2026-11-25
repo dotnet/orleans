@@ -238,12 +238,12 @@ namespace Tester.AzureUtils
             await manager.TryCreateTableVersionEntryAsync(TestContext.Current.CancellationToken);
             await RegisterSiloInstance();
 
-            var gateways = await manager.FindAllGatewayProxyEndpoints();
+            var gateways = await manager.FindAllGatewayProxyEndpoints(TestContext.Current.CancellationToken);
             Assert.Empty(gateways);  // "Number of gateways before Silo.Activate"
 
             await manager.ActivateSiloInstance(myEntry);
 
-            gateways = await manager.FindAllGatewayProxyEndpoints();
+            gateways = await manager.FindAllGatewayProxyEndpoints(TestContext.Current.CancellationToken);
             Assert.Single(gateways);  // "Number of gateways after Silo.Activate"
 
             Uri myGateway = gateways.First();

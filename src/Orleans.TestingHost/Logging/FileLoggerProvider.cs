@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.TestingHost.Logging
@@ -38,7 +39,7 @@ namespace Orleans.TestingHost.Logging
     public static class FileLoggerProviderExtensions
     {
         /// <summary>
-        /// Add <see cref="FileLoggerProvider"/> to <paramref name="builder"/>
+        /// Adds file logging with a provider owned by the logging service container.
         /// </summary>
         /// <param name="builder">The logging builder.</param>
         /// <param name="filePathName">The log file path</param>
@@ -49,7 +50,7 @@ namespace Orleans.TestingHost.Logging
         {
             if (builder == null)
                 throw new ArgumentNullException(nameof(builder));
-            builder.AddProvider(new FileLoggerProvider(filePathName));
+            builder.Services.AddSingleton<ILoggerProvider>(_ => new FileLoggerProvider(filePathName));
             return builder;
         }
     }

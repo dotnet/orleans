@@ -26,8 +26,11 @@ namespace Orleans.Serialization
         /// <returns>
         /// A collection of types which have serializability issues.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="codecProvider"/> or <paramref name="options"/> is <see langword="null"/>.</exception>
         public static Dictionary<Type, SerializerConfigurationComplaint> AnalyzeSerializerAvailability(ICodecProvider codecProvider, TypeManifestOptions options)
         {
+            if (codecProvider is null) throw new ArgumentNullException(nameof(codecProvider));
+            if (options is null) throw new ArgumentNullException(nameof(options));
             var allComplaints = new Dictionary<Type, SerializerConfigurationComplaint>();
             foreach (var @interface in options.InterfaceTypes)
             {

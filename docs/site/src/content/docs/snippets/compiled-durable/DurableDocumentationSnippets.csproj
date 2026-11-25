@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compiles documentation snippets for packages which target only net11.0. A layer which documents such a package
+    moves its snippet files from snippets/compiled into this directory, keeping their subfolders such as Grains/,
+    updates the :::code paths which reference them, and adds the ProjectReference items the snippets need.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <OrleansDocumentationTargetFrameworkException>Documents packages which target only net11.0.</OrleansDocumentationTargetFrameworkException>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\'))</RepositoryRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable.Http\Orleans.Durable.Http.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Durable.Analyzers\Orleans.Durable.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

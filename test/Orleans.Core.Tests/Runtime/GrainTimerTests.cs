@@ -341,6 +341,104 @@ public sealed class GrainTimerTests
     }
 
     [Fact]
+    public async Task DisposeAfterCompletedCallback_ReleasesCancellationWaitHandle()
+    {
+        using var fixture = new TimerFixture();
+        CancellationToken token = default;
+        using var timer = fixture.Register((_, value) =>
+        {
+            token = value;
+            return Task.CompletedTask;
+        }, 0, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        await fixture.InvokeAsync(Assert.Single(fixture.Requests));
+        var waitHandle = token.WaitHandle;
+        Assert.False(waitHandle.SafeWaitHandle.IsClosed);
+
+        timer.Dispose();
+        timer.Dispose();
+
+        Assert.True(token.IsCancellationRequested);
+        Assert.True(waitHandle.SafeWaitHandle.IsClosed);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task DisposeDuringCallback_ReleasesSourceAfterCallbackAndCancellation(
+        bool callbackCompletesFirst, bool callbackThrows)
+    {
+        using var fixture = new TimerFixture();
+        var callbackStarted = NewCompletion();
+        var releaseCallback = NewCompletion();
+        var cancellationStarted = NewCompletion();
+        var releaseCancellation = NewCompletion();
+        var exception = callbackThrows ? new InvalidOperationException("Callback failed") : null;
+        CancellationToken token = default;
+        using var timer = fixture.Register(async (_, value) =>
+        {
+            token = value;
+            callbackStarted.SetResult();
+            await releaseCallback.Task;
+            Assert.True(token.IsCancellationRequested);
+            Assert.False(token.WaitHandle.SafeWaitHandle.IsClosed);
+            if (exception is not null)
+            {
+                throw exception;
+            }
+        }, 0, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        var invocation = fixture.InvokeAsync(Assert.Single(fixture.Requests), exception);
+        await callbackStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var waitHandle = token.WaitHandle;
+        var cancellationThreadId = 0;
+        using var registration = token.Register(() =>
+        {
+            cancellationThreadId = Environment.CurrentManagedThreadId;
+            cancellationStarted.SetResult();
+            releaseCancellation.Task.GetAwaiter().GetResult();
+        });
+        var disposalThreadId = 0;
+        var disposal = Task.Run(() =>
+        {
+            disposalThreadId = Environment.CurrentManagedThreadId;
+            timer.Dispose();
+        }, TestContext.Current.CancellationToken);
+        try
+        {
+            await cancellationStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(disposalThreadId, cancellationThreadId);
+            timer.Dispose();
+            Assert.False(waitHandle.SafeWaitHandle.IsClosed);
+
+            if (callbackCompletesFirst)
+            {
+                releaseCallback.SetResult();
+                await invocation;
+                Assert.False(disposal.IsCompleted);
+            }
+            else
+            {
+                releaseCancellation.SetResult();
+                await disposal;
+                Assert.False(invocation.IsCompleted);
+            }
+
+            Assert.False(waitHandle.SafeWaitHandle.IsClosed);
+        }
+        finally
+        {
+            releaseCallback.TrySetResult();
+            releaseCancellation.TrySetResult();
+            await Task.WhenAll(invocation, disposal);
+        }
+
+        Assert.True(waitHandle.SafeWaitHandle.IsClosed);
+        Assert.Single(fixture.Events.OfType<GrainTimerEvents.Disposed>());
+        Assert.Single(fixture.Events.OfType<GrainTimerEvents.TickStop>());
+    }
+
+    [Fact]
     public async Task DisposeWithBlockedCancellation_QueuedTickDrainsBeforeCancellationReturns()
     {
         using var fixture = new TimerFixture();
@@ -355,6 +453,7 @@ public sealed class GrainTimerTests
             return Task.CompletedTask;
         }, 0, TimeSpan.Zero, Timeout.InfiniteTimeSpan, interleave: true);
         await fixture.InvokeAsync(Assert.Single(fixture.Requests));
+        var waitHandle = token.WaitHandle;
         using var registration = token.Register(() =>
         {
             entered.SetResult();
@@ -369,6 +468,7 @@ public sealed class GrainTimerTests
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.True(token.IsCancellationRequested);
             Assert.False(disposal.IsCompleted);
+            Assert.False(waitHandle.SafeWaitHandle.IsClosed);
             Assert.Equal(1, calls);
         }
         finally
@@ -376,6 +476,7 @@ public sealed class GrainTimerTests
             release.SetResult();
             await disposal;
         }
+        Assert.True(waitHandle.SafeWaitHandle.IsClosed);
         Assert.Single(fixture.Events.OfType<GrainTimerEvents.TickStart>());
         Assert.Single(fixture.Events.OfType<GrainTimerEvents.Disposed>());
     }
@@ -389,9 +490,11 @@ public sealed class GrainTimerTests
         var started = NewCompletion();
         var canceled = NewCompletion();
         var exception = new InvalidOperationException("Cancellation registration failed");
+        WaitHandle? waitHandle = null;
         IGrainTimer? timer = null;
         timer = fixture.Register(async (_, token) =>
         {
+            waitHandle = token.WaitHandle;
             using var registration = token.Register(() =>
             {
                 timer!.Change(TimeSpan.Zero, TimeSpan.Zero);
@@ -402,6 +505,7 @@ public sealed class GrainTimerTests
             started.SetResult();
             await canceled.Task;
             Assert.True(token.IsCancellationRequested);
+            Assert.False(token.WaitHandle.SafeWaitHandle.IsClosed);
         }, 0, TimeSpan.Zero, TimeSpan.Zero);
         using (timer)
         {
@@ -416,6 +520,8 @@ public sealed class GrainTimerTests
                 await invocation;
             }
             timer.Dispose();
+            Assert.NotNull(waitHandle);
+            Assert.True(waitHandle.SafeWaitHandle.IsClosed);
             var cancellationError = Assert.IsType<AggregateException>(fixture.SingleLoggedError());
             Assert.Same(exception, Assert.Single(cancellationError.InnerExceptions));
             registry.Received(1).OnTimerDisposed(timer);

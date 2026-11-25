@@ -53,10 +53,10 @@ public class ClientObserverDrainLifecycleTests
                 TimeSpan.FromMinutes(1),
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: false,
-                cancellationManager: null),
+                cancellationManager: null,
+                new ApplicationRequestInstruments(fixture.Instruments)),
             completion,
-            request,
-            new ApplicationRequestInstruments(fixture.Instruments));
+            request);
         try
         {
             using var response = new BufferedResponse(fixture.Services, request.Id, request.SendingGrain, malformed);
@@ -111,8 +111,9 @@ public class ClientObserverDrainLifecycleTests
             new SharedCallbackData(
                 message => callbacks.TryRemove(message.Id, out _),
                 NullLogger<CallbackData>.Instance, fixture.TimeProvider, TimeSpan.FromMinutes(1),
-                cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null),
-            source, outbound, new ApplicationRequestInstruments(fixture.Instruments));
+                cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null,
+                new ApplicationRequestInstruments(fixture.Instruments)),
+            source, outbound);
         var invocation = new ObservedInvocation("unused", async () => $"cleanup-result-{await AwaitCallbackAsync(source)}")
         {
             OnCompleted = () => events.Enqueue("observer-exit")
@@ -306,9 +307,10 @@ public class ClientObserverDrainLifecycleTests
             TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
-            cancellationManager: null);
+            cancellationManager: null,
+            new ApplicationRequestInstruments(fixture.Instruments));
         var callback = new CallbackData(
-            shared, source, outbound, new ApplicationRequestInstruments(fixture.Instruments));
+            shared, source, outbound);
         SiloUnavailableException? observedShutdown = null;
         var invocation = new ObservedInvocation("unused", async () =>
         {

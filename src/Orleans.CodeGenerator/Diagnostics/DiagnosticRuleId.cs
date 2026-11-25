@@ -18,4 +18,6 @@ internal static class DiagnosticRuleId
     public const string CancellationTokenNotLast = "ORLEANS0113";
     public const string InvalidSerializerContext = "ORLEANS0114";
     public const string UnsupportedSerializerContextType = "ORLEANS0115";
+    public const string InaccessibleCompoundTypeAlias = "ORLEANS0116";
+    public const string InvalidUnionCase = "ORLEANS0117";
 }

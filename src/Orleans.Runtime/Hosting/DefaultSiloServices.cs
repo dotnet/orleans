@@ -14,6 +14,7 @@ using Orleans.Connections;
 using Orleans.Connections.Transport;
 using Orleans.Connections.Transport.Sockets;
 using Orleans.Core;
+using Orleans.GrainDirectory;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Placement.Repartitioning;
@@ -159,6 +160,12 @@ namespace Orleans.Hosting
             services.AddSingleton<CachedGrainLocator>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
             services.AddSingleton<ClientGrainLocator>();
+            if (!services.Any(static service => service.IsKeyedService
+                && service.ServiceType == typeof(IGrainDirectory)
+                && Equals(service.ServiceKey, GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY)))
+            {
+                builder.AddDistributedGrainDirectory();
+            }
 
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -566,7 +573,7 @@ namespace Orleans.Hosting
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans", StringComparison.Ordinal))
                 {
                     return true;
                 }

@@ -18,7 +18,9 @@ expose Blob resources; the AppHost removes unsupported queue/table outputs and
 supplies clustering through a separate standard account.
 
 From the repository root, with the .NET SDK and a Docker-compatible container
-runtime available:
+runtime available, run the AppHost. It uses the Aspire CLI bundle for
+orchestration; the SDK uses an installed Aspire CLI or resolves its matching
+CLI through `dnx` and the configured NuGet sources:
 
 ```powershell
 dotnet run --project playground\DurableJobsJournaling\DurableJobsJournaling.AppHost

@@ -37,14 +37,7 @@ public class TlsClientAuthenticationOptions
         get => Value.LocalCertificateSelectionCallback is null ? null : new ClientCertificateSelectionCallback(Value.LocalCertificateSelectionCallback);
         set
         {
-#if NET10_0_OR_GREATER
             Value.LocalCertificateSelectionCallback = value is null ? null : new LocalCertificateSelectionCallback(value);
-#else
-            Value.LocalCertificateSelectionCallback = value is null
-                ? null
-                : (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
-                    value(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers)!;
-#endif
         }
     }
 

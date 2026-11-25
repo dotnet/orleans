@@ -17,11 +17,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed partial class BitArrayCodec : IFieldCodec<BitArray>
     {
-#if NET10_0_OR_GREATER
-#elif NET8_0_OR_GREATER
-        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_array")]
-        extern static ref int[] GetSetArray(BitArray bitArray);
-#else
+#if !NET10_0_OR_GREATER
         private static int[] GetSetArray(BitArray bitArray) => (typeof(BitArray).GetField("m_array", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(bitArray) as int[])!;
 #endif
 
@@ -425,22 +421,28 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Serializer for <see cref="PooledBuffer"/> instances.
     /// </summary>
+    /// <remarks>
+    /// Writing consumes the supplied buffer and releases its storage, including when serialization fails.
+    /// Deserialized buffers are owned by the receiver, which disposes them after use.
+    /// </remarks>
     [RegisterSerializer]
     public sealed class PooledBufferCodec : IFieldCodec<PooledBuffer>
     {
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
         {
-            ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
-            writer.WriteVarUInt32((uint)value.Length);
-            value.CopyTo(ref writer);
-
-            // Dispose of the value after sending it.
-            // PooledBuffer is special in this sense.
-            // Senders must not use the value after sending.
-            // Receivers must dispose of the value after use.
-            value.Reset();
+            try
+            {
+                ReferenceCodec.MarkValueField(writer.Session);
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
+                writer.WriteVarUInt32((uint)value.Length);
+                value.CopyTo(ref writer);
+            }
+            finally
+            {
+                // Serialization consumes this value, including when the writer fails partway through it.
+                value.Reset();
+            }
         }
 
         /// <inheritdoc />

@@ -24,11 +24,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
     internal const int SiloPortRangeEnd = 30_000;
 
     private bool _disposed;
-#if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
-#else
-    private readonly object _lockObj = new();
-#endif
     private readonly Dictionary<int, string> _allocatedPorts = [];
 
     /// <inheritdoc />
@@ -294,18 +290,28 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
         Error,
     }
 
-    private readonly record struct MutexAcquisition(MutexAcquisitionResult Result, Exception? Error = null);
+    internal readonly record struct MutexAcquisition(MutexAcquisitionResult Result, Exception? Error = null);
 
-    private class MutexManager
+    internal sealed class MutexManager : IDisposable
     {
         private readonly Dictionary<string, Mutex> _mutexes = [];
         private readonly BlockingCollection<Action> _workItems = [];
         private readonly Thread _thread;
+        private readonly TimeSpan _acquisitionTimeout;
+        private readonly Action? _beforeAcquire;
+        private int _shutdown;
 
         public static MutexManager Instance { get; } = new MutexManager();
 
-        private MutexManager()
+        private MutexManager() : this(TimeSpan.FromSeconds(10))
         {
+        }
+
+        internal MutexManager(TimeSpan acquisitionTimeout, Action? beforeAcquire = null)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(acquisitionTimeout, TimeSpan.Zero);
+            _acquisitionTimeout = acquisitionTimeout;
+            _beforeAcquire = beforeAcquire;
             _thread = new Thread(Run)
             {
                 Name = "MutexManager.Worker",
@@ -317,22 +323,35 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
 
         private void OnAppDomainUnload(object? sender, EventArgs e) => Shutdown();
 
-        private void Shutdown()
+        public void Dispose()
         {
-            _workItems.CompleteAdding();
-            _thread.Join();
+            AppDomain.CurrentDomain.DomainUnload -= OnAppDomainUnload;
+            Shutdown();
         }
 
-        public MutexAcquisition Acquire(string name)
+        private void Shutdown()
+        {
+            if (Interlocked.Exchange(ref _shutdown, 1) != 0)
+            {
+                return;
+            }
+
+            _workItems.CompleteAdding();
+            _thread.Join();
+            _workItems.Dispose();
+        }
+
+        internal MutexAcquisition Acquire(string name)
         {
             var result = new[] { MutexAcquisitionResult.HeldByCurrentProcess };
             var acquiredByRequest = new[] { false };
-            var signal = new ManualResetEventSlim(initialState: false);
+            var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             ExceptionDispatchInfo? error = null;
             _workItems.Add(() =>
             {
                 try
                 {
+                    _beforeAcquire?.Invoke();
                     if (!_mutexes.ContainsKey(name))
                     {
                         Mutex? mutex = new(false, name);
@@ -391,11 +410,16 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
                 }
                 finally
                 {
-                    signal.Set();
+                    signal.SetResult();
                 }
             });
 
-            if (!signal.Wait(TimeSpan.FromSeconds(10)))
+            try
+            {
+                // Port allocation is synchronous; named mutex acquisition runs on its thread-affine worker.
+                signal.Task.WaitAsync(_acquisitionTimeout).GetAwaiter().GetResult();
+            }
+            catch (TimeoutException)
             {
                 // The acquisition remains queued and can complete after this caller gives up.
                 // Queue conditional cleanup behind it so only a mutex acquired by this request is released.
@@ -415,10 +439,10 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
 
         private void SignalRelease(string name, bool[]? acquiredByRequest)
         {
-            if (_workItems.IsAddingCompleted) return;
-
             try
             {
+                if (_workItems.IsAddingCompleted) return;
+
                 _workItems.Add(() =>
                 {
                     if ((acquiredByRequest is null || acquiredByRequest[0]) && _mutexes.Remove(name, out var value))

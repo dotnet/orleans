@@ -7,6 +7,7 @@ namespace Orleans
     /// <summary>
     /// An analogue to <see cref="CancellationTokenSource"/> which can be sent between grains.
     /// </summary>
+    [Obsolete("Use CancellationTokenSource instead.")]
     public sealed class GrainCancellationTokenSource : IDisposable
     {
         /// <summary>

@@ -20,17 +20,18 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Restore and build
-        run: |
-          set +e
+      - name: Cache dependencies
+        uses: ./.github/actions/cache-dependencies
+        with:
+          nuget-scope: genapi
 
-          # Find all csproj files excluding specific paths
-          find src -name '*.csproj' | egrep -v 'Orleans.Analyzers|Orleans.CodeGenerator' | while read proj; do
-            export CI=false
-            dotnet restore "$proj" --configfile .github/NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true &&
-              dotnet build "$proj" -f net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"
-          done
-        continue-on-error: true
+      - name: Restore, build, and generate APIs
+        env:
+          CI: 'false'
+        run: |
+          dotnet msbuild .github/scripts/generate-api.proj -restore -maxCpuCount:2 \
+            -p:Configuration=Release -p:GenerateOrleansApiSource=true \
+            -p:RestoreConfigFile="$PWD/.github/NuGet.GenAPI.Config"
 
       - name: Create or update pull request
         env:

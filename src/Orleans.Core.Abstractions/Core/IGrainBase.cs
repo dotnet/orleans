@@ -44,15 +44,26 @@ namespace Orleans
         /// This call will mark this activation of the current grain to be deactivated and removed at the end of the current method.
         /// The next call to this grain will result in a different activation to be used, which typical means a new activation will be created automatically by the runtime.
         /// </summary>
-        public static void DeactivateOnIdle(this IGrainBase grain) =>
+        /// <param name="grain">The grain instance.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> is <see langword="null"/>.</exception>
+        public static void DeactivateOnIdle(this IGrainBase grain)
+        {
+            ArgumentNullException.ThrowIfNull(grain);
             grain.GrainContext.Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateOnIdle)} was called."));
+        }
 
         /// <summary>
         /// Starts an attempt to migrating this instance to another location.
         /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a new location.
         /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select an alternative location.
         /// </summary>
-        public static void MigrateOnIdle(this IGrainBase grain) => grain.GrainContext.Migrate(RequestContext.CallContextData?.Value.Values);
+        /// <param name="grain">The grain instance.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> is <see langword="null"/>.</exception>
+        public static void MigrateOnIdle(this IGrainBase grain)
+        {
+            ArgumentNullException.ThrowIfNull(grain);
+            grain.GrainContext.Migrate(RequestContext.CallContextData?.Value.Values);
+        }
 
         /// <summary>
         /// Runs <paramref name="callback"/> as a request on this grain activation.
@@ -78,9 +89,11 @@ namespace Orleans
         /// </param>
         /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
         /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, LocalRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> or <paramref name="callback"/> is <see langword="null"/>.</exception>
         public static Task RunRequestAsync(this IGrainBase grain, Func<CancellationToken, Task> callback, LocalRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
+            ArgumentNullException.ThrowIfNull(grain);
             return RunRequestCore<Func<CancellationToken, Task>, object?>(
                 grain.GrainContext,
                 static (callback, cancellationToken) => callback(cancellationToken),
@@ -117,9 +130,11 @@ namespace Orleans
         /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
         /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
         /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, LocalRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> or <paramref name="callback"/> is <see langword="null"/>.</exception>
         public static Task RunRequestAsync<TState>(this IGrainBase grain, Func<TState, CancellationToken, Task> callback, TState state, LocalRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
+            ArgumentNullException.ThrowIfNull(grain);
             return RunRequestCore<TState, object?>(grain.GrainContext, callback, state, options, cancellationToken);
         }
 
@@ -147,9 +162,11 @@ namespace Orleans
         /// </param>
         /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
         /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, LocalRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> or <paramref name="callback"/> is <see langword="null"/>.</exception>
         public static Task RunRequestAsync(this IGrainBase grain, Action<CancellationToken> callback, LocalRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
+            ArgumentNullException.ThrowIfNull(grain);
             return RunRequestCore<Action<CancellationToken>, object?>(
                 grain.GrainContext,
                 static (callback, cancellationToken) =>
@@ -190,9 +207,11 @@ namespace Orleans
         /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
         /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
         /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, LocalRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> or <paramref name="callback"/> is <see langword="null"/>.</exception>
         public static Task RunRequestAsync<TState>(this IGrainBase grain, Action<TState, CancellationToken> callback, TState state, LocalRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
+            ArgumentNullException.ThrowIfNull(grain);
             return RunRequestCore<(Action<TState, CancellationToken> Callback, TState State), object?>(
                 grain.GrainContext,
                 static (state, cancellationToken) =>
@@ -231,9 +250,11 @@ namespace Orleans
         /// <typeparam name="TResult">The type of the callback's result.</typeparam>
         /// <returns>A <see cref="Task{TResult}"/> which completes with the outcome of the callback.</returns>
         /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, LocalRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> or <paramref name="callback"/> is <see langword="null"/>.</exception>
         public static Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, Func<CancellationToken, Task<TResult>> callback, LocalRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
+            ArgumentNullException.ThrowIfNull(grain);
             return RunRequestCore<Func<CancellationToken, Task<TResult>>, TResult>(
                 grain.GrainContext,
                 static (callback, cancellationToken) => callback(cancellationToken),
@@ -292,9 +313,11 @@ namespace Orleans
         /// queue a custom <see cref="ILocalRequest"/> using <see cref="IGrainContext.ReceiveLocalRequest"/>.
         /// </para>
         /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> or <paramref name="callback"/> is <see langword="null"/>.</exception>
         public static Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, Func<TState, CancellationToken, Task<TResult>> callback, TState state, LocalRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
+            ArgumentNullException.ThrowIfNull(grain);
             return RunRequestCore<TState, TResult>(grain.GrainContext, callback, state, options, cancellationToken);
         }
 
@@ -369,13 +392,13 @@ namespace Orleans
         /// Exceptions thrown from the callback will be logged, but will not prevent the next timer tick from being queued.
         /// </para>
         /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grain"/> or <paramref name="callback"/> is <see langword="null"/>.</exception>
         public static IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, Func<TState, CancellationToken, Task> callback, TState state, GrainTimerCreationOptions options)
         {
             ArgumentNullException.ThrowIfNull(callback);
+            ArgumentNullException.ThrowIfNull(grain);
             if (grain is Grain grainClass)
             {
-                ArgumentNullException.ThrowIfNull(callback);
-
                 grainClass.EnsureRuntime();
                 return grainClass.Runtime.TimerRegistry.RegisterGrainTimer(grainClass.GrainContext, callback, state, options);
             }

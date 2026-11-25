@@ -312,20 +312,12 @@ public class HotReloadCodegenTests
         }
 
         using var module = ModuleMetadata.CreateFromImage(peImage);
-#if NET10_0_OR_GREATER
         var baseline = EmitBaseline.CreateInitialBaseline(
             compilationV1,
             module,
             static _ => default,
             static _ => default,
             true);
-#else
-        var baseline = EmitBaseline.CreateInitialBaseline(
-            module,
-            static _ => default,
-            static _ => default,
-            true);
-#endif
 
         using var metadataDelta = new MemoryStream();
         using var ilDelta = new MemoryStream();
@@ -453,11 +445,7 @@ public class HotReloadCodegenTests
     }
 
     private static SemanticEdit CreateSemanticEdit(SemanticEditKind kind, ISymbol? oldSymbol, ISymbol? newSymbol)
-#if NET10_0_OR_GREATER
         => new(kind, oldSymbol, newSymbol, syntaxMap: null, runtimeRudeEdit: null, instrumentation: default);
-#else
-        => new(kind, oldSymbol, newSymbol, syntaxMap: null, preserveLocalVariables: false);
-#endif
 
     private static IMethodSymbol GetCopierConstructor(INamedTypeSymbol copier)
         => copier.InstanceConstructors.Single(constructor => constructor.Parameters.Length == 1);

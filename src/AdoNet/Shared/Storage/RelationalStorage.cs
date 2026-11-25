@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -297,12 +298,14 @@ namespace Orleans.Tests.SqlUtils
                 }
                 finally
                 {
-                    cancellationRegistration.Dispose();
+                    await cancellationRegistration.DisposeAsync().ConfigureAwait(false);
                 }
             }
         }
 
 
+        [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities",
+            Justification = "Executes trusted SQL from provider query configuration; record and request values are bound separately by parameterProvider.")]
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
             string query,
             Action<DbCommand>? parameterProvider,
@@ -320,17 +323,12 @@ namespace Orleans.Tests.SqlUtils
 
                     _databaseCommandInterceptor.Intercept(command);
 
-                    Task<Tuple<IEnumerable<TResult>, int>> ret;
                     if (_isSynchronousAdoNetImplementation)
                     {
-                        ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), CancellationToken.None);
-                    }
-                    else
-                    {
-                        ret = executor(command, selector, commandBehavior, cancellationToken);
+                        return await Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), CancellationToken.None).ConfigureAwait(false);
                     }
 
-                    return await ret.ConfigureAwait(continueOnCapturedContext: false);
+                    return await executor(command, selector, commandBehavior, cancellationToken).ConfigureAwait(false);
                 }
             }
         }

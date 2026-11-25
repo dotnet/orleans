@@ -116,6 +116,113 @@ namespace UnitTests.SchedulerTests
             Assert.Equal(expected, received);
         }
 
+        [Theory]
+        [InlineData("task", false)]
+        [InlineData("task", true)]
+        [InlineData("task-result", false)]
+        [InlineData("task-result", true)]
+        [InlineData("value-task", false)]
+        [InlineData("value-task", true)]
+        [InlineData("action", false)]
+        public async Task ClosureWorkItem_PropagatesDelegateFailureThroughCompletionTask(string kind, bool delayedFailure)
+        {
+            var expected = new InvalidOperationException("Work-item delegate failed.");
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            WorkItemBase workItem;
+            Task completion;
+            switch (kind)
+            {
+                case "task":
+                    var asyncItem = new AsyncClosureWorkItem(
+                        () => delayedFailure ? FailAsync() : throw expected, _rootContext);
+                    workItem = asyncItem;
+                    completion = asyncItem.Task;
+                    break;
+                case "task-result":
+                    var resultItem = new AsyncClosureWorkItem<int>(
+                        () => delayedFailure ? FailAsync() : throw expected, _rootContext);
+                    workItem = resultItem;
+                    completion = resultItem.Task;
+                    break;
+                case "value-task":
+                    var valueTaskItem = new StatefulAsyncClosureWorkItem<Exception>(
+                        failure => delayedFailure ? new ValueTask(FailAsync()) : throw failure,
+                        expected, _rootContext);
+                    workItem = valueTaskItem;
+                    completion = valueTaskItem.Task;
+                    break;
+                case "action":
+                    var actionItem = new ClosureWorkItem<Exception>(
+                        static failure => throw failure, expected, null, _rootContext);
+                    workItem = actionItem;
+                    completion = actionItem.Task;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind));
+            }
+
+            _rootContext.Scheduler.QueueWorkItem(workItem);
+            try
+            {
+                if (delayedFailure)
+                {
+                    await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    Assert.False(completion.IsCompleted);
+                    release.SetResult();
+                }
+
+                var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    completion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                Assert.Same(expected, exception);
+                Assert.True(completion.IsFaulted);
+                var next = new Task<int>(() => 42);
+                _rootContext.Scheduler.QueueTask(next);
+                Assert.Equal(42, await next.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+            }
+            finally
+            {
+                release.TrySetResult();
+                await completion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            async Task<int> FailAsync()
+            {
+                started.SetResult();
+                await release.Task;
+                throw expected;
+            }
+        }
+
+        [Theory]
+        [InlineData("task", false)]
+        [InlineData("task", true)]
+        [InlineData("result", false)]
+        [InlineData("result", true)]
+        [InlineData("value-task", false)]
+        [InlineData("value-task", true)]
+        public async Task RunOrQueueTask_PropagatesInlineDelegateFailureThroughCompletionTask(string kind, bool cancellationFailure)
+        {
+            Exception expected = cancellationFailure
+                ? new OperationCanceledException()
+                : new InvalidOperationException("Inline delegate failed.");
+            await _rootContext.QueueTask(async () =>
+            {
+                Assert.Same(_rootContext, RuntimeContext.Current);
+                Task completion = kind switch
+                {
+                    "task" => _rootContext.RunOrQueueTask(() => throw expected),
+                    "result" => _rootContext.RunOrQueueTaskResult<int>(() => throw expected),
+                    "value-task" => _rootContext.RunOrQueueTask<Exception>(static failure => throw failure, expected).AsTask(),
+                    _ => throw new ArgumentOutOfRangeException(nameof(kind))
+                };
+
+                Assert.True(completion.IsFaulted);
+                Assert.Same(expected, await Record.ExceptionAsync(() => completion));
+            }).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+
         [Fact]
         public async Task Sched_SimpleFifoTest()
         {

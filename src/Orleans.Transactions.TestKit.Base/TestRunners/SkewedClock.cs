@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Transactions.TestKit
 {
@@ -22,6 +23,8 @@ namespace Orleans.Transactions.TestKit
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness injects positive or negative clock skew into transaction conformance tests.")]
         public DateTime UtcNow()
         {
             TimeSpan skew = TimeSpan.FromTicks(minSkew.Ticks + Random.Shared.Next(skewRangeTicks));

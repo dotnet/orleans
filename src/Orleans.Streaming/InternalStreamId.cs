@@ -85,6 +85,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            ArgumentNullException.ThrowIfNull(info);
             info.AddValue("pvn", ProviderName);
             info.AddValue("sid", StreamId, typeof(StreamId));
         }
@@ -138,6 +139,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override void Write(Utf8JsonWriter writer, QualifiedStreamId value, JsonSerializerOptions options)
         {
+            ArgumentNullException.ThrowIfNull(writer);
             if (string.IsNullOrWhiteSpace(value.ProviderName) || value.StreamId == default)
             {
                 throw new JsonException($"Could not serialize {nameof(QualifiedStreamId)}.");
@@ -184,6 +186,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] QualifiedStreamId value, JsonSerializerOptions options)
         {
+            ArgumentNullException.ThrowIfNull(writer);
             if (string.IsNullOrWhiteSpace(value.ProviderName) || value.StreamId == default)
             {
                 throw new JsonException($"Could not serialize {nameof(QualifiedStreamId)}.");

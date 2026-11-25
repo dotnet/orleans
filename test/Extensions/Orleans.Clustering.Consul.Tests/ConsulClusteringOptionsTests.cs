@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Membership;
 using Xunit;
 
 namespace Consul.Tests
@@ -8,6 +11,25 @@ namespace Consul.Tests
     [TestArea("Clustering")]
     public class ConsulClusteringOptionsTests
     {
+        [Fact, TestCategory("BVT"), TestCategory("Consul")]
+        public void GatewayConstructorRejectsNullRequiredOptions()
+        {
+            var options = Options.Create(new ConsulClusteringOptions());
+            var gatewayOptions = Options.Create(new GatewayOptions());
+            var clusterOptions = Options.Create(new ClusterOptions());
+            var logger = NullLogger<ConsulGatewayListProvider>.Instance;
+
+            Assert.Throws<ArgumentNullException>(
+                "options",
+                () => new ConsulGatewayListProvider(logger, null!, gatewayOptions, clusterOptions));
+            Assert.Throws<ArgumentNullException>(
+                "gatewayOptions",
+                () => new ConsulGatewayListProvider(logger, options, null!, clusterOptions));
+            Assert.Throws<ArgumentNullException>(
+                "clusterOptions",
+                () => new ConsulGatewayListProvider(logger, options, gatewayOptions, null!));
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void DefaultCreationBehaviorIsRetained()
         {

@@ -152,7 +152,9 @@ namespace Orleans.Runtime.Messaging
 
             using var _ = new ExecutionContextSuppressor();
             var task = new Task<Task>(CloseAsync);
+#pragma warning disable CA2025 // Unwrap completes after both task layers; the ref-struct suppressor only controls execution-context capture.
             if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is not null)
+#pragma warning restore CA2025
             {
                 return;
             }
@@ -360,12 +362,7 @@ namespace Orleans.Runtime.Messaging
                     else if (!_connection._transport.EnqueueWrite(writeRequest))
                     {
                         _connection.StartClosing(new ConnectionClosedException());
-                        for (var i = 0; i < writeRequest.MessageCount; i++)
-                        {
-                            _connection.RerouteMessage(writeRequest.GetMessage(i));
-                        }
-
-                        writeRequest.Reset();
+                        writeRequest.RerouteMessages(error: null);
                     }
                 }
                 finally
@@ -440,7 +437,7 @@ namespace Orleans.Runtime.Messaging
             "Reliability",
             "CA2000:Dispose objects before losing scope",
             Justification = "Ownership of the response message is transferred to the local message dispatcher.")]
-        private void OnMessageSerializationFailure(Message message, Exception exception)
+        internal void OnMessageSerializationFailure(Message message, Exception exception)
         {
             LogErrorExceptionSerializingMessage(Log, exception, message, this);
 

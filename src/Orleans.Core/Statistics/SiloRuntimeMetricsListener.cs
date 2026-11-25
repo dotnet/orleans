@@ -11,6 +11,11 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Listens for Orleans runtime metrics used to produce silo runtime statistics.
 /// </summary>
+/// <remarks>
+/// Collect the <c>orleans-messaging-sent-messages-size</c> and <c>orleans-messaging-received-messages-size</c>
+/// histograms through OpenTelemetry to obtain message byte totals since collection began.
+/// </remarks>
+[Obsolete("Use the orleans-messaging-sent-messages-size and orleans-messaging-received-messages-size histograms through OpenTelemetry instead.")]
 public static class SiloRuntimeMetricsListener
 {
     private static readonly MeterListener MeterListener = new();

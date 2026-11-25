@@ -106,17 +106,10 @@ public class CosmosClusteringProviderBuilderTests
         AssertBlankValueContract(() => services.GetRequiredService<IOptions<CosmosClusteringOptions>>().Value, key, blankValue, expectedType);
     }
 
-    // The configuration binding source generator treats an empty value as absent on .NET 10 and rejects it on .NET 8.
-    // Whitespace-only values are invalid on both.
-#if NET10_0_OR_GREATER
-    private static readonly bool EmptyValueIsAbsent = true;
-#else
-    private static readonly bool EmptyValueIsAbsent = false;
-#endif
-
+    // The configuration binding source generator treats an empty value as absent and rejects a whitespace-only value.
     private static void AssertBlankValueContract(Func<CosmosClusteringOptions> getOptions, string key, string blankValue, Type expectedType)
     {
-        if (EmptyValueIsAbsent && blankValue.Length == 0)
+        if (blankValue.Length == 0)
         {
             var options = getOptions();
             Assert.True(options.IsResourceCreationEnabled);

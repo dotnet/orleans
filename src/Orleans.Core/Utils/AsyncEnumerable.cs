@@ -15,11 +15,7 @@ namespace Orleans.Runtime.Utilities
 
     internal sealed class AsyncEnumerable<T> : IAsyncEnumerable<T> where T : notnull
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _updateLock = new();
-#else
-        private readonly object _updateLock = new();
-#endif
         private readonly Func<T, T, bool> _updateValidator;
         private readonly Action<T> _onPublished;
         private Element _current;
@@ -201,8 +197,10 @@ namespace Orleans.Runtime.Utilities
             public static Element CreateDisposed()
             {
                 var tcs = new TaskCompletionSource<Element>(TaskCreationOptions.RunContinuationsAsynchronously);
-                tcs.SetException(new ObjectDisposedException("This instance has been disposed"));
-                return new Element(AsyncEnumerable.DisposedValue, tcs);
+                var disposed = new Element(AsyncEnumerable.DisposedValue, tcs);
+                // The terminal element has no next reader, so its task completes without a fault.
+                tcs.SetResult(disposed);
+                return disposed;
             }
 
             public bool IsValid => !IsInitial && !IsDisposed;

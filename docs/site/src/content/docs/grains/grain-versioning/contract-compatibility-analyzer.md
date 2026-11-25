@@ -124,6 +124,10 @@ class [GrainType("cart")] Contoso.Grains.CartGrain
 
 The value before the colon is the effective runtime identity. A source `[Id(42)]`, source `[Alias("42")]`, and generated method ID `42` describe the same wire identity. The manifest records that result as `42:` and keeps source provenance in source code. Syntax-sensitive characters in aliases are backslash-escaped.
 
+Grain interface identities are recorded verbatim. Source <xref:Orleans.Runtime.GrainInterfaceTypeAttribute>, <xref:Orleans.GrainTypeAttribute>, and <xref:Orleans.AliasAttribute> values must be non-empty and contain no quotes, whitespace, control characters, or reserved type-name delimiters (`[](),*&`). [`ORLEANS0028`](../../diagnostics/orleans0028.md) reports invalid values during compilation, and attribute construction and configured type-alias registration validate the same contract at runtime.
+
+Generic arity suffixes use a backtick followed by ASCII decimal digits at the end of each nested type name, totaling at most 64. See [Migrate Orleans contract identities](../../migration/contract-identities.md) for baseline and persisted-alias upgrade procedures.
+
 `*RETIRED*` marks an intentionally removed contract:
 
 ```text
@@ -139,7 +143,7 @@ Retired entries preserve contract history and prevent a removed identity from be
 The analyzer uses Orleans identities before CLR names:
 
 - <xref:Orleans.GrainTypeAttribute> identifies grain classes.
-- <xref:Orleans.Runtime.GrainInterfaceTypeAttribute> identifies grain interfaces.
+- <xref:Orleans.Runtime.GrainInterfaceTypeAttribute> identifies grain interfaces. Without it, the interface's <xref:Orleans.AliasAttribute>, or an alias on a containing type, replaces the CLR type name, matching the identity Orleans resolves at runtime.
 - <xref:Orleans.IdAttribute> or <xref:Orleans.AliasAttribute> identifies grain methods.
 - <xref:Orleans.AliasAttribute> identifies serialized parameter and return types.
 
@@ -168,3 +172,5 @@ Standard `.editorconfig` diagnostic configuration can change these severities. P
 ## Scope
 
 The analyzer tracks RPC interface signatures, numeric interface versions, and concrete grain class identities. Behavioral compatibility and persisted state schemas require separate review using the [backward compatibility guidelines](backward-compatibility-guidelines.md) and mixed-version deployment tests.
+
+Identity analysis uses source attributes and CLR naming conventions. At runtime, configured <xref:Orleans.Runtime.IGrainInterfaceTypeProvider> registrations take precedence over naming conventions, and configured type aliases participate in type formatting. Verify application-specific identity configuration with <xref:Orleans.Metadata.GrainInterfaceTypeResolver.GetGrainInterfaceType*>.

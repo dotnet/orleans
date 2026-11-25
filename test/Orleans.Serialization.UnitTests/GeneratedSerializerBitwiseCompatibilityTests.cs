@@ -117,7 +117,6 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void ReadonlyGenericPersonExternalStruct_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateReadonlyGenericPersonExternalStruct()));
 
-#if NET9_0_OR_GREATER
     [Fact]
     public void GenericPersonExternal_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateGenericPersonExternal()));
@@ -125,7 +124,6 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     [Fact]
     public Task GenericPersonExternal_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateGenericPersonExternal())), extension: "txt").UseDirectory("snapshots");
-#endif
 #endif
 
     [Fact]
@@ -372,7 +370,6 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
         };
     }
 
-#if NET9_0_OR_GREATER
     private static GenericPersonExternal<Person2External> CreateGenericPersonExternal()
     {
         var inner = CreatePerson2External();
@@ -382,7 +379,6 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
             StarSign = "Aquaricorn",
         };
     }
-#endif
 #endif
 
     private static GenericPoco<string> CreateGenericPocoString() =>

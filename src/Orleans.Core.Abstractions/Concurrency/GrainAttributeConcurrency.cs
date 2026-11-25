@@ -4,6 +4,7 @@ using Orleans.Placement;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace Orleans.Concurrency
@@ -38,6 +39,8 @@ namespace Orleans.Concurrency
     public sealed class ReentrantAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods",
+            Justification = "AttributeGrainPropertiesProvider validates the properties collection before dispatching to attributes.")]
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[WellKnownGrainTypeProperties.Reentrant] = "true";
@@ -142,6 +145,8 @@ namespace Orleans.Concurrency
 
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods",
+            Justification = "AttributeGrainPropertiesProvider validates the properties collection before dispatching to attributes.")]
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[WellKnownGrainTypeProperties.MayInterleavePredicate] = this.CallbackMethodName;

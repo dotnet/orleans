@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\TestInfrastructure\TestExtensions\TestTraits.cs" Link="TestTraits.cs" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
   </ItemGroup>
 </Project>

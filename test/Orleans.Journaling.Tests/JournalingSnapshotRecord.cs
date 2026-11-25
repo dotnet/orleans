@@ -1,4 +1,4 @@
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Compound test type used by the codec snapshot tests to exercise Orleans field-codec

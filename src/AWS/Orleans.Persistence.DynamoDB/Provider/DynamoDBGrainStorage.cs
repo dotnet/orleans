@@ -119,14 +119,18 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainType"/> or <paramref name="grainState"/> is null.</exception>
         public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
             => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainType"/> or <paramref name="grainState"/> is null.</exception>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
 
             string partitionKey = GetKeyString(grainId);
             LogTraceReadingGrainState(logger, grainType, partitionKey, grainId, this.options.TableName);
@@ -165,14 +169,18 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainType"/> or <paramref name="grainState"/> is null.</exception>
         public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
             => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainType"/> or <paramref name="grainState"/> is null.</exception>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
 
             string partitionKey = GetKeyString(grainId);
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
@@ -277,14 +285,18 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainType"/> or <paramref name="grainState"/> is null.</exception>
         public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
             => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainType"/> or <paramref name="grainState"/> is null.</exception>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
 
             string partitionKey = GetKeyString(grainId);
             LogTraceClearingGrainState(logger, grainType, partitionKey, grainId, grainState.ETag, this.options.DeleteStateOnClear, this.options.TableName);

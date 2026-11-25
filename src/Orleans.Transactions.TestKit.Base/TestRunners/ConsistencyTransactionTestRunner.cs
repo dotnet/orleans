@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Orleans.Transactions.TestKit.Consistency;
@@ -40,6 +41,8 @@ namespace Orleans.Transactions.TestKit
         /// <param name="avoidTimeouts">Whether the workload should limit operations which can introduce response timeouts.</param>
         /// <param name="readwrite">The strategy used to determine whether transactions and grain calls are read-only or read-write.</param>
         /// <returns>A task which represents the consistency test.</returns>
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "A seeded PRNG derives workload seeds for transaction conformance tests.")]
         public virtual async Task RandomizedConsistency(int numGrains, int scale, bool avoidDeadlocks, bool avoidTimeouts, ReadWriteDetermination readwrite)
         {
             var random = new Random(scale + numGrains * 1000 + (avoidDeadlocks ? 666 : 333) + ((int)readwrite) * 123976);

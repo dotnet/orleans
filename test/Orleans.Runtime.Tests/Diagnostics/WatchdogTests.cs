@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -14,6 +15,95 @@ namespace Tester.Diagnostics;
 public class WatchdogTests
 {
     private static readonly DateTimeOffset Start = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void CheckComponentHealth_ReportsThrowingParticipantAsFailedAndContinues()
+    {
+        var checkedHealthyParticipant = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        release.SetResult();
+        var healthyParticipant = new BlockingHealthParticipant(checkedHealthyParticipant, release);
+        using var fixture = new WatchdogFixture(participants:
+        [
+            new FaultingHealthParticipant(new InvalidOperationException("Health probe failed.")),
+            healthyParticipant
+        ]);
+        using var checks = new MetricCollector<int>(fixture.MeterFactory, "Microsoft.Orleans", InstrumentNames.WATCHDOG_NUM_HEALTH_CHECKS);
+        using var failures = new MetricCollector<int>(fixture.MeterFactory, "Microsoft.Orleans", InstrumentNames.WATCHDOG_NUM_FAILED_HEALTH_CHECKS);
+
+        fixture.CheckComponentHealth();
+
+        Assert.Equal(1, Assert.Single(checks.GetMeasurementSnapshot()).Value);
+        Assert.Equal(1, Assert.Single(failures.GetMeasurementSnapshot()).Value);
+        Assert.Equal(1, healthyParticipant.CheckCount);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Stop_ReleasesCancellationResourcesAfterPartialStartup(bool unstartedThreads)
+    {
+        using var fixture = new WatchdogFixture();
+        var source = fixture.Cancellation;
+        var waitHandle = source.Token.WaitHandle;
+        if (unstartedThreads)
+        {
+            fixture.SetField("_componentWatchdogThread", new Thread(static () => { }));
+            fixture.SetField("_platformWatchdogThread", new Thread(static () => { }));
+        }
+
+        fixture.Stop();
+
+        Assert.Throws<ObjectDisposedException>(() => source.Token);
+        Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        fixture.Stop();
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task Stop_JoinsRunningHealthCheckBeforeReleasingCancellationResources()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var checking = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var fixture = new WatchdogFixture(participants: [new BlockingHealthParticipant(checking, release)]);
+        var source = fixture.Cancellation;
+        var token = source.Token;
+        var waitHandle = token.WaitHandle;
+        using var registration = token.Register(() => cancelled.TrySetResult());
+        Task? firstStop = null;
+        Task? secondStop = null;
+        try
+        {
+            fixture.StartWatchdog();
+            await checking.Task.WaitAsync(timeout.Token);
+            firstStop = Task.Run(fixture.Stop, TestContext.Current.CancellationToken);
+            await cancelled.Task.WaitAsync(timeout.Token);
+            secondStop = Task.Run(fixture.Stop, TestContext.Current.CancellationToken);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(firstStop.IsCompleted);
+
+            release.SetResult();
+            await Task.WhenAll(firstStop, secondStop).WaitAsync(timeout.Token);
+
+            Assert.Throws<ObjectDisposedException>(() => source.Token);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+            fixture.Stop();
+        }
+        finally
+        {
+            release.TrySetResult();
+            if (firstStop is not null) await firstStop;
+            if (secondStop is not null) await secondStop;
+        }
+    }
 
     [Fact, TestCategory("BVT")]
     public void CheckRuntimeHealth_RecordsGarbageCollectionPauseEvent()
@@ -119,7 +209,7 @@ public class WatchdogTests
         private readonly Watchdog _watchdog;
         private readonly RecordingHealthEventRecorder _recorder = new();
 
-        public WatchdogFixture(TimeSpan? componentPeriod = null)
+        public WatchdogFixture(TimeSpan? componentPeriod = null, IEnumerable<IHealthCheckParticipant>? participants = null)
         {
             var services = new ServiceCollection();
             services.AddMetrics();
@@ -131,7 +221,7 @@ public class WatchdogTests
             };
             _watchdog = new Watchdog(
                 Options.Create(options),
-                [],
+                participants ?? [],
                 NullLogger<Watchdog>.Instance,
                 new OrleansInstruments(_serviceProvider.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>()),
                 _recorder,
@@ -141,6 +231,17 @@ public class WatchdogTests
         public FakeTimeProvider TimeProvider { get; }
 
         public RecordedHealthEvent[] Events => _recorder.Events;
+
+        public System.Diagnostics.Metrics.IMeterFactory MeterFactory
+            => _serviceProvider.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>();
+
+        public CancellationTokenSource Cancellation => (CancellationTokenSource)typeof(Watchdog)
+            .GetField("_cancellation", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(_watchdog)!;
+
+        public void StartWatchdog() => _watchdog.Start();
+
+        public void Stop() => _watchdog.Stop();
 
         public void SetWatchdogTimestamp(string fieldName)
             => SetField(fieldName, TimeProvider.GetTimestamp());
@@ -155,11 +256,35 @@ public class WatchdogTests
                 .GetMethod("CheckRuntimeHealth", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(_watchdog, null);
 
+        public void CheckComponentHealth()
+            => typeof(Watchdog)
+                .GetMethod("CheckComponentHealth", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(_watchdog, null);
+
         public void Dispose()
         {
             _watchdog.Dispose();
             _serviceProvider.Dispose();
         }
+    }
+
+    private sealed class BlockingHealthParticipant(TaskCompletionSource checking, TaskCompletionSource release) : IHealthCheckParticipant
+    {
+        public int CheckCount { get; private set; }
+
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        {
+            CheckCount++;
+            checking.TrySetResult();
+            release.Task.GetAwaiter().GetResult();
+            reason = string.Empty;
+            return true;
+        }
+    }
+
+    private sealed class FaultingHealthParticipant(Exception exception) : IHealthCheckParticipant
+    {
+        public bool CheckHealth(DateTime lastCheckTime, out string reason) => throw exception;
     }
 
     private sealed class RecordingHealthEventRecorder : ILocalSiloHealthEventRecorder

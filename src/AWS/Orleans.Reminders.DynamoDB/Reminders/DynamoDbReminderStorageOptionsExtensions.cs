@@ -20,11 +20,16 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures this instance using the provided connection string.
         /// </summary>
+        /// <param name="options">The reminder storage options.</param>
+        /// <param name="connectionString">The connection string containing storage settings.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> or <paramref name="connectionString"/> is <see langword="null"/>.</exception>
         public static void ParseConnectionString(this DynamoDBReminderStorageOptions options, string connectionString)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(connectionString);
             var parameters = connectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
-            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
+            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
                 var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -32,7 +37,7 @@ namespace Orleans.Configuration
                     options.Service = value[1];
             }
 
-            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
+            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
                 var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -40,7 +45,7 @@ namespace Orleans.Configuration
                     options.SecretKey = value[1];
             }
 
-            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
+            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
                 var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -48,7 +53,7 @@ namespace Orleans.Configuration
                     options.AccessKey = value[1];
             }
 
-            var readCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(ReadCapacityUnitsPropertyName));
+            var readCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(ReadCapacityUnitsPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(readCapacityUnitsConfig))
             {
                 var value = readCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -56,7 +61,7 @@ namespace Orleans.Configuration
                     options.ReadCapacityUnits = int.Parse(value[1]);
             }
 
-            var writeCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(WriteCapacityUnitsPropertyName));
+            var writeCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(WriteCapacityUnitsPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(writeCapacityUnitsConfig))
             {
                 var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -64,7 +69,7 @@ namespace Orleans.Configuration
                     options.WriteCapacityUnits = int.Parse(value[1]);
             }
 
-            var useProvisionedThroughputConfig = Array.Find(parameters, p => p.Contains(UseProvisionedThroughputPropertyName));
+            var useProvisionedThroughputConfig = Array.Find(parameters, p => p.Contains(UseProvisionedThroughputPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(useProvisionedThroughputConfig))
             {
                 var value = useProvisionedThroughputConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -72,7 +77,7 @@ namespace Orleans.Configuration
                     options.UseProvisionedThroughput = bool.Parse(value[1]);
             }
 
-            var createIfNotExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(CreateIfNotExistsPropertyName));
+            var createIfNotExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(CreateIfNotExistsPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(createIfNotExistsPropertyNameConfig))
             {
                 var value = createIfNotExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -80,7 +85,7 @@ namespace Orleans.Configuration
                     options.CreateIfNotExists = bool.Parse(value[1]);
             }
 
-            var updateIfExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(UpdateIfExistsPropertyName));
+            var updateIfExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(UpdateIfExistsPropertyName, StringComparison.Ordinal));
             if (!string.IsNullOrWhiteSpace(updateIfExistsPropertyNameConfig))
             {
                 var value = updateIfExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);

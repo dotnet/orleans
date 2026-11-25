@@ -34,7 +34,7 @@ namespace Orleans.Analyzers
 
         private static void AnalyzeSyntax(SyntaxNodeAnalysisContext context)
         {
-            if (context.Node is not PropertyDeclarationSyntax syntax) return;
+            if (context.Node is not PropertyDeclarationSyntax { Parent: InterfaceDeclarationSyntax } syntax) return;
 
             var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken)!;
 

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using Orleans.Storage;
 
@@ -25,6 +26,8 @@ namespace Orleans.Transactions.TestKit
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness selects injected storage failures for transaction conformance tests.")]
         public void BeforeStore()
         {
             if (Random.Shared.NextDouble() < conflictProbability)
@@ -38,6 +41,8 @@ namespace Orleans.Transactions.TestKit
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness selects injected storage failures for transaction conformance tests.")]
         public void AfterStore()
         {
             if (Random.Shared.NextDouble() < afterProbability)

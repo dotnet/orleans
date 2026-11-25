@@ -113,7 +113,9 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task Stop()
         {
+#pragma warning disable CA1849 // Derived-service callbacks run on this calling scheduler and complete before the status transition.
             StoppedCancellationTokenSource.Cancel();
+#pragma warning restore CA1849
 
             LogInformationServiceStopping(Logger, typeName);
             Status = GrainServiceStatus.Stopped;

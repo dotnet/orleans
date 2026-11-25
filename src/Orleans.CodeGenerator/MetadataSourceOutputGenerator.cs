@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
@@ -17,20 +14,19 @@ internal static class MetadataSourceOutputGenerator
         {
             SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
             var metadataGenerator = new MetadataGenerator(metadataModel, metadataModel.AssemblyName, supportsModuleInitializers);
-            var metadataClass = metadataGenerator.GenerateMetadata();
             var metadataNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(metadataModel.AssemblyName ?? "Assembly").EscapeIdentifier()}";
-            var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
-            GeneratedSourceOutput.AddMember(namespacedMembers, metadataNamespace, metadataClass);
+            var namespacedMembers = new Dictionary<string, List<Action<SourceWriter>>>(StringComparer.Ordinal);
+            GeneratedSourceOutput.AddMember(namespacedMembers, metadataNamespace, metadataGenerator.WriteMetadata);
             var assemblyAttributes = CreateAssemblyAttributes(
                 metadataModel.ReferenceAssemblyData.ApplicationParts,
                 metadataNamespace,
-                metadataClass.Identifier.Text);
+                metadataGenerator.ClassName);
 
             var assemblyName = metadataModel.AssemblyName ?? "assembly";
             return SourceOutputResult.FromSource(
                 new GeneratedSourceEntry(
                     GeneratedSourceOutput.CreateMetadataHintName(assemblyName),
-                    GeneratedSourceOutput.CreateSourceString(GeneratedSourceOutput.CreateCompilationUnit(namespacedMembers, assemblyAttributes))));
+                    GeneratedSourceOutput.CreateSourceString(namespacedMembers, assemblyAttributes)));
         }
         catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
         {
@@ -38,27 +34,13 @@ internal static class MetadataSourceOutputGenerator
         }
     }
 
-    internal static SyntaxList<AttributeListSyntax> CreateAssemblyAttributes(
+    internal static List<string> CreateAssemblyAttributes(
         IEnumerable<string> applicationParts,
         string metadataNamespace,
         string metadataClassName)
     {
-        var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(
-            SyntaxFactory.ParseName("global::Orleans.ApplicationPartAttribute"),
-            applicationParts);
-        var metadataAttribute = SyntaxFactory.AttributeList()
-            .WithTarget(SyntaxFactory.AttributeTargetSpecifier(SyntaxFactory.Token(SyntaxKind.AssemblyKeyword)))
-            .WithAttributes(
-                SyntaxFactory.SingletonSeparatedList(
-                    SyntaxFactory.Attribute(SyntaxFactory.ParseName("global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute"))
-                        .AddArgumentListArguments(
-                            SyntaxFactory.AttributeArgument(
-                                SyntaxFactory.TypeOfExpression(
-                                    SyntaxFactory.QualifiedName(
-                                        SyntaxFactory.ParseName(metadataNamespace),
-                                        SyntaxFactory.IdentifierName(metadataClassName)))))));
-        assemblyAttributes.Add(metadataAttribute);
-
-        return SyntaxFactory.List(assemblyAttributes);
+        var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateAttributes("global::Orleans.ApplicationPartAttribute", applicationParts);
+        assemblyAttributes.Add($"[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof({metadataNamespace}.{metadataClassName}))]");
+        return assemblyAttributes;
     }
 }

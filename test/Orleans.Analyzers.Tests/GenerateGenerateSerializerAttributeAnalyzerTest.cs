@@ -92,4 +92,19 @@ public class GenerateGenerateSerializerAttributeAnalyzerTest : DiagnosticAnalyze
             {
             }
             """);
+
+    [Fact]
+    public async Task PartialType_WithGenerateSerializerOnAnotherDeclaration_ShouldNotTriggerDiagnostic()
+    {
+        const string source = """
+            using Serializer = Orleans.GenerateSerializerAttribute;
+
+            [System.Serializable] public partial class D { }
+            [Serializer] public partial class D { }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
 }

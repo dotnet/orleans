@@ -16,8 +16,10 @@ namespace Orleans.Hosting
         /// <param name="builder">The <see cref="ISiloBuilder" /> to configure.</param>
         /// <param name="configureDelegate"></param>
         /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="configureDelegate"/> is <see langword="null"/>.</exception>
         public static ISiloBuilder ConfigureServices(this ISiloBuilder builder, Action<IServiceCollection> configureDelegate)
         {
+            if (builder is null) throw new ArgumentNullException(nameof(builder));
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             configureDelegate(builder.Services);
             return builder;

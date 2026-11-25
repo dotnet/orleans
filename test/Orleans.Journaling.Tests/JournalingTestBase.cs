@@ -10,7 +10,7 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.Time.Testing;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Base class for journaling tests with common setup

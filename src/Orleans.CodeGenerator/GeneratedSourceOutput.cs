@@ -2,8 +2,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Hashing;
 using Orleans.CodeGenerator.Model;
 
@@ -142,8 +140,8 @@ internal static class GeneratedSourceOutput
     internal static ImmutableArray<SourceOutputResult> DeduplicateSourceOutputs(
         ImmutableArray<SourceOutputResult> sourceEntries)
     {
-        var emittedSourcesByOriginalHintName = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
         var emittedSourceByHintName = new Dictionary<string, string>(StringComparer.Ordinal);
+        Dictionary<string, HashSet<string>>? collidingSourcesByOriginalHintName = null;
         var result = ImmutableArray.CreateBuilder<SourceOutputResult>();
         foreach (var sourceOutput in sourceEntries)
         {
@@ -154,20 +152,8 @@ internal static class GeneratedSourceOutput
             }
 
             var source = entry.Source ?? string.Empty;
-            if (!emittedSourcesByOriginalHintName.TryGetValue(entry.HintName, out var emittedSources))
-            {
-                emittedSources = new Dictionary<string, string>(StringComparer.Ordinal);
-                emittedSourcesByOriginalHintName.Add(entry.HintName, emittedSources);
-            }
-
-            if (emittedSources.ContainsKey(source))
-            {
-                continue;
-            }
-
             if (!emittedSourceByHintName.TryGetValue(entry.HintName, out var emittedSource))
             {
-                emittedSources.Add(source, entry.HintName);
                 emittedSourceByHintName.Add(entry.HintName, source);
                 result.Add(sourceOutput);
                 continue;
@@ -175,12 +161,23 @@ internal static class GeneratedSourceOutput
 
             if (string.Equals(emittedSource, source, StringComparison.Ordinal))
             {
-                emittedSources.Add(source, entry.HintName);
+                continue;
+            }
+
+            // Only conflicting hints need full-source hashing and per-original-hint deduplication.
+            collidingSourcesByOriginalHintName ??= new(StringComparer.Ordinal);
+            if (!collidingSourcesByOriginalHintName.TryGetValue(entry.HintName, out var collidingSources))
+            {
+                collidingSources = new HashSet<string>(StringComparer.Ordinal);
+                collidingSourcesByOriginalHintName.Add(entry.HintName, collidingSources);
+            }
+
+            if (!collidingSources.Add(source))
+            {
                 continue;
             }
 
             var uniqueHintName = CreateDistinctSourceHintName(entry.HintName, source, emittedSourceByHintName);
-            emittedSources.Add(source, uniqueHintName);
             emittedSourceByHintName.Add(uniqueHintName, source);
             result.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(uniqueHintName, source)));
         }
@@ -197,32 +194,49 @@ internal static class GeneratedSourceOutput
         TypeMetadataIdentity metadataIdentity,
         string hintGeneratedNamespace,
         int genericArity,
-        ClassDeclarationSyntax serializer,
-        ClassDeclarationSyntax? copier,
-        ClassDeclarationSyntax? activator,
+        SerializerEmissionPlan serializer,
+        CopierEmissionPlan? copier,
+        ActivatorEmissionPlan? activator,
         string generatedNamespace)
     {
-        var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
-        AddMember(namespacedMembers, generatedNamespace, serializer);
+        var members = new List<Action<SourceWriter>>(3) { writer => SerializerGenerator.Write(writer, serializer) };
         if (copier is not null)
         {
-            AddMember(namespacedMembers, generatedNamespace, copier);
+            members.Add(writer => CopierGenerator.Write(writer, copier));
         }
 
         if (activator is not null)
         {
-            AddMember(namespacedMembers, generatedNamespace, activator);
+            members.Add(writer => ActivatorGenerator.Write(writer, activator));
+        }
+
+        return CreateSerializableSourceEntry(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity, generatedNamespace, [.. members]);
+    }
+
+    internal static GeneratedSourceEntry CreateSerializableSourceEntry(
+        string assemblyName,
+        string typeName,
+        TypeMetadataIdentity metadataIdentity,
+        string hintGeneratedNamespace,
+        int genericArity,
+        string generatedNamespace,
+        params Action<SourceWriter>[] members)
+    {
+        var namespacedMembers = new Dictionary<string, List<Action<SourceWriter>>>(StringComparer.Ordinal);
+        foreach (var member in members)
+        {
+            AddMember(namespacedMembers, generatedNamespace, member);
         }
 
         return new GeneratedSourceEntry(
             CreateSerializableHintName(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity),
-            CreateSourceString(CreateCompilationUnit(namespacedMembers)));
+            CreateSourceString(namespacedMembers));
     }
 
     internal static void AddMember(
-        Dictionary<string, List<MemberDeclarationSyntax>> namespacedMembers,
+        Dictionary<string, List<Action<SourceWriter>>> namespacedMembers,
         string ns,
-        MemberDeclarationSyntax member)
+        Action<SourceWriter> member)
     {
         var namespaceName = ns ?? string.Empty;
         if (!namespacedMembers.TryGetValue(namespaceName, out var members))
@@ -234,38 +248,61 @@ internal static class GeneratedSourceOutput
         members.Add(member);
     }
 
-    internal static string CreateSourceString(CompilationUnitSyntax unit)
+    /// <summary>
+    /// Writes a generated file: assembly attributes, then each namespace in ordinal order with its members in insertion order,
+    /// enclosed by the generated-code warning suppression.
+    /// </summary>
+    internal static string CreateSourceString(
+        Dictionary<string, List<Action<SourceWriter>>> namespacedMembers,
+        IReadOnlyList<string>? assemblyAttributes = null)
     {
-        return $"{GeneratedCodeWarningDisable}\r\n{unit.NormalizeWhitespace().ToFullString()}\r\n{GeneratedCodeWarningRestore}";
-    }
-
-    internal static CompilationUnitSyntax CreateCompilationUnit(
-        Dictionary<string, List<MemberDeclarationSyntax>> namespacedMembers,
-        SyntaxList<AttributeListSyntax> attributeLists = default)
-    {
-        var unit = SyntaxFactory.CompilationUnit().WithAttributeLists(attributeLists);
-        var usingDirectives = SyntaxFactory.List(
-        [
-            SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("global::Orleans.Serialization.Codecs")),
-            SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")),
-        ]);
-        var members = new List<MemberDeclarationSyntax>(namespacedMembers.Count);
+        var writer = new SourceWriter();
+        writer.WriteLine(GeneratedCodeWarningDisable);
+        var hasContent = false;
+        if (assemblyAttributes is not null)
+        {
+            foreach (var attribute in assemblyAttributes)
+            {
+                writer.WriteLine(attribute);
+                hasContent = true;
+            }
+        }
 
         foreach (var pair in namespacedMembers.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
         {
+            hasContent = true;
             if (string.IsNullOrWhiteSpace(pair.Key))
             {
-                members.AddRange(pair.Value);
+                foreach (var member in pair.Value)
+                {
+                    member(writer);
+                }
+
                 continue;
             }
 
-            members.Add(
-                SyntaxFactory.NamespaceDeclaration(SyntaxFactory.ParseName(pair.Key))
-                    .WithUsings(usingDirectives)
-                    .WithMembers(SyntaxFactory.List(pair.Value)));
+            writer.WriteLine("namespace " + pair.Key);
+            writer.OpenBlock();
+            writer.WriteLine("using global::Orleans.Serialization.Codecs;");
+            writer.WriteLine("using global::Orleans.Serialization.GeneratedCodeHelpers;");
+            writer.BlankLine();
+            foreach (var member in pair.Value)
+            {
+                member(writer);
+            }
+
+            writer.CloseBlock();
         }
 
-        return unit.WithMembers(SyntaxFactory.List(members));
+        if (!hasContent)
+        {
+            // An empty compilation unit still occupies the line between the suppression directives.
+            writer.StartLine();
+        }
+
+        writer.ContinueStatement();
+        writer.WriteLine(GeneratedCodeWarningRestore);
+        return writer.ToString();
     }
 
     internal static string CreateSerializableHintName(

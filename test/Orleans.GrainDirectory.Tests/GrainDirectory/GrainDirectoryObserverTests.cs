@@ -352,11 +352,9 @@ public sealed class GrainDirectoryObserverTests
         var builder = new InProcessTestClusterBuilder(siloCount);
         builder.Options.ConfigureFileLogging = false;
         builder.Options.InitializeClientOnDeploy = false;
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureSilo(static (_, siloBuilder) =>
             siloBuilder.Configure<GrainDirectoryOptions>(options => options.PartitionsPerSilo = PartitionCount));
-#pragma warning restore ORLEANSEXP003
 
         var cluster = builder.Build();
         try

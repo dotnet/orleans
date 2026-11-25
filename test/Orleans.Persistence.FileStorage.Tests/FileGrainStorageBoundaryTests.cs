@@ -8,6 +8,40 @@ namespace Orleans.Persistence.FileStorage.Tests;
 [TestProvider("None"), TestSuite("BVT"), TestCategory("FileStorage"), TestCategory("Persistence")]
 public sealed class FileGrainStorageBoundaryTests
 {
+    [Theory]
+    [InlineData("Read", false)]
+    [InlineData("Read", true)]
+    [InlineData("Write", false)]
+    [InlineData("Write", true)]
+    [InlineData("Clear", false)]
+    [InlineData("Clear", true)]
+    public async Task NullState_ThrowsBeforeAccessingStoredRecord(string operation, bool useCancellationOverload)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var directory = new TemporaryDirectory();
+        IGrainStorage storage = FileGrainStorageTestContext.CreateStorage(directory.RootDirectory);
+        var grainId = GrainId.Create("type", "key");
+        var state = new GrainState<FileStorageTestState>(new FileStorageTestState());
+        await storage.WriteStateAsync("state", grainId, state, cancellationToken);
+        var path = Assert.Single(FileGrainStorageTestContext.GetRecordFiles(directory.RootDirectory));
+        var invalidRecord = "invalid"u8.ToArray();
+        await File.WriteAllBytesAsync(path, invalidRecord, cancellationToken);
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() => (operation, useCancellationOverload) switch
+        {
+            ("Read", false) => storage.ReadStateAsync<FileStorageTestState>("state", grainId, null!),
+            ("Read", true) => storage.ReadStateAsync<FileStorageTestState>("state", grainId, null!, cancellationToken),
+            ("Write", false) => storage.WriteStateAsync<FileStorageTestState>("state", grainId, null!),
+            ("Write", true) => storage.WriteStateAsync<FileStorageTestState>("state", grainId, null!, cancellationToken),
+            ("Clear", false) => storage.ClearStateAsync<FileStorageTestState>("state", grainId, null!),
+            ("Clear", true) => storage.ClearStateAsync<FileStorageTestState>("state", grainId, null!, cancellationToken),
+            _ => throw new InvalidOperationException($"Unexpected operation '{operation}'."),
+        });
+
+        Assert.Equal("grainState", exception.ParamName);
+        Assert.Equal(invalidRecord, await File.ReadAllBytesAsync(path, cancellationToken));
+    }
+
     [Fact]
     public async Task BinaryPayload_RoundTripsWithoutTextConversion()
     {

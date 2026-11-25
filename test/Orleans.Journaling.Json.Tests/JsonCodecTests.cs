@@ -4,13 +4,13 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Journaling.Json;
-using Orleans.Journaling.Tests;
+using Orleans.Durable.Journaling.Json;
+using Orleans.Durable.Journaling.Tests;
 using Orleans.Serialization.Buffers;
 using Orleans.Hosting;
 using Xunit;
 
-namespace Orleans.Journaling.Json.Tests;
+namespace Orleans.Durable.Journaling.Json.Tests;
 
 /// <summary>
 /// Round-trip and JSON-format tests for the direct JSON codecs.

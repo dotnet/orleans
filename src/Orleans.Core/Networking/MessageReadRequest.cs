@@ -37,6 +37,18 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         _connection = connection;
     }
 
+    /// <summary>
+    /// Initializes this request with a message's serialized headers and body, which were read from a source other than a connection.
+    /// </summary>
+    internal void Initialize(ArcBuffer headers, ArcBuffer body)
+    {
+        Debug.Assert(_headerLength == 0 && _bodyLength == 0);
+        _headers = headers;
+        _body = body;
+        _headerLength = headers.Length;
+        _bodyLength = body.Length;
+    }
+
     public void Reset()
     {
         _headerLength = default;

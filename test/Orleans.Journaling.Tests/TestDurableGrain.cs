@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 public class DurableValueTestGrain(
     [FromKeyedServices("name")] IDurableValue<string> name,

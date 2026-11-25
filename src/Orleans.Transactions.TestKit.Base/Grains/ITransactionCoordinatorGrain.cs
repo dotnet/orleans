@@ -112,5 +112,13 @@ namespace Orleans.Transactions.TestKit
         [Transaction(TransactionOption.Create)]
         [ReadOnly]
         Task UpdateViolated(ITransactionTestGrain grains, int numberToAdd);
+
+        /// <summary>
+        /// Performs a read-committed read on the grain from inside a transaction.
+        /// </summary>
+        /// <param name="grain">The grain to read.</param>
+        /// <returns>The committed values.</returns>
+        [Transaction(TransactionOption.Create)]
+        Task<int[]> GetCommittedInTransaction(ITransactionTestGrain grain);
     }
 }

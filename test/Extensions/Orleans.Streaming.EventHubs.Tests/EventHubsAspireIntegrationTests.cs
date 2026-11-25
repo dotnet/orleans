@@ -102,7 +102,7 @@ public sealed class EventHubsAspireIntegrationTests
         var executionContext = new DistributedApplicationExecutionContext(
             new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
             {
-                ServiceProvider = services,
+                Services = services,
             });
         var values = new Dictionary<string, object>();
         var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);

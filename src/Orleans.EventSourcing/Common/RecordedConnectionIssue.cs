@@ -23,8 +23,13 @@ namespace Orleans.EventSourcing.Common
         /// <param name="newIssue">the connection issue to be recorded</param>
         /// <param name="listener">the listener for connection issues</param>
         /// <param name="services">for reporting exceptions in listener</param>
+        /// <exception cref="ArgumentNullException">A required argument is <see langword="null"/>.</exception>
         public void Record(ConnectionIssue newIssue, IConnectionIssueListener listener, ILogConsistencyProtocolServices services)
         {
+            ArgumentNullException.ThrowIfNull(newIssue);
+            ArgumentNullException.ThrowIfNull(listener);
+            ArgumentNullException.ThrowIfNull(services);
+
             newIssue.TimeStamp = DateTime.UtcNow;
             if (Issue != null)
             {
@@ -56,8 +61,12 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         /// <param name="listener">the listener for connection issues</param>
         /// <param name="services">for reporting exceptions in listener</param>
+        /// <exception cref="ArgumentNullException">A required argument is <see langword="null"/>.</exception>
         public void Resolve(IConnectionIssueListener listener, ILogConsistencyProtocolServices services)
         {
+            ArgumentNullException.ThrowIfNull(listener);
+            ArgumentNullException.ThrowIfNull(services);
+
             if (Issue != null)
             {
                 try
@@ -66,7 +75,7 @@ namespace Orleans.EventSourcing.Common
                 }
                 catch (Exception e)
                 {
-                    services.CaughtUserCodeException("OnConnectionIssueResolved", nameof(Record), e);
+                    services.CaughtUserCodeException("OnConnectionIssueResolved", nameof(Resolve), e);
                 }
                 Issue = null;
             }

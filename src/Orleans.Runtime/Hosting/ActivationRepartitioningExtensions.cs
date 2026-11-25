@@ -22,7 +22,6 @@ public static class ActivationRepartitioningExtensions
     /// </remarks>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The provided silo builder.</returns>
-    [Experimental("ORLEANSEXP001")]
     public static ISiloBuilder AddActivationRepartitioner(this ISiloBuilder builder)
         => builder.AddActivationRepartitioner<RebalancerCompatibleRule>();
 
@@ -36,7 +35,6 @@ public static class ActivationRepartitioningExtensions
     /// <typeparam name="TRule">The type of the imbalance rule to use.</typeparam>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The provided silo builder.</returns>
-    [Experimental("ORLEANSEXP001")]
     public static ISiloBuilder AddActivationRepartitioner<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TRule>(
         this ISiloBuilder builder)

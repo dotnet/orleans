@@ -1,4 +1,4 @@
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Interface for the test multi-collection grain

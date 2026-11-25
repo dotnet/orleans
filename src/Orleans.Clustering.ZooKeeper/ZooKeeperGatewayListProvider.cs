@@ -75,7 +75,14 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Initializes the ZooKeeper based gateway provider
         /// </summary>
-        public Task InitializeGatewayListProvider() => Task.CompletedTask;
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
 
         /// <summary>
         /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
@@ -85,9 +92,13 @@ namespace Orleans.Runtime.Membership
         /// Gateway discovery uses a version-fenced membership snapshot. Native reads retry connection-loss
         /// failures up to four times on the operation's session before propagating the final failure.
         /// </remarks>
-        public async Task<IList<Uri>> GetGateways()
+        public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
         {
-            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAsync(_createSession, _readRetryPipeline, null, CancellationToken.None);
+            cancellationToken.ThrowIfCancellationRequested();
+            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAsync(_createSession, _readRetryPipeline, null, cancellationToken);
             return membershipTableData.Members.Select(e => e.Item1).
                 Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                 Select(m =>

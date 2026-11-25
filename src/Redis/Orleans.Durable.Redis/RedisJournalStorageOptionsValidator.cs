@@ -1,0 +1,63 @@
+using Orleans.Providers;
+using Orleans.Runtime;
+using StackExchange.Redis;
+
+namespace Orleans.Durable.Journaling;
+
+internal sealed class RedisJournalStorageOptionsValidator(
+    RedisJournalStorageOptions options,
+    string name = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME) : IConfigurationValidator
+{
+    private static readonly Func<RedisJournalStorageOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> DefaultCreateMultiplexer
+        = RedisJournalStorageOptions.DefaultCreateMultiplexer;
+
+    public void ValidateConfiguration()
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.CreateMultiplexer is null)
+        {
+            throw new OrleansConfigurationException(
+                $"Invalid configuration for {nameof(RedisJournalStorageProvider)} '{name}'. {nameof(RedisJournalStorageOptions)}.{nameof(options.CreateMultiplexer)} is required.");
+        }
+
+        if (options.ConfigurationOptions is null && options.CreateMultiplexer.Equals(DefaultCreateMultiplexer))
+        {
+            throw new OrleansConfigurationException(
+                $"Invalid configuration for {nameof(RedisJournalStorageProvider)} '{name}'. {nameof(RedisJournalStorageOptions)}.{nameof(options.ConfigurationOptions)} is required when using the default multiplexer factory.");
+        }
+
+        if (options.GetKeyName is null)
+        {
+            throw new OrleansConfigurationException(
+                $"Invalid configuration for {nameof(RedisJournalStorageProvider)} '{name}'. {nameof(RedisJournalStorageOptions)}.{nameof(options.GetKeyName)} is required.");
+        }
+
+        if (options.KeyPrefix is { } keyPrefix)
+        {
+            if (string.IsNullOrWhiteSpace(keyPrefix))
+            {
+                throw new OrleansConfigurationException(
+                    $"Invalid configuration for {nameof(RedisJournalStorageProvider)} '{name}'. {nameof(RedisJournalStorageOptions)}.{nameof(options.KeyPrefix)} must not be empty or whitespace.");
+            }
+
+            if (keyPrefix.IndexOf('\0', StringComparison.Ordinal) >= 0)
+            {
+                throw new OrleansConfigurationException(
+                    $"Invalid configuration for {nameof(RedisJournalStorageProvider)} '{name}'. {nameof(RedisJournalStorageOptions)}.{nameof(options.KeyPrefix)} must not contain null characters.");
+            }
+        }
+
+        if (options.CompactionThresholdBytes < 0)
+        {
+            throw new OrleansConfigurationException(
+                $"Invalid configuration for {nameof(RedisJournalStorageProvider)} '{name}'. {nameof(RedisJournalStorageOptions)}.{nameof(options.CompactionThresholdBytes)} must be non-negative.");
+        }
+
+        if (options.ReadChunkSize <= 0)
+        {
+            throw new OrleansConfigurationException(
+                $"Invalid configuration for {nameof(RedisJournalStorageProvider)} '{name}'. {nameof(RedisJournalStorageOptions)}.{nameof(options.ReadChunkSize)} must be positive.");
+        }
+    }
+}

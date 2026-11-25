@@ -77,6 +77,7 @@ public class SQSFIFOStreamTests : TestClusterPerTest
                     .AddDynamoDBGrainStorage("DynamoDBStore", options =>
                     {
                         options.Service = AWSTestConstants.DynamoDbService;
+                        options.ServiceId = string.Empty;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                         options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                         options.DeleteStateOnClear = true;
@@ -84,6 +85,7 @@ public class SQSFIFOStreamTests : TestClusterPerTest
                     .AddDynamoDBGrainStorage("PubSubStore", options =>
                     {
                         options.Service = AWSTestConstants.DynamoDbService;
+                        options.ServiceId = string.Empty;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                         options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                     });

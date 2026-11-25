@@ -252,6 +252,11 @@ namespace Orleans.Transactions.TestKit
             return this.txState.PerformRead(readFunction);
         }
 
+        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction, ReadIsolation isolation)
+        {
+            return this.txState.PerformRead(readFunction, isolation);
+        }
+
         public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction)
         {
             return this.txState.PerformUpdate(updateFunction);

@@ -1,0 +1,4 @@
+﻿HEX: 01070000000800000003B204
+DISASSEMBLY:
+[entry 0] frame-version=1 length=7 streamId=8 payload-bytes=3
+0000  03 B2 04                                           |...|

@@ -145,6 +145,10 @@ namespace Orleans.Runtime.Membership
 
         public System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGateways() { throw null; }
 
+        public System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGatewaysAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.Task InitializeGatewayListProvider() { throw null; }
+
+        public System.Threading.Tasks.Task InitializeGatewayListProviderAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }

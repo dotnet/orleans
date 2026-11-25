@@ -63,13 +63,21 @@ namespace Orleans.Runtime
         /// <summary>
         /// The cumulative size, in bytes, of messages received by the silo.
         /// </summary>
-        [Id(8)]
+        /// <remarks>
+        /// Use the sum of the <c>orleans-messaging-received-messages-size</c> histogram through OpenTelemetry
+        /// to obtain the bytes received since collection began.
+        /// </remarks>
+        [Id(8), Obsolete("Use the orleans-messaging-received-messages-size histogram through OpenTelemetry instead.")]
         public long ReceivedMessages { get; }
 
         /// <summary>
         /// The cumulative size, in bytes, of messages sent by the silo.
         /// </summary>
-        [Id(9)]
+        /// <remarks>
+        /// Use the sum of the <c>orleans-messaging-sent-messages-size</c> histogram through OpenTelemetry
+        /// to obtain the bytes sent since collection began.
+        /// </remarks>
+        [Id(9), Obsolete("Use the orleans-messaging-sent-messages-size histogram through OpenTelemetry instead.")]
         public long SentMessages { get; }
 
         /// <summary>
@@ -89,13 +97,16 @@ namespace Orleans.Runtime
             int recentlyUsedActivationCount,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
+            long clientCount,
             DateTime dateTime)
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-            ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
+            ClientCount = clientCount;
+#pragma warning disable CS0618 // Preserve the legacy values in the serialized statistics contract.
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
             SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
+#pragma warning restore CS0618
             DateTime = dateTime;
 
             var statistics = environmentStatisticsProvider.GetEnvironmentStatistics();
@@ -112,7 +123,9 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
+#pragma warning disable CS0618 // Preserve the legacy fields in the diagnostic representation.
         public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount} CpuUsagePercentage={EnvironmentStatistics.FilteredCpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.FilteredMemoryUsageBytes} AvailableMemory={EnvironmentStatistics.FilteredAvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes} IsOverloaded={IsOverloaded} ClientCount={ClientCount} ReceivedMessages={ReceivedMessages} SentMessages={SentMessages} DateTime={DateTime}";
+#pragma warning restore CS0618
     }
 
     /// <summary>

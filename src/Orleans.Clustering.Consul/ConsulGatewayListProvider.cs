@@ -36,6 +36,10 @@ namespace Orleans.Runtime.Membership
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(gatewayOptions);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+
             this.logger = logger;
             this.clusterId = clusterOptions.Value.ClusterId;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
@@ -55,16 +59,24 @@ namespace Orleans.Runtime.Membership
             get { return true; }
         }
         /// <inheritdoc />
-        public Task InitializeGatewayListProvider()
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             consulClient = options.CreateClient();
             return Task.CompletedTask;
         }
 
         /// <inheritdoc />
-        public async Task<IList<Uri>> GetGateways()
+        public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAllAsync(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null, CancellationToken.None);
+            cancellationToken.ThrowIfCancellationRequested();
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAllAsync(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null, cancellationToken);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

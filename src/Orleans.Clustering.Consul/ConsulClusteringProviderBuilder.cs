@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Providers;
 using Microsoft.Extensions.Configuration;
 using Orleans;
@@ -10,6 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting;
 
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
+    Justification = "RegisterProvider exposes this builder to client and silo hosting, which instantiate the registered type when binding clustering configuration.")]
 internal sealed class ConsulClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)

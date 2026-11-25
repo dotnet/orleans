@@ -53,6 +53,18 @@ namespace Orleans.Runtime.Management
             this.grainLocator = grainLocator;
         }
 
+        public async Task DeactivateGrain(GrainId grainId, CancellationToken cancellationToken = default)
+        {
+            if (grainId.Type.IsSystemTarget())
+            {
+                throw new ArgumentException("System targets cannot be deactivated using grain management.", nameof(grainId));
+            }
+
+            var silos = await GetHosts(true, cancellationToken);
+            await Task.WhenAll(silos.Keys.Select(silo =>
+                GetSiloControlReference(silo).DeactivateGrain(grainId, cancellationToken))).WaitAsync(cancellationToken);
+        }
+
         public Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
             => GetHosts(onlyActive, CancellationToken.None);
 
@@ -293,10 +305,10 @@ namespace Orleans.Runtime.Management
             foreach (var silo in silos)
                 tasks.Add(GetSiloControlReference(silo).GetActivationCount(cancellationToken));
 
-            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
+            var counts = await Task.WhenAll(tasks).WaitAsync(cancellationToken);
             int sum = 0;
-            foreach (Task<int> task in tasks)
-                sum += task.Result;
+            foreach (var count in counts)
+                sum += count;
 
             return sum;
         }

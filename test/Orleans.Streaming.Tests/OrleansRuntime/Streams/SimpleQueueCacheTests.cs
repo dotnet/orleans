@@ -213,9 +213,9 @@ public class SimpleQueueCacheTests
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-    public void CursorAcquisitionPreservesCacheMissWhenCacheMutatesAfterPreflight()
+    public void CursorAcquisitionDisposesCursorAndPreservesRacedCacheMiss()
     {
-        var (cache, stream, requestedToken, retainedToken, retainedCursor) = CreateCacheWithMutationDuringInitialization();
+        var (trackingCache, cache, stream, requestedToken, retainedToken, retainedCursor) = CreateCacheWithMutationDuringInitialization();
         using (retainedCursor)
         {
             var result = ((IQueueCache)cache).TryGetCacheCursor(stream, requestedToken);
@@ -226,9 +226,10 @@ public class SimpleQueueCacheTests
             Assert.Same(requestedToken, cacheMiss.RequestedToken);
             Assert.Equal(2, cacheMiss.LowToken!.SequenceNumber);
             Assert.Equal(2, cacheMiss.HighToken!.SequenceNumber);
+            Assert.Equal(1, trackingCache.CreatedCursor!.DisposeCount);
         }
 
-        (cache, stream, requestedToken, retainedToken, retainedCursor) = CreateCacheWithMutationDuringInitialization();
+        (trackingCache, cache, stream, requestedToken, retainedToken, retainedCursor) = CreateCacheWithMutationDuringInitialization();
         using (retainedCursor)
         {
 #pragma warning disable CS0618 // Verify compatibility of the obsolete wrapper.
@@ -238,7 +239,91 @@ public class SimpleQueueCacheTests
             Assert.Equal(requestedToken.ToString(), exception.Requested);
             Assert.Equal(retainedToken.ToString(), exception.Low);
             Assert.Equal(retainedToken.ToString(), exception.High);
+            Assert.Equal(1, trackingCache.CreatedCursor!.DisposeCount);
         }
+    }
+
+    [Theory]
+    [InlineData(AcquisitionMode.Legacy)]
+    [InlineData(AcquisitionMode.Typed)]
+    public void CursorAcquisitionDisposesCursorAndPreservesInitializationException(AcquisitionMode mode)
+    {
+        var trackingCache = new TrackingCache();
+        var cache = trackingCache.Cache;
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        cache.AddToCache([new TestBatchContainer(stream, 1)]);
+        var expected = new InvalidOperationException("Token comparison failed.");
+        var token = new ThrowingCompareToken(1, 2, expected);
+
+        var actual = Record.Exception(() =>
+        {
+            if (mode == AcquisitionMode.Legacy)
+            {
+#pragma warning disable CS0618 // Verify compatibility of the obsolete wrapper.
+                cache.GetCacheCursor(stream, token);
+#pragma warning restore CS0618
+            }
+            else
+            {
+                ((IQueueCache)cache).TryGetCacheCursor(stream, token);
+            }
+        });
+
+        Assert.Same(expected, actual);
+        Assert.Equal(1, trackingCache.CreatedCursor!.DisposeCount);
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public void EarliestAvailableDisposesCursorWhenInitializationThrows()
+    {
+        var trackingCache = new TrackingCache();
+        var cache = trackingCache.Cache;
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        var expected = new InvalidOperationException("Stream ID access failed.");
+        cache.AddToCache([new ThrowingStreamIdBatchContainer(expected)]);
+
+        var actual = Record.Exception(() =>
+            ((IQueueCache)cache).TryGetCacheCursorAtPosition(
+                stream,
+                StreamSubscriptionStartPosition.EarliestAvailable));
+
+        Assert.Same(expected, actual);
+        Assert.Equal(1, trackingCache.CreatedCursor!.DisposeCount);
+    }
+
+    [Theory]
+    [InlineData(AcquisitionMode.Legacy)]
+    [InlineData(AcquisitionMode.Typed)]
+    [InlineData(AcquisitionMode.EarliestAvailable)]
+    public void SuccessfulCursorAcquisitionRemainsCallerOwned(AcquisitionMode mode)
+    {
+        var trackingCache = new TrackingCache();
+        var cache = trackingCache.Cache;
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        cache.AddToCache([new TestBatchContainer(stream, 1)]);
+
+        IQueueCacheCursor cursor;
+        if (mode == AcquisitionMode.Legacy)
+        {
+#pragma warning disable CS0618 // Verify compatibility of the obsolete wrapper.
+            cursor = cache.GetCacheCursor(stream, null);
+#pragma warning restore CS0618
+        }
+        else
+        {
+            var result = mode == AcquisitionMode.Typed
+                ? ((IQueueCache)cache).TryGetCacheCursor(stream, null)
+                : ((IQueueCache)cache).TryGetCacheCursorAtPosition(
+                    stream,
+                    StreamSubscriptionStartPosition.EarliestAvailable);
+            Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+            cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(result.Cursor);
+        }
+
+        Assert.Same(trackingCache.CreatedCursor, cursor);
+        Assert.Equal(0, trackingCache.CreatedCursor!.DisposeCount);
+        cursor.Dispose();
+        Assert.Equal(1, trackingCache.CreatedCursor.DisposeCount);
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -521,6 +606,7 @@ public class SimpleQueueCacheTests
     }
 
     private static (
+        TrackingCache TrackingCache,
         SimpleQueueCache Cache,
         StreamId Stream,
         StreamSequenceToken RequestedToken,
@@ -528,7 +614,8 @@ public class SimpleQueueCacheTests
         IQueueCacheCursor RetainedCursor)
         CreateCacheWithMutationDuringInitialization()
     {
-        var cache = new SimpleQueueCache(10, NullLogger.Instance);
+        var trackingCache = new TrackingCache();
+        var cache = trackingCache.Cache;
         var stream = StreamId.Create("namespace", Guid.NewGuid());
         var retainedToken = new EventSequenceTokenV2(2);
         cache.AddToCache(
@@ -547,7 +634,86 @@ public class SimpleQueueCacheTests
                 Assert.True(cache.TryPurgeFromCache(out var purgedItems));
                 Assert.Single(purgedItems);
             });
-        return (cache, stream, requestedToken, retainedToken, retainedCursor);
+        return (trackingCache, cache, stream, requestedToken, retainedToken, retainedCursor);
+    }
+
+    public enum AcquisitionMode
+    {
+        Legacy,
+        Typed,
+        EarliestAvailable,
+    }
+
+    private sealed class TrackingCache
+    {
+        public TrackingCache()
+        {
+            Cache = new SimpleQueueCache(
+                10,
+                NullLogger.Instance,
+                (cache, streamId) => CreatedCursor = new(cache, streamId));
+        }
+
+        public SimpleQueueCache Cache { get; }
+        public TrackingSimpleQueueCacheCursor? CreatedCursor { get; private set; }
+    }
+
+    private sealed class TrackingSimpleQueueCacheCursor(
+        SimpleQueueCache cache,
+        StreamId streamId) : SimpleQueueCacheCursor(cache, streamId, NullLogger.Instance)
+    {
+        public int DisposeCount { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeCount++;
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class ThrowingCompareToken(
+        long sequenceNumber,
+        int throwOnComparison,
+        Exception exception) : StreamSequenceToken
+    {
+        private int _comparisons;
+
+        public override long SequenceNumber
+        {
+            get => sequenceNumber;
+            protected set => throw new NotSupportedException();
+        }
+
+        public override int EventIndex
+        {
+            get => 0;
+            protected set => throw new NotSupportedException();
+        }
+
+        public override int CompareTo(StreamSequenceToken? other)
+        {
+            if (Interlocked.Increment(ref _comparisons) == throwOnComparison)
+            {
+                throw exception;
+            }
+
+            return other is null ? 1 : sequenceNumber.CompareTo(other.SequenceNumber);
+        }
+
+        public override bool Equals(StreamSequenceToken? other)
+            => other is not null && sequenceNumber == other.SequenceNumber && EventIndex == other.EventIndex;
+    }
+
+    private sealed class ThrowingStreamIdBatchContainer(Exception exception) : IBatchContainer
+    {
+        public StreamId StreamId => throw exception;
+        public StreamSequenceToken SequenceToken { get; } = new EventSequenceTokenV2(1);
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => [];
+        public bool ImportRequestContext() => false;
     }
 
     private sealed class MutatingCompareToken : StreamSequenceToken

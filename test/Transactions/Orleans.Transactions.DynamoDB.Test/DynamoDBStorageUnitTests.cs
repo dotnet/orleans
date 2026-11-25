@@ -27,6 +27,63 @@ public sealed class DynamoDBStorageUnitTests
         new("gsi-pk", ScalarAttributeType.S)
     ];
 
+    [Theory]
+    [InlineData("Read", false)]
+    [InlineData("Read", true)]
+    [InlineData("Query", false)]
+    [InlineData("Query", true)]
+    [InlineData("QueryAll", false)]
+    [InlineData("QueryAll", true)]
+    [InlineData("Scan", false)]
+    [InlineData("Scan", true)]
+    public async Task MissingResolver_ThrowsBeforeClientCall(string operation, bool legacyOverload)
+    {
+        var (storage, client) = CreateStorage();
+        using var ownedClient = client;
+
+        var error = await Record.ExceptionAsync(() =>
+            ReadWithMissingResolver(storage, operation, legacyOverload, TestContext.Current.CancellationToken));
+
+        Assert.Empty(client.Calls);
+        var exception = Assert.IsType<ArgumentNullException>(error);
+        Assert.Equal("resolver", exception.ParamName);
+        client.AssertAllScriptsConsumed();
+    }
+
+    [Theory]
+    [InlineData("Read")]
+    [InlineData("Query")]
+    [InlineData("QueryAll")]
+    [InlineData("Scan")]
+    public async Task MissingResolver_PreCancellationTakesPrecedence(string operation)
+    {
+        var (storage, client) = CreateStorage();
+        using var ownedClient = client;
+        var cancellationToken = new CancellationToken(canceled: true);
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            ReadWithMissingResolver(storage, operation, false, cancellationToken));
+
+        Assert.Equal(cancellationToken, exception.CancellationToken);
+        Assert.Empty(client.Calls);
+        client.AssertAllScriptsConsumed();
+    }
+
+    private static Task ReadWithMissingResolver(
+        DynamoDBStorage storage, string operation, bool legacyOverload, CancellationToken cancellationToken) =>
+        (operation, legacyOverload) switch
+        {
+            ("Read", true) => storage.ReadSingleEntryAsync<object>(TableName, [], null!),
+            ("Read", false) => storage.ReadSingleEntryAsync<object>(TableName, [], null!, cancellationToken),
+            ("Query", true) => storage.QueryAsync<object>(TableName, [], "pk = :pk", null!),
+            ("Query", false) => storage.QueryAsync<object>(TableName, [], "pk = :pk", null!, cancellationToken),
+            ("QueryAll", true) => storage.QueryAllAsync<object>(TableName, [], "pk = :pk", null!),
+            ("QueryAll", false) => storage.QueryAllAsync<object>(TableName, [], "pk = :pk", null!, cancellationToken),
+            ("Scan", true) => storage.ScanAsync<object>(TableName, [], "pk = :pk", null!),
+            ("Scan", false) => storage.ScanAsync<object>(TableName, [], "pk = :pk", null!, cancellationToken),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+        };
+
     [Fact]
     public async Task UpdateTableAsync_UpdateIfExistsFalse_ReturnsWithoutClientCall()
     {
@@ -1447,6 +1504,9 @@ public sealed class DynamoDBStorageUnitTests
         public List<RecordedCall<UpdateItemRequest>> UpdateItemCalls { get; } = [];
         public List<RecordedCall<BatchWriteItemRequest>> BatchWriteItemCalls { get; } = [];
         public List<RecordedCall<TransactWriteItemsRequest>> TransactWriteItemsCalls { get; } = [];
+        public List<RecordedCall<GetItemRequest>> GetItemCalls { get; } = [];
+        public List<RecordedCall<QueryRequest>> QueryCalls { get; } = [];
+        public List<RecordedCall<ScanRequest>> ScanCalls { get; } = [];
 
         public Queue<Func<DescribeTableRequest, CancellationToken, Task<DescribeTableResponse>>> DescribeTableScripts { get; } = [];
         public Queue<Func<DescribeTimeToLiveRequest, CancellationToken, Task<DescribeTimeToLiveResponse>>> DescribeTimeToLiveScripts { get; } = [];
@@ -1455,6 +1515,9 @@ public sealed class DynamoDBStorageUnitTests
         public Queue<Func<UpdateItemRequest, CancellationToken, Task<UpdateItemResponse>>> UpdateItemScripts { get; } = [];
         public Queue<Func<BatchWriteItemRequest, CancellationToken, Task<BatchWriteItemResponse>>> BatchWriteItemScripts { get; } = [];
         public Queue<Func<TransactWriteItemsRequest, CancellationToken, Task<TransactWriteItemsResponse>>> TransactWriteItemsScripts { get; } = [];
+        public Queue<Func<GetItemRequest, CancellationToken, Task<GetItemResponse>>> GetItemScripts { get; } = [];
+        public Queue<Func<QueryRequest, CancellationToken, Task<QueryResponse>>> QueryScripts { get; } = [];
+        public Queue<Func<ScanRequest, CancellationToken, Task<ScanResponse>>> ScanScripts { get; } = [];
 
         public override Task<DescribeTableResponse> DescribeTableAsync(string tableName, CancellationToken cancellationToken = default) =>
             Record(
@@ -1487,6 +1550,15 @@ public sealed class DynamoDBStorageUnitTests
         public override Task<TransactWriteItemsResponse> TransactWriteItemsAsync(TransactWriteItemsRequest request, CancellationToken cancellationToken = default) =>
             Record("TransactWriteItems", request, cancellationToken, TransactWriteItemsCalls, TransactWriteItemsScripts);
 
+        public override Task<GetItemResponse> GetItemAsync(GetItemRequest request, CancellationToken cancellationToken = default) =>
+            Record("GetItem", request, cancellationToken, GetItemCalls, GetItemScripts);
+
+        public override Task<QueryResponse> QueryAsync(QueryRequest request, CancellationToken cancellationToken = default) =>
+            Record("Query", request, cancellationToken, QueryCalls, QueryScripts);
+
+        public override Task<ScanResponse> ScanAsync(ScanRequest request, CancellationToken cancellationToken = default) =>
+            Record("Scan", request, cancellationToken, ScanCalls, ScanScripts);
+
         public void AssertAllScriptsConsumed()
         {
             Assert.Empty(DescribeTableScripts);
@@ -1496,6 +1568,9 @@ public sealed class DynamoDBStorageUnitTests
             Assert.Empty(UpdateItemScripts);
             Assert.Empty(BatchWriteItemScripts);
             Assert.Empty(TransactWriteItemsScripts);
+            Assert.Empty(GetItemScripts);
+            Assert.Empty(QueryScripts);
+            Assert.Empty(ScanScripts);
         }
 
         private Task<TResponse> Record<TRequest, TResponse>(

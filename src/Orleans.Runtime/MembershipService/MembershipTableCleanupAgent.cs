@@ -114,9 +114,15 @@ namespace Orleans.Runtime.MembershipService
                 var now = _timeProvider.GetUtcNow();
                 DateTimeOffset? beforeDate = default;
 
+                // Recently dead entries are retained so that silos with delayed or retried membership operations,
+                // such as a join insert whose response was lost, observe their own death rather than re-registering.
+                var minimumRetention = _clusterMembershipOptions.DefunctSiloMinimumRetention;
+                var retentionBeforeDate = now - minimumRetention;
+
                 if (_clusterMembershipOptions.DefunctSiloCleanupPeriod is { } cleanupPeriod)
                 {
-                    var expirationBeforeDate = now - _clusterMembershipOptions.DefunctSiloExpiration;
+                    var expiration = _clusterMembershipOptions.DefunctSiloExpiration;
+                    var expirationBeforeDate = now - (expiration > minimumRetention ? expiration : minimumRetention);
                     if (ShouldCleanupExpiredSilos(membership, now, expirationBeforeDate, cleanupPeriod))
                     {
                         beforeDate = expirationBeforeDate;
@@ -126,6 +132,7 @@ namespace Orleans.Runtime.MembershipService
                 if (_clusterMembershipOptions.MaxDefunctSiloEntries is { } maxDefunctSiloEntries)
                 {
                     var defunctSiloEntryCount = 0;
+                    var oldestDefunctUpdateTime = DateTime.MaxValue;
                     var trackedEntryCount = (long)maxDefunctSiloEntries + 1;
                     var newestDefunctEntries = new PriorityQueue<MembershipEntry, DefunctSiloEntryPriority>();
                     foreach (var entry in membership.Entries.Values)
@@ -136,6 +143,11 @@ namespace Orleans.Runtime.MembershipService
                         }
 
                         defunctSiloEntryCount++;
+                        if (entry.EffectiveUpdateTime < oldestDefunctUpdateTime)
+                        {
+                            oldestDefunctUpdateTime = entry.EffectiveUpdateTime;
+                        }
+
                         var entryPriority = new DefunctSiloEntryPriority(entry);
                         if (newestDefunctEntries.Count < trackedEntryCount)
                         {
@@ -153,7 +165,14 @@ namespace Orleans.Runtime.MembershipService
                     {
                         var newestEntryToRemove = newestDefunctEntries.Peek();
                         var excessBeforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveUpdateTime);
-                        if (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value)
+                        if (excessBeforeDate > retentionBeforeDate)
+                        {
+                            excessBeforeDate = retentionBeforeDate;
+                        }
+
+                        // Skip the call when minimum retention leaves no excess entry eligible for removal.
+                        if (oldestDefunctUpdateTime < excessBeforeDate.UtcDateTime
+                            && (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value))
                         {
                             beforeDate = excessBeforeDate;
                         }

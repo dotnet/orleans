@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -18,6 +19,8 @@ namespace Orleans.BroadcastChannel
         Task OnPublished(InternalChannelId streamId, object item, CancellationToken cancellationToken = default);
     }
 
+    [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
+        Justification = "AddBroadcastChannel registers this grain extension for construction by dependency injection during grain activation.")]
     internal class BroadcastChannelConsumerExtension : IBroadcastChannelConsumerExtension
     {
         private readonly ConcurrentDictionary<InternalChannelId, ICallback> _handlers = new();

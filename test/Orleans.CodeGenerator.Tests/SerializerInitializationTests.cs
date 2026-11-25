@@ -20,7 +20,7 @@ public sealed class SerializerInitializationTests
     public void AddingAutomaticServicesAfterContextInitializesThemOnce()
     {
         var services = new ServiceCollection()
-            .AddSerializerContext(new ManualContext())
+            .AddGeneratedContext(new ManualContext())
             .AddSerializer()
             .AddSerializer();
         Assert.Equal(3, services.Count(descriptor => descriptor.ServiceType == typeof(IGeneralizedCodec)));
@@ -32,7 +32,7 @@ public sealed class SerializerInitializationTests
     [Fact]
     public void ContextServicesUseTheCommonTypeResolver()
     {
-        using var provider = new ServiceCollection().AddSerializerContext(new ManualContext()).BuildServiceProvider();
+        using var provider = new ServiceCollection().AddGeneratedContext(new ManualContext()).BuildServiceProvider();
         var resolver = provider.GetRequiredService<TypeResolver>();
         Assert.IsType<CachedTypeResolver>(resolver);
         Assert.Equal(typeof(int), resolver.ResolveType("System.Int32"));
@@ -47,12 +47,10 @@ public sealed class SerializerInitializationTests
     [InlineData(false, true)]
     public async Task GeneratedMetadataRejectsConflictingTypesInEitherOrder(bool alias, bool reverse)
     {
-        var dictionary = SyntaxFactory.ParseExpression(alias ? "options.WellKnownTypeAliases" : "options.WellKnownTypeIds");
-        var key = SyntaxFactory.ParseExpression(alias ? "\"conflict-key\"" : "1042U");
-        var first = MetadataGenerator.CreateTypeMetadataRegistration(dictionary, key,
-            SyntaxFactory.ParseExpression(reverse ? "typeof(string)" : "typeof(int)")).NormalizeWhitespace().ToFullString();
-        var second = MetadataGenerator.CreateTypeMetadataRegistration(dictionary, key,
-            SyntaxFactory.ParseExpression(reverse ? "typeof(int)" : "typeof(string)")).NormalizeWhitespace().ToFullString();
+        var dictionary = alias ? "options.WellKnownTypeAliases" : "options.WellKnownTypeIds";
+        var key = alias ? "\"conflict-key\"" : "1042U";
+        var first = WriteRegistration(dictionary, key, reverse ? "typeof(string)" : "typeof(int)");
+        var second = WriteRegistration(dictionary, key, reverse ? "typeof(int)" : "typeof(string)");
         var compilation = await TestCompilationHelper.CreateCompilation($$"""
             public static class MetadataConflictProof
             {
@@ -81,9 +79,16 @@ public sealed class SerializerInitializationTests
         Assert.Contains(alias ? "conflict-key" : "1042", message, StringComparison.Ordinal);
     }
 
-    private sealed class ManualContext : SerializerContext
+    private sealed class ManualContext : GeneratedContext
     {
         protected override void ConfigureInner(TypeManifestOptions options)
             => options.AddSerializer<int>(static _ => new Int32Codec(), static _ => new ShallowCopier<int>());
+    }
+
+    private static string WriteRegistration(string dictionary, string key, string type)
+    {
+        var writer = new SourceWriter();
+        MetadataGenerator.WriteTypeMetadataRegistration(writer, dictionary, key, type);
+        return writer.ToString();
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using Orleans.Serialization.Buffers;
-using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
@@ -17,9 +16,12 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         Justification = "MessageHandlerShared owns and pools this request; the request does not own the shared pool.")]
     private readonly MessageHandlerShared _shared;
     private readonly ArcBufferWriter _buffer = new();
-    private readonly List<(Message Message, int TotalLength, int HeaderLength)> _messages = [];
+    private readonly List<(Message Message, int Offset, int TotalLength, int HeaderLength)> _messages = [];
     private Connection? _connection;
     private MessageSerializer? _messageSerializer;
+
+    // Keeps the serialized messages available after the transport consumes them, so that messages which are retried send the same bytes.
+    private ArcBuffer _written;
     private bool _hasLargeMessages;
     private bool _disposed;
 
@@ -38,33 +40,74 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
     public void WriteMessage(Message message)
     {
-        var startLength = _buffer.Length;
         var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
-        try
+        var offset = _buffer.Length;
+        var (headerLength, bodyLength) = MessageFrames.Write(messageSerializer, _buffer, message);
+        var totalLength = headerLength + bodyLength;
+        _messages.Add((message, offset, totalLength, headerLength));
+        _hasLargeMessages |= totalLength >= LargeMessageSize;
+    }
+
+    /// <summary>
+    /// Completes writing messages to this request, before it is submitted to the transport.
+    /// </summary>
+    public void CompleteWriting()
+    {
+        ReturnSerializer();
+        if (_messages.Count > 0)
         {
-            // Reserve space for framing
-            var framingBytes = _buffer.GetSpan(Message.LENGTH_HEADER_SIZE);
-            _buffer.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
-
-            // Serialize the message in full
-            var (headerLength, bodyLength) = messageSerializer.Write(_buffer, message);
-
-            // Write the framing
-            BinaryPrimitives.WriteInt32LittleEndian(framingBytes, headerLength);
-            BinaryPrimitives.WriteInt32LittleEndian(framingBytes[sizeof(int)..], bodyLength);
-
-            var totalLength = headerLength + bodyLength;
-            _messages.Add((message, totalLength, headerLength));
-            _hasLargeMessages |= totalLength >= LargeMessageSize;
-        }
-        catch
-        {
-            _buffer.Truncate(startLength);
-            throw;
+            _written = _buffer.PeekSlice(_buffer.Length);
         }
     }
 
-    public void CompleteWriting()
+    /// <summary>
+    /// Sends the messages in this request again, after the request could not be written.
+    /// </summary>
+    /// <remarks>
+    /// Serializing a message can consume values such as <see cref="PooledBuffer"/> arguments or request-context entries.
+    /// Each message keeps its serialized body and restores its request context from the written headers before retrying.
+    /// </remarks>
+    public void RerouteMessages(Exception? error)
+    {
+        var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
+        try
+        {
+            foreach (var (message, offset, totalLength, _) in _messages)
+            {
+                try
+                {
+                    KeepSerializedPayload(message, offset, totalLength);
+                }
+                catch (Exception exception)
+                {
+                    connection.OnMessageSerializationFailure(message, exception);
+                    continue;
+                }
+
+                connection.RerouteMessage(message, error);
+            }
+        }
+        finally
+        {
+            Reset();
+        }
+    }
+
+    private void KeepSerializedPayload(Message message, int offset, int totalLength)
+    {
+        using var frame = _written.Slice(offset, Message.LENGTH_HEADER_SIZE + totalLength);
+        using var original = MessageFrames.Read(_shared, frame);
+        message.RequestContextData = original.RequestContextData;
+        if (message._bodyObject is not MessageReadRequest && original._bodyObject is MessageReadRequest body)
+        {
+            // Transfer the serialized body while retaining the message's current routing and expiry.
+            original._bodyObject = null;
+            message.SetMessageReadRequest(body);
+            message.Result = original.Result;
+        }
+    }
+
+    private void ReturnSerializer()
     {
         if (_messageSerializer is { } serializer)
         {
@@ -78,14 +121,14 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         try
         {
             var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-            foreach (var (message, totalLength, headerLength) in _messages)
+            foreach (var (message, _, totalLength, headerLength) in _messages)
             {
                 connection.RecordMessageSend(message, totalLength, headerLength);
             }
         }
         finally
         {
-            foreach (var (message, _, _) in _messages)
+            foreach (var (message, _, _, _) in _messages)
             {
                 message.ReleaseBodyBuffer();
             }
@@ -105,13 +148,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
             LogErrorSendingMessages(_shared.ConnectionTrace, error, _messages);
         }
 
-        var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-        foreach (var (message, _, _) in _messages)
-        {
-            connection.RerouteMessage(message, error);
-        }
-
-        Reset();
+        RerouteMessages(error);
     }
 
     public void Reset()
@@ -120,7 +157,9 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
             && _messages[0].TotalLength is >= LargeMessageSize and < SendPageSize
                 ? SendPageSize
                 : 0;
-        CompleteWriting();
+        ReturnSerializer();
+        _written.Dispose();
+        _written = default;
         _messages.Clear();
         _hasLargeMessages = false;
         _buffer.Reset(nextPageSize);
@@ -136,7 +175,9 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         }
 
         _disposed = true;
-        CompleteWriting();
+        ReturnSerializer();
+        _written.Dispose();
+        _written = default;
         _messages.Clear();
         _buffer.Dispose();
     }

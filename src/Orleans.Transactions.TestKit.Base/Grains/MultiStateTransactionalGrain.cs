@@ -182,6 +182,17 @@ namespace Orleans.Transactions.TestKit
         }
 
         /// <inheritdoc/>
+        public async Task<int[]> GetCommitted()
+        {
+            var result = new int[dataArray.Length];
+            for (int i = 0; i < dataArray.Length; i++)
+            {
+                result[i] = await dataArray[i].PerformRead(state => state.Value, ReadIsolation.ReadCommitted);
+            }
+            return result;
+        }
+
+        /// <inheritdoc/>
         public async Task AddAndThrow(int numberToAdd)
         {
             await Add(numberToAdd);

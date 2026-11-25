@@ -1,7 +1,7 @@
 using TestExtensions;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 internal static class JournalingAzureStorageTestConfiguration
 {

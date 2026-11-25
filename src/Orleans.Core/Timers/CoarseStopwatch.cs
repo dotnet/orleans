@@ -5,7 +5,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Cheap, non-allocating stopwatch for timing durations with an accuracy within tens of milliseconds.
     /// </summary>
-    internal struct CoarseStopwatch
+    internal struct CoarseStopwatch : IEquatable<CoarseStopwatch>
     {
         private long _value;
 

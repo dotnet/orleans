@@ -7,6 +7,8 @@
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
+    <!-- Build prepares the standalone silo deployment consumed by the upgrade tests. -->
+    <OutputPath>$(PublishRoot)</OutputPath>
     <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
     <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
     <SourceDir>$(MSBuildThisFileDirectory)../TestVersionGrains/</SourceDir>
@@ -30,8 +32,4 @@
   <ItemGroup>
     <Compile Include="$(SourceDir)/**/*.cs" Exclude="$(SourceDir)obj/**/*.cs;$(SourceDir)bin/**/*.cs" />
   </ItemGroup>
-
-  <Target Name="PostBuildPublish" AfterTargets="Build">
-    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
-  </Target>
 </Project>

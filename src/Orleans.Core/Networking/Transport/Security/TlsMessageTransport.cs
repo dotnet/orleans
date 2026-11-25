@@ -164,18 +164,14 @@ internal abstract partial class TlsMessageTransport : StreamMessageTransport
         _tlsConnectionFeature.LocalCertificate = ConvertToX509Certificate2(_sslStream.LocalCertificate);
         _tlsConnectionFeature.RemoteCertificate = ConvertToX509Certificate2(_sslStream.RemoteCertificate);
         _tlsConnectionFeature.NegotiatedCipherSuite = GetOptionalTlsProperty(() => _sslStream.NegotiatedCipherSuite);
-#if NET10_0_OR_GREATER
 #pragma warning disable SYSLIB0058
-#endif
         _tlsConnectionFeature.CipherAlgorithm = GetOptionalTlsPropertyOrDefault(() => _sslStream.CipherAlgorithm);
         _tlsConnectionFeature.CipherStrength = GetOptionalTlsPropertyOrDefault(() => _sslStream.CipherStrength);
         _tlsConnectionFeature.HashAlgorithm = GetOptionalTlsPropertyOrDefault(() => _sslStream.HashAlgorithm);
         _tlsConnectionFeature.HashStrength = GetOptionalTlsPropertyOrDefault(() => _sslStream.HashStrength);
         _tlsConnectionFeature.KeyExchangeAlgorithm = GetOptionalTlsPropertyOrDefault(() => _sslStream.KeyExchangeAlgorithm);
         _tlsConnectionFeature.KeyExchangeStrength = GetOptionalTlsPropertyOrDefault(() => _sslStream.KeyExchangeStrength);
-#if NET10_0_OR_GREATER
 #pragma warning restore SYSLIB0058
-#endif
         _tlsConnectionFeature.Protocol = _sslStream.SslProtocol;
     }
 

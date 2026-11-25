@@ -4,11 +4,19 @@
   "version": "1.0.0",
   "description": "An admin dashboard for Microsoft Orleans",
   "type": "module",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": "24.22.2",
+    "npm": "11.19.1"
+  },
   "scripts": {
     "dev": "vite",
+    "restore": "node scripts/install.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:ui": "playwright test",
+    "test:install": "node --test scripts/install.test.mjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.1.0",
@@ -17,12 +25,12 @@
     "chart.js": "^4.4.8",
     "eventthing": "^1.0.7",
     "humanize-duration": "^3.32.1",
-    "mermaid": "^11.16.1",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@eslint/js": "^9.39.5",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@types/humanize-duration": "^3.27.4",

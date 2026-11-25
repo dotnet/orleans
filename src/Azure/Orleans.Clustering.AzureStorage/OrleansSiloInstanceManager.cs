@@ -148,19 +148,26 @@ namespace Orleans.AzureUtils
             return address.ToGatewayUri();
         }
 
-        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
+        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugSearchingGateway(this.DeploymentId);
 
             try
             {
                 const string Zero = "0";
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {INSTANCE_STATUS_ACTIVE} and ProxyPort ne {Zero}"));
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(
+                    TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {INSTANCE_STATUS_ACTIVE} and ProxyPort ne {Zero}"),
+                    cancellationToken);
 
                 var gatewaySiloInstances = queryResults.Select(entity => ConvertToGatewayUri(entity.Item1)).ToList();
 
                 LogFoundGateway(gatewaySiloInstances.Count, this.DeploymentId);
                 return gatewaySiloInstances;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -334,10 +341,19 @@ namespace Orleans.AzureUtils
         private static bool CanAcceptSnapshot(List<(SiloInstanceTableEntry Entity, string ETag)> entries)
         {
             var version = ValidateAllSiloEntries(entries);
-            if (entries[0].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
-                || entries[^1].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX)
+            var opening = entries[0].Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN;
+            var closing = entries[^1].Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX;
+            // Both markers absent identifies the legacy format, which uses legacy read semantics.
+            // The first membership write atomically establishes both markers with the new version.
+            // A query overlapping that write can see a partial pair, so retry partial or mismatched pairs.
+            if (!opening && !closing)
             {
-                throw new KeyNotFoundException("The membership query must include both ordered boundary version rows.");
+                return true;
+            }
+
+            if (!opening || !closing)
+            {
+                return false;
             }
 
             var before = entries[0].Entity.MembershipVersion
@@ -345,9 +361,21 @@ namespace Orleans.AzureUtils
             var after = entries[^1].Entity.MembershipVersion
                 ?? throw new InvalidOperationException("The closing boundary row does not contain a membership version.");
 
-            // Every canonical write changes both ordered markers atomically with the membership data.
-            return string.Equals(before, after, StringComparison.Ordinal)
-                && string.Equals(before, version, StringComparison.Ordinal);
+            // Boundary-aware writes atomically advance all three versions.
+            return (string.Equals(before, after, StringComparison.Ordinal)
+                && string.Equals(before, version, StringComparison.Ordinal))
+                || IsLegacyTableVersionAhead(version, before, after);
+        }
+
+        private static bool IsLegacyTableVersionAhead(string? tableVersion, string beforeVersion, string afterVersion)
+        {
+            // Older writers advance only VersionRow. A version ahead of both markers retains legacy
+            // read semantics, including potentially torn paginated snapshots, during rolling upgrades.
+            return int.TryParse(tableVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTableVersion)
+                && int.TryParse(beforeVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedBeforeVersion)
+                && int.TryParse(afterVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedAfterVersion)
+                && parsedTableVersion > parsedBeforeVersion
+                && parsedTableVersion > parsedAfterVersion;
         }
 
         private static List<(SiloInstanceTableEntry Entity, string ETag)> RemoveBoundaryVersionRows(

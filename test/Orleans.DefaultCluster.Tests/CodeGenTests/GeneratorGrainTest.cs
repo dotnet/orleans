@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -204,15 +205,29 @@ namespace Tester.CodeGenTests
             var localObject = new ObserverWithGenericMethods();
 
             var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
-            var observer = this.GrainFactory.CreateObjectReference<IGrainObserverWithGenericMethods>(localObject);
-            await grain.SetValueOnObserver(observer, "ToastedEnchiladas");
-            Assert.Equal("ToastedEnchiladas", await localObject.ValueTask);
 
-            // Keep the observer strongly reachable until its callback completes. CreateObjectReference holds
-            // only a weak reference to the target, so a garbage collection that runs after the ValueTask getter
-            // above is read (and before SetValue is invoked) could otherwise collect localObject prematurely,
-            // leaving valueCompletion uncompleted and this test hanging indefinitely (see dotnet/orleans#11427).
-            GC.KeepAlive(localObject);
+            // Orleans references observers weakly. After SetValueOnObserver returns, only localObject.ValueTask's
+            // continuation references this test's async state machine: xUnit starts tests from a detached work item,
+            // so no rooted caller retains it, and GC.KeepAlive cannot root the state machine which holds the local.
+            // The handle keeps the observer, and through its pending continuation this test, alive until the callback runs.
+            var observerRoot = GCHandle.Alloc(localObject);
+            try
+            {
+                var observer = this.GrainFactory.CreateObjectReference<IGrainObserverWithGenericMethods>(localObject);
+                try
+                {
+                    await grain.SetValueOnObserver(observer, "ToastedEnchiladas");
+                    Assert.Equal("ToastedEnchiladas", await localObject.ValueTask);
+                }
+                finally
+                {
+                    this.GrainFactory.DeleteObjectReference<IGrainObserverWithGenericMethods>(observer);
+                }
+            }
+            finally
+            {
+                observerRoot.Free();
+            }
         }
 
         [Fact]

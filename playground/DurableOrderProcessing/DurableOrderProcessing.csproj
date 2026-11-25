@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <NoWarn>$(NoWarn);ORLEANSEXP003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable\Orleans.Durable.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Http\Orleans.Durable.Http.csproj" />
+    <ProjectReference Include="..\..\src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+
+    <!-- The abstractions package carries the replay-safety analyzers; this sample references the project directly. -->
+    <ProjectReference Include="..\..\src\Orleans.Durable.Analyzers\Orleans.Durable.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

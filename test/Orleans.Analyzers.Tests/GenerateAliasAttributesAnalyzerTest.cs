@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -193,6 +194,49 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
        => VerifyHasNoDiagnostic("public record struct RS {}");
 
     #endregion
+
+    [Fact]
+    public async Task PartialTypesAndMethods_WithAliasedAttributes_ShouldOnlyReportMissingAliases()
+    {
+        const string unaliasedType = "[Serializer] public partial class Unaliased { }";
+        const string unaliasedMethod = "System.Threading.Tasks.Task Missing();";
+        var source = $$"""
+            using Orleans;
+            using Serializer = Orleans.GenerateSerializerAttribute;
+            using StableName = Orleans.AliasAttribute;
+
+            [Serializer] public partial class Aliased { }
+            [StableName("data")] public partial class Aliased { }
+
+            {{unaliasedType}}
+            public partial class Unaliased { }
+
+            public partial interface IApi : IGrainWithGuidKey
+            {
+                [StableName("existing")] System.Threading.Tasks.Task Existing();
+            }
+
+            [StableName("api")]
+            public partial interface IApi
+            {
+                {{unaliasedMethod}}
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsFullSourceAsync(source);
+
+        Assert.Collection(diagnostics,
+            diagnostic => AssertMissingAlias(diagnostic, unaliasedType, "Unaliased"),
+            diagnostic => AssertMissingAlias(diagnostic, unaliasedMethod, "Missing"));
+
+        void AssertMissingAlias(Diagnostic diagnostic, string declaration, string name)
+        {
+            Assert.Equal(GenerateAliasAttributesAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+            Assert.Equal(new TextSpan(source.IndexOf(declaration, StringComparison.Ordinal), declaration.Length), diagnostic.Location.SourceSpan);
+            Assert.Equal(name, diagnostic.Properties["TypeName"]);
+        }
+    }
 
     private static async Task<Diagnostic[]> GetDiagnosticsWithReferencedAssemblyAsync(string source, string referencedSource)
     {

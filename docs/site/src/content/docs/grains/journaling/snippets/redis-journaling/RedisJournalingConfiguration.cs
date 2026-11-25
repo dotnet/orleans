@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using StackExchange.Redis;
 
 namespace Orleans.Docs.Snippets.Journaling;

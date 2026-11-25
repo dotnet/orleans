@@ -1,4 +1,4 @@
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 /// <summary>
 /// Test class used for complex object serialization testing

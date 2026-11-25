@@ -184,6 +184,7 @@ function isPrereleaseOfVersion(value, requiredVersion) {
 export function validateProjectEvaluations({
   projectEvaluations,
   targetFramework,
+  exceptionTargetFramework,
   orleansPackageVersion,
 }) {
   const issues = [];
@@ -191,12 +192,26 @@ export function validateProjectEvaluations({
 
   for (const { project, evaluation } of projectEvaluations) {
     const frameworks = evaluatedFrameworks(evaluation);
-    if (frameworks.length !== 1 || frameworks[0] !== targetFramework) {
+    const frameworkExceptionReason = String(
+      evaluation.Properties?.OrleansDocumentationTargetFrameworkException ?? '',
+    ).trim();
+    const requiredFramework = frameworkExceptionReason ? exceptionTargetFramework : targetFramework;
+    if (frameworks.length !== 1 || frameworks[0] !== requiredFramework) {
       issues.push({
         rule: 'PROJECT004',
         project,
         message: `Project evaluates to target framework(s) '${frameworks.join(';') || '(missing)'}'.`,
-        remediation: `Target exactly ${targetFramework}; docs and samples use a single target framework.`,
+        remediation: frameworkExceptionReason
+          ? `Target exactly ${exceptionTargetFramework}, which OrleansDocumentationTargetFrameworkException selects.`
+          : `Target exactly ${targetFramework}, or exactly ${exceptionTargetFramework} with a meaningful OrleansDocumentationTargetFrameworkException; docs and samples use a single target framework.`,
+      });
+    }
+    if (frameworkExceptionReason && frameworkExceptionReason.length < 20) {
+      issues.push({
+        rule: 'PROJECT004',
+        project,
+        message: 'OrleansDocumentationTargetFrameworkException is missing a meaningful reason.',
+        remediation: `Explain which APIs require ${exceptionTargetFramework}.`,
       });
     }
 
@@ -278,6 +293,7 @@ export async function evaluateProject(projectFile) {
       '-getProperty:TargetFrameworks',
       '-getProperty:ManagePackageVersionsCentrally',
       '-getProperty:OrleansDocumentationVersionException',
+      '-getProperty:OrleansDocumentationTargetFrameworkException',
       '-getItem:PackageReference',
       '-getItem:PackageVersion',
       '-getItem:ProjectReference',

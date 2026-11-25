@@ -13,6 +13,7 @@ namespace Orleans
 
         [Alias("F388CED1")] Task ForceGarbageCollection(CancellationToken cancellationToken = default);
         [Alias("45D07D09")] Task ForceActivationCollection(TimeSpan ageLimit, CancellationToken cancellationToken = default);
+        [Alias("DeactivateGrain")] Task DeactivateGrain(GrainId grainId, CancellationToken cancellationToken = default);
         [Alias("0C7DBD0C")] Task ForceRuntimeStatisticsCollection(CancellationToken cancellationToken = default);
 
         [Alias("F18EAF24")] Task<SiloRuntimeStatistics> GetRuntimeStatistics(CancellationToken cancellationToken = default);

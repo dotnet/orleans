@@ -1,10 +1,9 @@
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.CopierGenerator;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Orleans.CodeGenerator.SerializerGenerator;
@@ -12,7 +11,7 @@ using static Orleans.CodeGenerator.SerializerGenerator;
 namespace Orleans.CodeGenerator;
 
 /// <summary>
-/// Generates RPC stub objects called invokers.
+/// Generates RPC proxies.
 /// </summary>
 internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenerator copierGenerator)
 {
@@ -23,33 +22,67 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
 
-    public (ClassDeclarationSyntax, GeneratedProxyDescription) Generate(ProxyInterfaceDescription interfaceDescription)
+    /// <summary>
+    /// Plans the proxy for an interface. Planning enumerates the interface's methods, which discovers their invokables
+    /// and compatibility invokers, and reports invalid methods.
+    /// </summary>
+    public ProxyEmissionPlan CreatePlan(ProxyInterfaceDescription interfaceDescription)
     {
         var generatedClassName = GetSimpleClassName(interfaceDescription);
-
         var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
-        var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-        var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
+        var methods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
+        var (constructors, constructorStatements) = CreateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
 
-        var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+        return new ProxyEmissionPlan(
+            generatedClassName,
+            CodeText.Type(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
+            CodeText.Type(interfaceDescription.InterfaceType.ToTypeSyntax()),
+            GenericParameterEmissionPlan.Create(interfaceDescription.TypeParameters),
+            fieldDescriptions.Select(static field => $"private readonly {CodeText.Type(field.FieldType)} {field.FieldName};").ToImmutableArray(),
+            constructors,
+            constructorStatements,
+            methods);
+    }
 
-        var classDeclaration = ClassDeclaration(generatedClassName)
-            .AddBaseListTypes(
-                SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
-                SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
-            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-            .AddMembers(fieldDeclarations)
-            .AddMembers(ctors)
-            .AddMembers(proxyMethods);
-
-        var typeParameters = interfaceDescription.TypeParameters;
-        if (typeParameters.Count > 0)
+    internal static void Write(SourceWriter writer, ProxyEmissionPlan plan)
+    {
+        var declaration = new StringBuilder();
+        declaration.Append("internal sealed class ").Append(plan.ClassName);
+        GenericParameterEmissionPlan.AppendParameterList(declaration, plan.TypeParameters);
+        declaration.Append(" : ").Append(plan.BaseType).Append(", ").Append(plan.InterfaceType);
+        writer.WriteLine(GeneratedCodeUtilities.GeneratedCodeAttributeText);
+        GenericParameterEmissionPlan.WriteDeclarationLine(writer, declaration, plan.TypeParameters);
+        writer.OpenBlock();
+        foreach (var field in plan.Fields)
         {
-            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, typeParameters);
+            writer.WriteLine(field);
         }
 
-        return (classDeclaration, new GeneratedProxyDescription(interfaceDescription, generatedClassName));
+        foreach (var constructor in plan.Constructors)
+        {
+            writer.WriteLine(constructor);
+            writer.OpenBlock();
+            foreach (var statement in plan.ConstructorStatements)
+            {
+                writer.WriteLine(statement);
+            }
+
+            writer.CloseBlock();
+        }
+
+        foreach (var method in plan.Methods)
+        {
+            writer.WriteLine(method.Declaration);
+            writer.OpenBlock();
+            foreach (var statement in method.Statements)
+            {
+                writer.WriteLine(statement);
+            }
+
+            writer.CloseBlock();
+        }
+
+        writer.CloseBlock();
     }
 
     public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
@@ -71,31 +104,21 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         return fields;
     }
 
-    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
-    {
-        return [.. fieldDescriptions.Select(GetFieldDeclaration)];
-
-        static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
-        {
-            return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-        }
-    }
-
-    private MemberDeclarationSyntax[] CreateProxyMethods(
+    private EquatableArray<ProxyMethodEmissionPlan> CreateProxyMethods(
         List<GeneratedFieldDescription> fieldDescriptions,
         ProxyInterfaceDescription interfaceDescription)
     {
-        var res = new List<MemberDeclarationSyntax>();
+        var res = ImmutableArray.CreateBuilder<ProxyMethodEmissionPlan>(interfaceDescription.Methods.Count);
         foreach (var methodDescription in interfaceDescription.Methods)
         {
             var forwardingMethod = interfaceDescription.Methods.FirstOrDefault(
                 candidate => IsCancellationCompatibilityOverload(methodDescription, candidate));
             res.Add(CreateProxyMethod(methodDescription, forwardingMethod));
         }
-        return [.. res];
 
-        MethodDeclarationSyntax CreateProxyMethod(
+        return res.MoveToImmutable();
+
+        ProxyMethodEmissionPlan CreateProxyMethod(
             ProxyMethodDescription methodDescription,
             ProxyMethodDescription? forwardingMethod)
         {
@@ -103,25 +126,25 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                 ? CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription)
                 : (false, CreateCompatibilityForwardingBody(methodDescription, forwardingMethod));
             var method = methodDescription.Method;
-            var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
-                .AddParameterListParameters([.. method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions))])
-                .WithBody(body);
-
+            var declaration = new StringBuilder();
             if (isAsync)
             {
-                declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.AsyncKeyword)));
+                declaration.Append("async ");
             }
 
-            var explicitInterfaceSpecifier = ExplicitInterfaceSpecifier(methodDescription.Method.ContainingType.ToNameSyntax());
-            declaration = declaration.WithExplicitInterfaceSpecifier(explicitInterfaceSpecifier);
-
+            CodeText.AppendType(declaration, method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions));
+            declaration.Append(' ');
+            CodeText.AppendType(declaration, methodDescription.Method.ContainingType.ToNameSyntax());
+            declaration.Append('.').Append(method.Name.EscapeIdentifier());
             if (methodDescription.MethodTypeParameters.Count > 0)
             {
-                declaration = declaration.WithTypeParameterList(
-                    TypeParameterList(SeparatedList(methodDescription.MethodTypeParameters.Select(tp => TypeParameter(tp.Name)))));
+                declaration.Append('<').Append(string.Join(", ", methodDescription.MethodTypeParameters.Select(static tp => tp.Name))).Append('>');
             }
 
-            return declaration;
+            declaration.Append('(');
+            AppendParameters(declaration, method.Parameters, methodDescription.TypeParameterSubstitutions);
+            declaration.Append(')');
+            return new(declaration.ToString(), body);
         }
 
         bool IsCancellationCompatibilityOverload(
@@ -249,57 +272,39 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             return SymbolEqualityComparer.Default.Equals(legacyType, candidateType);
         }
 
-        static BlockSyntax CreateCompatibilityForwardingBody(
+        static EquatableArray<string> CreateCompatibilityForwardingBody(
             ProxyMethodDescription legacyMethod,
             ProxyMethodDescription cancellationMethod)
         {
-            SimpleNameSyntax methodName = cancellationMethod.MethodTypeParameters.Count > 0
-                ? GenericName(
-                    Identifier(cancellationMethod.Method.Name.EscapeIdentifier()),
-                    TypeArgumentList(SeparatedList<TypeSyntax>(
-                        legacyMethod.MethodTypeParameters.Select(static parameter => (TypeSyntax)IdentifierName(parameter.Name)))))
-                : IdentifierName(cancellationMethod.Method.Name.EscapeIdentifier());
-            var target = ParenthesizedExpression(
-                CastExpression(
-                    cancellationMethod.Method.ContainingType.ToTypeSyntax(cancellationMethod.TypeParameterSubstitutions),
-                    ThisExpression()));
-            var arguments = legacyMethod.Method.Parameters
-                .Select((_, index) => Argument(IdentifierName($"arg{index}")))
-                .Append(Argument(ParseExpression("global::System.Threading.CancellationToken.None")));
-            var invocation = InvocationExpression(
-                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, target, methodName),
-                ArgumentList(SeparatedList(arguments)));
+            var invocation = new StringBuilder("((");
+            CodeText.AppendType(invocation, cancellationMethod.Method.ContainingType.ToTypeSyntax(cancellationMethod.TypeParameterSubstitutions));
+            invocation.Append(")this).").Append(cancellationMethod.Method.Name.EscapeIdentifier());
+            if (cancellationMethod.MethodTypeParameters.Count > 0)
+            {
+                invocation.Append('<').Append(string.Join(", ", legacyMethod.MethodTypeParameters.Select(static parameter => parameter.Name))).Append('>');
+            }
 
-            return legacyMethod.Method.ReturnsVoid
-                ? Block(ExpressionStatement(invocation))
-                : Block(ReturnStatement(invocation));
+            invocation.Append('(');
+            for (var index = 0; index < legacyMethod.Method.Parameters.Length; index++)
+            {
+                invocation.Append("arg").Append(index).Append(", ");
+            }
+
+            invocation.Append("global::System.Threading.CancellationToken.None)");
+            return ImmutableArray.Create(legacyMethod.Method.ReturnsVoid ? $"{invocation};" : $"return {invocation};");
         }
     }
 
-    private (bool IsAsync, BlockSyntax body) CreateAsyncProxyMethodBody(
+    private (bool IsAsync, EquatableArray<string> Body) CreateAsyncProxyMethodBody(
         List<GeneratedFieldDescription> fieldDescriptions,
         ProxyMethodDescription methodDescription)
     {
-        var statements = new List<StatementSyntax>();
-        var requestVar = IdentifierName("request");
-        var methodSymbol = methodDescription.Method;
+        var statements = ImmutableArray.CreateBuilder<string>();
         var invokable = methodDescription.GeneratedInvokable;
-        ExpressionSyntax createRequestExpr = (!invokable.IsEmptyConstructable || invokable.UseActivator) switch
-        {
-            true => InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
-            .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())),
-            _ => ObjectCreationExpression(invokable.TypeSyntax).WithArgumentList(ArgumentList())
-        };
-
-        statements.Add(
-            LocalDeclarationStatement(
-                VariableDeclaration(
-                    ParseTypeName("var"),
-                    SingletonSeparatedList(
-                        VariableDeclarator(
-                                Identifier("request"))
-                            .WithInitializer(
-                                EqualsValueClause(createRequestExpr))))));
+        var invokableType = CodeText.Type(invokable.TypeSyntax);
+        statements.Add(!invokable.IsEmptyConstructable || invokable.UseActivator
+            ? $"var request = this.GetInvokable<{invokableType}>();"
+            : $"var request = new {invokableType}();");
 
         var codecs = fieldDescriptions.OfType<ICopierDescription>()
                 .Concat(_generatorServices.LibraryTypes.StaticCopiers)
@@ -308,41 +313,18 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         // Set request object fields from method parameters.
         var parameterIndex = 0;
         var parameters = invokable.Members.OfType<MethodParameterFieldDescription>().Select(member => new SerializableMethodMember(member));
-        ExpressionSyntax copyContextPool = BaseExpression().Member(CopyContextPoolMemberName);
-        ExpressionSyntax copyContextVariable = IdentifierName("copyContext");
         var hasCopyContext = false;
         foreach (var parameter in parameters)
         {
             // Only create a copy context as needed.
             if (!hasCopyContext && !parameter.IsShallowCopyable)
             {
-                // C#: using var copyContext = base.CopyContext.GetContext();
-                statements.Add(
-                        LocalDeclarationStatement(
-                            VariableDeclaration(
-                                ParseTypeName("var"),
-                                SingletonSeparatedList(
-                                    VariableDeclarator(Identifier("copyContext")).WithInitializer(
-                                        EqualsValueClause(InvocationExpression(
-                                                copyContextPool.Member("GetContext"),
-                                                ArgumentList())))))).WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
+                statements.Add($"using var copyContext = base.{CopyContextPoolMemberName}.GetContext();");
                 hasCopyContext = true;
             }
 
-            var valueExpression = _copierGenerator.GenerateMemberCopy(
-                fieldDescriptions,
-                IdentifierName($"arg{parameterIndex}"),
-                copyContextVariable,
-                codecs,
-                parameter);
-
-            statements.Add(
-                ExpressionStatement(
-                    AssignmentExpression(
-                        SyntaxKind.SimpleAssignmentExpression,
-                        requestVar.Member($"arg{parameterIndex}"),
-                        valueExpression)));
-
+            var value = _copierGenerator.GenerateMemberCopy(fieldDescriptions, codecs, parameter).Copy($"arg{parameterIndex}", "copyContext");
+            statements.Add($"request.arg{parameterIndex} = {value};");
             parameterIndex++;
         }
 
@@ -365,222 +347,155 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
         }
 
-        ExpressionSyntax baseInvokeExpression;
+        string baseInvokeExpression;
         var isVoid = methodReturnType.SpecialType is SpecialType.System_Void;
         if (namedMethodReturnType.TypeArguments.Length == 1)
         {
             // Task<T> / ValueTask<T>
             var resultType = namedMethodReturnType.TypeArguments[0];
-            baseInvokeExpression = BaseExpression().Member(
-                invokeMethodName ?? "InvokeAsync",
-                resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions));
+            baseInvokeExpression = $"base.{CodeText.Identifier(invokeMethodName ?? "InvokeAsync")}<{CodeText.Type(resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions))}>";
         }
         else if (isVoid)
         {
             // void
-            baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "Invoke");
+            baseInvokeExpression = $"base.{CodeText.Identifier(invokeMethodName ?? "Invoke")}";
         }
         else
         {
             // Task / ValueTask
-            baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "InvokeAsync");
+            baseInvokeExpression = $"base.{CodeText.Identifier(invokeMethodName ?? "InvokeAsync")}";
         }
 
         // C#: base.InvokeAsync<TReturn>(request);
-        var invocationExpression =
-                     InvocationExpression(
-                         baseInvokeExpression,
-                         ArgumentList(SeparatedList([Argument(requestVar)])));
+        var invocationExpression = $"{baseInvokeExpression}(request)";
 
         var rt = namedMethodReturnType.ConstructedFrom;
         bool isAsync;
         if (SymbolEqualityComparer.Default.Equals(rt, LibraryTypes.Task_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, LibraryTypes.Task))
         {
-            // C#: return <invocation>.AsTask()
-            statements.Add(ReturnStatement(InvocationExpression(invocationExpression.Member("AsTask"), ArgumentList())));
+            statements.Add($"return {invocationExpression}.AsTask();");
             isAsync = false;
         }
         else if (SymbolEqualityComparer.Default.Equals(rt, LibraryTypes.ValueTask_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, LibraryTypes.ValueTask))
         {
-            // ValueTask<T> / ValueTask
-            // C#: return <invocation>
-            statements.Add(ReturnStatement(invocationExpression));
+            statements.Add($"return {invocationExpression};");
             isAsync = false;
         }
         else if (invokable.ReturnValueInitializerMethod is { } returnValueInitializerMethod)
         {
-            // C#: return request.<returnValueInitializerMethod>(this);
-            statements.Add(ReturnStatement(InvocationExpression(requestVar.Member(returnValueInitializerMethod), ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
+            statements.Add($"return request.{CodeText.Identifier(returnValueInitializerMethod)}(this);");
             isAsync = false;
         }
         else if (isVoid)
         {
-            // C#: <invocation>
-            statements.Add(ExpressionStatement(invocationExpression));
+            statements.Add($"{invocationExpression};");
             isAsync = false;
         }
         else if (rt.Arity == 0)
         {
-            // C#: await <invocation>
-            statements.Add(ExpressionStatement(AwaitExpression(invocationExpression)));
+            statements.Add($"await {invocationExpression};");
             isAsync = true;
         }
         else
         {
-            // C#: return await <invocation>
-            statements.Add(ReturnStatement(AwaitExpression(invocationExpression)));
+            statements.Add($"return await {invocationExpression};");
             isAsync = true;
         }
 
-        return (isAsync, Block(statements));
+        return (isAsync, statements.ToImmutable());
     }
 
-    private MemberDeclarationSyntax[] GenerateConstructors(
+    private static (EquatableArray<string> Declarations, EquatableArray<string> Statements) CreateConstructors(
         string simpleClassName,
         List<GeneratedFieldDescription> fieldDescriptions,
         INamedTypeSymbol baseType)
     {
         if (baseType is null)
         {
-            return [];
+            return ([], []);
         }
 
-        var bodyStatements = GetBodyStatements();
-        var res = new List<MemberDeclarationSyntax>();
+        var statements = ImmutableArray.CreateBuilder<string>();
+        foreach (var field in fieldDescriptions)
+        {
+            var name = CodeText.Identifier(field.FieldName);
+            switch (field)
+            {
+                case GeneratedFieldDescription _ when field.IsInjected:
+                    statements.Add($"this.{name} = OrleansGeneratedCodeHelper.UnwrapService(this, {name});");
+                    break;
+                case CopierFieldDescription:
+                    statements.Add($"{name} = {GetServiceExpression(CodeText.Type(field.FieldType), CodecProviderMemberName)};");
+                    break;
+            }
+        }
+
+        var declarations = ImmutableArray.CreateBuilder<string>();
         foreach (var member in baseType.GetMembers())
         {
-            if (member is not IMethodSymbol method)
+            if (member is not IMethodSymbol { MethodKind: MethodKind.Constructor } method
+                || method.DeclaredAccessibility == Accessibility.Private)
             {
                 continue;
             }
 
-            if (method.MethodKind != MethodKind.Constructor)
-            {
-                continue;
-            }
-
-            if (method.DeclaredAccessibility == Accessibility.Private)
-            {
-                continue;
-            }
-
-            res.Add(CreateConstructor(method));
-        }
-        return [.. res];
-
-        ConstructorDeclarationSyntax CreateConstructor(IMethodSymbol baseConstructor)
-        {
-            return ConstructorDeclaration(simpleClassName)
-                .AddParameterListParameters([.. baseConstructor.Parameters.Select((p, i) => GetParameterSyntax(i, p, typeParameterSubstitutions: null))])
-                .WithModifiers(TokenList(GetModifiers(baseConstructor)))
-                .WithInitializer(
-                    ConstructorInitializer(
-                        SyntaxKind.BaseConstructorInitializer,
-                        ArgumentList(
-                            SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
-                .WithBody(Block(bodyStatements));
-        }
-
-        static SyntaxToken[] GetModifiers(IMethodSymbol method)
-        {
+            var declaration = new StringBuilder();
             switch (method.DeclaredAccessibility)
             {
                 case Accessibility.Public:
                 case Accessibility.Protected:
-                    return [Token(SyntaxKind.PublicKeyword)];
+                    declaration.Append("public ");
+                    break;
                 case Accessibility.Internal:
                 case Accessibility.ProtectedOrInternal:
                 case Accessibility.ProtectedAndInternal:
-                    return [Token(SyntaxKind.InternalKeyword)];
-                default:
-                    return [];
-            }
-        }
-
-        static ArgumentSyntax GetBaseInitializerArgument(IParameterSymbol parameter, int index)
-        {
-            var name = $"arg{index}";
-            var result = Argument(IdentifierName(name));
-            switch (parameter.RefKind)
-            {
-                case RefKind.None:
-                    break;
-                case RefKind.Ref:
-                    result = result.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
-                    break;
-                case RefKind.Out:
-                    result = result.WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword));
-                    break;
-                default:
+                    declaration.Append("internal ");
                     break;
             }
 
-            return result;
-        }
-
-        List<StatementSyntax> GetBodyStatements()
-        {
-            var res = new List<StatementSyntax>();
-            foreach (var field in fieldDescriptions)
+            declaration.Append(simpleClassName).Append('(');
+            AppendParameters(declaration, method.Parameters, typeParameterSubstitutions: null);
+            declaration.Append(") : base(");
+            for (var index = 0; index < method.Parameters.Length; index++)
             {
-                switch (field)
+                if (index > 0)
                 {
-                    case GeneratedFieldDescription _ when field.IsInjected:
-                        res.Add(ExpressionStatement(
-                            AssignmentExpression(
-                                SyntaxKind.SimpleAssignmentExpression,
-                                ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                Unwrapped(field.FieldName.ToIdentifierName()))));
-                        break;
-                    case CopierFieldDescription codec:
-                        {
-                            res.Add(ExpressionStatement(
-                                AssignmentExpression(
-                                    SyntaxKind.SimpleAssignmentExpression,
-                                    field.FieldName.ToIdentifierName(),
-                                    GetService(field.FieldType))));
-                        }
-                        break;
+                    declaration.Append(", ");
                 }
-            }
-            return res;
 
-            static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
-            {
-                return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
-                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
+                declaration.Append(method.Parameters[index].RefKind switch
+                {
+                    RefKind.Ref => "ref ",
+                    RefKind.Out => "out ",
+                    _ => string.Empty,
+                }).Append("arg").Append(index);
             }
 
-            static ExpressionSyntax GetService(TypeSyntax type)
-            {
-                return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
-                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName))])));
-            }
+            declarations.Add(declaration.Append(')').ToString());
         }
+
+        return (declarations.ToImmutable(), statements.ToImmutable());
     }
 
-    private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
+    private static void AppendParameters(StringBuilder builder, ImmutableArray<IParameterSymbol> parameters, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
     {
-        var result = Parameter(Identifier($"arg{index}")).WithType(parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
-        switch (parameter.RefKind)
+        for (var index = 0; index < parameters.Length; index++)
         {
-            case RefKind.None:
-                break;
-            case RefKind.Ref:
-                result = result.WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
-                break;
-            case RefKind.Out:
-                result = result.WithModifiers(TokenList(Token(SyntaxKind.OutKeyword)));
-                break;
-            case RefKind.In:
-                result = result.WithModifiers(TokenList(Token(SyntaxKind.InKeyword)));
-                break;
-            default:
-                break;
-        }
+            if (index > 0)
+            {
+                builder.Append(", ");
+            }
 
-        return result;
+            var parameter = parameters[index];
+            builder.Append(parameter.RefKind switch
+            {
+                RefKind.Ref => "ref ",
+                RefKind.Out => "out ",
+                RefKind.In => "in ",
+                _ => string.Empty,
+            });
+            CodeText.AppendType(builder, parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
+            builder.Append(" arg").Append(index);
+        }
     }
 }

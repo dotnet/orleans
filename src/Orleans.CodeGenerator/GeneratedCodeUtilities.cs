@@ -1,8 +1,6 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
 namespace Orleans.CodeGenerator;
@@ -75,33 +73,17 @@ internal static class GeneratedCodeUtilities
 
     internal static string? GetAlias(LibraryTypes libraryTypes, ISymbol symbol) => (string?)symbol.GetAttribute(libraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
 
-    internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
+    private static readonly string GeneratedCodeAttributeArguments =
+        $"{CodeText.QuotedText(CodeGeneratorName)}, {CodeText.QuotedText(typeof(GeneratedCodeUtilities).Assembly.GetName().Version.ToString())}";
 
-    internal static AttributeListSyntax GetGeneratedMemberAttributes() => GeneratedMemberAttributeSyntax;
+    /// <summary>The attribute list applied to each generated type.</summary>
+    internal static readonly string GeneratedCodeAttributeText =
+        $"[global::System.CodeDom.Compiler.GeneratedCodeAttribute({GeneratedCodeAttributeArguments}), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]";
 
-    private static readonly AttributeSyntax GeneratedCodeAttribute =
-        Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
-            .AddArgumentListArguments(
-                AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                AttributeArgument(typeof(GeneratedCodeUtilities).Assembly.GetName().Version.ToString().GetLiteralExpression()));
+    /// <summary>The attribute list applied to generated members of user-declared types.</summary>
+    internal static readonly string GeneratedMemberAttributeText =
+        $"[global::System.CodeDom.Compiler.GeneratedCodeAttribute({GeneratedCodeAttributeArguments}), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]";
 
-    private static readonly AttributeSyntax ExcludeFromCodeCoverageAttribute =
-        Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"));
-
-    private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
-        AttributeList().AddAttributes(
-            GeneratedCodeAttribute,
-            Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
-                .AddArgumentListArguments(
-                    AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never"))),
-            ExcludeFromCodeCoverageAttribute);
-
-    private static readonly AttributeListSyntax GeneratedMemberAttributeSyntax =
-        AttributeList().AddAttributes(GeneratedCodeAttribute, ExcludeFromCodeCoverageAttribute);
-
-    internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
-
-    private static readonly AttributeSyntax MethodImplAttributeSyntax =
-        Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
-            .AddArgumentListArguments(AttributeArgument(ParseName("global::System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
+    internal const string MethodImplAttributeText =
+        "[global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]";
 }

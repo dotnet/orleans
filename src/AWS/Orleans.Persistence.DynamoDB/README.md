@@ -27,6 +27,7 @@ var builder = Host.CreateApplicationBuilder(args)
                 configureOptions: options =>
                 {
                     options.Service = "us-east-1";
+                    options.ServiceId = "my-application";
                     options.TableName = "OrleansGrainState";
                     options.UseProvisionedThroughput = false;
                 });
@@ -35,6 +36,12 @@ var builder = Host.CreateApplicationBuilder(args)
 // Run the host
 await builder.RunAsync();
 ```
+
+## Service identity and upgrades
+
+Set `DynamoDBStorageOptions.ServiceId` explicitly for every provider. It prefixes each grain state key as `{ServiceId}_{grainId}` and must remain stable across deployments that share state. Startup validation reports an `OrleansConfigurationException` when it is unset.
+
+For new deployments, choose a stable application identifier, such as the cluster's `ServiceId`. When upgrading, retain the identifier used to write the existing state. If the deployment used the previous empty-string default, set `ServiceId = string.Empty` in code or `"ServiceId": ""` in configuration to preserve access to those keys. Choosing a different identifier selects a different state namespace; accessing existing state under that prefix requires a separate data migration.
 
 ## Endpoints and credentials
 

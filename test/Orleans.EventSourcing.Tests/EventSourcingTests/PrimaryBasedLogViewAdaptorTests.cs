@@ -51,6 +51,32 @@ public sealed class PrimaryBasedLogViewAdaptorTests
         Assert.Equal(["write:start", "write:end"], adaptor.OperationLog);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SubmitRange_NullEntries_ThrowsBeforeInitializingOrQueuing(bool conditional)
+    {
+        var (adaptor, host, _) = CreateAdaptor();
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+        {
+            if (conditional)
+            {
+                _ = adaptor.TryAppendRange(null!);
+            }
+            else
+            {
+                adaptor.SubmitRange(null!);
+            }
+        });
+
+        Assert.Equal("logEntries", exception.ParamName);
+        Assert.Equal(0, adaptor.InitializationCount);
+        Assert.Empty(adaptor.UnconfirmedSuffix);
+        Assert.Empty(host.ViewChanges);
+        Assert.Empty(adaptor.OperationLog);
+    }
+
     [Fact]
     public async Task TryAppendRange_WithEmptyRange_CompletesTrueWithoutSchedulingStorage()
     {

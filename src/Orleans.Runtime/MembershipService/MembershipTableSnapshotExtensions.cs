@@ -20,7 +20,7 @@ namespace Orleans.Runtime.MembershipService
                         && suspectTimes.All(suspect => !suspect.Item1.Equals(entry.SiloAddress)));
             }
 
-            return new ClusterMembershipSnapshot(memberBuilder.ToImmutable(), membership.Version);
+            return new ClusterMembershipSnapshot(memberBuilder.ToImmutable(), membership.Version, membership.MinimumSiloGeneration, membership.RecentlyDeadSilos);
         }
     }
 }

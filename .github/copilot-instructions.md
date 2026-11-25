@@ -6,10 +6,10 @@ For code review, use `.github/skills/code-review/SKILL.md`.
 
 ## Build, test, and style commands
 
-* The repo builds with the .NET SDK from `global.json` (`10.0.400`, roll-forward `major`). Do not edit `global.json` unless explicitly asked.
+* The repo builds with the .NET SDK from `global.json` (`11.0.100`, roll-forward `major`). Do not edit `global.json` unless explicitly asked.
 * Build the solution with `dotnet build Orleans.slnx -bl`. CI uses this form and uploads the binlog.
 * On Windows, `.\Build.cmd` runs `build.ps1`, which restores, builds, and packs `Orleans.slnx`, writes restore/build/pack binlogs, and outputs packages under `Artifacts\<Configuration>`. Set `BuildConfiguration=Release` to build release artifacts.
-* Run tests with `dotnet test --solution Orleans.slnx --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1`. CI also runs `net8.0`; source projects default to `net8.0;net10.0`.
+* Run tests with `dotnet test --solution Orleans.slnx --framework net11.0 --minimum-expected-tests 1 --max-parallel-test-modules 1`. CI also runs `net10.0`; source projects default to `net10.0;net11.0`.
 * Run a category with `dotnet test --solution Orleans.slnx --framework net10.0 --filter-trait "Category=BVT" --minimum-expected-tests 1 --max-parallel-test-modules 1`. Common categories are `BVT`, `SlowBVT`, `Functional`, and provider-specific categories such as `Redis`, `Cassandra`, `SqlServer`, `Azure`, `AWS`, and `Streaming`.
 * Run one test with `dotnet test --project test\Orleans.Core.Tests\Orleans.Core.Tests.csproj --framework net10.0 --filter-class "*MyTestClass*" --filter-method "*MyTestMethod*" --minimum-expected-tests 1`.
 * `.\Test.cmd` runs the scripted Windows test subset using the default xUnit query filter `/[(Category=BVT)|(Category=SlowBVT)]`. `.\TestAll.cmd` adds the `Functional` category.
@@ -25,7 +25,7 @@ For code review, use `.github/skills/code-review/SKILL.md`.
 * `src\Orleans.Runtime` is the silo implementation: activation lifecycle, placement, cluster membership, reminders, runtime services, and grain execution.
 * `src\Orleans.Sdk`, `src\Orleans.Client`, and `src\Orleans.Server` are packaging/metapackage projects. The SDK brings in core packages plus analyzers/code generation; the client/server packages compose the SDK with client or silo dependencies.
 * Provider packages are intentionally split by backend and capability under `src\Azure`, `src\AWS`, `src\AdoNet`, `src\Cassandra`, `src\Redis`, and related top-level provider directories. They usually expose builder extensions in `Orleans.Hosting` and options in `Orleans.Configuration`.
-* Tests mirror runtime areas under `test\`. Shared test infrastructure is in `test\TestInfrastructure\TestExtensions`, test grains and grain interfaces are under `test\Grains`, and `Orleans.TestingHost`/`TestClusterBuilder` are the primary integration-test harnesses.
+* Tests mirror runtime areas under `test\`. Shared cluster fixtures are in `test\TestInfrastructure\TestExtensions`; shared traits are in the lean `test\TestInfrastructure\TestUtilities` library. Test grains and grain interfaces are under `test\Grains`, and `Orleans.TestingHost`/`TestClusterBuilder` are the primary integration-test harnesses.
 * `src\api` contains generated public API surfaces. Follow the regeneration and package compatibility commands in root `AGENTS.md`.
 
 ## Key conventions
@@ -35,7 +35,7 @@ For code review, use `.github/skills/code-review/SKILL.md`.
 * `src\Directory.Build.props` makes source projects packable by default; `test\Directory.Build.props` makes test projects non-packable and configures MTP test applications. The root `Directory.Build.targets` copies `test\testconfig.json` under each test assembly name.
 * Build-time code generation is controlled by `OrleansBuildTimeCodeGen=true`, which imports the Orleans code generator and analyzers as build analyzers for framework projects.
 * Serializable Orleans types that cross grain calls, storage, or streams generally need `[GenerateSerializer]` plus stable `[Id(n)]` members. Do not renumber existing serialization IDs.
-* Tests use xUnit with the custom `[TestCategory("...")]` attribute from `test\TestInfrastructure\TestExtensions\TestCategory.cs`; this maps categories to xUnit traits for `dotnet test --filter-trait "Category=..."`.
+* Tests use xUnit with the custom `[TestCategory("...")]` attribute from `test\TestInfrastructure\TestUtilities\TestCategory.cs`; this maps categories to xUnit traits for `dotnet test --filter-trait "Category=..."`.
 * Cluster tests usually derive from or compose fixtures in `test\TestInfrastructure\TestExtensions` and configure silos through `TestClusterBuilder`, `ISiloConfigurator`, or `ISiloBuilder`. The default cluster fixture uses in-memory reminders, durable jobs, and grain storage.
 * Follow `.editorconfig`: C# uses file-scoped namespaces, system directives first, `var` preferences, braces on new lines, `_camelCase` private fields, and preview language features. Nullable is enabled for source projects and disabled for test projects.
 * Add XML docs for new or changed public APIs even though CS1591 is currently suppressed; package projects generate documentation files.

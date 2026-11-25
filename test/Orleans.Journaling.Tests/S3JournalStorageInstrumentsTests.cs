@@ -10,7 +10,7 @@ using NSubstitute;
 using Orleans.Serialization;
 using Orleans.Storage;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

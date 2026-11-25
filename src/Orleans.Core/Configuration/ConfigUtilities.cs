@@ -18,23 +18,24 @@ namespace Orleans.Runtime.Configuration
         {
             long unitSize;
             string numberInput;
-            var trimmedInput = input.Trim().ToLowerInvariant();
-            if (trimmedInput.EndsWith("ms", StringComparison.Ordinal))
+            var trimmedInput = input.Trim();
+            var unitSymbol = trimmedInput.Length > 0 ? char.ToLowerInvariant(trimmedInput[^1]) : '\0';
+            if (unitSymbol == 's' && trimmedInput.Length > 1 && char.ToLowerInvariant(trimmedInput[^2]) == 'm')
             {
                 unitSize = 10000;
                 numberInput = trimmedInput.Remove(trimmedInput.Length - 2).Trim();
             }
-            else if (trimmedInput.EndsWith('s'))
+            else if (unitSymbol == 's')
             {
                 unitSize = 1000 * 10000;
                 numberInput = trimmedInput.Remove(trimmedInput.Length - 1).Trim();
             }
-            else if (trimmedInput.EndsWith('m'))
+            else if (unitSymbol == 'm')
             {
                 unitSize = 60 * 1000 * 10000;
                 numberInput = trimmedInput.Remove(trimmedInput.Length - 1).Trim();
             }
-            else if (trimmedInput.EndsWith("hr", StringComparison.Ordinal))
+            else if (unitSymbol == 'r' && trimmedInput.Length > 1 && char.ToLowerInvariant(trimmedInput[^2]) == 'h')
             {
                 unitSize = 60 * 60 * 1000 * 10000L;
                 numberInput = trimmedInput.Remove(trimmedInput.Length - 2).Trim();
@@ -244,7 +245,7 @@ namespace Orleans.Runtime.Configuration
             var mark = "<--SNIP-->";
             if (string.IsNullOrEmpty(connectionString)) return "null";
             //if connection string format doesn't contain any secretKey, then return just <--SNIP-->
-            if (!Array.Exists(secretKeys, key => connectionString.Contains(key))) return mark;
+            if (!Array.Exists(secretKeys, key => connectionString.Contains(key, StringComparison.Ordinal))) return mark;
 
             string connectionInfo = connectionString;
 

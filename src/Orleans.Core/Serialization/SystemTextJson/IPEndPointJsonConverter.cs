@@ -20,8 +20,13 @@ namespace Orleans.Serialization
             => Parse(ref reader);
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void Write(Utf8JsonWriter writer, IPEndPoint value, JsonSerializerOptions options)
-            => writer.WriteStringValue(value.ToString());
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WriteStringValue(value.ToString());
+        }
 
         /// <inheritdoc />
         public override IPEndPoint ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -51,8 +56,11 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] IPEndPoint value, JsonSerializerOptions options)
         {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
             writer.WritePropertyName(value.ToString());
         }
     }

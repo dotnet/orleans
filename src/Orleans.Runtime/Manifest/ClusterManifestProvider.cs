@@ -33,11 +33,7 @@ namespace Orleans.Runtime.Metadata
         private readonly SemaphoreSlim? _peerProbeSlots;
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly AsyncEnumerable<ClusterManifest> _updates;
-#if NET9_0_OR_GREATER
         private readonly Lock _currentLock = new();
-#else
-        private readonly object _currentLock = new();
-#endif
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;

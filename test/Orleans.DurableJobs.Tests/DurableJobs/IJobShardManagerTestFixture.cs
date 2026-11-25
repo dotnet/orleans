@@ -7,11 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Runtime;
 
-namespace Orleans.DurableJobs.Tests;
+namespace Orleans.Durable.Jobs.Tests;
 
 public interface IJobShardManagerTestFixture
 {

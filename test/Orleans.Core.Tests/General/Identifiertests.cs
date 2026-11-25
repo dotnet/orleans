@@ -1,4 +1,7 @@
+using System.Buffers;
 using System.Net;
+using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,6 +59,49 @@ namespace UnitTests.General
             Assert.True(IPAddressComparer.Instance.Compare(lowerScopeAddress, higherScopeAddress) < 0);
             Assert.True(lowerScopeSilo.CompareTo(higherScopeSilo) < 0);
             Assert.NotEqual(lowerScopeSilo, higherScopeSilo);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressEqualityOperatorsCompareValues()
+        {
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+            var constructor = typeof(SiloAddress).GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic, null, [typeof(IPEndPoint), typeof(int)], null)!;
+            var equal = (SiloAddress)constructor.Invoke([new IPEndPoint(IPAddress.Loopback, 11111), 1]);
+            var differentAddress = SiloAddress.New(IPAddress.IPv6Loopback, 11111, 1);
+            var differentPort = SiloAddress.New(IPAddress.Loopback, 11112, 1);
+            var differentGeneration = SiloAddress.New(IPAddress.Loopback, 11111, 2);
+
+            Assert.NotSame(address, equal);
+            Assert.True(address.Equals(equal));
+            Assert.Equal(address.GetHashCode(), equal.GetHashCode());
+            Assert.True(address == equal);
+            Assert.True(equal == address);
+            Assert.False(address != equal);
+            Assert.False(equal != address);
+
+            foreach (var other in new[] { differentAddress, differentPort, differentGeneration })
+            {
+                Assert.False(address.Equals(other));
+                Assert.False(address == other);
+                Assert.False(other == address);
+                Assert.True(address != other);
+                Assert.True(other != address);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressEqualityOperatorsHandleNull()
+        {
+            SiloAddress? missing = null;
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+
+            Assert.True(missing == null);
+            Assert.False(missing != null);
+            Assert.False(address == missing);
+            Assert.False(missing == address);
+            Assert.True(address != missing);
+            Assert.True(missing != address);
         }
 
         [TestSuite("BVT")]
@@ -447,6 +493,481 @@ namespace UnitTests.General
 
             Assert.False(SiloAddress.TryParse("not-a-silo", out _));
             Assert.False(SiloAddress.TryParse(Encoding.UTF8.GetBytes("not-a-silo"), null, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressNewRejectsNullEndpoint()
+        {
+            Assert.Throws<ArgumentNullException>("ep", () => SiloAddress.New(null!, 1));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressNewPreservesNormalizedAndSpecialIdentities()
+        {
+            foreach (var generation in new[] { 0, -1, int.MinValue, int.MaxValue })
+            {
+                var address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), generation);
+                Assert.Equal(IPAddress.Loopback, address.Endpoint.Address);
+                Assert.Equal(11111, address.Endpoint.Port);
+                Assert.Equal(generation, address.Generation);
+                Assert.Equal(generation < 0, address.IsClient);
+                Assert.Equal($"127.0.0.1:11111@{generation}", address.ToParsableString());
+                Assert.Same(address, SiloAddress.New(new IPEndPoint(IPAddress.Loopback.MapToIPv6(), 11111), generation));
+            }
+
+            var ipv6 = SiloAddress.New(new IPEndPoint(IPAddress.IPv6Loopback, 65535), 1);
+            Assert.Equal("::1:65535@1", ipv6.ToParsableString());
+            Assert.Same(SiloAddress.Zero, SiloAddress.New(new IPEndPoint(IPAddress.Any, 0), 0));
+            Assert.Equal("0.0.0.0:0@0", SiloAddress.Zero.ToParsableString());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressNullComparisonContractsArePreserved()
+        {
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 2);
+            Assert.False(address.IsSuccessorOf(null!));
+            Assert.False(address.IsPredecessorOf(null!));
+            Assert.False(address.Equals((SiloAddress?)null));
+            Assert.False(address.Equals((object?)null));
+            Assert.Equal(1, address.CompareTo(null));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressGenerationPredicatesPreserveBoundaries()
+        {
+            (int Current, int Other, bool Successor, bool Predecessor)[] cases =
+            [
+                (2, 1, true, false),
+                (2, 2, false, false),
+                (2, 3, false, true),
+                (2, 0, false, false),
+                (0, 2, false, false),
+                (2, -1, false, false),
+                (-1, 2, false, false),
+            ];
+            foreach (var (current, other, successor, predecessor) in cases)
+            {
+                var address = SiloAddress.New(IPAddress.Loopback, 11111, current);
+                var peer = SiloAddress.New(IPAddress.Loopback, 11111, other);
+                Assert.Equal(successor, address.IsSuccessorOf(peer));
+                Assert.Equal(predecessor, address.IsPredecessorOf(peer));
+                Assert.Equal(current == other, address.Equals(peer));
+            }
+
+            var target = SiloAddress.New(IPAddress.Loopback, 11111, 2);
+            foreach (var generation in new[] { 1, 3 })
+            {
+                foreach (var peer in new[]
+                {
+                    SiloAddress.New(IPAddress.Loopback, 11112, generation),
+                    SiloAddress.New(IPAddress.Parse("127.0.0.2"), 11111, generation),
+                })
+                {
+                    Assert.False(target.IsSuccessorOf(peer));
+                    Assert.False(target.IsPredecessorOf(peer));
+                }
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressConverterRejectsNullWriteInputs()
+        {
+            var converter = new SiloAddressConverter();
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+            using var writer = new Utf8JsonWriter(new ArrayBufferWriter<byte>());
+            Assert.Throws<ArgumentNullException>("writer", () => converter.Write(null!, address, null!));
+            Assert.Throws<ArgumentNullException>("value", () => converter.Write(writer, null!, null!));
+            Assert.Throws<ArgumentNullException>("writer", () => converter.WriteAsPropertyName(null!, address, null!));
+            Assert.Throws<ArgumentNullException>("value", () => converter.WriteAsPropertyName(writer, null!, null!));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressConverterPreservesJsonTextAndNull()
+        {
+            var converter = new SiloAddressConverter();
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 12345);
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                converter.Write(writer, address, null!);
+            }
+
+            const string json = "\"127.0.0.1:11111@12345\"";
+            Assert.Equal(json, Encoding.UTF8.GetString(buffer.WrittenSpan));
+            Assert.Equal(json, JsonSerializer.Serialize(address));
+            Assert.Same(address, JsonSerializer.Deserialize<SiloAddress>(json));
+
+            var propertyBuffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(propertyBuffer))
+            {
+                writer.WriteStartObject();
+                converter.WriteAsPropertyName(writer, address, null!);
+                writer.WriteNumberValue(7);
+                writer.WriteEndObject();
+            }
+
+            const string propertyJson = "{\"127.0.0.1:11111@12345\":7}";
+            Assert.Equal(propertyJson, Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+            var entry = Assert.Single(JsonSerializer.Deserialize<Dictionary<SiloAddress, int>>(propertyJson)!);
+            Assert.Same(address, entry.Key);
+            Assert.Equal(7, entry.Value);
+            Assert.Equal("null", JsonSerializer.Serialize<SiloAddress?>(null));
+            Assert.Null(JsonSerializer.Deserialize<SiloAddress>("null"));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressParsePreservesNullAndMalformedInputs()
+        {
+            Assert.Throws<ArgumentNullException>("value", () => SiloAddress.Parse((string)null!));
+            Assert.Throws<ArgumentNullException>("value", () => SiloAddress.FromParsableString(null!));
+            Assert.False(SiloAddress.TryParse((string?)null, out var nullResult));
+            Assert.Null(nullResult);
+            foreach (var text in new[] { "", "not-a-silo", "127.0.0.1:65536@1", "127.0.0.1:1@2147483648", "127.0.0.1:1@1 " })
+            {
+                Assert.Throws<FormatException>(() => SiloAddress.Parse(text));
+                Assert.False(SiloAddress.TryParse(text, out var result));
+                Assert.Null(result);
+                var bytes = Encoding.UTF8.GetBytes(text);
+                Assert.Throws<FormatException>(() => SiloAddress.Parse(bytes));
+                Assert.False(SiloAddress.TryParse(bytes, out var utf8Result));
+                Assert.Null(utf8Result);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GuidIdGetObjectDataValidatesInfoAndPreservesGuidEntry()
+        {
+            var guid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
+            var id = GuidId.GetGuidId(guid);
+            Assert.Throws<ArgumentNullException>("info", () => id.GetObjectData(null!, default));
+
+#pragma warning disable SYSLIB0050 // Exercise the existing public ISerializable metadata contract, not formatter serialization.
+            var info = new SerializationInfo(typeof(GuidId), new FormatterConverter());
+#pragma warning restore SYSLIB0050
+            id.GetObjectData(info, default);
+            Assert.Equal(1, info.MemberCount);
+            var entries = info.GetEnumerator();
+            Assert.True(entries.MoveNext());
+            Assert.Equal("Guid", entries.Name);
+            Assert.Equal(typeof(Guid), entries.ObjectType);
+            Assert.Equal(guid, Assert.IsType<Guid>(entries.Value));
+            Assert.False(entries.MoveNext());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GuidIdConverterRejectsNullWriteInputs()
+        {
+            var converter = new GuidIdConverter();
+            var id = GuidId.GetGuidId(Guid.Empty);
+            using var writer = new Utf8JsonWriter(new ArrayBufferWriter<byte>());
+            Assert.Throws<ArgumentNullException>("writer", () => converter.Write(null!, id, null!));
+            Assert.Throws<ArgumentNullException>("value", () => converter.Write(writer, null!, null!));
+            Assert.Throws<ArgumentNullException>("writer", () => converter.WriteAsPropertyName(null!, id, null!));
+            Assert.Throws<ArgumentNullException>("value", () => converter.WriteAsPropertyName(writer, null!, null!));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GuidIdConverterPreservesJsonTextAndIdentity()
+        {
+            var converter = new GuidIdConverter();
+            var guid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
+            var id = GuidId.GetGuidId(guid);
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                converter.Write(writer, id, null!);
+            }
+
+            const string json = "\"00112233445566778899aabbccddeeff\"";
+            Assert.Equal(json, Encoding.UTF8.GetString(buffer.WrittenSpan));
+            Assert.Equal(json, JsonSerializer.Serialize(id));
+            var parsed = Assert.IsType<GuidId>(JsonSerializer.Deserialize<GuidId>(json));
+            Assert.Same(id, parsed);
+            Assert.Equal(guid, parsed.Guid);
+            Assert.Equal("00112233-4455-6677-8899-aabbccddeeff", id.ToString());
+
+            var propertyBuffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(propertyBuffer))
+            {
+                writer.WriteStartObject();
+                converter.WriteAsPropertyName(writer, id, null!);
+                writer.WriteNumberValue(7);
+                writer.WriteEndObject();
+            }
+
+            const string propertyJson = "{\"00112233445566778899aabbccddeeff\":7}";
+            Assert.Equal(propertyJson, Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+            var entry = Assert.Single(JsonSerializer.Deserialize<Dictionary<GuidId, int>>(propertyJson)!);
+            Assert.Same(id, entry.Key);
+            Assert.Equal(7, entry.Value);
+            Assert.Equal("null", JsonSerializer.Serialize<GuidId?>(null));
+            Assert.Null(JsonSerializer.Deserialize<GuidId>("null"));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GuidIdNullAndComparisonContractsArePreserved()
+        {
+            var id = GuidId.GetGuidId(Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"));
+            var same = GuidId.GetGuidId(Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"));
+            var lower = GuidId.GetGuidId(Guid.Empty);
+            GuidId? missing = null;
+            Assert.False(id.Equals((GuidId?)null));
+            Assert.False(id.Equals((object?)null));
+            Assert.Equal(1, id.CompareTo(null));
+            Assert.True(missing == null);
+            Assert.False(missing != null);
+            Assert.False(id == missing);
+            Assert.False(missing == id);
+            Assert.True(id != missing);
+            Assert.True(missing != id);
+            Assert.True(id.Equals(same));
+            Assert.True(id == same);
+            Assert.False(id != same);
+            Assert.Equal(0, id.CompareTo(same));
+            Assert.False(id.Equals(lower));
+            Assert.True(id != lower);
+            Assert.True(id.CompareTo(lower) > 0);
+            Assert.True(lower.CompareTo(id) < 0);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GrainIdGetObjectDataValidatesInfoAndPreservesLegacyEntries()
+        {
+            var id = GrainId.Create("type", "key");
+            Assert.Throws<ArgumentNullException>("info", () => id.GetObjectData(null!, default));
+
+            foreach (var value in new[] { id, default })
+            {
+#pragma warning disable SYSLIB0050 // Exercise the existing ISerializable metadata contract, not formatter serialization.
+                var info = new SerializationInfo(typeof(GrainId), new FormatterConverter());
+#pragma warning restore SYSLIB0050
+                value.GetObjectData(info, default);
+                Assert.Equal(4, info.MemberCount);
+                var entries = info.GetEnumerator();
+                Assert.True(entries.MoveNext());
+                Assert.Equal("tv", entries.Name);
+                Assert.Equal(value.IsDefault ? typeof(object) : typeof(byte[]), entries.ObjectType);
+                Assert.Equal(value.IsDefault ? null : Encoding.UTF8.GetBytes("type"), (byte[]?)entries.Value);
+                Assert.True(entries.MoveNext());
+                Assert.Equal("th", entries.Name);
+                Assert.Equal(typeof(int), entries.ObjectType);
+                Assert.Equal(value.Type.GetHashCode(), Assert.IsType<int>(entries.Value));
+                Assert.True(entries.MoveNext());
+                Assert.Equal("kv", entries.Name);
+                Assert.Equal(value.IsDefault ? typeof(object) : typeof(byte[]), entries.ObjectType);
+                Assert.Equal(value.IsDefault ? null : Encoding.UTF8.GetBytes("key"), (byte[]?)entries.Value);
+                Assert.True(entries.MoveNext());
+                Assert.Equal("kh", entries.Name);
+                Assert.Equal(typeof(int), entries.ObjectType);
+                Assert.Equal(value.Key.GetHashCode(), Assert.IsType<int>(entries.Value));
+                Assert.False(entries.MoveNext());
+
+                var constructor = typeof(GrainId).GetConstructor(
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                    binder: null, [typeof(SerializationInfo), typeof(StreamingContext)], modifiers: null)!;
+                var restored = Assert.IsType<GrainId>(constructor.Invoke([info, default(StreamingContext)]));
+                Assert.Equal(value.IsDefault ? "/" : "type/key", restored.ToString());
+                Assert.Equal(value.IsDefault, restored.IsDefault);
+                Assert.Equal(value.Type.GetHashCode(), restored.Type.GetHashCode());
+                Assert.Equal(value.Key.GetHashCode(), restored.Key.GetHashCode());
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GrainIdConverterRejectsNullWriters()
+        {
+            var converter = new GrainIdJsonConverter();
+            Assert.Throws<ArgumentNullException>("writer", () => converter.Write(null!, default, null!));
+            Assert.Throws<ArgumentNullException>("writer", () => converter.WriteAsPropertyName(null!, default, null!));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GrainIdConverterPreservesJsonTextAndPropertyNames()
+        {
+            var converter = new GrainIdJsonConverter();
+            (GrainId Id, string Json)[] cases =
+            [
+                (GrainId.Create("type", "key"), "\"type/key\""),
+                (default, "\"/\""),
+                (GrainId.Create("type", "é\"\\尾"), "\"type/\\u00E9\\u0022\\\\\\u5C3E\""),
+            ];
+            foreach (var (id, json) in cases)
+            {
+                var buffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(buffer))
+                {
+                    converter.Write(writer, id, null!);
+                }
+
+                Assert.Equal(json, Encoding.UTF8.GetString(buffer.WrittenSpan));
+                Assert.Equal(json, JsonSerializer.Serialize(id));
+                var parsed = JsonSerializer.Deserialize<GrainId>(json);
+                Assert.Equal(id.Type.AsSpan().ToArray(), parsed.Type.AsSpan().ToArray());
+                Assert.Equal(id.Key.AsSpan().ToArray(), parsed.Key.AsSpan().ToArray());
+
+                var propertyBuffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(propertyBuffer))
+                {
+                    writer.WriteStartObject();
+                    converter.WriteAsPropertyName(writer, id, null!);
+                    writer.WriteNumberValue(7);
+                    writer.WriteEndObject();
+                }
+
+                var propertyJson = "{" + json + ":7}";
+                Assert.Equal(propertyJson, Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+                var entry = Assert.Single(JsonSerializer.Deserialize<Dictionary<GrainId, int>>(propertyJson)!);
+                Assert.Equal(id.Type.AsSpan().ToArray(), entry.Key.Type.AsSpan().ToArray());
+                Assert.Equal(id.Key.AsSpan().ToArray(), entry.Key.Key.AsSpan().ToArray());
+                Assert.Equal(7, entry.Value);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void UniqueKeyConverterRejectsNullWriteInputs()
+        {
+            var converter = new UniqueKeyJsonConverter();
+            var key = UniqueKey.NewKey(0);
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                Assert.Throws<ArgumentNullException>("writer", () => converter.Write(null!, key, null!));
+                Assert.Throws<ArgumentNullException>("value", () => converter.Write(writer, null!, null!));
+                Assert.Equal(0, writer.BytesPending);
+                converter.Write(writer, key, null!);
+            }
+
+            Assert.Equal("\"000000000000000000000000000000000000000000000000\"", Encoding.UTF8.GetString(buffer.WrittenSpan));
+            var propertyBuffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(propertyBuffer))
+            {
+                writer.WriteStartObject();
+                var bytesPending = writer.BytesPending;
+                Assert.Throws<ArgumentNullException>("writer", () => converter.WriteAsPropertyName(null!, key, null!));
+                Assert.Throws<ArgumentNullException>("value", () => converter.WriteAsPropertyName(writer, null!, null!));
+                Assert.Equal(bytesPending, writer.BytesPending);
+                converter.WriteAsPropertyName(writer, key, null!);
+                writer.WriteNumberValue(7);
+                writer.WriteEndObject();
+            }
+
+            Assert.Equal("{\"000000000000000000000000000000000000000000000000\":7}", Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void UniqueKeyConverterPreservesLegacyJsonAndNull()
+        {
+            var converter = new UniqueKeyJsonConverter();
+            (UniqueKey Key, string Json)[] cases =
+            [
+                (UniqueKey.NewKey(0), "\"000000000000000000000000000000000000000000000000\""),
+                (UniqueKey.NewKey(-1, UniqueKey.Category.Grain, 0x12345678), "\"0000000000000000ffffffffffffffff0300000012345678\""),
+                (UniqueKey.NewKey(1UL, 2UL, UniqueKey.Category.KeyExtGrain, 0x12345678, "é\"\\尾"),
+                    "\"000000000000000100000000000000020600000012345678\\u002B\\u00E9\\u0022\\\\\\u5C3E\""),
+            ];
+            foreach (var (key, json) in cases)
+            {
+                var buffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(buffer))
+                {
+                    converter.Write(writer, key, null!);
+                }
+
+                Assert.Equal(json, Encoding.UTF8.GetString(buffer.WrittenSpan));
+                Assert.Equal(json, JsonSerializer.Serialize(key));
+                var parsed = Assert.IsType<UniqueKey>(JsonSerializer.Deserialize<UniqueKey>(json));
+                Assert.Equal(key.N0, parsed.N0);
+                Assert.Equal(key.N1, parsed.N1);
+                Assert.Equal(key.TypeCodeData, parsed.TypeCodeData);
+                Assert.Equal(key.KeyExt, parsed.KeyExt);
+
+                var propertyBuffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(propertyBuffer))
+                {
+                    writer.WriteStartObject();
+                    converter.WriteAsPropertyName(writer, key, null!);
+                    writer.WriteNumberValue(7);
+                    writer.WriteEndObject();
+                }
+
+                var propertyJson = "{" + json + ":7}";
+                Assert.Equal(propertyJson, Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+                var entry = Assert.Single(JsonSerializer.Deserialize<Dictionary<UniqueKey, int>>(propertyJson)!);
+                Assert.Equal(key.N0, entry.Key.N0);
+                Assert.Equal(key.N1, entry.Key.N1);
+                Assert.Equal(key.TypeCodeData, entry.Key.TypeCodeData);
+                Assert.Equal(key.KeyExt, entry.Key.KeyExt);
+                Assert.Equal(7, entry.Value);
+                Assert.False(key.Equals((UniqueKey?)null));
+                Assert.False(key.Equals((object?)null));
+                Assert.Equal(1, key.CompareTo(null));
+            }
+
+            Assert.Equal("null", JsonSerializer.Serialize<UniqueKey?>(null));
+            Assert.Null(JsonSerializer.Deserialize<UniqueKey>("null"));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SystemTargetGrainIdRejectsNullAddresses()
+        {
+            var kind = SystemTargetGrainId.CreateGrainType("boundary");
+            var target = SystemTargetGrainId.Create(kind, SiloAddress.Zero);
+            Assert.Throws<ArgumentNullException>("address", () => SystemTargetGrainId.Create(kind, null!));
+            Assert.Throws<ArgumentNullException>("address", () => SystemTargetGrainId.Create(kind, null!, "extension"));
+            Assert.Throws<ArgumentNullException>("siloAddress", () => target.WithSiloAddress(null!));
+            Assert.Throws<ArgumentNullException>("address", () => SystemTargetGrainId.CreateGrainServiceGrainId(1, "service", null!));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SystemTargetGrainIdPreservesKeyExtensionsWhenRetargeting()
+        {
+            var kind = SystemTargetGrainId.CreateGrainType("boundary");
+            var originalAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+            var replacement = SiloAddress.New(IPAddress.IPv6Loopback, 22222, int.MaxValue);
+            var plain = SystemTargetGrainId.Create(kind, originalAddress);
+            Assert.Equal("sys.svc.boundary", plain.GrainId.Type.ToString());
+            Assert.Equal("127.0.0.1:11111@1", plain.GrainId.Key.ToString());
+            Assert.False(plain.Equals((object?)null));
+
+            foreach (var extension in new string?[] { null, "", "é+part++尾" })
+            {
+                var original = SystemTargetGrainId.Create(kind, originalAddress, extension);
+                var suffix = extension is null ? "" : "+" + extension;
+                Assert.Equal(Encoding.UTF8.GetBytes("127.0.0.1:11111@1" + suffix), original.GrainId.Key.AsSpan().ToArray());
+                Assert.Equal(extension is null, plain == original);
+                var updated = original.WithSiloAddress(replacement);
+                Assert.Equal(kind, updated.GrainId.Type);
+                Assert.Equal(Encoding.UTF8.GetBytes("::1:22222@2147483647" + suffix), updated.GrainId.Key.AsSpan().ToArray());
+                Assert.Same(replacement, updated.GetSiloAddress());
+                Assert.Same(originalAddress, original.GetSiloAddress());
+                Assert.Equal(Encoding.UTF8.GetBytes("127.0.0.1:11111@1" + suffix), original.GrainId.Key.AsSpan().ToArray());
+                Assert.True(SystemTargetGrainId.TryParse(updated.GrainId, out var parsed));
+                Assert.Equal(updated, parsed);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SystemTargetGrainIdPreservesGrainServiceIdentity()
+        {
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 12345);
+            (int Code, string Text)[] codes =
+            [
+                (0, "00000000"),
+                (int.MaxValue, "7FFFFFFF"),
+                (int.MinValue, "80000000"),
+                (-1, "FFFFFFFF"),
+            ];
+            foreach (var (code, text) in codes)
+            {
+                foreach (var systemId in new string?[] { null, "", "é+service" })
+                {
+                    var id = SystemTargetGrainId.CreateGrainServiceGrainId(code, systemId!, address);
+                    Assert.Equal(Encoding.UTF8.GetBytes("sys.svc.user." + text + systemId), id.Type.AsSpan().ToArray());
+                    Assert.Equal(Encoding.UTF8.GetBytes("127.0.0.1:11111@12345"), id.Key.AsSpan().ToArray());
+                    Assert.True(SystemTargetGrainId.TryParse(id, out var target));
+                    Assert.Same(address, target.GetSiloAddress());
+                }
+            }
         }
 
         /// <summary>

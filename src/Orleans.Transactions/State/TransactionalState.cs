@@ -62,8 +62,10 @@ namespace Orleans.Transactions
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="operation"/> is null.</exception>
         public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation)
         {
+            ArgumentNullException.ThrowIfNull(operation);
             if (detectReentrancy)
             {
                 throw new LockRecursionException("Cannot perform a read operation from within another operation");
@@ -113,6 +115,48 @@ namespace Orleans.Transactions
 
                     return result;
                 });
+        }
+
+        /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="operation"/> is null.</exception>
+        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation, ReadIsolation isolation)
+        {
+            return isolation switch
+            {
+                ReadIsolation.Serializable => PerformRead(operation),
+                ReadIsolation.ReadCommitted => PerformReadCommitted(operation),
+                _ => throw new ArgumentOutOfRangeException(nameof(isolation), isolation, "Unknown read isolation."),
+            };
+        }
+
+        private async Task<TResult> PerformReadCommitted<TResult>(Func<TState, TResult> operation)
+        {
+            ArgumentNullException.ThrowIfNull(operation);
+            if (detectReentrancy)
+            {
+                throw new LockRecursionException("Cannot perform a read operation from within another operation");
+            }
+
+            // A committed snapshot is outside the ambient transaction's locks, so it would break serializability.
+            if (TransactionContext.GetTransactionInfo() is { } info)
+            {
+                throw new OrleansTransactionException($"A read-committed read cannot be performed inside transaction {info.Id}.");
+            }
+
+            await this.queue.Ready();
+
+            this.queue.GetCommittedState(out var state, out var sequenceNumber);
+            LogDebugReadCommitted(sequenceNumber);
+
+            try
+            {
+                detectReentrancy = true;
+                return CopyResult(operation(state));
+            }
+            finally
+            {
+                detectReentrancy = false;
+            }
         }
 
         /// <inheritdoc/>
@@ -267,6 +311,12 @@ namespace Orleans.Transactions
             Message = "Update-lock read v{SequenceNumber} {TransactionId} {Timestamp}"
         )]
         private partial void LogDebugUpdateLockRead(long sequenceNumber, Guid transactionId, DateTimeLogRecord timestamp);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Read-committed read v{SequenceNumber}"
+        )]
+        private partial void LogDebugReadCommitted(long sequenceNumber);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

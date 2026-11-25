@@ -17,7 +17,7 @@ using NSubstitute;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -1471,7 +1471,7 @@ public sealed class JournalStorageCatalogTests
     public async Task VolatileListAsync_TracksExistenceAcrossNewEnumerations(string operation)
     {
         var provider = new VolatileJournalStorageProvider();
-        var storage = provider.CreateStorage(new("tenant/id"));
+        var storage = await provider.CreateStorage(new("tenant/id")).ReadForWriteAsync();
         var listing = provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Empty(await DrainAsync(listing));
         await MaterializeAsync();

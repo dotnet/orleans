@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string] $RestoreCommand = 'dotnet'
+    [string] $RestoreCommand = 'dotnet',
+    [string] $Solution = 'Orleans.slnx'
 )
 
 Set-StrictMode -Version Latest
@@ -8,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 function Invoke-SolutionRestore {
     $messages = [Collections.Generic.List[string]]::new()
-    & $RestoreCommand restore Orleans.slnx 2>&1 | ForEach-Object {
+    & $RestoreCommand restore $Solution 2>&1 | ForEach-Object {
         $messages.Add($_.ToString())
         $_ | Out-Host
     }

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Core;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
@@ -12,7 +12,7 @@ using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("Functional")]
 [TestProvider("AzureStorage")]
@@ -157,7 +157,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
 
         await using (var writerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, cts.Token))
         {
-            var storage = writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
+            var storage = await writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId)).ReadForWriteAsync();
             await storage.ReplaceAsync(new ReadOnlySequence<byte>(replacedBytes), cts.Token);
             await storage.AppendAsync(new ReadOnlySequence<byte>(appendedBytes), cts.Token);
         }
@@ -180,7 +180,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
     public async Task AzureTableStorage_LargeAppend_RoundTripsAcrossPropertiesAndRows()
     {
         var grainId = GrainId.Create("journaling-table-large-append", Guid.NewGuid().ToString("N"));
-        var storage = _storageProvider.CreateStorage(JournalId.FromGrainId(grainId));
+        var storage = await _storageProvider.CreateStorage(JournalId.FromGrainId(grainId)).ReadForWriteAsync();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         // Larger than one data row (15 x 64 KiB) so the append spans multiple rows in one transaction.

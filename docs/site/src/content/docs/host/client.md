@@ -74,6 +74,10 @@ You can replace the default with <xref:Orleans.Hosting.ClientBuilderExtensions.U
 - Honor the supplied cancellation token.
 - Let startup fail when the cluster or configuration is persistently unavailable.
 
+Startup cancellation interrupts gateway discovery, connection attempts, and initial cluster-manifest retrieval. The client stops initialization work and releases partially started client resources before the cancelled start completes. After startup succeeds, gateway and manifest refreshes follow the client's lifetime.
+
+Custom gateway providers implement <xref:Orleans.Messaging.IGatewayListProvider.InitializeGatewayListProviderAsync*> and <xref:Orleans.Messaging.IGatewayListProvider.GetGatewaysAsync*> and pass the supplied token to their cancellation-aware I/O operations. For providers which implement the tokenless methods, default interface implementations cancel the caller's wait and observe the provider operation's eventual completion.
+
 ### Client lifetime and registration
 
 For generic-host and ASP.NET Core applications, treat <xref:Orleans.IClusterClient> as a singleton for the lifetime of the application process. Register it once with <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> and resolve it from dependency injection instead of creating a second client per request, per controller, or in a static field.

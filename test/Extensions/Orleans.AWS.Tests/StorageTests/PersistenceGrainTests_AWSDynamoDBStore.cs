@@ -38,7 +38,11 @@ namespace AWSUtils.Tests.StorageTests
                 {
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
                     hostBuilder.AddMemoryGrainStorage("test1");
-                    hostBuilder.AddDynamoDBGrainStorage("GrainStorageForTest", options => options.Service = AWSTestConstants.DynamoDbService);
+                    hostBuilder.AddDynamoDBGrainStorage("GrainStorageForTest", options =>
+                    {
+                        options.Service = AWSTestConstants.DynamoDbService;
+                        options.ServiceId = string.Empty;
+                    });
                 }
             }
         }

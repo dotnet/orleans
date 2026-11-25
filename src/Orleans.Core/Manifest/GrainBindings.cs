@@ -44,11 +44,7 @@ namespace Orleans.Metadata
     {
         private const string BindingPrefix = WellKnownGrainTypeProperties.BindingPrefix + ".";
         private const char BindingIndexEnd = '.';
-#if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
-#else
-        private readonly object _lockObj = new();
-#endif
         private readonly ConcurrentDictionary<GenericGrainType, GrainType> _genericMapping = new ConcurrentDictionary<GenericGrainType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private Cache _cache;

@@ -9,11 +9,7 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class ProbeRequestMonitor
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _lock = new();
-#else
-        private readonly object _lock = new();
-#endif
         private readonly TimeProvider _timeProvider;
         private long? _lastProbeRequestTimestamp;
 

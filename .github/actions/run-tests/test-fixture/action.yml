@@ -16,6 +16,8 @@ inputs:
     description: Test result artifact name.
   retention-days:
     description: Test result artifact retention.
+  solution:
+    description: Solution graph forwarded by run-tests.
 
 runs:
   using: composite
@@ -29,6 +31,9 @@ runs:
           'TEST_RETRY_RESULT_IDS=' >> $env:GITHUB_ENV
         }
         'dotnet-test' {
+          if ('${{ inputs.solution }}' -cne $env:TEST_RETRY_SOLUTION) {
+            throw 'Test attempt received a different solution graph.'
+          }
           $attempt = [int] $env:TEST_RETRY_ATTEMPTS + 1
           "TEST_RETRY_ATTEMPTS=$attempt" >> $env:GITHUB_ENV
           $resultIds = @($env:TEST_RETRY_RESULT_IDS, '${{ inputs.result-id }}') |

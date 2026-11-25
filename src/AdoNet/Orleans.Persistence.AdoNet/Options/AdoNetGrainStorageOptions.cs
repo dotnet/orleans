@@ -68,6 +68,16 @@ namespace Orleans.Configuration
         /// Delete record row from db when state is cleared.
         /// </summary>
         public bool DeleteStateOnClear { get; set; }
+
+        /// <summary>
+        /// Gets or sets how grain state is mapped to storage keys. Defaults to <see cref="AdoNetGrainStorageKeyFormat.Legacy"/>.
+        /// </summary>
+        /// <remarks>
+        /// Use <see cref="AdoNetGrainStorageKeyFormat.GrainTypeQualified"/> for new databases so that grains of
+        /// different types which share a key have separate state. Keep <see cref="AdoNetGrainStorageKeyFormat.Legacy"/>
+        /// for databases which already hold state written with that format.
+        /// </remarks>
+        public AdoNetGrainStorageKeyFormat KeyFormat { get; set; } = AdoNetGrainStorageKeyFormat.Legacy;
     }
 
     /// <summary>
@@ -105,6 +115,16 @@ namespace Orleans.Configuration
             if (this.options.HashPicker == null)
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} {name}. {nameof(options.HashPicker)} is required.");
+            }
+
+            if (!Enum.IsDefined(this.options.KeyFormat))
+            {
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.KeyFormat)} value {this.options.KeyFormat} is not supported.");
+            }
+
+            if (this.options.KeyFormat != AdoNetGrainStorageKeyFormat.Legacy && this.options.HashPicker is Orleans3CompatibleStorageHashPicker)
+            {
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". The Orleans v3-compatible hash picker requires {nameof(options.KeyFormat)} = {nameof(AdoNetGrainStorageKeyFormat.Legacy)}.");
             }
         }
     }

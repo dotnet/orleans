@@ -113,10 +113,19 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
         return Task.CompletedTask;
     }
 
-    public Task InitializeGatewayListProvider() => Task.CompletedTask;
+    public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
 
-    public Task<IList<Uri>> GetGateways()
+    public Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+    public Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var table = _table.ReadAll();
         var result = table.Members
            .Where(x => x.Item1.Status == SiloStatus.Active && x.Item1.ProxyPort != 0)
@@ -132,11 +141,7 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
 
     private sealed class Table
     {
-#if NET9_0_OR_GREATER
         private readonly Lock _lock = new();
-#else
-        private readonly object _lock = new();
-#endif
         private readonly Dictionary<SiloAddress, (MembershipEntry Entry, string ETag)> _table = [];
         private TableVersion _tableVersion;
         private long _lastETagCounter;

@@ -269,7 +269,9 @@ namespace Orleans.Streams
             {
                 using (await bindExtLock.LockAsync())
                 {
+#pragma warning disable CA1508 // Another caller can bind the extension while this caller awaits bindExtLock.
                     if (myExtension == null)
+#pragma warning restore CA1508
                     {
                         LogDebugBindExtensionLazy(providerRuntime);
                         (myExtension, myGrainReference) = providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(

@@ -33,12 +33,21 @@ internal partial class CosmosGatewayListProvider : IGatewayListProvider
         MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
     }
 
-    public async Task InitializeGatewayListProvider()
+    public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+    public async Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var client = await _options.CreateClient!(_serviceProvider).ConfigureAwait(false);
+            var creation = _options.CreateClient!(_serviceProvider).AsTask();
+            creation.Ignore();
+            var client = await creation.WaitAsync(cancellationToken).ConfigureAwait(false);
             _container = client.GetContainer(_options.DatabaseName, _options.ContainerName);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -47,11 +56,14 @@ internal partial class CosmosGatewayListProvider : IGatewayListProvider
         }
     }
 
-    public async Task<IList<Uri>> GetGateways()
+    public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+    public async Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var query = _container
+            using var query = _container
                 .GetItemLinqQueryable<SiloEntity>(requestOptions: _queryRequestOptions)
                 .Where(g => g.EntityType == nameof(SiloEntity) &&
                     g.Status == (int)SiloStatus.Active &&
@@ -61,12 +73,16 @@ internal partial class CosmosGatewayListProvider : IGatewayListProvider
             var entities = new List<SiloEntity>();
             do
             {
-                var items = await query.ReadNextAsync();
+                var items = await query.ReadNextAsync(cancellationToken);
                 entities.AddRange(items);
             } while (query.HasMoreResults);
 
             var uris = entities.Select(ConvertToGatewayUri).ToArray();
             return uris;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -104,7 +104,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
 
         array ??= [];
         var result = new Stack<T>(array);
-        ReferenceCodec.RecordObject(reader.Session, array, placeholderReferenceId);
+        ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
         return result!;
     }
 

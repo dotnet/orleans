@@ -94,6 +94,9 @@ public class ExclusiveLockCoordinatorInputValidationTests
 
         public Task Set(int newValue) => UnexpectedCall(nameof(Set));
 
+        public Task<int[]> GetCommitted() =>
+            Task.FromException<int[]>(new InvalidOperationException($"Unexpected {nameof(GetCommitted)} call."));
+
         public Task AddAndThrow(int numberToAdd) => UnexpectedCall(nameof(AddAndThrow));
 
         public Task SetAndThrow(int numberToSet) => UnexpectedCall(nameof(SetAndThrow));

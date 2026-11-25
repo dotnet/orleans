@@ -85,7 +85,7 @@ public static partial class StaticFactoryContracts
 
     private static ServiceProvider CreateMixedCycleServices(ConstructionGate gate)
     {
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.AddSingleton(gate);
         services.Configure<TypeManifestOptions>(options =>
         {
@@ -105,7 +105,7 @@ public static partial class StaticFactoryContracts
     public static void CaughtNestedFailureFaultsTheWholeGraph()
     {
         using var gate = new ConstructionGate { FailFirst = true };
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.Configure<TypeManifestOptions>(options =>
         {
             options.AddSerializerService<CatchingRoot>(provider => new CatchingRoot(provider));
@@ -284,7 +284,7 @@ public static partial class StaticFactoryContracts
 
     private static ServiceProvider CreateConstructionServices(ConstructionGate gate)
     {
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.Configure<TypeManifestOptions>(options =>
         {
             options.AddSerializerService<FirstCodec>(provider => new FirstCodec(provider, gate));
@@ -304,7 +304,7 @@ public static partial class StaticFactoryContracts
     private static object ResolveFirst(CodecProvider provider, bool copier)
         => copier ? provider.GetDeepCopier<FirstValue>() : provider.GetCodec<FirstValue>();
 
-    private sealed class ConstructionContext : SerializerContext
+    private sealed class ConstructionContext : GeneratedContext
     {
 #if NATIVE_AOT_SMOKE
         public static IDeepCopier<T> CreateForwardCopier<T>(ICodecProvider provider)

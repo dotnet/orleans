@@ -898,6 +898,8 @@ namespace NonSilo.Tests.Membership
             TimeProvider? timeProvider = null)
         {
             timeProvider ??= TimeProvider.System;
+            // These fixtures use fixed generations unrelated to the clock.
+            clusterMembershipOptions.SiloGenerationRetirementAge = null;
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(clusterMembershipOptions),

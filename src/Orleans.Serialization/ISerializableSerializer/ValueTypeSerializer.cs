@@ -128,7 +128,9 @@ namespace Orleans.Serialization
 
             _constructor(ref result, info, _streamingContext);
             _callbacks.OnDeserialized?.Invoke(ref result, _streamingContext);
+#pragma warning disable CA1508 // A closed struct T can implement IDeserializationCallback; the generic constraint does not require it.
             if (result is IDeserializationCallback callback)
+#pragma warning restore CA1508
             {
                 callback.OnDeserialization(_streamingContext.Context);
             }

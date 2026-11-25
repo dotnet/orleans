@@ -47,7 +47,7 @@ namespace Orleans.TestingHost
         {
             if (args.Length < 2)
             {
-                Console.Error.WriteLine("Expected JSON-serialized configuration to be provided as an argument");
+                await Console.Error.WriteLineAsync("Expected JSON-serialized configuration to be provided as an argument");
             }
 
             var monitorProcessId = int.Parse(args[0], NumberStyles.Integer, CultureInfo.InvariantCulture);
@@ -77,7 +77,9 @@ namespace Orleans.TestingHost
                 var localSiloDetails = (ILocalSiloDetails)host.Services.GetService(typeof(ILocalSiloDetails))!;
                 Console.WriteLine($"{SiloAddressLog}{localSiloDetails.SiloAddress.ToParsableString()}");
                 Console.WriteLine($"{GatewayAddressLog}{localSiloDetails.GatewayAddress.ToParsableString()}");
+#pragma warning disable CA1303 // The parent process matches this machine-readable readiness marker exactly.
                 Console.WriteLine(StartedLog);
+#pragma warning restore CA1303
 
                 await cts.Token.WhenCancelled();
 
@@ -116,7 +118,7 @@ namespace Orleans.TestingHost
                             await Task.Delay(5000);
                             if (!Array.Exists(Process.GetProcesses(), p => p.Id == monitorProcessId))
                             {
-                                Console.Error.WriteLine($"Parent process {monitorProcessId} has exited");
+                                await Console.Error.WriteLineAsync($"Parent process {monitorProcessId} has exited");
                                 Environment.Exit(0);
                             }
                         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
@@ -25,6 +26,8 @@ namespace Orleans
         /// Specifies the period of inactivity before a grain is available for collection and deactivation.
         /// </summary>
         /// <param name="inactivityPeriod">The period of inactivity before a grain is available for collection and deactivation, expressed as a string using <see cref="TimeSpan.Parse(string)"/> syntax.</param>
+        [SuppressMessage("Design", "CA1019:Define accessors for attribute arguments",
+            Justification = "The parsed inactivity period is exposed through the typed TimeSpan AgeLimit property.")]
         public CollectionAgeLimitAttribute(string inactivityPeriod) => _value = TimeSpan.Parse(inactivityPeriod);
 
         /// <summary>

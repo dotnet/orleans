@@ -186,12 +186,44 @@ namespace Orleans.Analyzers
                 return false;
             }
 
-            // Check if the type implements IGrain or ISystemTarget interface
+            var implementsGrainBase = false;
             foreach (var interfaceSymbol in typeSymbol.AllInterfaces)
             {
                 var interfaceName = interfaceSymbol.ToDisplayString(NullableFlowState.None);
                 if (Constants.IGrainFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal) ||
                     Constants.ISystemTargetFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                if (Constants.IGrainBaseFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal))
+                {
+                    implementsGrainBase = true;
+                }
+            }
+
+            if (implementsGrainBase)
+            {
+                // Must implement an RPC interface (an interface extending IAddressable other than IAddressable itself)
+                // or have an explicit GrainType attribute
+                foreach (var interfaceSymbol in typeSymbol.AllInterfaces)
+                {
+                    var interfaceName = interfaceSymbol.ToDisplayString(NullableFlowState.None);
+                    if (Constants.IAddressibleFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal) ||
+                        Constants.IGrainBaseFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (interfaceSymbol.AllInterfaces.Any(i =>
+                        Constants.IAddressibleFullyQualifiedName.Equals(i.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal)))
+                    {
+                        return true;
+                    }
+                }
+
+                if (typeSymbol.GetAttributes().Any(a =>
+                    Constants.GrainTypeAttributeFullyQualifiedName.Equals(a.AttributeClass?.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal)))
                 {
                     return true;
                 }

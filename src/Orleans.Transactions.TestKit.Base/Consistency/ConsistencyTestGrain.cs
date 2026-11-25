@@ -3,6 +3,7 @@ using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -63,6 +64,8 @@ namespace Orleans.Transactions.TestKit.Consistency
         private const double RecursionProbability = .1 - .9 * (1.0 / (10 * 40 - 1));
 
         /// <inheritdoc />
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness selects transaction conformance operations and test-grain targets.")]
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
             ArgumentNullException.ThrowIfNull(options);
@@ -90,7 +93,7 @@ namespace Orleans.Transactions.TestKit.Consistency
             //    throw new UserAbort();
             //}
 
-            var txhash = stack[..stack.IndexOf(')')].GetHashCode();
+            var txhash = stack[..stack.IndexOf(')', StringComparison.Ordinal)].GetHashCode(StringComparison.Ordinal);
 
             var whethertoreadorwrite =
                   (options.ReadWrite == ReadWriteDetermination.PerTransaction) ? new Random(options.RandomSeed + txhash)
@@ -159,6 +162,8 @@ namespace Orleans.Transactions.TestKit.Consistency
             });
         }
 
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness selects transaction conformance operations and test-grain targets.")]
         private async Task<Observation[]> Recurse(ConsistencyTestOptions options, int depth, string stack, Random random, int count, bool parallel, int maxgrain, DateTime stopAfter)
         {
             LogTraceRecurse(logger, MyNumber, TransactionContext.CurrentTransactionId, stack, count, parallel ? "par" : "seq");
@@ -183,11 +188,11 @@ namespace Orleans.Transactions.TestKit.Consistency
                     if (DateTime.UtcNow > stopAfter)
                         break;
                 }
-                await Task.WhenAll(tasks);
+                var observations = await Task.WhenAll(tasks);
                 var result = new HashSet<Observation>();
-                for (int i = 0; i < count; i++)
+                foreach (var nestedObservations in observations)
                 {
-                    foreach (var x in tasks[i].Result)
+                    foreach (var x in nestedObservations)
                         result.Add(x);
                 }
                 return result.ToArray();

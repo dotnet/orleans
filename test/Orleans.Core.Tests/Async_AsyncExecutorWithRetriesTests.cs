@@ -24,6 +24,74 @@ namespace NonSilo.Tests
             this.output = output;
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        public async Task MissingAction_IsRejectedWithoutRetrying()
+        {
+            var filterCalls = 0;
+            var backoff = new CountingBackoff();
+            bool Retry(Exception exception, int attempt)
+            {
+                filterCalls++;
+                return true;
+            }
+
+            var error = await Record.ExceptionAsync(() => AsyncExecutorWithRetries.ExecuteWithRetries(
+                (Func<int, Task>)null!, 3, Retry, Timeout.InfiniteTimeSpan, backoff));
+
+            Assert.Equal(0, filterCalls);
+            Assert.Equal(0, backoff.Attempts);
+            var exception = Assert.IsType<ArgumentNullException>(error);
+            Assert.Equal("action", exception.ParamName);
+        }
+
+        [Theory, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task MissingFunction_IsRejectedWithoutRetrying_PreservesCancellationPriority(
+            bool withSuccessFilter, bool canceled)
+        {
+            var filterCalls = 0;
+            var backoff = new CountingBackoff();
+            var cancellationToken = canceled ? new CancellationToken(true) : TestContext.Current.CancellationToken;
+            bool Retry(Exception exception, int attempt)
+            {
+                filterCalls++;
+                return true;
+            }
+
+            var error = await Record.ExceptionAsync(() => withSuccessFilter
+                ? AsyncExecutorWithRetries.ExecuteWithRetries<int>(
+                    null!, 0, 3, null, Retry, Timeout.InfiniteTimeSpan, backoff, backoff, cancellationToken)
+                : AsyncExecutorWithRetries.ExecuteWithRetries<int>(
+                    null!, 3, Retry, Timeout.InfiniteTimeSpan, backoff, cancellationToken));
+
+            Assert.Equal(0, filterCalls);
+            Assert.Equal(0, backoff.Attempts);
+            if (canceled)
+            {
+                var exception = Assert.IsType<OperationCanceledException>(error);
+                Assert.Equal(cancellationToken, exception.CancellationToken);
+            }
+            else
+            {
+                var exception = Assert.IsType<ArgumentNullException>(error);
+                Assert.Equal("function", exception.ParamName);
+            }
+        }
+
+        private sealed class CountingBackoff : IBackoffProvider
+        {
+            public int Attempts { get; private set; }
+
+            public TimeSpan Next(int attempt)
+            {
+                Attempts++;
+                return TimeSpan.Zero;
+            }
+        }
+
         /// <summary>
         /// Tests that AsyncExecutorWithRetries retries a failing function until it succeeds, 
         /// and verifies that it fails when max retries are exceeded.

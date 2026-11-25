@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// Initializes a new instance of the <see cref="SpanBufferWriter"/> struct.
         /// </summary>
         /// <param name="buffer">The buffer.</param>
-        internal SpanBufferWriter(Span<byte> buffer)
+        internal SpanBufferWriter(ReadOnlySpan<byte> buffer)
         {
             _maxLength = buffer.Length;
             _bytesWritten = 0;

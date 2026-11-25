@@ -166,7 +166,9 @@ internal abstract class Striped64
                         // Try to attach new Cell
                         // Optimistically create
                         var r = new Cell(x);
+#pragma warning disable CA1508 // Another thread can acquire the cell lock between the optimistic reads; CAS establishes ownership.
                         if (_cellsBusy == 0 && CasCellsBusy())
+#pragma warning restore CA1508
                         {
                             try
                             {

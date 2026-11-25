@@ -1,6 +1,7 @@
 using System;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Metadata
 {
@@ -87,10 +88,14 @@ namespace Orleans
         /// Initializes a new instance of the <see cref="GrainTypeAttribute"/> class.
         /// </summary>
         /// <param name="grainType">
-        /// The grain type name.
+        /// A non-empty grain type name containing no quotes, whitespace, control characters, or reserved type-name delimiters (<c>[](),*&amp;</c>).
         /// </param>
+        /// <remarks>Generic arity suffixes must be decimal integers at the end of each nested type name, totaling at most 64.</remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="grainType"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="grainType"/> is empty, contains a quote, whitespace, a control character, or a reserved type-name delimiter, or has an invalid generic arity suffix.</exception>
         public GrainTypeAttribute(string grainType)
         {
+            IdentityNameValidator.Validate(grainType, nameof(grainType));
             this._grainType = GrainType.Create(grainType);
         }
 

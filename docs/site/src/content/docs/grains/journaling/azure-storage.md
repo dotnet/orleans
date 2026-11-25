@@ -1,13 +1,13 @@
 ---
 title: Azure Storage providers for Journaling
 description: Configure Azure Blob Storage or Azure Table Storage for experimental Orleans Journaling.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: how-to
 ---
 
 # Azure Storage providers for Journaling
 
-The pre-release [`Microsoft.Orleans.Journaling.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) package provides Azure Blob Storage and Azure Table Storage implementations. Its APIs carry diagnostic `ORLEANSEXP005`.
+The pre-release `Microsoft.Orleans.Durable.AzureStorage` package provides Azure Blob Storage and Azure Table Storage implementations.
 
 Use Microsoft Entra workload identity in hosted environments and grant the silo identity only the data-plane permissions required for the selected container or table.
 
@@ -30,7 +30,7 @@ full inventory, and retirement criteria.
 
 ## Azure Blob Storage
 
-Configure <xref:Orleans.Journaling.AzureBlobStorageHostingExtensions.AddAzureBlobJournalStorage*> with an authenticated <xref:Azure.Storage.Blobs.BlobServiceClient>:
+Configure <xref:Orleans.Durable.Journaling.AzureBlobStorageHostingExtensions.AddAzureBlobJournalStorage*> with an authenticated <xref:Azure.Storage.Blobs.BlobServiceClient>:
 
 :::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="configure_azure_blob":::
 
@@ -40,11 +40,11 @@ Each journal uses:
 - Immutable checkpoint blobs at `checkpoints/<journalId>/<snapshotId>`.
 - WAL metadata which identifies the current checkpoint, journal format, and optimistic-concurrency state.
 
-Recovery reads the published checkpoint followed by the WAL tail. A replacement uploads the new checkpoint and then atomically publishes it through WAL metadata. The provider performs best-effort cleanup of obsolete checkpoints after publication when <xref:Orleans.Journaling.AzureBlobJournalStorageOptions.DeleteOldCheckpoints> is `true`, which is the default.
+Recovery reads the published checkpoint followed by the WAL tail. A replacement uploads the new checkpoint and then atomically publishes it through WAL metadata. The provider performs best-effort cleanup of obsolete checkpoints after publication when <xref:Orleans.Durable.Journaling.AzureBlobJournalStorageOptions.DeleteOldCheckpoints> is `true`, which is the default.
 
-Customize <xref:Orleans.Journaling.AzureBlobJournalStorageOptions.GetWalBlobName> and <xref:Orleans.Journaling.AzureBlobJournalStorageOptions.GetCheckpointBlobName> to apply a tenant or application prefix. Keep the mapping stable or migrate every referenced blob and its metadata together.
+Customize <xref:Orleans.Durable.Journaling.AzureBlobJournalStorageOptions.GetWalBlobName> and <xref:Orleans.Durable.Journaling.AzureBlobJournalStorageOptions.GetCheckpointBlobName> to apply a tenant or application prefix. Keep the mapping stable or migrate every referenced blob and its metadata together.
 
-Azure append blobs limit append-block size and block count. The provider accepts an encoded append batch up to 100 MiB, requests compaction after 49,000 committed blocks, and reserves additional headroom before the 50,000-block service limit.
+Each append is one append block, so Azure commits the whole batch or none of it. Azure append blobs limit append-block size and block count. The provider accepts an encoded append batch up to 100 MiB and rejects a larger batch before sending any request. It requests compaction after 49,000 committed blocks and reserves additional headroom before the 50,000-block service limit.
 
 The journal catalog selects append blobs in the `wal/` namespace of the configured container. Custom naming delegates participating in catalog discovery produce `wal/<journalId>` for each journal. The separate checkpoint namespace keeps checkpoints out of listing pages. Raw journal-id prefixes and conservative ASCII bounds narrow the native listing on both flat-namespace and hierarchical-namespace (HNS) accounts.
 
@@ -54,7 +54,7 @@ Catalog callers can request a metadata snapshot with each identity. Blob listing
 
 ## Azure Table Storage
 
-Configure <xref:Orleans.Journaling.AzureTableStorageHostingExtensions.AddAzureTableJournalStorage*> with an authenticated <xref:Azure.Data.Tables.TableServiceClient>:
+Configure <xref:Orleans.Durable.Journaling.AzureTableStorageHostingExtensions.AddAzureTableJournalStorage*> with an authenticated <xref:Azure.Data.Tables.TableServiceClient>:
 
 :::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="configure_azure_table":::
 
@@ -63,21 +63,23 @@ Each journal occupies one table partition:
 - A header row stores the journal manifest, format, generation, and concurrency ETag.
 - Ordered data rows store the encoded journal bytes for the published generation.
 - Append operations commit new rows and the header update in one entity group transaction.
-- Replacement writes a new generation and atomically changes the header to publish it. The provider performs best-effort cleanup of the previous generation when <xref:Orleans.Journaling.AzureTableJournalStorageOptions.DeleteOldGenerations> is `true`.
+- Replacement writes a new generation and atomically changes the header to publish it. The provider performs best-effort cleanup of the previous generation when <xref:Orleans.Durable.Journaling.AzureTableJournalStorageOptions.DeleteOldGenerations> is `true`.
 
-A single append batch is limited to 2 MiB by the provider's entity group transaction design. Snapshot replacements can exceed that size because rows are written before the header publishes the generation.
+A single append batch is limited to 2 MiB, which keeps its rows and header update within one entity group transaction of at most 100 entities and 4 MiB. The provider rejects a larger batch before sending any request. Snapshot replacements can exceed that size because rows are written before the header publishes the generation, and readers see only published generations.
 
-Compaction is requested at either <xref:Orleans.Journaling.AzureTableJournalStorageOptions.CompactionRowCountThreshold> (10,000 rows by default) or <xref:Orleans.Journaling.AzureTableJournalStorageOptions.CompactionSizeThreshold> (32 MiB by default).
+After a failed publication attempt, staged rows are retained so a delayed header update can still publish a complete generation. Deleting the journal reclaims the partition's retained rows.
+
+Compaction is requested at either <xref:Orleans.Durable.Journaling.AzureTableJournalStorageOptions.CompactionRowCountThreshold> (10,000 rows by default) or <xref:Orleans.Durable.Journaling.AzureTableJournalStorageOptions.CompactionSizeThreshold> (32 MiB by default).
 
 The default partition mapping accepts printable ASCII journal ids (`0x20` through `0x7E`) and encodes each byte as two uppercase hexadecimal digits. It preserves ordinal ordering and prefixes for indexed catalog queries and supports journal ids up to 512 characters. Storage creation validates the id before accessing Azure. This restriction is specific to the default Table mapping.
 
-Customize <xref:Orleans.Journaling.AzureTableJournalStorageOptions.GetPartitionKey> when a different partition layout is required. Custom mappings support other journal-id alphabets, remain unique per journal, and satisfy Azure Table partition-key constraints. Their catalog queries filter the canonical journal-id property and can require a table scan.
+Customize <xref:Orleans.Durable.Journaling.AzureTableJournalStorageOptions.GetPartitionKey> when a different partition layout is required. Custom mappings support other journal-id alphabets, remain unique per journal, and satisfy Azure Table partition-key constraints. Their catalog queries filter the canonical journal-id property and can require a table scan.
 
 Metadata-enabled catalog queries select the header's format and caller-owned metadata together with its ETag. Identity-only queries retain their smaller projection. Each returned metadata snapshot has the same meaning as a direct metadata read and can become stale after it is listed.
 
 ## Optimistic concurrency
 
-Both providers condition append, replace, and delete operations on the last observed ETag. Metadata-only conflicts receive a bounded in-place refresh and retry. A journal-content conflict raises <xref:Orleans.Storage.InconsistentStateException>, which permanently fences the Journaling state manager and requests grain deactivation. A fresh activation replays the durable journal.
+Both providers condition append, replace, and delete operations on the last observed ETag. A storage instance which recovered an absent journal creates it only while it is still absent, so a concurrent creator makes the write fail. Metadata-only conflicts receive a bounded in-place refresh and retry. A journal-content conflict raises <xref:Orleans.Storage.InconsistentStateException>, which permanently fences the Journaling state manager and requests grain deactivation. A fresh activation replays the durable journal.
 
 Configure the metadata-only retry cap and backoff with the corresponding `MaxMetadataOnlyConflictRetries`, `MetadataOnlyConflictInitialBackoff`, and `MetadataOnlyConflictMaxBackoff` options.
 

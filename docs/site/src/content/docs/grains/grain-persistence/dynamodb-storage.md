@@ -18,7 +18,13 @@ The [AWS SDK for .NET credential and profile resolution chain](https://docs.aws.
 
 <xref:Orleans.Configuration.DynamoDBStorageOptions.DeleteStateOnClear> controls whether clearing state deletes the item or resets it. <xref:Orleans.Configuration.DynamoDBStorageOptions.TimeToLive> advances the item's expiration on every write; enable it only when disappearing state is valid application behavior.
 
-<xref:Orleans.Configuration.DynamoDBStorageOptions.ServiceId> must remain stable across deployments that share the same logical application state. The provider uses optimistic concurrency and rejects stale writes.
+## Service identity and upgrades
+
+<xref:Orleans.Configuration.DynamoDBStorageOptions.ServiceId> prefixes the key of every grain state as `{ServiceId}_{grainId}`. Configure it explicitly for each DynamoDB grain storage provider and keep it stable across deployments that share the same logical application state. Startup validation reports an <xref:Orleans.Runtime.OrleansConfigurationException> when the value is unset.
+
+For a new deployment, choose a stable application identifier, such as <xref:Orleans.Configuration.ClusterOptions.ServiceId>. When upgrading an existing deployment, retain the value used to write its state. If the deployment used the previous empty-string default, explicitly set `ServiceId` to `string.Empty` in code or `""` in configuration to keep reading and writing the same keys. Choosing a different value selects a different state namespace; accessing existing state under that prefix requires a separate data migration.
+
+The provider uses optimistic concurrency and rejects stale writes.
 
 ## Serialization
 

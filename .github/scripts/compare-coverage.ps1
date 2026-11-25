@@ -275,7 +275,7 @@ if ($baselineStatus -eq 'available') {
 }
 $markdown += @(
     ''
-    'Coverage combines every CI test matrix job, including providers, CodeGen, .NET 8/10, Linux, Windows, and macOS, using canonical physical source and branch identities.'
+    'Coverage combines every CI test matrix job, including providers, CodeGen, .NET 10/11, Linux, Windows, and macOS, using canonical physical source and branch identities.'
     ''
     'The comparison remains report-only while normal line and branch variance is calibrated.'
     ''

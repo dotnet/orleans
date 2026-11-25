@@ -1,6 +1,6 @@
 using Azure.Storage.Blobs;
 using Orleans;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 
 namespace DurableJobsMigration;
 

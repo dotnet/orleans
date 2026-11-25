@@ -107,7 +107,11 @@ public class AzureMembershipPaginationTests
     [Theory]
     [InlineData(1, 2, 2)]
     [InlineData(1, 3, 3)]
-    [InlineData(7, 9, 7)]
+    [InlineData(2, 2, 1)]
+    [InlineData(3, 3, 1)]
+    [InlineData(9, 7, 9)]
+    [InlineData(9, 8, 7)]
+    [InlineData(7, 8, 9)]
     public async Task MismatchedMarkersRetry(int before, int version, int after)
     {
         var storage = new ScriptedMembershipTableReadStorage();
@@ -122,6 +126,109 @@ public class AzureMembershipPaginationTests
         var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal("current", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
+        Assert.Equal(2, storage.QueryCount);
+    }
+
+    [Theory]
+    [InlineData(false, 7, 9, 7)]
+    [InlineData(true, 7, 9, 7)]
+    [InlineData(true, 7, 10, 9)]
+    [InlineData(true, 9, 10, 7)]
+    [InlineData(false, 9, 10, 9)]
+    [InlineData(true, int.MaxValue - 1, int.MaxValue, int.MaxValue - 1)]
+    public async Task LegacyVersionAheadOfBothMarkersUsesOneQuery(bool paginated, int before, int version, int after)
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        var silo = StoredSilo();
+        silo.Status = nameof(SiloStatus.ShuttingDown);
+        for (var attempt = 0; attempt < OrleansSiloInstanceManager.MaxMembershipSnapshotAttempts; attempt++)
+        {
+            storage.AddQuery(Query(
+                paginated,
+                BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, before, "before"),
+                (silo, "legacy-silo"),
+                Version(version, "legacy-version"),
+                BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, after, "after")));
+        }
+        var client = CreateHeartbeatClient();
+        var table = CreateTable(CreateManager(storage, client));
+
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(version, result.Version.Version);
+        Assert.Equal("legacy-version", result.Version.VersionEtag);
+        var member = Assert.Single(result.Members);
+        Assert.Equal(ProposedEntry().SiloAddress, member.Item1.SiloAddress);
+        Assert.Equal(SiloStatus.ShuttingDown, member.Item1.Status);
+        Assert.Equal("legacy-silo", member.Item2);
+        Assert.Equal(1, storage.QueryCount);
+        Assert.Empty(client.ReceivedCalls());
+    }
+
+    [Theory]
+    [InlineData("invalid", "10", "9")]
+    [InlineData("9", "invalid", "9")]
+    [InlineData("9", "10", "invalid")]
+    [InlineData("9", "2147483648", "9")]
+    public async Task InvalidMismatchedVersionsRetry(string before, string version, string after)
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        var query = FencedQuery(1, Silo("silo-1", "stale"));
+        query.Entries[0].Entity.MembershipVersion = before;
+        query.Entries.Single(entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW).Entity.MembershipVersion = version;
+        query.Entries[^1].Entity.MembershipVersion = after;
+        storage.AddQuery(query);
+        storage.AddQuery(FencedQuery(10, Silo("silo-1", "current")));
+
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
+
+        Assert.Equal("current", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
+        Assert.Equal("10", result.Single(entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW).Entity.MembershipVersion);
+        Assert.Equal(2, storage.QueryCount);
+    }
+
+    [Fact]
+    public async Task BoundaryAwareWriteAdvancesLegacySnapshotAndBothMarkers()
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        var silo = StoredSilo();
+        silo.Status = nameof(SiloStatus.ShuttingDown);
+        storage.AddQuery(Query(
+            true,
+            BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, 7, "before"),
+            (silo, "legacy-silo"),
+            Version(8, "legacy-version"),
+            BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, 7, "after")));
+        var client = CreateHeartbeatClient();
+        TableTransactionAction[]? transaction = null;
+        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                transaction = call.Arg<IEnumerable<TableTransactionAction>>().ToArray();
+                return SuccessfulTransaction();
+            });
+        var table = CreateTable(CreateManager(storage, client));
+        var legacy = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+        var member = Assert.Single(legacy.Members);
+        member.Item1.Status = SiloStatus.Stopping;
+
+        Assert.True(await table.UpdateRowAsync(
+            member.Item1, member.Item2, legacy.Version.Next(), TestContext.Current.CancellationToken));
+
+        Assert.NotNull(transaction);
+        Assert.Equal(4, transaction.Length);
+        Assert.Equal("legacy-version", transaction[1].ETag.ToString());
+        var written = transaction.Select(action => Assert.IsType<SiloInstanceTableEntry>(action.Entity))
+            .OrderBy(entry => entry.RowKey, StringComparer.Ordinal).ToArray();
+        Assert.All(written.Where(entry => SiloInstanceTableEntry.IsVersionRow(entry.RowKey)),
+            entry => Assert.Equal("9", entry.MembershipVersion));
+        storage.AddQuery(Query(true, written.Select(entry => (entry, "updated-etag")).ToArray()));
+
+        var updated = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(9, updated.Version.Version);
+        Assert.Equal("updated-etag", updated.Version.VersionEtag);
+        Assert.Equal(SiloStatus.Stopping, Assert.Single(updated.Members).Item1.Status);
         Assert.Equal(2, storage.QueryCount);
     }
 
@@ -149,22 +256,63 @@ public class AzureMembershipPaginationTests
     }
 
     [Theory]
-    [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public async Task MissingBoundaryRowsFail(bool opening, bool closing)
+    public async Task SingleMissingBoundaryRowRetries(bool opening, bool closing)
     {
         var storage = new ScriptedMembershipTableReadStorage();
-        var query = FencedQuery(1, Silo("silo-1", "s1"));
+        var query = FencedQuery(1, Silo("silo-1", "stale"));
         if (!opening) query.Entries.RemoveAt(0);
         if (!closing) query.Entries.RemoveAt(query.Entries.Count - 1);
         storage.AddQuery(query);
+        storage.AddQuery(FencedQuery(2, Silo("silo-1", "current")));
 
-        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
+
+        Assert.Equal("current", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
+        Assert.Equal("2", result.Single(entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW).Entity.MembershipVersion);
+        Assert.Equal(2, storage.QueryCount);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task PersistentSingleBoundaryRowFailsAfterBound(bool opening, bool closing)
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        for (var attempt = 0; attempt < OrleansSiloInstanceManager.MaxMembershipSnapshotAttempts; attempt++)
+        {
+            var query = FencedQuery(1, Silo("silo-1", "s1"));
+            if (!opening) query.Entries.RemoveAt(0);
+            if (!closing) query.Entries.RemoveAt(query.Entries.Count - 1);
+            storage.AddQuery(query);
+        }
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
             () => CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken));
 
-        Assert.Equal("The membership query must include both ordered boundary version rows.", exception.Message);
+        Assert.Equal(
+            $"Unable to read a consistent membership snapshot for cluster '{ClusterId}' from table '{TableName}' after {OrleansSiloInstanceManager.MaxMembershipSnapshotAttempts} attempts.",
+            exception.Message);
+        Assert.Equal(OrleansSiloInstanceManager.MaxMembershipSnapshotAttempts, storage.QueryCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LegacySnapshotUsesOneQuery(bool paginated)
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        storage.AddQuery(Query(paginated, Silo("silo-1", "s1"), Version(7, "legacy")));
+        var client = CreateHeartbeatClient();
+
+        var result = await CreateManager(storage, client).FindAllSiloEntries(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["silo-1", SiloInstanceTableEntry.TABLE_VERSION_ROW], result.Select(entry => entry.Entity.RowKey));
+        Assert.Equal(["s1", "legacy"], result.Select(entry => entry.ETag));
+        Assert.Equal("7", result[1].Entity.MembershipVersion);
         Assert.Equal(1, storage.QueryCount);
+        Assert.Empty(client.ReceivedCalls());
     }
 
     [Fact]

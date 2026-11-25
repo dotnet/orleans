@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageVersion Include="Azure.Identity" Version="1.18.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Blazor.LocalStorage" Version="9.0.1" />
     <PackageVersion Include="Blazor.Serialization" Version="9.0.1" />
     <PackageVersion Include="Bogus" Version="35.6.5" />

@@ -11,9 +11,9 @@ The [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/mai
 
 The sample demonstrates:
 
-- An ordinary <xref:Orleans.Grain> with an injected <xref:Orleans.Journaling.IDurableStateManager>, using constructor-time `GetOrAdd` declarations and activation lifecycle recovery.
-- <xref:Orleans.Journaling.IDurableDictionary`2>, <xref:Orleans.Journaling.IDurableList`1>, <xref:Orleans.Journaling.IDurableQueue`1>, and <xref:Orleans.Journaling.IDurableSet`1>.
-- <xref:Orleans.Journaling.IDurableValue`1>, journal-backed <xref:Orleans.Runtime.IPersistentState`1>, and <xref:Orleans.Journaling.IDurableTaskCompletionSource`1>.
+- An ordinary <xref:Orleans.Grain> with an injected <xref:Orleans.Durable.Journaling.IDurableStateManager>, using constructor-time `GetOrAdd` declarations and activation lifecycle recovery.
+- <xref:Orleans.Durable.Journaling.IDurableDictionary`2>, <xref:Orleans.Durable.Journaling.IDurableList`1>, <xref:Orleans.Durable.Journaling.IDurableQueue`1>, and <xref:Orleans.Durable.Journaling.IDurableSet`1>.
+- <xref:Orleans.Durable.Journaling.IDurableValue`1>, journal-backed <xref:Orleans.Runtime.IPersistentState`1>, and <xref:Orleans.Durable.Journaling.IDurableTaskCompletionSource`1>.
 - JSON source-generation metadata for all journaled payload types.
 - Azure Blob WAL and checkpoint name customization.
 - An acknowledged write, grain deactivation, reactivation, and recovered-state verification.
@@ -33,7 +33,7 @@ This sample keeps its own NuGet package declarations. While the manager APIs awa
 
 ## Run the Redis sample
 
-The [Redis Journaling snippet project](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/journaling/snippets/redis-journaling) retains keyed injection and the <xref:Orleans.Journaling.DurableGrain> helper. It configures Redis, writes an <xref:Orleans.Journaling.IDurableValue`1>, deactivates the grain, and verifies recovery on a new activation:
+The [Redis Journaling snippet project](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/journaling/snippets/redis-journaling) retains keyed injection and the <xref:Orleans.Durable.Journaling.DurableGrain> helper. It configures Redis, writes an <xref:Orleans.Durable.Journaling.IDurableValue`1>, deactivates the grain, and verifies recovery on a new activation:
 
 :::code language="csharp" source="./snippets/redis-journaling/Program.cs" id="redis_journal_counter":::
 

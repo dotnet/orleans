@@ -4,7 +4,7 @@ using Azure.Core.Pipeline;
 using Azure.Data.Tables;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]

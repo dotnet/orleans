@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Orleans.Journaling.Json.Tests;
+namespace Orleans.Durable.Journaling.Json.Tests;
 
 [JsonSerializable(typeof(DateTime))]
 [JsonSerializable(typeof(int))]
@@ -16,14 +16,14 @@ internal partial class JsonCodecTestJsonContext : JsonSerializerContext;
 internal sealed record JsonCodecTestValue(string Name, int Count);
 
 /// <summary>
-/// JSON-side mirror of <see cref="Orleans.Journaling.Tests.JournalingSnapshotRecord"/>: the
+/// JSON-side mirror of <see cref="Orleans.Durable.Journaling.Tests.JournalingSnapshotRecord"/>: the
 /// snapshot tests use logically-identical record shapes on both sides so the binary and JSONL
 /// coverage matrices stay parallel.
 /// </summary>
 internal sealed record JournalingSnapshotRecord(string Name, int Count, JournalingSnapshotRecordTag Tag);
 
 /// <summary>
-/// JSON-side mirror of <see cref="Orleans.Journaling.Tests.JournalingSnapshotRecordTag"/>.
+/// JSON-side mirror of <see cref="Orleans.Durable.Journaling.Tests.JournalingSnapshotRecordTag"/>.
 /// </summary>
 internal readonly record struct JournalingSnapshotRecordTag(string Label, int Code);
 

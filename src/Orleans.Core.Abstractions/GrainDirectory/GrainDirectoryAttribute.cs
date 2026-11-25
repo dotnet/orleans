@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
@@ -40,6 +41,8 @@ namespace Orleans.GrainDirectory
         public string GrainDirectoryName { get; set; }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods",
+            Justification = "AttributeGrainPropertiesProvider validates the properties collection before dispatching to attributes.")]
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[WellKnownGrainTypeProperties.GrainDirectory] = this.GrainDirectoryName ?? DEFAULT_GRAIN_DIRECTORY;

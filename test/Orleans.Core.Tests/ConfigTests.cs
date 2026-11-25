@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,74 @@ namespace UnitTests
         public ConfigTests(ITestOutputHelper output)
         {
             this.output = output;
+        }
+
+        public static IEnumerable<TheoryDataRow<string, long>> TimeSpanCases =>
+        [
+            new("2.5ms", 25_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_MillisecondsLower" },
+            new("2.5MS", 25_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_MillisecondsUpper" },
+            new("2.5Ms", 25_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_MillisecondsTitle" },
+            new("2.5mS", 25_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_MillisecondsMixed" },
+            new("2.5s", 25_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_SecondsLower" },
+            new("2.5S", 25_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_SecondsUpper" },
+            new("2.5m", 1_500_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_MinutesLower" },
+            new("2.5M", 1_500_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_MinutesUpper" },
+            new("2.5hr", 90_000_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_HoursLower" },
+            new("2.5HR", 90_000_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_HoursUpper" },
+            new("2.5Hr", 90_000_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_HoursTitle" },
+            new("2.5hR", 90_000_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_HoursMixed" },
+            new(" \t+1.25 mS\r\n", 12_500L) { TestDisplayName = "ParseTimeSpan_ExactTicks_Whitespace" },
+            new("-0.00015MS", -1L) { TestDisplayName = "ParseTimeSpan_ExactTicks_NegativeSubTickTruncation" },
+            new("2.5", 25_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_DefaultSeconds" },
+            new("+1.25", 12_500_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_PositiveDefault" },
+            new("-1.25", -12_500_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_NegativeDefault" },
+            new("0.00000015", 1L) { TestDisplayName = "ParseTimeSpan_ExactTicks_FractionalDefaultTickTruncation" },
+            new("0hr", 0L) { TestDisplayName = "ParseTimeSpan_ExactTicks_Zero" },
+            new("1e2s", 1_000_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_InvariantExponent" },
+            new("1,234.5s", 12_345_000_000L) { TestDisplayName = "ParseTimeSpan_ExactTicks_InvariantGrouping" },
+        ];
+
+        [Theory, MemberData(nameof(TimeSpanCases)), TestCategory("Functional"), TestCategory("Config")]
+        public void ParseTimeSpan_ExactTicks(string input, long expectedTicks)
+        {
+            var result = ConfigUtilities.ParseTimeSpan(input, "Invalid duration");
+
+            Assert.Equal(expectedTicks, result.Ticks);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void ParseTimeSpan_UsesInvariantCultureUnderFrenchCurrentCulture()
+        {
+            // CurrentCulture is local to this execution context, not a process-wide default.
+            var previousCulture = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+
+                var result = ConfigUtilities.ParseTimeSpan("1,234.5S", "Invalid duration");
+
+                Assert.Equal(12_345_000_000L, result.Ticks);
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = previousCulture;
+            }
+        }
+
+        public static IEnumerable<TheoryDataRow<string>> InvalidTimeSpanCases =>
+        [
+            new(" 1day ") { TestDisplayName = "ParseTimeSpan_InvalidInput_UnsupportedUnit" },
+            new("not-a-numbermS") { TestDisplayName = "ParseTimeSpan_InvalidInput_MalformedNumber" },
+            new("1\u017F") { TestDisplayName = "ParseTimeSpan_InvalidInput_UnicodeSecondSuffix" },
+            new("1m\u017F") { TestDisplayName = "ParseTimeSpan_InvalidInput_UnicodeMillisecondSuffix" },
+        ];
+
+        [Theory, MemberData(nameof(InvalidTimeSpanCases)), TestCategory("Functional"), TestCategory("Config")]
+        public void ParseTimeSpan_InvalidInput_PreservesCustomError(string input)
+        {
+            var exception = Assert.Throws<FormatException>(() => ConfigUtilities.ParseTimeSpan(input, "Custom duration error"));
+
+            Assert.Equal("Custom duration error. Tried to parse " + input, exception.Message);
         }
 
         /// <summary>
@@ -111,6 +180,29 @@ namespace UnitTests
             Assert.Equal(
                 WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue,
                 keepAliveProperties[WellKnownGrainTypeProperties.IdleDeactivationPeriod]);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void DurationAttributes_ExposeParsedTimeSpanValuesAndPreserveCollectionMetadata()
+        {
+            var response = new ResponseTimeoutAttribute("00:00:42");
+            var collection = new CollectionAgeLimitAttribute("00:01:15");
+            var properties = new Dictionary<string, string>();
+
+            collection.Populate(null!, null!, default, properties);
+
+            Assert.Equal(TimeSpan.FromSeconds(42), response.Timeout);
+            Assert.Equal(TimeSpan.FromSeconds(75), collection.AgeLimit);
+            Assert.Equal("00:01:15", properties[WellKnownGrainTypeProperties.IdleDeactivationPeriod]);
+        }
+
+        [Theory, TestCategory("Functional"), TestCategory("Config")]
+        [InlineData("")]
+        [InlineData("not-a-duration")]
+        public void DurationAttributes_InvalidDuration_PropagatesFormatException(string duration)
+        {
+            Assert.Throws<FormatException>(() => new ResponseTimeoutAttribute(duration));
+            Assert.Throws<FormatException>(() => new CollectionAgeLimitAttribute(duration));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]

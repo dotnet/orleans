@@ -36,15 +36,12 @@ internal sealed partial class ActivationData :
     IGrainManagementExtension,
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
+    IGrainRequestAdmission,
     IAsyncDisposable,
     IDisposable
 {
-    private const string GrainAddressMigrationContextKey = "sys.addr";
-#if NET10_0_OR_GREATER
+    internal const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
@@ -56,6 +53,10 @@ internal sealed partial class ActivationData :
     private Message? _blockingRequest;
     private int _runningNonAlwaysInterleaveCount;
     private int _runningNonAlwaysInterleaveWritableCount;
+
+    // Whether an exclusive section is open: only requests which always interleave, and requests on the section holder's call
+    // chain, start. See IGrainRequestAdmission.EnterExclusiveSectionAsync.
+    private bool _exclusiveSectionOpen;
     private bool _isInWorkingSet = true;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
@@ -218,7 +219,9 @@ internal sealed partial class ActivationData :
         lock (_lock)
         {
             var waitingCount = _waitingRequests.Count;
-            return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0);
+
+            // An open exclusive section runs code, such as a transaction, which needn't be a request.
+            return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0 && !_exclusiveSectionOpen);
         }
     }
 
@@ -464,11 +467,7 @@ internal sealed partial class ActivationData :
 
     private void SetState(ActivationState state)
     {
-#if NET10_0_OR_GREATER
         Debug.Assert(_lock.IsHeldByCurrentThread);
-#else
-        Debug.Assert(Monitor.IsEntered(_lock));
-#endif
         State = state;
         if (state is ActivationState.Valid or ActivationState.Invalid)
         {
@@ -1319,14 +1318,7 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            var requests = new List<Message>(_waitingRequests.Count);
-            foreach (var (message, _) in _waitingRequests)
-            {
-                requests.Add(message);
-            }
-
-            _waitingRequests.Clear();
-            return requests;
+            return TakeWaitingRequests();
         }
 
         void AbandonStuckDeactivatingActivation()
@@ -1345,6 +1337,19 @@ internal sealed partial class ActivationData :
 
         bool MayInvokeRequest(Message incoming)
         {
+            if (_exclusiveSectionOpen)
+            {
+                // Only requests which always interleave and requests on the section holder's call chain start while an
+                // exclusive section is open.
+                if (incoming.IsAlwaysInterleave)
+                {
+                    return true;
+                }
+
+                var reentrancyId = incoming.GetReentrancyId();
+                return reentrancyId != Guid.Empty && reentrancyId == _extras?.ExclusiveSectionReentrancyId;
+            }
+
             if (!IsCurrentlyExecuting)
             {
                 return true;
@@ -1506,10 +1511,20 @@ internal sealed partial class ActivationData :
                 if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) &&
                     previousRegistration is not null)
                 {
+                    if (previousRegistration.GrainId != GrainId)
+                    {
+                        throw new ArgumentException("The previous registration must identify the grain being rehydrated.", nameof(context));
+                    }
+
                     PreviousRegistration = previousRegistration;
                     LogPreviousActivationAddress(_shared.Logger, previousRegistration);
                     rehydrateSpan?.SetTag(ActivityTagKeys.RehydratePreviousRegistration,
                         previousRegistration.ToFullString());
+
+                    foreach (var (message, _) in _waitingRequests)
+                    {
+                        message.AddToCacheInvalidationHeader(previousRegistration, Address);
+                    }
                 }
 
                 if (_lifecycle is { } lifecycle)
@@ -1687,6 +1702,146 @@ internal sealed partial class ActivationData :
         _workSignal.Signal();
     }
 
+    // The holder's call chain is read here, synchronously in the caller's flow.
+    ValueTask<IDisposable> IGrainRequestAdmission.EnterExclusiveSectionAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var reentrancyId = RequestContext.ReentrancyId;
+        ExclusiveSectionWaiter waiter;
+        lock (_lock)
+        {
+            if (!_exclusiveSectionOpen)
+            {
+                Debug.Assert(_extras?.ExclusiveSectionWaiters is not { Count: > 0 }, "Sections wait only while one is open.");
+                Debug.Assert(_extras is not { } extras || extras.ExclusiveSectionReentrancyId == Guid.Empty, "Only an open section has a call chain.");
+                _exclusiveSectionOpen = true;
+                if (reentrancyId != Guid.Empty)
+                {
+                    (_extras ??= new()).ExclusiveSectionReentrancyId = reentrancyId;
+                }
+
+                return new(new ExclusiveSection(this));
+            }
+
+            var waiters = (_extras ??= new()).ExclusiveSectionWaiters ??= new();
+            if (waiters.Closed is { } closed)
+            {
+                return ValueTask.FromException<IDisposable>(closed);
+            }
+
+            waiter = new(reentrancyId);
+            waiters.Enqueue(waiter);
+        }
+
+        return WaitAsync(this, waiter, cancellationToken);
+
+        static async ValueTask<IDisposable> WaitAsync(ActivationData activation, ExclusiveSectionWaiter waiter, CancellationToken cancellationToken)
+        {
+            // A canceled waiter stays queued, and the next exit skips it.
+            using (cancellationToken.UnsafeRegister(static (state, token) => ((ExclusiveSectionWaiter)state!).TrySetCanceled(token), waiter))
+            {
+                await waiter.Task;
+            }
+
+            return new ExclusiveSection(activation);
+        }
+    }
+
+    // Closes the open section, or hands it, with its holder's call chain, to the next waiting section, which keeps it open.
+    private void ExitExclusiveSection()
+    {
+        bool signal;
+        lock (_lock)
+        {
+            Debug.Assert(_exclusiveSectionOpen);
+            var next = HandOffExclusiveSection();
+            if (_extras is { } extras)
+            {
+                extras.ExclusiveSectionReentrancyId = next?.ReentrancyId ?? Guid.Empty;
+            }
+
+            _exclusiveSectionOpen = next is not null;
+
+            // Requests which waited for the section, or which are on the next holder's call chain, can start now.
+            signal = _waitingRequests.Count > 0 && (next is null || next.ReentrancyId != Guid.Empty);
+        }
+
+        if (signal)
+        {
+            _workSignal.Signal();
+        }
+    }
+
+    // Returns the first waiting section which accepts the open section, or null when none waits. Must be called under _lock.
+    private ExclusiveSectionWaiter? HandOffExclusiveSection()
+    {
+        if (_extras?.ExclusiveSectionWaiters is not { } waiters)
+        {
+            return null;
+        }
+
+        while (waiters.TryDequeue(out var next))
+        {
+            if (next.TrySetResult())
+            {
+                return next;
+            }
+        }
+
+        if (waiters.Closed is null)
+        {
+            _extras.ExclusiveSectionWaiters = null;
+        }
+
+        return null;
+    }
+
+    // Faults the sections which wait once the activation finishes deactivating: the open section's code may never end, since
+    // deactivation doesn't wait for code which isn't a request, and later sections can't open.
+    private void CloseExclusiveSections()
+    {
+        lock (_lock)
+        {
+            if (!_exclusiveSectionOpen)
+            {
+                return;
+            }
+
+            var waiters = (_extras ??= new()).ExclusiveSectionWaiters ??= new();
+            var closed = waiters.Closed ??= new InvalidOperationException($"Activation {this} is deactivating, so it opens no more exclusive sections.");
+            while (waiters.TryDequeue(out var waiter))
+            {
+                waiter.TrySetException(closed);
+            }
+        }
+    }
+
+    // An open exclusive section of an activation, which disposing closes once.
+    private sealed class ExclusiveSection(ActivationData activation) : IDisposable
+    {
+        private ActivationData? _activation = activation;
+
+        public void Dispose()
+        {
+            var activation = _activation;
+            _activation = null;
+            activation?.ExitExclusiveSection();
+        }
+    }
+
+    // A section which waits for the open section to close, with the call-chain reentrancy ID of the code which requested it.
+    private sealed class ExclusiveSectionWaiter(Guid reentrancyId) : TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
+    {
+        public Guid ReentrancyId { get; } = reentrancyId;
+    }
+
+    // The sections which wait for the open section to close, in the order in which they were requested.
+    private sealed class ExclusiveSectionWaiters : Queue<ExclusiveSectionWaiter>
+    {
+        // Set once the activation finishes deactivating, after which sections which would wait fault.
+        public Exception? Closed { get; set; }
+    }
+
     /// <summary>
     /// Restarts the idle period and ensures the activation is in the working set. Must be called under <see cref="_lock"/>.
     /// </summary>
@@ -1782,13 +1937,30 @@ internal sealed partial class ActivationData :
     }
 
     /// <summary>
-    /// Rejects or forwards requests which this activation dequeued once it could no longer process them.
+    /// Removes all queued requests. The caller holds <see cref="_lock"/>.
     /// </summary>
-    /// <remarks>
-    /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
-    /// Local requests never leave the activation, so they are rejected.
-    /// </remarks>
-    private void RejectOrForwardRequests(List<Message> requests)
+    /// <returns>The requests, or <see langword="null"/> if there are none.</returns>
+    private List<Message>? TakeWaitingRequests()
+    {
+        if (_waitingRequests.Count == 0)
+        {
+            return null;
+        }
+
+        var requests = new List<Message>(_waitingRequests.Count);
+        foreach (var (message, _) in _waitingRequests)
+        {
+            requests.Add(message);
+        }
+
+        _waitingRequests.Clear();
+        return requests;
+    }
+
+    /// <summary>
+    /// Removes and rejects local requests, which never leave the activation.
+    /// </summary>
+    private void RejectLocalOnlyRequests(List<Message> requests)
     {
         foreach (var message in requests)
         {
@@ -1799,6 +1971,18 @@ internal sealed partial class ActivationData :
         }
 
         requests.RemoveAll(static message => message.IsLocalOnly);
+    }
+
+    /// <summary>
+    /// Rejects or forwards requests which this activation dequeued once it could no longer process them.
+    /// </summary>
+    /// <remarks>
+    /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
+    /// Local requests never leave the activation, so they are rejected.
+    /// </remarks>
+    private void RejectOrForwardRequests(List<Message> requests)
+    {
+        RejectLocalOnlyRequests(requests);
         if (requests.Count == 0)
         {
             return;
@@ -2151,6 +2335,7 @@ internal sealed partial class ActivationData :
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
+        ActivationMigration? migration = null;
         var encounteredError = false;
         try
         {
@@ -2160,6 +2345,9 @@ internal sealed partial class ActivationData :
 
                 // Stop timers from firing.
                 DisposeTimers();
+
+                // Code which waits to run exclusively won't run on this activation.
+                CloseExclusiveSections();
 
                 // If the grain was valid when deactivation started, call OnDeactivateAsync.
                 if (deactivateCommand.PreviousState == ActivationState.Valid)
@@ -2218,6 +2406,17 @@ internal sealed partial class ActivationData :
                     encounteredError = true;
                 }
 
+                // When its silo retires, an activation which still has queued requests migrates, carrying the requests with it.
+                // Only an activation which completed activation migrates, since an interrupted activation may hold partially initialized state.
+                if (!encounteredError
+                    && deactivateCommand.PreviousState == ActivationState.Valid
+                    && DehydrationContext is null
+                    && WaitingCount > 0
+                    && MigratesOnRetirement())
+                {
+                    DehydrationContext = new(_shared.SerializerSessionPool, requestContext: null);
+                }
+
                 if (!encounteredError
                     && DehydrationContext is { } context
                     && _shared.MigrationManager is { } migrationManager
@@ -2273,8 +2472,6 @@ internal sealed partial class ActivationData :
                 _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
-            UnregisterMessageTarget();
-
             try
             {
                 await DisposeAsync();
@@ -2292,8 +2489,39 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            // Signal deactivation
-            GetDeactivationCompletionSource().TrySetResult(true);
+            // The activation leaves the catalog only now, so the catalog awaits all of its deactivation, and no new local activation of the grain is created before it completes.
+            // Leaving, forwarding queued requests, and signaling deactivation are synchronous, and forwarding follows leaving so that forwarded requests do not return to this activation.
+            UnregisterMessageTarget();
+            try
+            {
+                if (migration is not null)
+                {
+                    _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
+                    migration.Deliver();
+                }
+            }
+            finally
+            {
+                try
+                {
+                    // Requests outside the original handoff remain owned by this activation.
+                    List<Message>? queued;
+                    lock (_lock)
+                    {
+                        queued = TakeWaitingRequests();
+                    }
+
+                    if (queued is not null)
+                    {
+                        RejectOrForwardRequests(queued);
+                    }
+                }
+                finally
+                {
+                    GetDeactivationCompletionSource().TrySetResult(true);
+                }
+            }
+
             _workSignal.Signal();
         }
         finally
@@ -2324,8 +2552,11 @@ internal sealed partial class ActivationData :
 
                 OnDehydrate(context.MigrationContext);
 
-                // Send the dehydration context to the target host.
-                await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
+                // Send the dehydration context and queued requests to the target host, which admits them through its ordinary request queue.
+                // This activation remains in the catalog until the migration completes, so that the requests which reach this silo for the grain reach it.
+                // Cancellation stops a migration which has not been sent. One which has been sent completes when the target responds.
+                migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
+                await migration.Completion;
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
             }
@@ -2601,6 +2832,21 @@ internal sealed partial class ActivationData :
         /// </summary>
         public DehydrationContextHolder? DehydrationContext { get => GetValueOrDefault<DehydrationContextHolder>(nameof(DehydrationContext)); set => SetOrRemoveValue(nameof(DehydrationContext), value); }
 
+        /// <summary>
+        /// The exclusive sections which wait for the open exclusive section to close.
+        /// </summary>
+        public ExclusiveSectionWaiters? ExclusiveSectionWaiters { get => GetValueOrDefault<ExclusiveSectionWaiters>(nameof(ExclusiveSectionWaiters)); set => SetOrRemoveValue(nameof(ExclusiveSectionWaiters), value); }
+
+        /// <summary>
+        /// The call-chain reentrancy ID of the open exclusive section's holder, which is <see cref="Guid.Empty"/> when no section
+        /// is open or its holder has no call chain. Only a non-empty ID is stored.
+        /// </summary>
+        public Guid ExclusiveSectionReentrancyId
+        {
+            get => TryGetValue(nameof(ExclusiveSectionReentrancyId), out var id) ? (Guid)id : Guid.Empty;
+            set => SetOrRemoveValue(nameof(ExclusiveSectionReentrancyId), value == Guid.Empty ? null : value);
+        }
+
         private DeactivationInfo? GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
         private DeactivationInfo EnsureDeactivationInfo()
         {
@@ -2655,11 +2901,7 @@ internal sealed partial class ActivationData :
     private abstract class Command(CancellationTokenSource cts) : IDisposable
     {
         private bool _disposed;
-#if NET10_0_OR_GREATER
         private readonly Lock _lock = new();
-#else
-        private readonly object _lock = new();
-#endif
         private readonly CancellationTokenSource _cts = cts;
         public CancellationToken CancellationToken => _cts.Token;
 

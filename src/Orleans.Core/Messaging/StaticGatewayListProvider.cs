@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -26,10 +27,24 @@ namespace Orleans.Messaging
         }
 
         /// <inheritdoc />
-        public Task InitializeGatewayListProvider() => Task.CompletedTask;
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
 
         /// <inheritdoc />
-        public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.options.Gateways);
+        public Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IList<Uri>>(this.options.Gateways);
+        }
 
         /// <inheritdoc />
         public TimeSpan MaxStaleness

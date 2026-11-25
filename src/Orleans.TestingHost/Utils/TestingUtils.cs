@@ -68,8 +68,18 @@ namespace Orleans.TestingHost.Utils
         public static ILoggerFactory CreateDefaultLoggerFactory(string filePath, LoggerFilterOptions filters)
         {
             var factory = new LoggerFactory(new List<ILoggerProvider>(), filters);
-            factory.AddProvider(new FileLoggerProvider(filePath));
-            return factory;
+            try
+            {
+#pragma warning disable CA2000 // LoggerFactory.AddProvider owns the provider; the factory is disposed before construction failures propagate.
+                factory.AddProvider(new FileLoggerProvider(filePath));
+#pragma warning restore CA2000
+                return factory;
+            }
+            catch
+            {
+                factory.Dispose();
+                throw;
+            }
         }
 
         /// <summary>Run the predicate until it succeeds or times out.</summary>

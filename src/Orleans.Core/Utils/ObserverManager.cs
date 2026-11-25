@@ -156,8 +156,11 @@ public partial class ObserverManager<TIdentity, TObserver> : IEnumerable<TObserv
     /// <returns>
     /// A <see cref="Task"/> representing the work performed.
     /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="notification"/> is <see langword="null"/>.</exception>
     public async Task Notify(Func<TObserver, Task> notification, Func<TObserver, bool>? predicate = null)
     {
+        ArgumentNullException.ThrowIfNull(notification);
+
         var now = GetDateTime();
         var defunct = default(List<TIdentity>);
 
@@ -204,8 +207,11 @@ public partial class ObserverManager<TIdentity, TObserver> : IEnumerable<TObserv
     /// <param name="predicate">
     /// The predicate used to select observers to notify.
     /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="notification"/> is <see langword="null"/>.</exception>
     public void Notify(Action<TObserver> notification, Func<TObserver, bool>? predicate = null)
     {
+        ArgumentNullException.ThrowIfNull(notification);
+
         var now = GetDateTime();
         var defunct = default(List<TIdentity>);
 

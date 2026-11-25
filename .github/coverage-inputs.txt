@@ -1,4 +1,5 @@
 .github/actions/archive-test-results/action.yml
+.github/actions/cache-dependencies/action.yml
 .github/actions/dotnet-test/action.yml
 .github/actions/run-tests/action.yml
 .github/actions/setup-coverage/action.yml
@@ -7,6 +8,8 @@
 .github/coverage.config.xml
 .github/scripts/coverage-report.ps1
 .github/scripts/invoke-coverage.ps1
+.github/scripts/invoke-restore.ps1
 .github/scripts/setup-coverage.ps1
+.github/solutions/CodeGenerator.slnf
 .github/workflows/ci.yml
 global.json

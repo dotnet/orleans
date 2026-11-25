@@ -328,4 +328,13 @@
   <data name="GrainClassDuplicateDeclarationDescription" xml:space="preserve">
     <value>Each grain class should only be declared once in OrleansContracts.txt.</value>
   </data>
+  <data name="InvalidIdentityTitle" xml:space="preserve">
+    <value>Invalid Orleans identity</value>
+  </data>
+  <data name="InvalidIdentityMessageFormat" xml:space="preserve">
+    <value>{0} requires a non-empty identity containing no quotes, whitespace, control characters, or reserved type-name delimiters ([](),*&amp;), with decimal generic arity suffixes totaling at most 64</value>
+  </data>
+  <data name="InvalidIdentityDescription" xml:space="preserve">
+    <value>Orleans aliases, grain types, and grain interface types must use non-empty identities containing no quotes, whitespace, control characters, or reserved type-name delimiters ([](),*&amp;). Generic arity suffixes must be decimal integers at the end of each nested type name, totaling at most 64.</value>
+  </data>
 </root>

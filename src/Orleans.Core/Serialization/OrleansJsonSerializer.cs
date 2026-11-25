@@ -33,8 +33,10 @@ namespace Orleans.Serialization
         /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
         /// </summary>
         /// <param name="options">The configured JSON serializer options.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
         {
+            ArgumentNullException.ThrowIfNull(options);
             this.settings = options.Value.JsonSerializerSettings;
         }
 
@@ -106,7 +108,14 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            IPAddress ip = (IPAddress)value!;
+            ArgumentNullException.ThrowIfNull(writer);
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            IPAddress ip = (IPAddress)value;
             writer.WriteValue(ip.ToString());
         }
 
@@ -130,7 +139,14 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            GrainId id = (GrainId)value!;
+            ArgumentNullException.ThrowIfNull(writer);
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            GrainId id = (GrainId)value;
             writer.WriteStartObject();
             writer.WritePropertyName("Type");
             writer.WriteValue(id.Type.ToString());
@@ -160,13 +176,21 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            ActivationId id = (ActivationId)value!;
+            ArgumentNullException.ThrowIfNull(writer);
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            ActivationId id = (ActivationId)value;
             writer.WriteValue(id.ToParsableString());
         }
 
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(reader);
             return reader.Value switch
             {
                 string { Length: > 0 } str => ActivationId.FromParsableString(str),
@@ -190,13 +214,21 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            SiloAddress addr = (SiloAddress)value!;
+            ArgumentNullException.ThrowIfNull(writer);
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            SiloAddress addr = (SiloAddress)value;
             writer.WriteValue(addr.ToParsableString());
         }
 
         /// <inheritdoc/>
         public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(reader);
             switch (reader.TokenType)
             {
                 case JsonToken.StartObject:
@@ -222,13 +254,21 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            MembershipVersion typedValue = (MembershipVersion)value!;
+            ArgumentNullException.ThrowIfNull(writer);
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            MembershipVersion typedValue = (MembershipVersion)value;
             writer.WriteValue(typedValue.Value);
         }
 
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(reader);
             return reader.Value switch
             {
                 long l => new MembershipVersion(l),
@@ -252,7 +292,14 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            UniqueKey key = (UniqueKey)value!;
+            ArgumentNullException.ThrowIfNull(writer);
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            UniqueKey key = (UniqueKey)value;
             writer.WriteStartObject();
             writer.WritePropertyName("UniqueKey");
             writer.WriteValue(key.ToHexString());
@@ -283,7 +330,15 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            IPEndPoint ep = (IPEndPoint)value!;
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(serializer);
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            IPEndPoint ep = (IPEndPoint)value;
             writer.WriteStartObject();
             writer.WritePropertyName("Address");
             serializer.Serialize(writer, ep.Address);
@@ -329,6 +384,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(writer);
             var val = ((IAddressable)value!).AsReference();
             writer.WriteStartObject();
             writer.WritePropertyName("Id");

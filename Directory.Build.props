@@ -1,4 +1,9 @@
 <Project>
+  <!-- Establish the SDK default before evaluating configuration-dependent properties. -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+  </PropertyGroup>
+
   <!-- Set the repository root into a variable -->
   <PropertyGroup>
     <SourceRoot>$(MSBuildThisFileDirectory)</SourceRoot>
@@ -21,7 +26,7 @@
     <LangVersion>preview</LangVersion>
     <Features>strict</Features>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>10.0</AnalysisLevel>
+    <AnalysisLevel>11.0</AnalysisLevel>
     <AnalysisMode>Recommended</AnalysisMode>
     <Nullable>enable</Nullable>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -32,6 +37,7 @@
     <IncludeSource>false</IncludeSource>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>

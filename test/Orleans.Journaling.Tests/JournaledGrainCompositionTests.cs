@@ -5,13 +5,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Durable.Journaling.Tests;
 
 [TestCategory("BVT"), TestSuite("BVT"), TestProvider("None"), TestArea("Journaling")]
 public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fixture)

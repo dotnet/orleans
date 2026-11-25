@@ -364,20 +364,16 @@ namespace Orleans.Hosting
 {
     public static partial class ActivationRebalancerExtensions
     {
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP002")]
         public static ISiloBuilder AddActivationRebalancer(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP002")]
         public static ISiloBuilder AddActivationRebalancer<TProvider>(this ISiloBuilder builder)
             where TProvider : class, Placement.Rebalancing.IFailedSessionBackoffProvider { throw null; }
     }
 
     public static partial class ActivationRepartitioningExtensions
     {
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP001")]
         public static ISiloBuilder AddActivationRepartitioner(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP001")]
         public static ISiloBuilder AddActivationRepartitioner<TRule>(this ISiloBuilder builder)
             where TRule : class, Placement.Repartitioning.IImbalanceToleranceRule { throw null; }
     }
@@ -386,7 +382,6 @@ namespace Orleans.Hosting
     {
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP003")]
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null) { throw null; }
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DevelopmentClusterMembershipOptions>> configureOptions) { throw null; }
@@ -394,6 +389,8 @@ namespace Orleans.Hosting
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Configuration.DevelopmentClusterMembershipOptions> configureOptions) { throw null; }
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint? primarySiloEndpoint) { throw null; }
+
+        public static ISiloBuilder UseLegacyGrainDirectory(this ISiloBuilder siloBuilder) { throw null; }
 
         public static ISiloBuilder UseLocalhostClustering(this ISiloBuilder builder, int siloPort = 11111, int gatewayPort = 30000, System.Net.IPEndPoint? primarySiloEndpoint = null, string serviceId = "dev", string clusterId = "dev") { throw null; }
     }
@@ -507,6 +504,10 @@ namespace Orleans.Hosting
 
     public static partial class SystemTextJsonSerializerExtensions
     {
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Serialization.SystemTextJsonGrainStorageSerializerOptions>> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Serialization.SystemTextJsonGrainStorageSerializerOptions> configureOptions) { throw null; }
+
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
     }
 }
@@ -1577,6 +1578,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.LeaseRequest[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1610,6 +1613,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.AcquiredLease[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1643,6 +1648,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.AcquiredLease[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }

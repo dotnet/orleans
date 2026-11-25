@@ -88,6 +88,9 @@ public class ConsistencyTestGrainInputValidationTests
             throw new InvalidOperationException("Transactional state must not be read.");
         }
 
+        public Task<TResult> PerformRead<TResult>(Func<ConsistencyTestGrain.State, TResult> readFunction, ReadIsolation isolation) =>
+            PerformRead(readFunction);
+
         public Task<TResult> PerformUpdate<TResult>(Func<ConsistencyTestGrain.State, TResult> updateFunction)
         {
             InteractionCount++;

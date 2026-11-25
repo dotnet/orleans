@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -20,7 +21,7 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
         List<TypeSyntax> constructorArguments,
         List<CompoundTypeAliasComponent[]> compoundTypeAliases,
         string? returnValueInitializerMethod,
-        ClassDeclarationSyntax classDeclarationSyntax)
+        InvokableEmissionPlan emissionPlan)
     {
         if (methodDescription.AllTypeParameters.Count == 0)
         {
@@ -41,7 +42,7 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
         ActivatorConstructorParameters = constructorArguments;
         CompoundTypeAliases = compoundTypeAliases;
         ReturnValueInitializerMethod = returnValueInitializerMethod;
-        ClassDeclarationSyntax = classDeclarationSyntax;
+        EmissionPlan = emissionPlan;
     }
 
     public Accessibility Accessibility { get; }
@@ -75,7 +76,7 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
     public List<TypeSyntax> ActivatorConstructorParameters { get; }
     public bool HasActivatorConstructor => UseActivator;
     public List<CompoundTypeAliasComponent[]> CompoundTypeAliases { get; }
-    public ClassDeclarationSyntax ClassDeclarationSyntax { get; }
+    public InvokableEmissionPlan EmissionPlan { get; }
     public string? ReturnValueInitializerMethod { get; }
 
     public InvokableMethodDescription MethodDescription { get; }

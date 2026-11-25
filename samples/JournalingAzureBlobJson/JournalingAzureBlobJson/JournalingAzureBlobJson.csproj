@@ -2,17 +2,16 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <OrleansDocumentationTargetFrameworkException>The durable packages target net11.0 only.</OrleansDocumentationTargetFrameworkException>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
-    <OrleansDocumentationVersionException>Uses prerelease Journaling packages until their first 10.2.2 publication.</OrleansDocumentationVersionException>
+    <OrleansDocumentationVersionException>The Microsoft.Orleans.Durable packages require locally built packages until they are published.</OrleansDocumentationVersionException>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" />
   </ItemGroup>
 
@@ -20,8 +19,8 @@
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Durable" />
+    <PackageReference Include="Microsoft.Orleans.Durable.AzureStorage" />
   </ItemGroup>
 
 </Project>

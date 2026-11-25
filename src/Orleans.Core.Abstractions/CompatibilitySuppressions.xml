@@ -8,11 +8,4 @@
     <Right>lib/net10.0/Orleans.Core.Abstractions.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Runtime.SiloAddress.GetUniformHashCodes(System.Int32)</Target>
-    <Left>lib/net8.0/Orleans.Core.Abstractions.dll</Left>
-    <Right>lib/net8.0/Orleans.Core.Abstractions.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
 </Suppressions>

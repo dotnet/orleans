@@ -120,7 +120,8 @@ namespace Orleans.Serialization.TestKit
 
             void Test(TValue original)
             {
-                var output = copier.DeepCopy(original, new CopyContext(_codecProvider, _ => { }));
+                using var context = new CopyContext(_codecProvider, _ => { });
+                var output = copier.DeepCopy(original, context);
                 var isEqual = Equals(original, output);
                 Assert.True(
                     isEqual,

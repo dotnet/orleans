@@ -1,0 +1,75 @@
+﻿# Pet: Cat
+hex: 2020E84011576869736B657273E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 0 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 8b) ["Whiskers"]
+0x000E  }
+0x000F }
+
+# Pet: Dog
+hex: 2021E84007526578E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 1 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 3b) ["Rex"]
+0x0009  }
+0x000A }
+
+# Pet: empty
+hex: 20E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+
+0x0002 }
+
+# PetV2: Dog (case 2)
+hex: 2022E840094669646FE0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 2 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 4b) ["Fido"]
+0x000A  }
+0x000B }
+
+# IntOrString: int
+hex: 2000A9E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 VarInt Id: 0 SchemaType: Expected] Value: 84 (0x54)
+0x0004 }
+
+# IntOrString: string
+hex: 20410974657874E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 4b) ["text"]
+0x0008 }
+
+# MaybeNumber: int?
+hex: 20001DE0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 VarInt Id: 0 SchemaType: Expected] Value: 14 (0xE)
+0x0004 }
+
+# Either<int, string>: Value<string>
+hex: 2021E8400372E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 1 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 1b) ["r"]
+0x0007  }
+0x0008 }
+
+# Shape<int>: Square<int>
+hex: 2021E8E8E80015E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 1 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   - End of base type fields -
+0x0005   - End of base type fields -
+0x0006   [#3 VarInt Id: 0 SchemaType: Expected] Value: 10 (0xA)
+0x0008  }
+0x0009 }

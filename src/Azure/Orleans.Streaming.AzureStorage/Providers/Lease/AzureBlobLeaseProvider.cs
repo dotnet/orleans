@@ -48,7 +48,9 @@ namespace Orleans.LeaseProviders
             }
         }
 
+#pragma warning disable CA1308 // Persisted lease blob addresses use lowercase category and resource-key components.
         private BlobClient GetBlobClient(string category, string resourceKey) => this.container!.GetBlobClient($"{category.ToLowerInvariant()}-{resourceKey.ToLowerInvariant()}.json");
+#pragma warning restore CA1308
 
         /// <inheritdoc />
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)

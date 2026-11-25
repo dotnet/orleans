@@ -53,8 +53,10 @@ namespace Orleans.Serialization.Internal
         /// </summary>
         /// <param name="parts">The collection to add assemblies to.</param>
         /// <param name="assembly">The assembly to inspect.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="parts"/> or <paramref name="assembly"/> is <see langword="null"/>.</exception>
         public static void AddAssembly(HashSet<Assembly> parts, Assembly assembly)
         {
+            if (parts is null) throw new ArgumentNullException(nameof(parts));
             if (assembly == null)
             {
                 throw new ArgumentNullException(nameof(assembly));

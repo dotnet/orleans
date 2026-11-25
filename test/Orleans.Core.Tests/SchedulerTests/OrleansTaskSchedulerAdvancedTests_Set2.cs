@@ -237,7 +237,7 @@ namespace UnitTests.SchedulerTests
                     return 2;
                 });
 
-                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2)));
+                join = Task.WhenAny(task1, task2);
 
                 finish.SetResult(true);
             });
@@ -254,7 +254,7 @@ namespace UnitTests.SchedulerTests
             }
 
             pause1.Set();
-            await join;
+            await join.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
             Assert.True(join.IsCompleted && !join.IsFaulted, "Join Status " + join.Status);
             Assert.False(task1.IsFaulted, "Task-1 Faulted " + task1.Exception);
             Assert.False(task2.IsFaulted, "Task-2 Faulted " + task2.Exception);
@@ -292,7 +292,7 @@ namespace UnitTests.SchedulerTests
                     return 2;
                 });
 
-                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2), fakeTimeProvider));
+                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2), fakeTimeProvider, TestContext.Current.CancellationToken));
 
                 finish.SetResult(true);
             });

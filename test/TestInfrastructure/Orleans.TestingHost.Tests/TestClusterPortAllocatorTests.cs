@@ -103,6 +103,144 @@ public class TestClusterPortAllocatorTests
         Assert.Equal(port, thirdAllocator.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1));
     }
 
+    [Fact]
+    public async Task ConcurrentReservations_StayExclusiveAndReleaseBeforeQueuedReacquisition()
+    {
+        var port = GetAvailablePort(30_001, 32_768);
+        var allocators = Enumerable.Range(0, 8).Select(_ => new TestClusterPortAllocator()).ToArray();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reservations = allocators.Select(allocator => Task.Run(async () =>
+        {
+            await start.Task;
+            try
+            {
+                return allocator.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1) == port;
+            }
+            catch (InvalidOperationException exception)
+            {
+                Assert.Contains($"range [{port}, {port + 1}) after 100 attempts", exception.Message);
+                Assert.Contains("reservation held by another process=0", exception.Message);
+                Assert.Contains("reservation error=0", exception.Message);
+                return false;
+            }
+        })).ToArray();
+
+        try
+        {
+            start.SetResult();
+            var results = await Task.WhenAll(reservations).WaitAsync(TestContext.Current.CancellationToken);
+            var winner = Assert.Single(Enumerable.Range(0, results.Length), index => results[index]);
+            allocators[winner].Dispose();
+
+            using var verifier = new TestClusterPortAllocator();
+            Assert.Equal(port, verifier.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1));
+        }
+        finally
+        {
+            start.TrySetResult();
+            try
+            {
+                await Task.WhenAll(reservations);
+            }
+            finally
+            {
+                foreach (var allocator in allocators)
+                {
+                    allocator.Dispose();
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task MutexManager_LateAcquisitionAfterTimeout_ReleasesReservationAndAllowsSubsequentRequests()
+    {
+        var workerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var resumeWorker = new ManualResetEventSlim();
+        var blockNextAcquire = 1;
+        using var manager = new TestClusterPortAllocator.MutexManager(
+            TimeSpan.FromMilliseconds(100),
+            () =>
+            {
+                if (Interlocked.Exchange(ref blockNextAcquire, 0) != 0)
+                {
+                    workerEntered.SetResult();
+                    resumeWorker.Wait();
+                }
+            });
+        var name = $"Orleans.TestClusterPortAllocatorTests.{Guid.NewGuid():N}";
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timedOutAcquisition = Task.Run(() => manager.Acquire(name), cancellationToken);
+
+        try
+        {
+            await workerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            await Assert.ThrowsAsync<TimeoutException>(() => timedOutAcquisition.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        }
+        finally
+        {
+            resumeWorker.Set();
+        }
+
+        var subsequentAcquisition = await Task.Run(() => manager.Acquire(name), cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(TestClusterPortAllocator.MutexAcquisitionResult.Acquired, subsequentAcquisition.Result);
+        manager.SignalRelease(name);
+    }
+
+    [Fact]
+    public async Task MutexManager_TimedOutAcquisitionForOwnedName_PreservesOwnerReservation()
+    {
+        var workerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var resumeWorker = new ManualResetEventSlim();
+        var blockNextAcquire = 0;
+        using var manager = new TestClusterPortAllocator.MutexManager(
+            TimeSpan.FromMilliseconds(100),
+            () =>
+            {
+                if (Interlocked.Exchange(ref blockNextAcquire, 0) != 0)
+                {
+                    workerEntered.SetResult();
+                    resumeWorker.Wait();
+                }
+            });
+        var name = $"Orleans.TestClusterPortAllocatorTests.{Guid.NewGuid():N}";
+        var ownerAcquisition = manager.Acquire(name);
+        Assert.Equal(TestClusterPortAllocator.MutexAcquisitionResult.Acquired, ownerAcquisition.Result);
+
+        Volatile.Write(ref blockNextAcquire, 1);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timedOutAcquisition = Task.Run(() => manager.Acquire(name), cancellationToken);
+        try
+        {
+            await workerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            await Assert.ThrowsAsync<TimeoutException>(() => timedOutAcquisition.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        }
+        finally
+        {
+            resumeWorker.Set();
+        }
+
+        var ownerReservation = await Task.Run(() => manager.Acquire(name), cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(TestClusterPortAllocator.MutexAcquisitionResult.HeldByCurrentProcess, ownerReservation.Result);
+
+        manager.SignalRelease(name);
+        var subsequentAcquisition = await Task.Run(() => manager.Acquire(name), cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(TestClusterPortAllocator.MutexAcquisitionResult.Acquired, subsequentAcquisition.Result);
+        manager.SignalRelease(name);
+    }
+
+    [Fact]
+    public void MutexManager_SignalReleaseAfterDispose_DoesNotThrow()
+    {
+        using var manager = new TestClusterPortAllocator.MutexManager(TimeSpan.FromSeconds(1));
+        manager.Dispose();
+
+        manager.SignalRelease($"Orleans.TestClusterPortAllocatorTests.{Guid.NewGuid():N}");
+    }
+
     private static int GetAvailablePort(int rangeStart, int rangeEnd, int excludedPort = -1)
     {
         for (var port = rangeStart; port < rangeEnd; port++)

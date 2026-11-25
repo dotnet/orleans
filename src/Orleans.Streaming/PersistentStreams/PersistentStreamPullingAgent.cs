@@ -290,8 +290,10 @@ namespace Orleans.Streams
                 if (localReceiver != null)
                 {
                     var task = OrleansTaskExtentions.SafeExecute(() => localReceiver.Shutdown(this.options.InitQueueTimeout, cancellationToken));
+#pragma warning disable CA2025 // LogException awaits the shutdown task, and its result is awaited before provider cleanup continues.
                     task = task.LogException(logger, ErrorCode.PersistentStreamPullingAgent_07,
                         $"QueueAdapterReceiver {QueueId} failed to Shutdown.");
+#pragma warning restore CA2025
                     await task;
                 }
             }

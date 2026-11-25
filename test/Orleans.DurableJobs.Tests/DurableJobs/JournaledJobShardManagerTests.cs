@@ -9,10 +9,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
-using Orleans.DurableJobs;
+using Orleans.Durable.Jobs;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
+using Orleans.Durable.Journaling;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Runtime;
 using Xunit;
 
@@ -1102,6 +1102,12 @@ public partial class JournaledJobShardManagerTests
         public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status)
         {
             _members = _members.SetItem(siloAddress, new ClusterMember(siloAddress, status, siloAddress.ToParsableString()));
+            _version++;
+        }
+
+        public void RemoveSilo(SiloAddress siloAddress)
+        {
+            _members = _members.Remove(siloAddress);
             _version++;
         }
 

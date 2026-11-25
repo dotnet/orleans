@@ -27,6 +27,13 @@
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
   </Folder>
+  <Folder Name="/playground/OrderProcessing/">
+    <Project Path="playground/OrderProcessing/OrderProcessing.csproj" />
+  </Folder>
+  <Folder Name="/playground/DurableOrderProcessing/">
+    <Project Path="playground/DurableOrderProcessing/DurableOrderProcessing.csproj" />
+    <Project Path="test/DurableOrderProcessing.Tests/DurableOrderProcessing.Tests.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
@@ -42,14 +49,14 @@
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
+    <Project Path="src/Orleans.Durable/Orleans.Durable.csproj" />
+    <Project Path="src/Orleans.Durable.Analyzers/Orleans.Durable.Analyzers.csproj" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
-    <Project Path="src/Orleans.Journaling/Orleans.Journaling.csproj" />
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
     <Project Path="src/Orleans.Persistence.TestKit/Orleans.Persistence.TestKit.csproj" />
     <Project Path="src/Orleans.Reminders/Orleans.Reminders.csproj" />
     <Project Path="src/Orleans.Reminders.TestKit/Orleans.Reminders.TestKit.csproj" />
     <Project Path="src/Orleans.Runtime/Orleans.Runtime.csproj" />
-    <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />
     <Project Path="src/Orleans.Sdk/Orleans.Sdk.csproj" />
     <Project Path="src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj" />
     <Project Path="src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
@@ -62,6 +69,8 @@
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
+    <Project Path="src/Orleans.Durable.Abstractions/Orleans.Durable.Abstractions.csproj" />
+    <Project Path="src/Orleans.Durable.Http/Orleans.Durable.Http.csproj" />
   </Folder>
   <Folder Name="/src/Dashboard/">
     <Project Path="src/Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
@@ -81,7 +90,7 @@
   </Folder>
   <Folder Name="/src/Extensions/AWS/">
     <Project Path="src/AWS/Orleans.Clustering.DynamoDB/Orleans.Clustering.DynamoDB.csproj" />
-    <Project Path="src/AWS/Orleans.Journaling.S3/Orleans.Journaling.S3.csproj" />
+    <Project Path="src/AWS/Orleans.Durable.S3/Orleans.Durable.S3.csproj" />
     <Project Path="src/AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Streaming.Kinesis/Orleans.Streaming.Kinesis.csproj" />
@@ -92,20 +101,18 @@
     <Project Path="src/Azure/Orleans.Clustering.AzureStorage/Orleans.Clustering.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Clustering.Cosmos/Orleans.Clustering.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.GrainDirectory.AzureStorage/Orleans.GrainDirectory.AzureStorage.csproj" />
-    <Project Path="src/Azure/Orleans.Journaling.AzureStorage/Orleans.Journaling.AzureStorage.csproj" />
+    <Project Path="src/Azure/Orleans.Durable.AzureStorage/Orleans.Durable.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.AzureStorage/Orleans.Persistence.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.Cosmos/Orleans.Persistence.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.AzureStorage/Orleans.Reminders.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.Cosmos/Orleans.Reminders.Cosmos.csproj" />
-    <Project Path="src/Azure/Orleans.DurableJobs.AzureStorage/Orleans.DurableJobs.AzureStorage.csproj" Id="5bbb1058-9ab2-44e9-b237-49f5b6bee151" />
     <Project Path="src/Azure/Orleans.Streaming.AzureStorage/Orleans.Streaming.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Streaming.EventHubs/Orleans.Streaming.EventHubs.csproj" />
     <Project Path="src/Azure/Orleans.Transactions.AzureStorage/Orleans.Transactions.AzureStorage.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Cassandra/">
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
-    <Project Path="src/Cassandra/Orleans.DurableJobs.Cassandra/Orleans.DurableJobs.Cassandra.csproj" />
-    <Project Path="src/Cassandra/Orleans.Journaling.Cassandra/Orleans.Journaling.Cassandra.csproj" />
+    <Project Path="src/Cassandra/Orleans.Durable.Cassandra/Orleans.Durable.Cassandra.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Google/">
     <Project Path="src/Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
@@ -118,7 +125,7 @@
   </Folder>
   <Folder Name="/src/Extensions/Redis/">
     <Project Path="src/Redis/Orleans.Clustering.Redis/Orleans.Clustering.Redis.csproj" />
-    <Project Path="src/Redis/Orleans.Journaling.Redis/Orleans.Journaling.Redis.csproj" />
+    <Project Path="src/Redis/Orleans.Durable.Redis/Orleans.Durable.Redis.csproj" />
     <Project Path="src/Redis/Orleans.GrainDirectory.Redis/Orleans.GrainDirectory.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Persistence.Redis/Orleans.Persistence.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Reminders.Redis/Orleans.Reminders.Redis.csproj" />
@@ -130,6 +137,9 @@
     <Project Path="src/Orleans.Transactions/Orleans.Transactions.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/Orleans.DurableTasks.Http.Tests/Orleans.DurableTasks.Http.Tests.csproj" />
+    <Project Path="test/Microsoft.Orleans.DurableTasks.IntegrationTests/Microsoft.Orleans.DurableTasks.IntegrationTests.csproj" />
+    <Project Path="test/Microsoft.Orleans.DurableTasks.Tests/Microsoft.Orleans.DurableTasks.Tests.csproj" />
     <Project Path="test/Orleans.Testing.Reminders/Orleans.Testing.Reminders.csproj" />
     <Project Path="test/Orleans.Analyzers.Tests/Orleans.Analyzers.Tests.csproj" />
     <Project Path="test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" />
@@ -154,8 +164,11 @@
     <Project Path="test/Orleans.GrainDirectory.Tests/Orleans.GrainDirectory.Tests.csproj" />
     <Project Path="test/Orleans.Streaming.Tests/Orleans.Streaming.Tests.csproj" />
     <Project Path="test/Orleans.BroadcastChannel.Tests/Orleans.BroadcastChannel.Tests.csproj" />
+    <Project Path="test/Orleans.Messaging.Tests/Orleans.Messaging.Tests.csproj" />
+    <Project Path="test/Orleans.DurableTasks.Analyzers.Tests/Orleans.DurableTasks.Analyzers.Tests.csproj" />
     <Project Path="test/Orleans.EventSourcing.Tests/Orleans.EventSourcing.Tests.csproj" />
     <Project Path="test/Orleans.DurableJobs.Tests/Orleans.DurableJobs.Tests.csproj" />
+    <Project Path="test/Orleans.DurableTasks.Abstractions.Tests/Orleans.DurableTasks.Abstractions.Tests.csproj" />
   </Folder>
   <Folder Name="/templates/">
     <Project Path="templates/Microsoft.Orleans.Templates/Microsoft.Orleans.Templates.csproj" />
@@ -183,8 +196,9 @@
     <Project Path="test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.EventHubs.Tests/Orleans.Streaming.EventHubs.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Journaling.Cassandra.Tests/Orleans.Journaling.Cassandra.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Durable.Cassandra.Tests/Orleans.Durable.Cassandra.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Durable.Redis.Tests/Orleans.Durable.Redis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Firestore.Tests/Orleans.Clustering.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.GrainDirectory.Firestore.Tests/Orleans.GrainDirectory.Firestore.Tests.csproj" />
@@ -211,8 +225,10 @@
     <Project Path="test/Misc/TestSerializerExternalModels/TestSerializerExternalModels.csproj" />
   </Folder>
   <Folder Name="/test/TestInfrastructure/">
+    <Project Path="test/TestInfrastructure/FSharpCodeGenModels/FSharpCodeGenModels.fsproj" />
     <Project Path="test/TestInfrastructure/Orleans.TestingHost.Tests/Orleans.TestingHost.Tests.csproj" />
     <Project Path="test/TestInfrastructure/TestExtensions/TestExtensions.csproj" />
+    <Project Path="test/TestInfrastructure/TestUtilities/TestUtilities.csproj" />
   </Folder>
   <Folder Name="/test/Transactions/">
     <Project Path="test/Transactions/Orleans.Transactions.Azure.Test/Orleans.Transactions.Azure.Test.csproj" />
