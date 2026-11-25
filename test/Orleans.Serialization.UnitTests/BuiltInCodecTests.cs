@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.FSharp.Core;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -1078,6 +1079,92 @@ namespace Orleans.Serialization.UnitTests
         protected override string CreateValue() => Guid.NewGuid().ToString();
         protected override bool Equals(string? left, string? right) => StringComparer.Ordinal.Equals(left, right);
         protected override string[] TestValues => [null!, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!"];
+
+        [Fact]
+        public void WriteField_EmitsUtf8BytesWithLengthPrefix()
+        {
+            string[] values =
+            {
+                string.Empty, "orleans", new string('x', 41), new string('x', 42), new string('x', 43),
+                new string('\u0800', 42), new string('\u0800', 42) + "a",
+                new string('\u0800', 42) + "aa", new string('\u0800', 43), "á日本😀",
+                "a\uD800b\uDC00c", new string('x', 500) + "😀" + new string('\u0800', 10)
+            };
+
+            foreach (var value in values)
+            {
+                var payload = System.Text.Encoding.UTF8.GetBytes(value);
+                var expected = new ArrayBufferWriter<byte>();
+                var expectedWriter = Writer.Create(expected, session: null!);
+                expectedWriter.WriteFieldHeaderExpected(0, Orleans.Serialization.WireProtocol.WireType.LengthPrefixed);
+                expectedWriter.WriteVarUInt32((uint)payload.Length);
+                expectedWriter.Write(payload);
+                expectedWriter.Commit();
+
+                var contiguous = new ArrayBufferWriter<byte>();
+                using var contiguousSession = SessionPool.GetSession();
+                var contiguousWriter = Writer.Create(contiguous, contiguousSession);
+                StringCodec.WriteField(ref contiguousWriter, 0, value);
+                contiguousWriter.Commit();
+                Assert.Equal(expected.WrittenSpan.ToArray(), contiguous.WrittenSpan.ToArray());
+
+                var small = new ArrayBufferWriter<byte>(1);
+                using var smallSession = SessionPool.GetSession();
+                var smallWriter = Writer.Create(small, smallSession);
+                StringCodec.WriteField(ref smallWriter, 0, value);
+                smallWriter.Commit();
+                Assert.Equal(expected.WrittenSpan.ToArray(), small.WrittenSpan.ToArray());
+
+                var fieldOutput = new ArrayBufferWriter<byte>();
+                using var fieldSession = SessionPool.GetSession();
+                var fieldWriter = Writer.Create(fieldOutput, fieldSession);
+                IFieldCodec<string> codec = new StringCodec();
+                codec.WriteField(ref fieldWriter, 0, typeof(string), value);
+                fieldWriter.Commit();
+                Assert.Equal(expected.WrittenSpan.ToArray(), fieldOutput.WrittenSpan.ToArray());
+            }
+        }
+
+        [Fact]
+        public void WriteField_PreservesReferencesAndSessionReset()
+        {
+            var value = new string("référence😀".AsSpan());
+            using var writerSession = SessionPool.GetSession();
+            using var readerSession = SessionPool.GetSession();
+
+            for (var iteration = 0; iteration < 2; iteration++)
+            {
+                var output = new ArrayBufferWriter<byte>();
+                var writer = Writer.Create(output, writerSession);
+                StringCodec.WriteField(ref writer, 0, value);
+                StringCodec.WriteField(ref writer, 0, value);
+                writer.Commit();
+
+                var reader = Reader.Create(output.WrittenMemory, readerSession);
+                var first = StringCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                var second = StringCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                Assert.Equal(value, first);
+                Assert.Same(first, second);
+
+                writerSession.Reset();
+                readerSession.Reset();
+            }
+        }
+
+        [Fact]
+        public void WriteField_RoundTripsUnicodeAcrossSegments()
+        {
+            var value = new string('x', 510) + "😀日本" + new string('y', 20);
+            var output = new TestMultiSegmentBufferWriter(maxAllocationSize: 8);
+            using var writerSession = SessionPool.GetSession();
+            var writer = Writer.Create(output, writerSession);
+            StringCodec.WriteField(ref writer, 0, value);
+            writer.Commit();
+
+            using var readerSession = SessionPool.GetSession();
+            var reader = Reader.Create(output.GetReadOnlySequence(maxSegmentSize: 1), readerSession);
+            Assert.Equal(value, StringCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
+        }
     }
 
     public class StringCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<string, IDeepCopier<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
