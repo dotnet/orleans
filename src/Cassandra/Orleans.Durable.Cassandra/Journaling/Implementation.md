@@ -87,12 +87,11 @@ the header. A metadata-only revision change can be refreshed and retried when
 the content revision is unchanged. A content change is an optimistic
 concurrency failure and is reported as an inconsistent-state error.
 
-Before appending or replacing, a storage handle creates a missing header with
-an LWT. If it previously observed the journal as absent and that creation loses
-to another writer, it rejects the operation and keeps the observed-absence
-fence; the caller must recover before writing. A handle which has not observed
-the journal can adopt an existing header after its create-if-absent LWT loses,
-preserving cold-handle behavior.
+Each storage handle establishes its content precondition by successfully reading
+or creating the journal. Metadata operations leave that precondition unchanged.
+Before appending or replacing after observing an absent journal, the handle
+creates a header with an LWT. If another writer created the journal first, the
+operation fails and the handle retains its observed-absence precondition.
 
 An append inserts the next entry with `IF NOT EXISTS` and conditionally updates
 the header in one **logged, same-partition conditional batch**. The LWT is on
@@ -103,8 +102,8 @@ When appending the first entry to an empty journal, the same LWT updates the
 header's format key to the configured write format. This handles an empty
 journal created under a different format, where recovery has no bytes from
 which to request a migration snapshot. Non-empty journals retain their format
-until replacement publishes a snapshot in the configured format. Empty appends
-do not write a row. `MaxAppendBytes` bounds one append payload, not the
+until replacement publishes a snapshot in the configured format. Appends
+require a non-empty segment. `MaxAppendBytes` bounds one append payload, not the
 lifetime journal size.
 
 ## Replacement protocol
@@ -226,8 +225,8 @@ coverage includes:
 - first append updates the format key for an empty journal after a format
   change;
 - append and replacement rejection after another handle creates a journal
-  which this handle observed as absent, plus cold-handle adoption of an
-  existing journal;
+  which this handle observed as absent, and write preconditions for unread
+  handles;
 - detection of missing active-generation rows before reporting a complete read;
 - generation replacement, restarted sequence numbers, and exact old-generation
   deletion;

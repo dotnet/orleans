@@ -57,19 +57,13 @@ internal sealed class CassandraJournalStorage : IJournalStorage
             return true;
         }
 
-        SetState(await ReadHeaderAsync(cancellationToken).ConfigureAwait(false));
-        if (_state is null)
-        {
-            throw CreateInconsistentStateException("The Cassandra journal header disappeared during creation.", revision, null);
-        }
-
         return false;
     }
 
     public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
     {
-        SetState(await ReadHeaderAsync(cancellationToken).ConfigureAwait(false));
-        return _state is { } state ? CreateMetadata(state, includeETag: true) : null;
+        var state = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
+        return state is { } header ? CreateMetadata(header, includeETag: true) : null;
     }
 
     public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
@@ -87,14 +81,12 @@ internal sealed class CassandraJournalStorage : IJournalStorage
             var state = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
             if (state is null)
             {
-                SetState(null);
                 return null;
             }
 
             var current = state.Value;
             if (expectedRevision is { } required && current.Revision != required)
             {
-                SetState(current);
                 return null;
             }
 
@@ -111,7 +103,6 @@ internal sealed class CassandraJournalStorage : IJournalStorage
 
             if (DictionaryEqual(current.Metadata, updatedMetadata))
             {
-                SetState(current);
                 return CreateMetadata(current, includeETag: true);
             }
 
@@ -123,33 +114,39 @@ internal sealed class CassandraJournalStorage : IJournalStorage
             if (CassandraJournalStorageQueries.WasApplied(result))
             {
                 current = current with { Metadata = updatedMetadata, Revision = revision };
-                SetState(current);
                 return CreateMetadata(current, includeETag: true);
             }
 
             if (expectedRevision is not null)
             {
-                SetState(await ReadHeaderAsync(cancellationToken).ConfigureAwait(false));
                 return null;
             }
         }
 
-        SetState(await ReadHeaderAsync(cancellationToken).ConfigureAwait(false));
+        var latest = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
         throw CreateInconsistentStateException(
             "Cassandra journal metadata changed repeatedly while updating metadata; retry the operation.",
             expectedRevision,
-            _state?.Revision);
+            latest?.Revision);
     }
 
     public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         var state = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
-        SetState(state);
+        if (_hasObservedState && _state?.ContentRevision != state?.ContentRevision)
+        {
+            throw CreateInconsistentStateException(
+                "Cassandra journal changed while reading it; recovery is required.",
+                _state?.Revision,
+                state?.Revision);
+        }
+
         if (state is null)
         {
             using var empty = new ArcBufferWriter();
             consumer.Read(new JournalBufferReader(empty.Reader, isCompleted: true), metadata: null);
+            SetState(null);
             return;
         }
 
@@ -202,15 +199,15 @@ internal sealed class CassandraJournalStorage : IJournalStorage
         {
             throw new InvalidOperationException("The journal storage consumer did not read all supplied journal data.");
         }
+
+        SetState(state);
     }
 
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (value.IsEmpty)
-        {
-            return;
-        }
+        ArgumentOutOfRangeException.ThrowIfZero(value.Length, nameof(value));
+        ThrowIfWriteBeforeRead(nameof(AppendAsync));
 
         if (value.Length > _options.MaxAppendBytes)
         {
@@ -263,20 +260,20 @@ internal sealed class CassandraJournalStorage : IJournalStorage
             var current = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
             if (current is null || current.Value.ContentRevision != state.ContentRevision)
             {
-                SetState(current);
                 throw CreateInconsistentStateException("Cassandra journal changed while appending; recovery is required.", state.Revision, current?.Revision);
             }
 
             state = current.Value;
         }
 
-        SetState(await ReadHeaderAsync(cancellationToken).ConfigureAwait(false));
-        throw CreateInconsistentStateException("Cassandra journal metadata changed repeatedly while appending; recovery is required.", state.Revision, _state?.Revision);
+        var latest = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
+        throw CreateInconsistentStateException("Cassandra journal metadata changed repeatedly while appending; recovery is required.", state.Revision, latest?.Revision);
     }
 
     public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfWriteBeforeRead(nameof(ReplaceAsync));
         var state = await EnsureHeaderAsync(cancellationToken).ConfigureAwait(false);
         var generation = CassandraJournalGenerationId.Create();
         var sequence = 0L;
@@ -353,15 +350,14 @@ internal sealed class CassandraJournalStorage : IJournalStorage
                 var current = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
                 if (current is null || current.Value.ContentRevision != state.ContentRevision)
                 {
-                    SetState(current);
                     throw CreateInconsistentStateException("Cassandra journal changed while replacing it; recovery is required.", state.Revision, current?.Revision);
                 }
 
                 state = current.Value;
             }
 
-            SetState(await ReadHeaderAsync(cancellationToken).ConfigureAwait(false));
-            throw CreateInconsistentStateException("Cassandra journal metadata changed repeatedly while replacing it; recovery is required.", state.Revision, _state?.Revision);
+            var latest = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
+            throw CreateInconsistentStateException("Cassandra journal metadata changed repeatedly while replacing it; recovery is required.", state.Revision, latest?.Revision);
         }
         catch (Exception operationFailure)
         {
@@ -400,40 +396,44 @@ internal sealed class CassandraJournalStorage : IJournalStorage
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfWriteBeforeRead(nameof(DeleteAsync));
         var expectedState = _state;
-        var hasExpectedState = _hasObservedState;
-        var state = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
-        if (hasExpectedState
-            && (expectedState is null
-                ? state is not null
-                : state is { } observed && observed.ContentRevision != expectedState.Value.ContentRevision))
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            throw CreateInconsistentStateException(
-                "Cassandra journal changed while deleting it; recovery is required.",
-                expectedState?.Revision,
-                state?.Revision);
+            var state = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
+            if (expectedState?.ContentRevision != state?.ContentRevision)
+            {
+                throw CreateInconsistentStateException(
+                    "Cassandra journal changed while deleting it; recovery is required.",
+                    expectedState?.Revision,
+                    state?.Revision);
+            }
+
+            if (state is null)
+            {
+                SetState(null);
+                return;
+            }
+
+            var current = state.Value;
+            var result = await _queries.Session.ExecuteAsync(_queries.DeleteHeader(_journalId.Value, current.Revision))
+                .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (CassandraJournalStorageQueries.WasApplied(result))
+            {
+                SetState(null);
+                await _queries.Session.ExecuteAsync(_queries.DeleteGeneration(_journalId.Value, current.Generation))
+                    .ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                return;
+            }
         }
 
-        SetState(state);
-        if (state is null)
-        {
-            return;
-        }
-
-        var current = state.Value;
-        var result = await _queries.Session.ExecuteAsync(_queries.DeleteHeader(_journalId.Value, current.Revision))
-            .ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!CassandraJournalStorageQueries.WasApplied(result))
-        {
-            var updated = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
-            throw CreateInconsistentStateException("Cassandra journal changed while deleting it; recovery is required.", current.Revision, updated?.Revision);
-        }
-
-        SetState(null);
-        await _queries.Session.ExecuteAsync(_queries.DeleteGeneration(_journalId.Value, current.Generation))
-            .ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
+        var latest = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
+        throw CreateInconsistentStateException(
+            "Cassandra journal metadata changed repeatedly while deleting it; recovery is required.",
+            expectedState?.Revision,
+            latest?.Revision);
     }
 
     private async ValueTask<HeaderState> EnsureHeaderAsync(CancellationToken cancellationToken)
@@ -443,12 +443,10 @@ internal sealed class CassandraJournalStorage : IJournalStorage
             return state;
         }
 
-        var hadObservedAbsence = _hasObservedState;
         var created = await CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (!created && hadObservedAbsence)
+        if (!created)
         {
-            var current = _state;
-            SetState(null);
+            var current = await ReadHeaderAsync(cancellationToken).ConfigureAwait(false);
             throw CreateInconsistentStateException(
                 "Cassandra journal was created after this storage handle observed it absent; recovery is required.",
                 null,
@@ -457,6 +455,14 @@ internal sealed class CassandraJournalStorage : IJournalStorage
 
         state = _state ?? throw CreateInconsistentStateException("Cassandra journal header is missing after creation.", null, null);
         return state;
+    }
+
+    private void ThrowIfWriteBeforeRead(string operation)
+    {
+        if (!_hasObservedState)
+        {
+            throw new InvalidOperationException($"{operation} requires reading or creating the journal first.");
+        }
     }
 
     private BatchStatement CreateReplaceBatch()

@@ -16,7 +16,8 @@ namespace Tester.Cassandra.Journaling;
 [TestArea("Journaling")]
 [TestCategory("BVT")]
 [TestCategory("Cassandra")]
-public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJournalContainer>
+[Collection("Cassandra journal storage")]
+public sealed class CassandraJournalStorageTests
 {
     private readonly CassandraJournalContainer _container;
 
@@ -58,13 +59,14 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var id = NewJournalId();
         await harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
             cancellationToken: TestContext.Current.CancellationToken);
+        var storage = await CreateWriterAsync(harness, id);
         failureInjector.Arm(
             static statement => statement is BatchStatement { BatchType: BatchType.Logged },
             FailureInjectionTiming.BeforeExecution,
             "Injected failure before append execution.");
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(
-            () => harness.Provider.CreateStorage(id).AppendAsync(
+            () => storage.AppendAsync(
                 new ReadOnlySequence<byte>([1]),
                 TestContext.Current.CancellationToken).AsTask());
 
@@ -77,7 +79,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         Assert.Empty(consumer.Bytes.ToArray());
         Assert.True(consumer.IsCompleted);
 
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([2]),
             TestContext.Current.CancellationToken);
         consumer = new CapturingConsumer();
@@ -94,13 +96,14 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var id = NewJournalId();
         await harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
             cancellationToken: TestContext.Current.CancellationToken);
+        var storage = await CreateWriterAsync(harness, id);
         failureInjector.Arm(
             static statement => statement is BatchStatement { BatchType: BatchType.Logged },
             FailureInjectionTiming.AfterExecution,
             "Injected lost response after append commit.");
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(
-            () => harness.Provider.CreateStorage(id).AppendAsync(
+            () => storage.AppendAsync(
                 new ReadOnlySequence<byte>([1]),
                 TestContext.Current.CancellationToken).AsTask());
 
@@ -114,7 +117,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         Assert.Equal([1], consumer.Bytes.ToArray());
         Assert.True(consumer.IsCompleted);
 
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([2]),
             TestContext.Current.CancellationToken);
         consumer = new CapturingConsumer();
@@ -154,7 +157,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await harness.Provider.CreateStorage(firstId).UpdateMetadataAsync(
             set: new Dictionary<string, string> { ["owner"] = "bob" },
             cancellationToken: TestContext.Current.CancellationToken);
-        await harness.Provider.CreateStorage(deletedId).DeleteAsync(TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, deletedId)).DeleteAsync(TestContext.Current.CancellationToken);
 
         var entries = new List<JournalCatalogEntry>();
         await foreach (var entry in harness.Provider.ListAsync(
@@ -321,7 +324,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await staleStorage.ReadAsync(consumer, TestContext.Current.CancellationToken);
         Assert.True(consumer.IsCompleted);
 
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
 
@@ -343,7 +346,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await staleStorage.ReadAsync(consumer, TestContext.Current.CancellationToken);
         Assert.True(consumer.IsCompleted);
 
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
 
@@ -356,24 +359,29 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
-    public async Task AppendAndReplaceAsync_ColdHandlesUseCurrentJournal()
+    public async Task Writes_ColdHandlesRequireReadingOrCreating()
     {
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(
-            new ReadOnlySequence<byte>([1]),
-            TestContext.Current.CancellationToken);
+        var storage = harness.Provider.CreateStorage(id);
+        Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
 
-        await harness.Provider.CreateStorage(id).AppendAsync(
-            new ReadOnlySequence<byte>([2]),
-            TestContext.Current.CancellationToken);
-        await harness.Provider.CreateStorage(id).ReplaceAsync(
-            new ReadOnlySequence<byte>([3]),
-            TestContext.Current.CancellationToken);
+        await RecoverAsync(storage);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        var cold = harness.Provider.CreateStorage(id);
+        Assert.NotNull(await cold.GetMetadataAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => cold.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
 
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
-        Assert.Equal([3], consumer.Bytes.ToArray());
+        Assert.Equal([1], consumer.Bytes.ToArray());
     }
 
     [Fact]
@@ -399,17 +407,20 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
-    public async Task AppendAsync_EmptySequenceDoesNotCreateOrChangeJournal()
+    public async Task AppendAsync_EmptySequenceThrowsWithoutChangingJournal()
     {
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
 
-        await storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken).AsTask());
         Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
-        await storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken).AsTask());
 
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
@@ -427,7 +438,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         Assert.True(await oldFormatHarness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
             cancellationToken: TestContext.Current.CancellationToken));
 
-        await newFormatHarness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(newFormatHarness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1, 2]),
             TestContext.Current.CancellationToken);
 
@@ -446,6 +457,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync(rowSizeBytes: 4, readPageSize: 2);
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), TestContext.Current.CancellationToken);
         var oldGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
 
@@ -471,7 +483,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var id = NewJournalId();
         var expected = Enumerable.Range(0, 65).Select(static value => (byte)value).ToArray();
 
-        await harness.Provider.CreateStorage(id).ReplaceAsync(
+        await (await CreateWriterAsync(harness, id)).ReplaceAsync(
             new ReadOnlySequence<byte>(expected),
             TestContext.Current.CancellationToken);
 
@@ -493,6 +505,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([99]), TestContext.Current.CancellationToken);
         var oldGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
         failureInjector.Arm(
@@ -527,17 +540,18 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
         var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([99]),
             TestContext.Current.CancellationToken);
         var oldGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        var storage = await CreateWriterAsync(harness, id);
         failureInjector.Arm(
             static statement => statement is BatchStatement { BatchType: BatchType.Unlogged },
             FailureInjectionTiming.AfterExecution,
             "Injected lost response after replacement staging.");
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(
-            () => harness.Provider.CreateStorage(id).ReplaceAsync(
+            () => storage.ReplaceAsync(
                 new ReadOnlySequence<byte>([1, 2, 3]),
                 TestContext.Current.CancellationToken).AsTask());
 
@@ -560,7 +574,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var expected = Enumerable.Range(1, 37).Select(value => (byte)value).ToArray();
         var value = CreateSegmentedSequence(expected, [1, 3, 2, 7, 1, 5, 4, 9, 5]);
 
-        await harness.Provider.CreateStorage(id).ReplaceAsync(value, TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, id)).ReplaceAsync(value, TestContext.Current.CancellationToken);
 
         var generation = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
         Assert.Equal(7, (await GetSequencesAsync(harness.Session, harness.Options.TableName, id, generation)).Length);
@@ -575,6 +589,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var previousGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
 
@@ -599,7 +614,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     {
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
         var generation = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
@@ -624,7 +639,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync(rowSizeBytes: 5, readPageSize: 1);
         var id = NewJournalId();
         var expected = Enumerable.Range(1, 24).Select(value => (byte)value).ToArray();
-        await harness.Provider.CreateStorage(id).ReplaceAsync(
+        await (await CreateWriterAsync(harness, id)).ReplaceAsync(
             new ReadOnlySequence<byte>(expected),
             TestContext.Current.CancellationToken);
 
@@ -648,7 +663,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
                 return DelayedPageSessionProxy.Create(session, out pagingSession);
             });
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, id)).AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 #pragma warning disable xUnit1051 // The linked token is canceled by this test to exercise paging.
@@ -683,6 +698,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
 
         var staleGeneration = CassandraJournalGenerationId.Create(DateTimeOffset.UtcNow.AddDays(-2));
@@ -723,6 +739,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var previousGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
 
@@ -749,9 +766,10 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
         var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
+        var storage = await CreateWriterAsync(harness, id);
         failureInjector.Arm(
             static statement => statement is BoundStatement bound
                 && bound.PreparedStatement.QueryString.Contains("SET active_generation", StringComparison.Ordinal),
@@ -759,7 +777,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             "Injected lost response after replacement publication.");
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(
-            () => harness.Provider.CreateStorage(id).ReplaceAsync(
+            () => storage.ReplaceAsync(
                 new ReadOnlySequence<byte>([2, 3]),
                 TestContext.Current.CancellationToken).AsTask());
         Assert.Equal("Injected lost response after replacement publication.", exception.Message);
@@ -770,7 +788,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         Assert.Equal([2, 3], consumer.Bytes.ToArray());
         Assert.True(consumer.IsCompleted);
 
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([4]),
             TestContext.Current.CancellationToken);
         consumer = new CapturingConsumer();
@@ -784,6 +802,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
 
         var original = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
@@ -811,7 +830,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
         var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
         failureInjector.Arm(
@@ -831,6 +850,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
             await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Equal("alice", metadata.Properties["owner"]);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
@@ -844,6 +864,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var seed = harness.Provider.CreateStorage(id);
+        await RecoverAsync(seed);
         await seed.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var first = harness.Provider.CreateStorage(id);
         var second = harness.Provider.CreateStorage(id);
@@ -865,12 +886,121 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         Assert.Equal([1, 2], consumer.Bytes.ToArray());
     }
 
+    [Theory]
+    [InlineData("get")]
+    [InlineData("update")]
+    [InlineData("no-op")]
+    [InlineData("rejected-update")]
+    [InlineData("create")]
+    public async Task MetadataAndExistingCreation_PreserveStaleContentPrecondition(string operation)
+    {
+        await using var harness = await CreateHarnessAsync();
+        var id = NewJournalId();
+        var stale = await CreateWriterAsync(harness, id);
+        await stale.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        var oldMetadata = await stale.GetMetadataAsync(TestContext.Current.CancellationToken);
+        var current = await CreateWriterAsync(harness, id);
+        await current.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+
+        switch (operation)
+        {
+            case "get":
+                Assert.NotNull(await stale.GetMetadataAsync(TestContext.Current.CancellationToken));
+                break;
+            case "update":
+                Assert.NotNull(await stale.UpdateMetadataAsync(
+                    set: new Dictionary<string, string> { ["owner"] = "alice" },
+                    cancellationToken: TestContext.Current.CancellationToken));
+                break;
+            case "no-op":
+                Assert.NotNull(await stale.UpdateMetadataAsync(cancellationToken: TestContext.Current.CancellationToken));
+                break;
+            case "rejected-update":
+                Assert.Null(await stale.UpdateMetadataAsync(
+                    set: new Dictionary<string, string> { ["owner"] = "alice" },
+                    expectedETag: oldMetadata!.ETag,
+                    cancellationToken: TestContext.Current.CancellationToken));
+                break;
+            case "create":
+                Assert.False(await stale.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+                break;
+        }
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => stale.ReplaceAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => stale.AppendAsync(new ReadOnlySequence<byte>([4]), TestContext.Current.CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => stale.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
+
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+    }
+
+    [Theory]
+    [InlineData("get")]
+    [InlineData("update")]
+    public async Task MetadataAfterDeletion_PreservesStaleContentPrecondition(string operation)
+    {
+        await using var harness = await CreateHarnessAsync();
+        var id = NewJournalId();
+        var stale = await CreateWriterAsync(harness, id);
+        await stale.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, id)).DeleteAsync(TestContext.Current.CancellationToken);
+
+        if (operation == "get")
+        {
+            Assert.Null(await stale.GetMetadataAsync(TestContext.Current.CancellationToken));
+        }
+        else
+        {
+            Assert.Null(await stale.UpdateMetadataAsync(cancellationToken: TestContext.Current.CancellationToken));
+        }
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => stale.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => stale.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
+        Assert.Null(await harness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task MetadataUpdate_WhenConcurrentAppendWins_PreservesContentPrecondition()
+    {
+        MetadataUpdateRaceSessionProxy? raceProxy = null;
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: session => MetadataUpdateRaceSessionProxy.Create(session, out raceProxy));
+        var id = NewJournalId();
+        var stale = await CreateWriterAsync(harness, id);
+        await stale.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        var metadata = await stale.GetMetadataAsync(TestContext.Current.CancellationToken);
+        var current = await CreateWriterAsync(harness, id);
+        raceProxy!.BeforeUpdateAsync = () => current.AppendAsync(
+            new ReadOnlySequence<byte>([2]),
+            TestContext.Current.CancellationToken).AsTask();
+
+        Assert.Null(await stale.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" },
+            expectedETag: metadata!.ETag,
+            cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => stale.ReplaceAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => stale.AppendAsync(new ReadOnlySequence<byte>([4]), TestContext.Current.CancellationToken).AsTask());
+
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+    }
+
     [Fact]
     public async Task ReplaceAsync_RejectsStalePublicationAndCleansStagedGeneration()
     {
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var seed = harness.Provider.CreateStorage(id);
+        await RecoverAsync(seed);
         await seed.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
 
         var replacer = harness.Provider.CreateStorage(id);
@@ -896,6 +1026,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var deletedGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
 
@@ -921,10 +1052,11 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
         var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
         var deletedGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        var storage = await CreateWriterAsync(harness, id);
         failureInjector.Arm(
             static statement => statement is BoundStatement bound
                 && bound.PreparedStatement.QueryString.Contains("DELETE", StringComparison.OrdinalIgnoreCase)
@@ -933,7 +1065,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             "Injected lost response after journal deletion.");
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(
-            () => harness.Provider.CreateStorage(id).DeleteAsync(TestContext.Current.CancellationToken).AsTask());
+            () => storage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal("Injected lost response after journal deletion.", exception.Message);
         Assert.Equal(1, failureInjector.InjectedFailures);
@@ -947,7 +1079,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         }
 
         Assert.DoesNotContain(entries, entry => entry.Id == id);
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([2]),
             TestContext.Current.CancellationToken);
 
@@ -964,10 +1096,11 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var staleStorage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(staleStorage);
         await staleStorage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         await RecoverAsync(staleStorage);
 
-        var currentStorage = harness.Provider.CreateStorage(id);
+        var currentStorage = await CreateWriterAsync(harness, id);
         await currentStorage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(
@@ -984,10 +1117,11 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var staleStorage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(staleStorage);
         await staleStorage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         await RecoverAsync(staleStorage);
 
-        await harness.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, id)).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => staleStorage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
@@ -1003,9 +1137,9 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var staleStorage = harness.Provider.CreateStorage(id);
-        Assert.Null(await staleStorage.GetMetadataAsync(TestContext.Current.CancellationToken));
+        await RecoverAsync(staleStorage);
 
-        await harness.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, id)).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => staleStorage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
@@ -1021,11 +1155,12 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var staleStorage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(staleStorage);
         await staleStorage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         await RecoverAsync(staleStorage);
 
-        await harness.Provider.CreateStorage(id).DeleteAsync(TestContext.Current.CancellationToken);
-        await harness.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, id)).DeleteAsync(TestContext.Current.CancellationToken);
+        await (await CreateWriterAsync(harness, id)).AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => staleStorage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
@@ -1041,6 +1176,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync();
         var id = NewJournalId();
         var staleStorage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(staleStorage);
         await staleStorage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         await RecoverAsync(staleStorage);
 
@@ -1059,20 +1195,39 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await using var harness = await CreateHarnessAsync(
             sessionDecorator: session => DeleteHeaderRaceSessionProxy.Create(session, out raceProxy));
         var id = NewJournalId();
-        await harness.Provider.CreateStorage(id).AppendAsync(
+        await (await CreateWriterAsync(harness, id)).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
-        var appender = harness.Provider.CreateStorage(id);
+        var appender = await CreateWriterAsync(harness, id);
+        var deleter = await CreateWriterAsync(harness, id);
         raceProxy!.BeforeDeleteAsync = () => appender.AppendAsync(
             new ReadOnlySequence<byte>([2]),
             TestContext.Current.CancellationToken).AsTask();
 
         await Assert.ThrowsAsync<InconsistentStateException>(
-            () => harness.Provider.CreateStorage(id).DeleteAsync(TestContext.Current.CancellationToken).AsTask());
+            () => deleter.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
 
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
         Assert.Equal([1, 2], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RetriesMetadataUpdateAfterHeaderRead()
+    {
+        DeleteHeaderRaceSessionProxy? raceProxy = null;
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: session => DeleteHeaderRaceSessionProxy.Create(session, out raceProxy));
+        var id = NewJournalId();
+        var storage = await CreateWriterAsync(harness, id);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        raceProxy!.BeforeDeleteAsync = () => harness.Provider.CreateStorage(id).UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" },
+            cancellationToken: TestContext.Current.CancellationToken).AsTask();
+
+        await storage.DeleteAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(await harness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -1083,6 +1238,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var generation = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
         failureInjector.Arm(
@@ -1109,6 +1265,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     {
         await using var harness = await CreateHarnessAsync(maxAppendBytes: 3);
         var storage = harness.Provider.CreateStorage(NewJournalId());
+        await RecoverAsync(storage);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3, 4]), TestContext.Current.CancellationToken).AsTask());
@@ -1184,6 +1341,45 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             var beforeDelete = BeforeDeleteAsync
                 ?? throw new InvalidOperationException("A delete race callback was not configured.");
             await beforeDelete().ConfigureAwait(false);
+            return await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
+        }
+    }
+
+    private class MetadataUpdateRaceSessionProxy : DispatchProxy
+    {
+        private ISession? _inner;
+        private int _racePending;
+
+        public Func<Task>? BeforeUpdateAsync { get; set; }
+
+        public static ISession Create(ISession inner, out MetadataUpdateRaceSessionProxy proxy)
+        {
+            var session = DispatchProxy.Create<ISession, MetadataUpdateRaceSessionProxy>();
+            proxy = (MetadataUpdateRaceSessionProxy)(object)session;
+            proxy._inner = inner;
+            proxy._racePending = 1;
+            return session;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(ISession.ExecuteAsync)
+                && args is { Length: > 0 }
+                && args[0] is BoundStatement statement
+                && statement.PreparedStatement.QueryString.Contains("SET caller_metadata", StringComparison.Ordinal)
+                && Interlocked.Exchange(ref _racePending, 0) == 1)
+            {
+                return ExecuteAfterRaceAsync(statement);
+            }
+
+            return targetMethod!.Invoke(_inner, args);
+        }
+
+        private async Task<RowSet> ExecuteAfterRaceAsync(BoundStatement statement)
+        {
+            var beforeUpdate = BeforeUpdateAsync
+                ?? throw new InvalidOperationException("A metadata update race callback was not configured.");
+            await beforeUpdate().ConfigureAwait(false);
             return await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
         }
     }
@@ -1269,6 +1465,13 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
 
     private static async Task RecoverAsync(IJournalStorage storage)
         => await storage.ReadAsync(new CapturingConsumer(), TestContext.Current.CancellationToken);
+
+    private static async Task<IJournalStorage> CreateWriterAsync(ProviderHarness harness, JournalId id)
+    {
+        var storage = harness.Provider.CreateStorage(id);
+        await RecoverAsync(storage);
+        return storage;
+    }
 
     private static JournalId NewJournalId() => new($"test/{Guid.NewGuid():N}");
 

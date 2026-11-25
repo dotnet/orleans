@@ -6,6 +6,11 @@ using Xunit;
 
 namespace Tester.Cassandra.Journaling;
 
+[CollectionDefinition("Cassandra journal storage")]
+public sealed class CassandraJournalStorageCollection : ICollectionFixture<CassandraJournalContainer>
+{
+}
+
 public sealed class CassandraJournalContainer : IAsyncLifetime
 {
     private const string DefaultCassandraVersion = "5.0";
