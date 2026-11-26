@@ -6,7 +6,7 @@ using Orleans.Services;
 namespace Orleans.Runtime;
 
 /// <summary>
-/// Chooses the single system-target identity of a grain service and the other interface addresses that share it.
+/// Chooses the system-target identity a grain service already had, and the other interface addresses that share that instance.
 /// </summary>
 internal static class GrainServiceInterfaceMap
 {
@@ -23,7 +23,8 @@ internal static class GrainServiceInterfaceMap
 
     /// <summary>
     /// Returns interfaces that should resolve to <paramref name="serviceType"/> without becoming its primary identity.
-    /// An interface implemented by more than one registered service is omitted so it is not given to two instances.
+    /// An interface implemented by more than one registered service is omitted. That keeps a shared interface on the
+    /// service whose primary it already is, and leaves it unregistered when it was nobody's primary.
     /// </summary>
     internal static Type[] GetAliasInterfaces(Type serviceType, IReadOnlyList<Type> registeredServiceTypes)
     {
@@ -66,16 +67,11 @@ internal static class GrainServiceInterfaceMap
 
     private static Type SelectPrimary(Type[] candidates)
     {
-        // An interface that another candidate extends is a parent. The remaining interfaces are the most derived.
-        var mostDerived = Array.FindAll(candidates, candidate => !Array.Exists(candidates, other => other != candidate && other.GetInterfaces().Contains(candidate)));
-        var pool = mostDerived.Length > 0 ? mostDerived : candidates;
-        if (pool.Length == 1)
-        {
-            return pool[0];
-        }
-
-        Array.Sort(pool, static (left, right) => string.Compare(left.FullName, right.FullName, StringComparison.Ordinal));
-        return pool[0];
+        // GetCandidates preserves Type.GetInterfaces() order, which is the order Array.Find used.
+        // That interface is the system-target id existing clients already call. Replacing it with the
+        // most-derived interface drops a shared base that was this service's id, and assigns one leaf
+        // id to two services that previously owned different interfaces.
+        return candidates[0];
     }
 
     private static int CountRegistrations(Type interfaceType, IReadOnlyList<Type> registeredServiceTypes)

@@ -105,13 +105,6 @@ namespace Tester
             }
         }
 
-        public sealed class BaseOnlyService : ServiceBase, IBaseService
-        {
-            public BaseOnlyService(GrainId id) : base(id)
-            {
-            }
-        }
-
         public interface IOtherLeafService : IBaseService
         {
         }
@@ -123,37 +116,66 @@ namespace Tester
             }
         }
 
+        // Lists the ordinally later name first, so a FullName sort would pick the other interface.
+        public sealed class SiblingBFirstService : ServiceBase, ISiblingServiceB, ISiblingServiceA
+        {
+            public SiblingBFirstService(GrainId id) : base(id)
+            {
+            }
+        }
+
+        public sealed class FlatAndSiblingService : ServiceBase, IFlatService, ISiblingServiceA
+        {
+            public FlatAndSiblingService(GrainId id) : base(id)
+            {
+            }
+        }
+
+        public sealed class FlatAndOtherSiblingService : ServiceBase, IFlatService, ISiblingServiceB
+        {
+            public FlatAndOtherSiblingService(GrainId id) : base(id)
+            {
+            }
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public void SingleInterface_IsUsedForTypeCode()
         {
-            Assert.Equal(ExpectedGrainId(typeof(IFlatService)), GetRegisteredGrainId(typeof(FlatService)));
+            AssertPrimary(typeof(FlatService), typeof(IFlatService));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
-        public void InterfaceHierarchy_UsesMostDerivedInterface()
+        public void LeafOnly_KeepsLeafAndAliasesBase()
         {
-            Assert.Equal(ExpectedGrainId(typeof(ILeafService)), GetRegisteredGrainId(typeof(LeafService)));
+            AssertPrimary(typeof(LeafService), typeof(ILeafService));
+            AssertSameInstance(typeof(LeafService), typeof(ILeafService), typeof(IBaseService));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
-        public void InterfaceHierarchy_UsesMostDerivedInterface_RegardlessOfDeclarationOrder()
+        public void BaseDeclaredFirst_KeepsBaseAndAliasesLeaf()
         {
-            Assert.Equal(ExpectedGrainId(typeof(ILeafService)), GetRegisteredGrainId(typeof(BaseFirstLeafService)));
+            AssertPrimary(typeof(BaseFirstLeafService), typeof(IBaseService));
+            AssertSameInstance(typeof(BaseFirstLeafService), typeof(IBaseService), typeof(ILeafService));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
-        public void ThreeLevelHierarchy_UsesMostDerivedInterface_RegardlessOfDeclarationOrder()
+        public void ThreeLevelHierarchy_KeepsTheLegacyPrimary()
         {
-            Assert.Equal(ExpectedGrainId(typeof(IDeepLeafService)), GetRegisteredGrainId(typeof(DeepLeafService)));
-            Assert.Equal(ExpectedGrainId(typeof(IDeepLeafService)), GetRegisteredGrainId(typeof(BaseFirstDeepLeafService)));
+            AssertPrimary(typeof(DeepLeafService), typeof(IDeepLeafService));
+            AssertSameInstance(typeof(DeepLeafService), typeof(IDeepLeafService), typeof(IMidService), typeof(IBaseService));
+
+            AssertPrimary(typeof(BaseFirstDeepLeafService), typeof(IBaseService));
+            AssertSameInstance(typeof(BaseFirstDeepLeafService), typeof(IBaseService), typeof(IMidService), typeof(IDeepLeafService));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
-        public void UnrelatedInterfaces_DoNotThrow_AndUseOrdinalLowestName()
+        public void UnrelatedInterfaces_DoNotThrow_AndKeepTheFirstInterface()
         {
-            Assert.Equal(ExpectedGrainId(typeof(ISiblingServiceA)), GetRegisteredGrainId(typeof(SiblingService)));
-            var aliases = GrainServiceInterfaceMap.GetAliasInterfaces(typeof(SiblingService), [typeof(SiblingService)]);
-            Assert.Equal([typeof(ISiblingServiceB)], aliases);
+            AssertPrimary(typeof(SiblingService), typeof(ISiblingServiceA));
+            Assert.Equal([typeof(ISiblingServiceB)], GrainServiceInterfaceMap.GetAliasInterfaces(typeof(SiblingService), [typeof(SiblingService)]));
+
+            AssertPrimary(typeof(SiblingBFirstService), typeof(ISiblingServiceB));
+            Assert.Equal([typeof(ISiblingServiceA)], GrainServiceInterfaceMap.GetAliasInterfaces(typeof(SiblingBFirstService), [typeof(SiblingBFirstService)]));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
@@ -165,38 +187,89 @@ namespace Tester
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
-        public void Hierarchy_AliasesParentInterfacesToTheSameInstance()
+        public void BaseFirstAndLeaf_KeepDistinctLegacyOwners()
         {
+            var registered = new[] { typeof(BaseFirstLeafService), typeof(LeafService) };
+            AssertPrimary(typeof(BaseFirstLeafService), typeof(IBaseService));
+            AssertPrimary(typeof(LeafService), typeof(ILeafService));
+
             using var directory = CreateDirectory();
-            var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
-            var primary = GrainIdOn(typeof(IDeepLeafService), silo);
-            var service = new AddressableService(primary);
-            directory.RecordNewTarget(service);
+            var silo = NewSilo();
+            var baseService = Register(directory, typeof(IBaseService), silo);
+            var leafService = Register(directory, typeof(ILeafService), silo);
+            PublishAliases(directory, baseService, typeof(BaseFirstLeafService), registered);
+            PublishAliases(directory, leafService, typeof(LeafService), registered);
 
-            var registered = new[] { typeof(DeepLeafService) };
-            foreach (var aliasInterface in GrainServiceInterfaceMap.GetAliasInterfaces(typeof(DeepLeafService), registered))
-            {
-                Assert.True(directory.RecordAlias(GrainServiceInterfaceMap.CreateAliasGrainId(primary, aliasInterface), service));
-            }
-
-            Assert.Equal(1, directory.Count);
-            Assert.Single(directory);
-            Assert.Same(service, directory.FindTarget(primary));
-            Assert.Same(service, directory.FindTarget(GrainIdOn(typeof(IMidService), silo)));
-            Assert.Same(service, directory.FindTarget(GrainIdOn(typeof(IBaseService), silo)));
-            Assert.Equal(primary.Key, GrainServiceInterfaceMap.CreateAliasGrainId(primary, typeof(IBaseService)).Key);
+            Assert.Same(baseService, directory.FindTarget(baseService.GrainId));
+            Assert.Same(leafService, directory.FindTarget(leafService.GrainId));
+            Assert.NotSame(baseService, leafService);
+            Assert.Equal(2, directory.Count);
+            Assert.Empty(GrainServiceInterfaceMap.GetAliasInterfaces(typeof(BaseFirstLeafService), registered));
+            Assert.Empty(GrainServiceInterfaceMap.GetAliasInterfaces(typeof(LeafService), registered));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
-        public void SharedBase_IsNotAliasedOntoEitherLeaf()
+        public void BaseFirstAndOtherLeaf_KeepTheSharedBaseOnItsLegacyOwner()
+        {
+            var registered = new[] { typeof(BaseFirstLeafService), typeof(OtherLeafService) };
+            AssertPrimary(typeof(BaseFirstLeafService), typeof(IBaseService));
+            AssertPrimary(typeof(OtherLeafService), typeof(IOtherLeafService));
+
+            using var directory = CreateDirectory();
+            var silo = NewSilo();
+            var baseService = Register(directory, typeof(IBaseService), silo);
+            var otherService = Register(directory, typeof(IOtherLeafService), silo);
+            PublishAliases(directory, baseService, typeof(BaseFirstLeafService), registered);
+            PublishAliases(directory, otherService, typeof(OtherLeafService), registered);
+
+            Assert.Same(baseService, directory.FindTarget(GrainIdOn(typeof(IBaseService), silo)));
+            Assert.Same(otherService, directory.FindTarget(GrainIdOn(typeof(IOtherLeafService), silo)));
+            Assert.Same(baseService, directory.FindTarget(GrainIdOn(typeof(ILeafService), silo)));
+            Assert.NotSame(otherService, directory.FindTarget(GrainIdOn(typeof(IBaseService), silo)));
+            Assert.Equal(2, directory.Count);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
+        public void UnrelatedLeaves_DoNotReceiveTheSharedBase()
         {
             var registered = new[] { typeof(LeafService), typeof(OtherLeafService) };
+            AssertPrimary(typeof(LeafService), typeof(ILeafService));
+            AssertPrimary(typeof(OtherLeafService), typeof(IOtherLeafService));
             Assert.Empty(GrainServiceInterfaceMap.GetAliasInterfaces(typeof(LeafService), registered));
             Assert.Empty(GrainServiceInterfaceMap.GetAliasInterfaces(typeof(OtherLeafService), registered));
 
-            var baseAndLeaf = new[] { typeof(BaseOnlyService), typeof(LeafService) };
-            Assert.Empty(GrainServiceInterfaceMap.GetAliasInterfaces(typeof(BaseOnlyService), baseAndLeaf));
-            Assert.Empty(GrainServiceInterfaceMap.GetAliasInterfaces(typeof(LeafService), baseAndLeaf));
+            using var directory = CreateDirectory();
+            var silo = NewSilo();
+            var leafService = Register(directory, typeof(ILeafService), silo);
+            var otherService = Register(directory, typeof(IOtherLeafService), silo);
+            PublishAliases(directory, leafService, typeof(LeafService), registered);
+            PublishAliases(directory, otherService, typeof(OtherLeafService), registered);
+
+            Assert.Same(leafService, directory.FindTarget(leafService.GrainId));
+            Assert.Same(otherService, directory.FindTarget(otherService.GrainId));
+            Assert.Null(directory.FindTarget(GrainIdOn(typeof(IBaseService), silo)));
+            Assert.Equal(2, directory.Count);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
+        public void SameLegacyPrimary_DoesNotAliasTheLoserOntoTheWinner()
+        {
+            var registered = new[] { typeof(FlatAndSiblingService), typeof(FlatAndOtherSiblingService) };
+            AssertPrimary(typeof(FlatAndSiblingService), typeof(IFlatService));
+            AssertPrimary(typeof(FlatAndOtherSiblingService), typeof(IFlatService));
+
+            using var directory = CreateDirectory();
+            var silo = NewSilo();
+            var winner = Register(directory, typeof(IFlatService), silo);
+            var loser = new AddressableService(winner.GrainId);
+            directory.RecordNewTarget(loser);
+            PublishAliases(directory, winner, typeof(FlatAndSiblingService), registered);
+            PublishAliases(directory, loser, typeof(FlatAndOtherSiblingService), registered);
+
+            Assert.Same(winner, directory.FindTarget(winner.GrainId));
+            Assert.Same(winner, directory.FindTarget(GrainIdOn(typeof(ISiblingServiceA), silo)));
+            Assert.Null(directory.FindTarget(GrainIdOn(typeof(ISiblingServiceB), silo)));
+            Assert.Equal(1, directory.Count);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
@@ -240,6 +313,55 @@ namespace Tester
             ((IDisposable)directory).Dispose();
             Assert.Equal(1, service.DisposeCount);
         }
+
+        private static void AssertPrimary(Type serviceType, Type interfaceType)
+        {
+            var legacy = Array.Find(serviceType.GetInterfaces(), static candidate => candidate.GetInterfaces().Contains(typeof(IGrainService)));
+            Assert.Equal(interfaceType, legacy);
+            Assert.Equal(interfaceType, GrainServiceInterfaceMap.GetPrimaryInterface(serviceType));
+            Assert.Equal(ExpectedGrainId(interfaceType), GetRegisteredGrainId(serviceType));
+        }
+
+        private static void AssertSameInstance(Type serviceType, params Type[] interfaceTypes)
+        {
+            using var directory = CreateDirectory();
+            var silo = NewSilo();
+            var registered = new[] { serviceType };
+            var primaryInterface = GrainServiceInterfaceMap.GetPrimaryInterface(serviceType);
+            var service = Register(directory, primaryInterface, silo);
+            PublishAliases(directory, service, serviceType, registered);
+
+            Assert.Equal(1, directory.Count);
+            Assert.Single(directory);
+            foreach (var interfaceType in interfaceTypes)
+            {
+                Assert.Same(service, directory.FindTarget(GrainIdOn(interfaceType, silo)));
+            }
+
+            Assert.Equal(service.GrainId.Key, GrainServiceInterfaceMap.CreateAliasGrainId(service.GrainId, interfaceTypes[0]).Key);
+        }
+
+        private static AddressableService Register(ActivationDirectory directory, Type interfaceType, SiloAddress silo)
+        {
+            var service = new AddressableService(GrainIdOn(interfaceType, silo));
+            directory.RecordNewTarget(service);
+            return service;
+        }
+
+        private static void PublishAliases(ActivationDirectory directory, AddressableService service, Type serviceType, IReadOnlyList<Type> registered)
+        {
+            if (!ReferenceEquals(directory.FindTarget(service.GrainId), service))
+            {
+                return;
+            }
+
+            foreach (var aliasInterface in GrainServiceInterfaceMap.GetAliasInterfaces(serviceType, registered))
+            {
+                Assert.True(directory.RecordAlias(GrainServiceInterfaceMap.CreateAliasGrainId(service.GrainId, aliasInterface), service));
+            }
+        }
+
+        private static SiloAddress NewSilo() => SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
 
         private static GrainId GetRegisteredGrainId(Type serviceType)
         {

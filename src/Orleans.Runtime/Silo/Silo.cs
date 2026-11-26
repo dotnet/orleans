@@ -232,20 +232,27 @@ namespace Orleans.Runtime
 
         private async Task CreateGrainServices()
         {
-            var grainServices = this.Services.GetServices<IGrainService>();
-            foreach (var grainService in grainServices)
-            {
-                await RegisterGrainService(grainService);
-            }
-
-            // Parent and sibling interface addresses are published after Init, before the silo accepts calls.
-            RegisterGrainServiceAliases();
-        }
-
-        private void RegisterGrainServiceAliases()
-        {
+            // Enumeration constructs every service. The full set is required before any alias is published,
+            // and aliases must exist before Init so a later service can call an earlier one through a parent interface.
             var services = this.Services.GetServices<IGrainService>().ToList();
             var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
+            foreach (var service in services)
+            {
+                var grainService = (GrainService)service;
+                activationDirectory.RecordNewTarget(grainService);
+                this.grainServices.Add(grainService);
+            }
+
+            RegisterGrainServiceAliases(services, activationDirectory);
+
+            foreach (var service in services)
+            {
+                await InitializeGrainService(service);
+            }
+        }
+
+        private static void RegisterGrainServiceAliases(List<IGrainService> services, ActivationDirectory activationDirectory)
+        {
             var serviceTypes = new Type[services.Count];
             for (var i = 0; i < services.Count; i++)
             {
@@ -274,12 +281,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task RegisterGrainService(IGrainService service)
+        private async Task InitializeGrainService(IGrainService service)
         {
             var grainService = (GrainService)service;
-            var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
-            activationDirectory.RecordNewTarget(grainService);
-            grainServices.Add(grainService);
 
             try
             {
