@@ -237,6 +237,41 @@ namespace Orleans.Runtime
             {
                 await RegisterGrainService(grainService);
             }
+
+            // Parent and sibling interface addresses are published after Init, before the silo accepts calls.
+            RegisterGrainServiceAliases();
+        }
+
+        private void RegisterGrainServiceAliases()
+        {
+            var services = this.Services.GetServices<IGrainService>().ToList();
+            var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
+            var serviceTypes = new Type[services.Count];
+            for (var i = 0; i < services.Count; i++)
+            {
+                serviceTypes[i] = services[i].GetType();
+            }
+
+            foreach (var service in services)
+            {
+                if (service is not GrainService grainService)
+                {
+                    continue;
+                }
+
+                // A duplicate registration does not own the directory entry. Only the recorded instance gets aliases.
+                var owner = activationDirectory.FindTarget(grainService.GrainId);
+                if (!ReferenceEquals(owner, grainService))
+                {
+                    continue;
+                }
+
+                foreach (var aliasInterface in GrainServiceInterfaceMap.GetAliasInterfaces(grainService.GetType(), serviceTypes))
+                {
+                    var aliasId = GrainServiceInterfaceMap.CreateAliasGrainId(grainService.GrainId, aliasInterface);
+                    activationDirectory.RecordAlias(aliasId, grainService);
+                }
+            }
         }
 
         private async Task RegisterGrainService(IGrainService service)
