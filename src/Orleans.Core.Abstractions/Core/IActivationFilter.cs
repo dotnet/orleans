@@ -13,6 +13,11 @@ namespace Orleans
     /// <summary>
     /// Interface for grain activation and deactivation filters.
     /// </summary>
+    /// <remarks>
+    /// A filter must invoke and await <see cref="IActivationContext.Invoke"/> to run the rest of the
+    /// pipeline (the remaining filters and then the grain's activation or deactivation hook). Returning
+    /// without invoking it breaks the pipeline and the activation fails.
+    /// </remarks>
     public interface IActivationFilter
     {
         /// <summary>

@@ -98,7 +98,8 @@ public sealed class ActivationFilterTests
         var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(ActivationFilterGrain).FullName);
         await Assert.ThrowsAnyAsync<Exception>(() => grain.Ping().AsTask().WaitAsync(Timeout, Cancellation));
 
-        // The filter ran, but the grain's activation hook never did, and the activation never became valid.
+        // The filter ran (so the failure is the filter's, not a timeout), but the grain's activation hook never did, and the activation never became valid.
+        Assert.Contains("Filter-Before", state.Events);
         Assert.DoesNotContain("OnActivateAsync", state.Events);
         await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
     }

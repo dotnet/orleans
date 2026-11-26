@@ -49,6 +49,7 @@ internal sealed partial class ActivationData :
     private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private List<IActivationFilter>? _activationFilters;
+    private static readonly List<IActivationFilter> _emptyActivationFilters = [];
     private GrainLifecycle? _lifecycle;
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
@@ -163,7 +164,20 @@ internal sealed partial class ActivationData :
     /// Gets the registered <see cref="IActivationFilter"/> instances, resolved once from the activation's service provider.
     /// </summary>
     private List<IActivationFilter> ActivationFilters
-        => _activationFilters ??= [.. ActivationServices.GetServices<IActivationFilter>()];
+        => _activationFilters ??= GetActivationFilters();
+
+    private List<IActivationFilter> GetActivationFilters()
+    {
+        // Most activations have no filters registered; avoid retaining an
+        // empty list for the activation's lifetime in that case.
+        var services = ActivationServices.GetServices<IActivationFilter>();
+        if (services is ICollection<IActivationFilter> { Count: 0 })
+        {
+            return _emptyActivationFilters;
+        }
+
+        return [.. services];
+    }
     public ActivationId ActivationId => Address.ActivationId;
     public IGrainLifecycle ObservableLifecycle
     {
