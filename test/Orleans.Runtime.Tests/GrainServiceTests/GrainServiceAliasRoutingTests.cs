@@ -57,6 +57,16 @@ public interface IProbeOwnedLeaf : IProbeOwnedBase
 {
 }
 
+public interface IProbeInitOrderEarly : IGrainService
+{
+    Task<bool> SawLaterRejectedBeforeInit();
+}
+
+public interface IProbeInitOrderLate : IGrainService
+{
+    Task<string> Ping();
+}
+
 public sealed class ProbeRouteBaseClient(IServiceProvider serviceProvider) : GrainServiceClient<IProbeRouteBase>(serviceProvider)
 {
     public Task<string> RouteId(SiloAddress silo) => GetGrainService(silo).RouteId();
@@ -109,6 +119,16 @@ public sealed class ProbeOwnedBaseClient(IServiceProvider serviceProvider) : Gra
 public sealed class ProbeOwnedLeafClient(IServiceProvider serviceProvider) : GrainServiceClient<IProbeOwnedLeaf>(serviceProvider)
 {
     public Task<string> Owner(SiloAddress silo) => GetGrainService(silo).Owner();
+}
+
+public sealed class ProbeInitOrderEarlyClient(IServiceProvider serviceProvider) : GrainServiceClient<IProbeInitOrderEarly>(serviceProvider)
+{
+    public Task<bool> SawLaterRejectedBeforeInit(SiloAddress silo) => GetGrainService(silo).SawLaterRejectedBeforeInit();
+}
+
+public sealed class ProbeInitOrderLateClient(IServiceProvider serviceProvider) : GrainServiceClient<IProbeInitOrderLate>(serviceProvider)
+{
+    public Task<string> Ping(SiloAddress silo) => GetGrainService(silo).Ping();
 }
 
 public sealed class ProbeRouteLeafService : GrainService, IProbeRouteLeaf
@@ -207,6 +227,41 @@ public sealed class ProbeOwnedLeafService : GrainService, IProbeOwnedLeaf
     public Task<string> Owner() => Task.FromResult("leaf");
 }
 
+public sealed class ProbeInitOrderEarlyService : GrainService, IProbeInitOrderEarly
+{
+    private bool _sawLaterRejectedBeforeInit;
+
+    public ProbeInitOrderEarlyService(GrainId id, Silo silo, ILoggerFactory loggerFactory) : base(id, silo, loggerFactory)
+    {
+    }
+
+    public override async Task Init(IServiceProvider serviceProvider)
+    {
+        await base.Init(serviceProvider);
+        var late = serviceProvider.GetRequiredService<ProbeInitOrderLateClient>();
+        try
+        {
+            await late.Ping(this.Silo);
+        }
+        catch (Exception exception) when (exception.Message.Contains("not active on this silo", StringComparison.Ordinal)
+            || exception.ToString().Contains("not active on this silo", StringComparison.Ordinal))
+        {
+            _sawLaterRejectedBeforeInit = true;
+        }
+    }
+
+    public Task<bool> SawLaterRejectedBeforeInit() => Task.FromResult(_sawLaterRejectedBeforeInit);
+}
+
+public sealed class ProbeInitOrderLateService : GrainService, IProbeInitOrderLate
+{
+    public ProbeInitOrderLateService(GrainId id, Silo silo, ILoggerFactory loggerFactory) : base(id, silo, loggerFactory)
+    {
+    }
+
+    public Task<string> Ping() => Task.FromResult("late");
+}
+
 /// <summary>
 /// Routes real grain-service calls through the silo registration path.
 /// </summary>
@@ -232,12 +287,16 @@ public class GrainServiceAliasRoutingTests : OrleansTestingBase, IClassFixture<G
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddGrainService<ProbeInitOrderEarlyService>()
+                    .AddGrainService<ProbeInitOrderLateService>()
                     .AddGrainService<ProbeRouteLeafService>()
                     .AddGrainService<ProbeRouteInitCallerService>()
                     .AddGrainService<ProbeRouteSiblingService>()
                     .AddGrainService<ProbeOwnedBaseService>()
                     .AddGrainService<ProbeOwnedLeafService>()
                     .ConfigureServices(services => services
+                        .AddSingleton<ProbeInitOrderEarlyClient>()
+                        .AddSingleton<ProbeInitOrderLateClient>()
                         .AddSingleton<ProbeRouteBaseClient>()
                         .AddSingleton<ProbeRouteMidClient>()
                         .AddSingleton<ProbeRouteLeafClient>()
@@ -279,6 +338,18 @@ public class GrainServiceAliasRoutingTests : OrleansTestingBase, IClassFixture<G
         {
             var seen = await silo.ServiceProvider.GetRequiredService<ProbeRouteInitCallerClient>().Seen(silo.SiloAddress);
             Assert.Equal("leaf", seen);
+        }
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
+    public async Task Init_LaterServiceIsNotCallableBeforeItIsPublished()
+    {
+        foreach (var silo in Silos())
+        {
+            var early = silo.ServiceProvider.GetRequiredService<ProbeInitOrderEarlyClient>();
+            var late = silo.ServiceProvider.GetRequiredService<ProbeInitOrderLateClient>();
+            Assert.True(await early.SawLaterRejectedBeforeInit(silo.SiloAddress));
+            Assert.Equal("late", await late.Ping(silo.SiloAddress));
         }
     }
 

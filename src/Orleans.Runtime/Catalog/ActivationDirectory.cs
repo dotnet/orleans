@@ -78,7 +78,12 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
     {
         if (_activations.TryRemove(KeyValuePair.Create(target.GrainId, target)))
         {
-            RemoveAliases(target.GrainId);
+            // Only grain-service primaries own aliases. Skip the scan on ordinary grain deactivations.
+            if (target.GrainId.Type.IsGrainService())
+            {
+                RemoveAliases(target.GrainId);
+            }
+
             Interlocked.Decrement(ref _activationsCount);
             GetMetrics(target).OnActivationRemoved();
             return true;

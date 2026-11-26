@@ -232,27 +232,12 @@ namespace Orleans.Runtime
 
         private async Task CreateGrainServices()
         {
-            // Enumeration constructs every service. The full set is required before any alias is published,
-            // and aliases must exist before Init so a later service can call an earlier one through a parent interface.
+            // Enumeration constructs every service so collision ownership can use the complete type set.
+            // Each service and its eligible aliases are published immediately before that service's Init,
+            // so later services are not callable until their turn, while an earlier service's aliases
+            // already exist when a later Init calls through a parent interface.
             var services = this.Services.GetServices<IGrainService>().ToList();
             var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
-            foreach (var service in services)
-            {
-                var grainService = (GrainService)service;
-                activationDirectory.RecordNewTarget(grainService);
-                this.grainServices.Add(grainService);
-            }
-
-            RegisterGrainServiceAliases(services, activationDirectory);
-
-            foreach (var service in services)
-            {
-                await InitializeGrainService(service);
-            }
-        }
-
-        private static void RegisterGrainServiceAliases(List<IGrainService> services, ActivationDirectory activationDirectory)
-        {
             var serviceTypes = new Type[services.Count];
             for (var i = 0; i < services.Count; i++)
             {
@@ -261,23 +246,30 @@ namespace Orleans.Runtime
 
             foreach (var service in services)
             {
-                if (service is not GrainService grainService)
-                {
-                    continue;
-                }
+                var grainService = (GrainService)service;
+                activationDirectory.RecordNewTarget(grainService);
+                this.grainServices.Add(grainService);
+                RegisterGrainServiceAliases(grainService, serviceTypes, activationDirectory);
+                await InitializeGrainService(service);
+            }
+        }
 
-                // A duplicate registration does not own the directory entry. Only the recorded instance gets aliases.
-                var owner = activationDirectory.FindTarget(grainService.GrainId);
-                if (!ReferenceEquals(owner, grainService))
-                {
-                    continue;
-                }
+        private static void RegisterGrainServiceAliases(
+            GrainService grainService,
+            Type[] serviceTypes,
+            ActivationDirectory activationDirectory)
+        {
+            // A duplicate registration does not own the directory entry. Only the recorded instance gets aliases.
+            var owner = activationDirectory.FindTarget(grainService.GrainId);
+            if (!ReferenceEquals(owner, grainService))
+            {
+                return;
+            }
 
-                foreach (var aliasInterface in GrainServiceInterfaceMap.GetAliasInterfaces(grainService.GetType(), serviceTypes))
-                {
-                    var aliasId = GrainServiceInterfaceMap.CreateAliasGrainId(grainService.GrainId, aliasInterface);
-                    activationDirectory.RecordAlias(aliasId, grainService);
-                }
+            foreach (var aliasInterface in GrainServiceInterfaceMap.GetAliasInterfaces(grainService.GetType(), serviceTypes))
+            {
+                var aliasId = GrainServiceInterfaceMap.CreateAliasGrainId(grainService.GrainId, aliasInterface);
+                activationDirectory.RecordAlias(aliasId, grainService);
             }
         }
 

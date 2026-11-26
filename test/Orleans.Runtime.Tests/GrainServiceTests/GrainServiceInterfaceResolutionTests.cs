@@ -314,6 +314,30 @@ namespace Tester
             Assert.Equal(1, service.DisposeCount);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
+        public void Alias_SurvivesOrdinaryActivationRemoval()
+        {
+            using var directory = CreateDirectory();
+            var silo = NewSilo();
+            var primary = GrainIdOn(typeof(ILeafService), silo);
+            var alias = GrainIdOn(typeof(IBaseService), silo);
+            var service = new AddressableService(primary);
+            var ordinary = new AddressableService(GrainId.Create("test", "ordinary"));
+            Assert.False(ordinary.GrainId.Type.IsGrainService());
+
+            directory.RecordNewTarget(service);
+            Assert.True(directory.RecordAlias(alias, service));
+            directory.RecordNewTarget(ordinary);
+
+            Assert.True(directory.RemoveTarget(ordinary));
+            Assert.Same(service, directory.FindTarget(alias));
+
+            Assert.True(directory.RemoveTarget(service));
+            Assert.Null(directory.FindTarget(alias));
+            directory.RecordNewTarget(service);
+            Assert.True(directory.RecordAlias(alias, service));
+        }
+
         private static void AssertPrimary(Type serviceType, Type interfaceType)
         {
             var legacy = Array.Find(serviceType.GetInterfaces(), static candidate => candidate.GetInterfaces().Contains(typeof(IGrainService)));
