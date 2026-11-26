@@ -48,6 +48,7 @@ internal sealed partial class ActivationData :
     private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
     private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
+    private List<IActivationFilter>? _activationFilters;
     private GrainLifecycle? _lifecycle;
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
@@ -157,6 +158,12 @@ internal sealed partial class ActivationData :
     public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
 
     public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
+
+    /// <summary>
+    /// Gets the registered <see cref="IActivationFilter"/> instances, resolved once from the activation's service provider.
+    /// </summary>
+    private List<IActivationFilter> ActivationFilters
+        => _activationFilters ??= [.. ActivationServices.GetServices<IActivationFilter>()];
     public ActivationId ActivationId => Address.ActivationId;
     public IGrainLifecycle ObservableLifecycle
     {
@@ -2212,7 +2219,7 @@ internal sealed partial class ActivationData :
 
                     try
                     {
-                        await grainBase.OnActivateAsync(cancellationToken);
+                        await InvokeOnActivateAsync(grainBase, cancellationToken);
                         cancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (Exception exception)
@@ -2327,6 +2334,52 @@ internal sealed partial class ActivationData :
     #region Deactivation
 
     /// <summary>
+    /// Invokes <see cref="IGrainBase.OnActivateAsync"/> through the registered <see cref="IActivationFilter"/> pipeline,
+    /// or directly when no filters are registered.
+    /// </summary>
+    private async Task InvokeOnActivateAsync(IGrainBase grainBase, CancellationToken cancellationToken)
+    {
+        var filters = ActivationFilters;
+        if (filters is { Count: > 0 } || grainBase is IActivationFilter)
+        {
+            var invoker = new ActivationFilterInvoker(
+                this,
+                filters,
+                ActivationStage.Activating,
+                default,
+                cancellationToken,
+                token => grainBase.OnActivateAsync(token));
+            await invoker.Invoke();
+            return;
+        }
+
+        await grainBase.OnActivateAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Invokes <see cref="IGrainBase.OnDeactivateAsync"/> through the registered <see cref="IActivationFilter"/> pipeline,
+    /// or directly when no filters are registered.
+    /// </summary>
+    private async Task InvokeOnDeactivateAsync(IGrainBase grainBase, CancellationToken cancellationToken)
+    {
+        var filters = ActivationFilters;
+        if (filters is { Count: > 0 } || grainBase is IActivationFilter)
+        {
+            var invoker = new ActivationFilterInvoker(
+                this,
+                filters,
+                ActivationStage.Deactivating,
+                DeactivationReason,
+                cancellationToken,
+                token => grainBase.OnDeactivateAsync(DeactivationReason, token));
+            await invoker.Invoke();
+            return;
+        }
+
+        await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken);
+    }
+
+    /// <summary>
     /// Completes the deactivation process.
     /// </summary>
     private async Task FinishDeactivating(Command.Deactivate deactivateCommand, CancellationToken cancellationToken)
@@ -2374,7 +2427,7 @@ internal sealed partial class ActivationData :
 
                             // The deactivation timeout cancels this token. The runtime awaits user code to completion before it
                             // unregisters the activation or disposes its services.
-                            await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken);
+                            await InvokeOnDeactivateAsync(grainBase, cancellationToken);
 
                             LogAfterOnDeactivateAsync(_shared.Logger, this);
                         }

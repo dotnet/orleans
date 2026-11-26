@@ -8,6 +8,13 @@
 //------------------------------------------------------------------------------
 namespace Orleans
 {
+    public delegate System.Threading.Tasks.Task ActivationFilterDelegate(IActivationContext context);
+    public enum ActivationStage
+    {
+        Activating = 0,
+        Deactivating = 1
+    }
+
     public readonly partial struct DeactivationReason : System.IEquatable<DeactivationReason>
     {
         private readonly object _dummy;
@@ -1229,6 +1236,26 @@ namespace Orleans
         protected virtual System.Threading.Tasks.Task ReadStateAsync() { throw null; }
 
         protected virtual System.Threading.Tasks.Task WriteStateAsync() { throw null; }
+    }
+
+    public partial interface IActivationContext
+    {
+        DeactivationReason DeactivationReason { get; }
+
+        object Grain { get; }
+
+        Runtime.IGrainContext GrainContext { get; }
+
+        Runtime.GrainId GrainId { get; }
+
+        ActivationStage Stage { get; }
+
+        System.Threading.Tasks.Task Invoke();
+    }
+
+    public partial interface IActivationFilter
+    {
+        System.Threading.Tasks.Task Invoke(IActivationContext context);
     }
 
     public partial interface IConfigurationValidator
