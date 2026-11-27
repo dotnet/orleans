@@ -129,6 +129,89 @@ public sealed class ActivationFilterTests
     }
 
     [Fact]
+    public async Task RetryFilter_RetryThenShortCircuit_FailsActivation()
+    {
+        // Regression test: the terminal ran (and threw) on the first attempt, so a plain flag would stay
+        // set and let a retry which short-circuits pass as if the hook had run. The activation must fail.
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.AddActivationFilter(async context =>
+            {
+                var events = ActivationFilterTestState.For(context.GrainId).Events;
+                events.Add("RetryFilter-Before");
+                try
+                {
+                    await context.Invoke();
+                }
+                catch (InvalidOperationException)
+                {
+                    events.Add("RetryFilter-Retrying");
+                    await context.Invoke();
+                }
+
+                events.Add("RetryFilter-After");
+            });
+            silo.AddActivationFilter(async context =>
+            {
+                var events = ActivationFilterTestState.For(context.GrainId).Events;
+                events.Add("DownstreamFilter-Before");
+                if (events.Count(e => e == "DownstreamFilter-Before") == 1)
+                {
+                    await context.Invoke();
+                }
+
+                // Second invocation short-circuits: never calls context.Invoke().
+            });
+        }));
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(FlakyActivationGrain).FullName);
+        await Assert.ThrowsAnyAsync<Exception>(() => grain.Ping().AsTask().WaitAsync(Timeout, Cancellation));
+
+        // The hook ran once (and threw), the retry short-circuited, and the activation never became valid.
+        Assert.Equal(
+            ["RetryFilter-Before", "DownstreamFilter-Before", "OnActivateAsync", "RetryFilter-Retrying", "DownstreamFilter-Before"],
+            state.Events);
+        Assert.DoesNotContain("Ping", state.Events);
+        await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
+    }
+
+    [Fact]
+    public async Task GrainFilter_RetryThenShortCircuit_FailsActivation()
+    {
+        // Regression test, grain-level path: same stale-flag hole as the system-filter path, but the
+        // short-circuiting filter is the grain itself.
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddActivationFilter(async context =>
+        {
+            var events = ActivationFilterTestState.For(context.GrainId).Events;
+            events.Add("RetryFilter-Before");
+            try
+            {
+                await context.Invoke();
+            }
+            catch (InvalidOperationException)
+            {
+                events.Add("RetryFilter-Retrying");
+                await context.Invoke();
+            }
+
+            events.Add("RetryFilter-After");
+        })));
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(FlakySelfFilteringGrain).FullName);
+        await Assert.ThrowsAnyAsync<Exception>(() => grain.Ping().AsTask().WaitAsync(Timeout, Cancellation));
+
+        Assert.Equal(
+            ["RetryFilter-Before", "GrainFilter-Before", "OnActivateAsync", "RetryFilter-Retrying", "GrainFilter-Before"],
+            state.Events);
+        Assert.DoesNotContain("Ping", state.Events);
+        await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
+    }
+
+    [Fact]
     public async Task FilterThrowingOnActivation_FailsActivation()
     {
         var key = Guid.NewGuid();
@@ -353,6 +436,40 @@ public class ActivationFilterGrain : Grain, IActivationFilterGrain
 public sealed class FlakyActivationGrain : ActivationFilterGrain
 {
     private int activationAttempts;
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        ActivationFilterTestState.For(this.GrainContext.GrainId).Events.Add("OnActivateAsync");
+        if (++activationAttempts == 1)
+        {
+            throw new InvalidOperationException("Activation hook failed on first attempt.");
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// A grain which implements <see cref="IActivationFilter"/> itself, passes the pipeline through on its
+/// first invocation but short-circuits on later invocations, and whose activation hook fails on the
+/// first attempt. A retry must not mistake the earlier terminal run for the retry's.
+/// </summary>
+public sealed class FlakySelfFilteringGrain : ActivationFilterGrain, IActivationFilter
+{
+    private int activationAttempts;
+    private int filterInvocations;
+
+    public async Task Invoke(IActivationContext context)
+    {
+        var events = ActivationFilterTestState.For(context.GrainId).Events;
+        events.Add("GrainFilter-Before");
+        if (++filterInvocations == 1)
+        {
+            await context.Invoke();
+        }
+
+        // Later invocations short-circuit: never call context.Invoke().
+    }
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {

@@ -18,7 +18,12 @@ internal sealed class ActivationFilterInvoker : IActivationContext
     private readonly CancellationToken cancellationToken;
     private readonly Func<CancellationToken, Task> terminal;
     private int invocationStage;
-    private bool terminalInvoked;
+
+    // How many times the terminal hook has run. A filter may retry the pipeline after a hook failure,
+    // so a single flag cannot tell whether the terminal ran during *this* call: a previous attempt can
+    // satisfy the check for a later attempt which short-circuits. Each call compares this count against
+    // its value at entry instead.
+    private int terminalInvocationCount;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ActivationFilterInvoker"/> class.
@@ -68,6 +73,7 @@ internal sealed class ActivationFilterInvoker : IActivationContext
         // decrementing would leave the stage one step too far. A filter which catches a failure and invokes
         // the pipeline again must retry from the same stage, or it silently skips the next filter.
         var entryStage = invocationStage;
+        var terminalInvocationsAtEntry = terminalInvocationCount;
         try
         {
             // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
@@ -79,8 +85,8 @@ internal sealed class ActivationFilterInvoker : IActivationContext
                 invocationStage++;
                 await systemWideFilter.Invoke(this);
 
-                // If the terminal step did not run, some filter did not continue the pipeline.
-                if (!terminalInvoked)
+                // If the terminal step did not run during this call, some filter did not continue the pipeline.
+                if (terminalInvocationCount == terminalInvocationsAtEntry)
                 {
                     ThrowBrokenFilterChain(systemWideFilter.GetType().Name);
                 }
@@ -97,8 +103,8 @@ internal sealed class ActivationFilterInvoker : IActivationContext
                 {
                     await grainClassLevelFilter.Invoke(this);
 
-                    // If the terminal step did not run, the grain did not continue the pipeline.
-                    if (!terminalInvoked)
+                    // If the terminal step did not run during this call, the grain did not continue the pipeline.
+                    if (terminalInvocationCount == terminalInvocationsAtEntry)
                     {
                         ThrowBrokenFilterChain(Grain.GetType().Name);
                     }
@@ -111,7 +117,7 @@ internal sealed class ActivationFilterInvoker : IActivationContext
             {
                 // Finally invoke the grain's activation or deactivation hook.
                 invocationStage++;
-                terminalInvoked = true;
+                terminalInvocationCount++;
                 await terminal(cancellationToken);
                 return;
             }
