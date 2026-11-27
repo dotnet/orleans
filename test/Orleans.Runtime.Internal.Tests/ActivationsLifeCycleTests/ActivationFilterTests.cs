@@ -85,6 +85,50 @@ public sealed class ActivationFilterTests
     }
 
     [Fact]
+    public async Task RetryFilter_RetriesFromSameStage_AfterHookFailure()
+    {
+        // Regression test: when the grain does not implement IActivationFilter, a downstream Invoke()
+        // advances the stage twice (skipping the grain-filter slot), so retrying from a wrongly restored
+        // stage would skip the logging filter and call the hook directly.
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.AddActivationFilter(async context =>
+            {
+                var events = ActivationFilterTestState.For(context.GrainId).Events;
+                events.Add("RetryFilter-Before");
+                try
+                {
+                    await context.Invoke();
+                }
+                catch (InvalidOperationException)
+                {
+                    events.Add("RetryFilter-Retrying");
+                    await context.Invoke();
+                }
+
+                events.Add("RetryFilter-After");
+            });
+            silo.AddActivationFilter(async context =>
+            {
+                var events = ActivationFilterTestState.For(context.GrainId).Events;
+                events.Add("LoggingFilter-Before");
+                await context.Invoke();
+                events.Add("LoggingFilter-After");
+            });
+        }));
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(FlakyActivationGrain).FullName);
+        await grain.Ping();
+
+        // The logging filter runs on both attempts: the retry does not skip it.
+        Assert.Equal(
+            ["RetryFilter-Before", "LoggingFilter-Before", "OnActivateAsync", "RetryFilter-Retrying", "LoggingFilter-Before", "OnActivateAsync", "LoggingFilter-After", "RetryFilter-After", "Ping"],
+            state.Events);
+    }
+
+    [Fact]
     public async Task FilterThrowingOnActivation_FailsActivation()
     {
         var key = Guid.NewGuid();
@@ -127,6 +171,85 @@ public sealed class ActivationFilterTests
         // Deactivation completes even though the filter threw; the grain's deactivation hook never ran.
         await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
         Assert.Contains("Filter-Deactivate-Throw", state.Events);
+        Assert.DoesNotContain("OnDeactivateAsync", state.Events);
+    }
+
+    [Fact]
+    public async Task FilterShortCircuitingActivation_FailsActivationWithoutRunningHook()
+    {
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddActivationFilter(context =>
+        {
+            ActivationFilterTestState.For(context.GrainId).Events.Add("Filter-ShortCircuit");
+            return Task.CompletedTask;
+        })));
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(ActivationFilterGrain).FullName);
+        await Assert.ThrowsAnyAsync<Exception>(() => grain.Ping().AsTask().WaitAsync(Timeout, Cancellation));
+
+        // The filter ran (so the failure is the broken chain, not a timeout), but the grain's activation hook never did, and the activation never became valid.
+        Assert.Contains("Filter-ShortCircuit", state.Events);
+        Assert.DoesNotContain("OnActivateAsync", state.Events);
+        await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
+    }
+
+    [Fact]
+    public async Task FilterShortCircuitingDeactivation_RemovesActivationWithoutRunningHook()
+    {
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddActivationFilter(context =>
+        {
+            if (context.Stage == ActivationStage.Deactivating)
+            {
+                ActivationFilterTestState.For(context.GrainId).Events.Add("Filter-Deactivate-ShortCircuit");
+                return Task.CompletedTask;
+            }
+
+            return context.Invoke();
+        })));
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(ActivationFilterGrain).FullName);
+        await grain.Ping();
+        await grain.Deactivate();
+
+        // Deactivation completes even though the filter never invoked the pipeline; the grain's deactivation hook never ran.
+        await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
+        Assert.Contains("Filter-Deactivate-ShortCircuit", state.Events);
+        Assert.DoesNotContain("OnDeactivateAsync", state.Events);
+    }
+
+    [Fact]
+    public async Task GrainFilterShortCircuitingActivation_FailsActivationWithoutRunningHook()
+    {
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync();
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(SelfShortCircuitGrain).FullName);
+        await Assert.ThrowsAnyAsync<Exception>(() => grain.Ping().AsTask().WaitAsync(Timeout, Cancellation));
+
+        // The grain-level filter ran (so the failure is the broken chain, not a timeout), but the grain's activation hook never did.
+        Assert.Contains("GrainFilter-ShortCircuit", state.Events);
+        Assert.DoesNotContain("OnActivateAsync", state.Events);
+        await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
+    }
+
+    [Fact]
+    public async Task GrainFilterShortCircuitingDeactivation_RemovesActivationWithoutRunningHook()
+    {
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync();
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(SelfShortCircuitOnDeactivateGrain).FullName);
+        await grain.Ping();
+        await grain.Deactivate();
+
+        // Deactivation completes even though the grain-level filter never invoked the pipeline; the grain's deactivation hook never ran.
+        await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
+        Assert.Contains("GrainFilter-Deactivate-ShortCircuit", state.Events);
         Assert.DoesNotContain("OnDeactivateAsync", state.Events);
     }
 
@@ -221,6 +344,57 @@ public class ActivationFilterGrain : Grain, IActivationFilterGrain
     {
         ActivationFilterTestState.For(this.GrainContext.GrainId).Events.Add("OnDeactivateAsync");
         return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// A grain whose activation hook fails on the first attempt and succeeds on the next, so a filter can retry it.
+/// </summary>
+public sealed class FlakyActivationGrain : ActivationFilterGrain
+{
+    private int activationAttempts;
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        ActivationFilterTestState.For(this.GrainContext.GrainId).Events.Add("OnActivateAsync");
+        if (++activationAttempts == 1)
+        {
+            throw new InvalidOperationException("Activation hook failed on first attempt.");
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// A grain which implements <see cref="IActivationFilter"/> itself but never invokes the downstream pipeline.
+/// </summary>
+public sealed class SelfShortCircuitGrain : ActivationFilterGrain, IActivationFilter
+{
+    public Task Invoke(IActivationContext context)
+    {
+        ActivationFilterTestState.For(context.GrainId).Events.Add("GrainFilter-ShortCircuit");
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// A grain which implements <see cref="IActivationFilter"/> itself, passes activation through, but never invokes the downstream pipeline on deactivation.
+/// </summary>
+public sealed class SelfShortCircuitOnDeactivateGrain : ActivationFilterGrain, IActivationFilter
+{
+    public async Task Invoke(IActivationContext context)
+    {
+        var events = ActivationFilterTestState.For(context.GrainId).Events;
+        if (context.Stage == ActivationStage.Deactivating)
+        {
+            events.Add("GrainFilter-Deactivate-ShortCircuit");
+            return;
+        }
+
+        events.Add("GrainFilter-Before");
+        await context.Invoke();
+        events.Add("GrainFilter-After");
     }
 }
 

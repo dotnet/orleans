@@ -63,6 +63,11 @@ internal sealed class ActivationFilterInvoker : IActivationContext
     /// <inheritdoc />
     public async Task Invoke()
     {
+        // Remember the stage this call started at. A downstream call can advance the stage more than once
+        // (the grain-filter slot is skipped when the grain does not implement the filter), so restoring by
+        // decrementing would leave the stage one step too far. A filter which catches a failure and invokes
+        // the pipeline again must retry from the same stage, or it silently skips the next filter.
+        var entryStage = invocationStage;
         try
         {
             // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
@@ -113,7 +118,7 @@ internal sealed class ActivationFilterInvoker : IActivationContext
         }
         finally
         {
-            invocationStage--;
+            invocationStage = entryStage;
         }
 
         // If this method has been called more than the expected number of times, that is invalid.
