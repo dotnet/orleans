@@ -362,6 +362,16 @@ namespace Orleans.Core
 
 namespace Orleans.Hosting
 {
+    public static partial class ActivationFilterSiloBuilderExtensions
+    {
+        public static ISiloBuilder AddActivationFilter(this ISiloBuilder builder, ActivationFilterDelegate filter) { throw null; }
+
+        public static ISiloBuilder AddActivationFilter(this ISiloBuilder builder, IActivationFilter filter) { throw null; }
+
+        public static ISiloBuilder AddActivationFilter<TImplementation>(this ISiloBuilder builder)
+            where TImplementation : class, IActivationFilter { throw null; }
+    }
+
     public static partial class ActivationRebalancerExtensions
     {
         public static ISiloBuilder AddActivationRebalancer(this ISiloBuilder builder) { throw null; }
