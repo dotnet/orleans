@@ -63,6 +63,9 @@ internal sealed class ActivationFilterInvoker : IActivationContext
     public ActivationStage Stage => stage;
 
     /// <inheritdoc />
+    public CancellationToken CancellationToken => cancellationToken;
+
+    /// <inheritdoc />
     public DeactivationReason DeactivationReason => deactivationReason;
 
     /// <inheritdoc />

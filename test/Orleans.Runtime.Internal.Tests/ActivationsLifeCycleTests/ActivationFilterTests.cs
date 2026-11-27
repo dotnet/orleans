@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
@@ -228,6 +230,46 @@ public sealed class ActivationFilterTests
         // The filter ran (so the failure is the filter's, not a timeout), but the grain's activation hook never did, and the activation never became valid.
         Assert.Contains("Filter-Before", state.Events);
         Assert.DoesNotContain("OnActivateAsync", state.Events);
+        await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
+    }
+
+    [Fact]
+    public async Task FilterAwaitingWork_SeesActivationTimeoutCancellation()
+    {
+        // The activation timeout cancels the token exposed on the context, so a filter doing
+        // I/O can stop instead of holding activation open past the timeout.
+        var key = Guid.NewGuid();
+        var state = ActivationFilterTestState.Create(key);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.Services.Configure<GrainCollectionOptions>(options => options.ActivationTimeout = TimeSpan.FromSeconds(5));
+            silo.AddActivationFilter(async context =>
+            {
+                var events = ActivationFilterTestState.For(context.GrainId).Events;
+                events.Add("Filter-Before");
+                try
+                {
+                    await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, context.CancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    events.Add("Filter-Cancelled");
+                    throw;
+                }
+
+                await context.Invoke();
+            });
+        }));
+
+        var grain = GetGrainFactory(cluster).GetGrain<IActivationFilterGrain>(key, typeof(ActivationFilterGrain).FullName);
+        await Assert.ThrowsAnyAsync<Exception>(() => grain.Ping().AsTask().WaitAsync(Timeout, Cancellation));
+
+        // The filter observed the cancellation (so the failure is the timeout, not a hang), but the
+        // grain's activation hook never ran and the activation never became valid.
+        Assert.Contains("Filter-Before", state.Events);
+        Assert.Contains("Filter-Cancelled", state.Events);
+        Assert.DoesNotContain("OnActivateAsync", state.Events);
+        Assert.DoesNotContain("Ping", state.Events);
         await WaitUntilAsync(() => FindActivation(cluster.Silos[0], grain.GetGrainId()) is null);
     }
 

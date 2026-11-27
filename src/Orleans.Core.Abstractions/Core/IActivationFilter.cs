@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -52,6 +53,13 @@ namespace Orleans
         /// Gets which lifecycle operation is running.
         /// </summary>
         ActivationStage Stage { get; }
+
+        /// <summary>
+        /// Gets the token canceled when the activation or deactivation times out. Filter-owned
+        /// work should observe it instead of running unbounded, since the runtime awaits the
+        /// pipeline before cleanup.
+        /// </summary>
+        CancellationToken CancellationToken { get; }
 
         /// <summary>
         /// Gets the reason for deactivation. Meaningful only when <see cref="Stage"/> is <see cref="ActivationStage.Deactivating"/>.

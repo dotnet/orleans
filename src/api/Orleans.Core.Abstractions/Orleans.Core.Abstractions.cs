@@ -1240,6 +1240,8 @@ namespace Orleans
 
     public partial interface IActivationContext
     {
+        System.Threading.CancellationToken CancellationToken { get; }
+
         DeactivationReason DeactivationReason { get; }
 
         object Grain { get; }
