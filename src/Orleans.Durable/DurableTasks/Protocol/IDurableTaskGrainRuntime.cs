@@ -263,6 +263,26 @@ internal interface IDurableTaskGrainRuntime
     }
 
     /// <summary>
+    /// Gets the observer of the replay host which runs this runtime in replay mode, or <see langword="null"/> for live
+    /// execution; see <see cref="IDurableTaskReplayObserver"/>.
+    /// </summary>
+    IDurableTaskReplayObserver? ReplayObserver => null;
+
+    /// <summary>
+    /// Ends the attempt which <paramref name="context"/> runs because it reached the end of its recorded history in
+    /// replay mode, before it stages any new operation.
+    /// </summary>
+    void StopReplayAttempt(GrainDurableTaskContext context)
+    {
+    }
+
+    /// <summary>
+    /// Returns whether the delay <paramref name="taskId"/> recorded its due time or its outcome, so a replay which schedules
+    /// it again reaches the recorded delay rather than starting a new one.
+    /// </summary>
+    bool HasRecordedDelay(TaskId taskId) => false;
+
+    /// <summary>
     /// Stages the terminal response of the body which <paramref name="context"/> runs, from the work item which ran the
     /// body's final code on the activation, without writing.
     /// </summary>

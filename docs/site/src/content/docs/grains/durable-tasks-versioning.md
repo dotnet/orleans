@@ -1,7 +1,7 @@
 ---
 title: Version durable tasks
 description: Change durable task code while executions are pending, with DurableTask.GetVersion branches which each execution follows from its recorded version, and retire old versions safely.
-ms.date: 10/16/2026
+ms.date: 10/17/2026
 ms.topic: how-to
 ---
 
@@ -17,6 +17,8 @@ This page builds on [Replay and determinism](durable-tasks.md#replay-and-determi
 [Task identity and references](durable-tasks-identity.md). Changes which only add
 operations after existing ones, or which add a new method, need no version; see
 [Version workflows safely](durable-tasks-operations.md#version-workflows-safely).
+[Test workflow changes](durable-tasks-testing.md) replays recorded histories against a
+change before it's deployed.
 
 ## Branch on a change's version
 
@@ -104,6 +106,10 @@ Retire a version once no pending execution follows it:
 Give a later change a new name rather than reusing a retired one: an execution which ran
 past the retired check before it was added holds no record, and a new check under the
 old name would decide version `0` for it.
+
+A replay test checks each step against recorded histories: a history which follows a
+retired version stalls with `UnsupportedVersion`, as its execution would in a deployment;
+see [Test workflow changes](durable-tasks-testing.md#check-changes-in-ci).
 
 ## Stalled executions
 

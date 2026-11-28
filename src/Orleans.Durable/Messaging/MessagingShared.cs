@@ -32,8 +32,11 @@ internal sealed class MessagingShared
         var format = services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey;
         InboxCodec = services.GetRequiredKeyedService<IDurableValueCommandCodec<InboxCommand>>(format);
         OutboxCodec = services.GetRequiredKeyedService<IDurableValueCommandCodec<OutboxCommand>>(format);
+        HoldsRecordedState = services.GetService<MessagingReplayHold>() is not null;
     }
 
+    /// <summary>Gets whether inboxes and outboxes keep their recovered messages at their recorded state; see <see cref="MessagingReplayHold"/>.</summary>
+    public bool HoldsRecordedState { get; }
 
     public DurableMessagingOptions Options { get; }
 

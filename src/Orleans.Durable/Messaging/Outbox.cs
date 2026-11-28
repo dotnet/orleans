@@ -376,6 +376,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     /// </remarks>
     internal async ValueTask<bool> AdvanceAsync(CancellationToken cancellationToken)
     {
+        if (Shared.HoldsRecordedState) return false;
+
         var progress = false;
         if (_outcomes.Count > 0)
         {
@@ -648,6 +650,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     internal async Task StartAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (Shared.HoldsRecordedState) return;
+
         try
         {
             if (!CompactDeadLetters(TimeProvider.GetUtcNow())) return;
