@@ -80,9 +80,7 @@ namespace Orleans.Serialization.Codecs
                 return;
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(string), WireType.LengthPrefixed);
-            var numBytes = Encoding.UTF8.GetByteCount(value);
-            writer.WriteVarUInt32((uint)numBytes);
-            WriteRaw(ref writer, value, numBytes);
+            WriteLengthPrefixed(ref writer, value);
         }
 
         /// <summary>
@@ -93,6 +91,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null values before the string is accessed.")]
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] string value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceFieldExpected(ref writer, fieldIdDelta, value))
@@ -101,9 +100,28 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.LengthPrefixed);
-            var numBytes = Encoding.UTF8.GetByteCount(value);
-            writer.WriteVarUInt32((uint)numBytes);
-            WriteRaw(ref writer, value, numBytes);
+            WriteLengthPrefixed(ref writer, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void WriteLengthPrefixed<TBufferWriter>(ref Writer<TBufferWriter> writer, string value) where TBufferWriter : IBufferWriter<byte>
+        {
+            // At most three UTF-8 bytes per UTF-16 code unit means 42 units always fit a one-byte length prefix.
+            if (value.Length <= 42)
+            {
+                var destination = writer.WritableSpan;
+                if (destination.Length > value.Length * 3)
+                {
+                    var numBytes = Encoding.UTF8.GetBytes(value, destination[1..]);
+                    destination[0] = (byte)(((uint)numBytes << 1) | 1);
+                    writer.AdvanceSpan(numBytes + 1);
+                    return;
+                }
+            }
+
+            var byteCount = Encoding.UTF8.GetByteCount(value);
+            writer.WriteVarUInt32((uint)byteCount);
+            WriteRaw(ref writer, value, byteCount);
         }
 
         /// <summary>
