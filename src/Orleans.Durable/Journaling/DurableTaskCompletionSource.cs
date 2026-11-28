@@ -47,6 +47,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
+    private readonly JournaledStateAccessTarget _accessTarget;
 
     private TaskCompletionSource<T> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DurableTaskCompletionSourceStatus _status;
@@ -68,6 +69,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableTaskCompletionSourceCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _copier = copier;
         _exceptionCopier = exceptionCopier;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -82,10 +84,23 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = codec;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
-    public bool TrySetResult(T value)
+    public bool TrySetResult(T value) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetResult, value, (Self: this, Value: value), static state => state.Self.TrySetResultCore(state.Value))
+        : TrySetResultCore(value);
+
+    public bool TrySetException(Exception exception) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetException, exception.GetType().FullName, (Self: this, Exception: exception), static state => state.Self.TrySetExceptionCore(state.Exception))
+        : TrySetExceptionCore(exception);
+
+    public bool TrySetCanceled() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetCanceled, this, static self => self.TrySetCanceledCore())
+        : TrySetCanceledCore();
+
+    private bool TrySetResultCore(T value)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -98,7 +113,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         return true;
     }
 
-    public bool TrySetException(Exception exception)
+    private bool TrySetExceptionCore(Exception exception)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -111,7 +126,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         return true;
     }
 
-    public bool TrySetCanceled()
+    private bool TrySetCanceledCore()
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -124,7 +139,11 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     public Task<T> Task => _completion.Task;
 
-    public DurableTaskCompletionSourceState<T> State => _status switch
+    public DurableTaskCompletionSourceState<T> State => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.CompletionSourceState, this, static self => self.StateCore)
+        : StateCore;
+
+    private DurableTaskCompletionSourceState<T> StateCore => _status switch
     {
         DurableTaskCompletionSourceStatus.Pending => new DurableTaskCompletionSourceState<T> { Status = DurableTaskCompletionSourceStatus.Pending },
         DurableTaskCompletionSourceStatus.Completed => new DurableTaskCompletionSourceState<T> { Status = DurableTaskCompletionSourceStatus.Completed, Value = _value },
