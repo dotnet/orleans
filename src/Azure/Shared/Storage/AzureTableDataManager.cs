@@ -826,7 +826,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > this.StoragePolicyOptions.OperationTimeout)
             {
-                LogWarningSlowAccess(Logger, operation, TableName, timeSpan);
+                LogWarningSlowAccess(Logger, TableName, operation, timeSpan);
             }
         }
 
