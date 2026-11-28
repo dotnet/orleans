@@ -11,6 +11,8 @@
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.Durable.Jobs.IDurableJobReceiverExtension")] Orleans.Durable.Jobs.IDurableJobReceiverExtension [Version(0)]
+  EA0FF3C5: CompleteDurableJobTurnAsync(Orleans.Durable.Jobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Jobs.DurableJobRunResult>
+  10ECBBEC: ExecuteDurableJobTurnAsync(Orleans.Durable.Jobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Jobs.DurableJobRunResult>
   71047BC9: HandleDurableJobAsync(Orleans.Durable.Jobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Jobs.DurableJobRunResult>
 
 interface [GrainInterfaceType("Orleans.Durable.Jobs.ILocalDurableJobManagerSystemTarget")] Orleans.Durable.Jobs.ILocalDurableJobManagerSystemTarget [Version(0)]

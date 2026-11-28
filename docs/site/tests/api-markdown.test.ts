@@ -67,6 +67,13 @@ describe('native API Markdown companions', () => {
     expect(nugetHref('Microsoft.Orleans.Durable.Http')).toBeUndefined();
   });
 
+  test.each(['', '.AdoNet', '.AzureStorage', '.Cosmos', '.DynamoDB', '.Redis'])(
+    'omits the package link for unpublished Advanced Reminders%s',
+    (suffix) => {
+      expect(nugetHref(`Microsoft.Orleans.AdvancedReminders${suffix}`)).toBeUndefined();
+    },
+  );
+
   test('renders member documentation, parameters, returns, exceptions, and examples', () => {
     const markdown = renderMemberKindMarkdown(pkg, grain, 'method', '/orleans/');
 

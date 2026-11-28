@@ -328,15 +328,14 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                 throw new InvalidOperationException("Cannot unregister a DurableJobs shard owned by another silo.");
             }
 
-            var count = await shard.GetJobCountAsync();
-            if (count == 0)
+            if (!journaledShard.ExecutionRetired && await shard.GetJobCountAsync() == 0)
             {
-                // No jobs left, we can delete the shard.
+                // The mutation barrier completed and the durable job count is known to be zero.
                 await journaledShard.DeleteStateAsync(cancellationToken);
             }
             else
             {
-                // There are still jobs in the shard, release ownership gracefully.
+                // Release for replay if jobs remain or a failed write invalidated the live queue.
                 var updatedMetadata = await UpdateMetadataAsync(
                     descriptor,
                     new Dictionary<string, string>(StringComparer.Ordinal)

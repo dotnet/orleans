@@ -511,6 +511,7 @@ namespace Orleans.Hosting
 
             ApplySubsection(builder, cfg, knownProviderTypes, "Clustering");
             ApplySubsection(builder, cfg, knownProviderTypes, "Reminders");
+            ApplySubsection(builder, cfg, knownProviderTypes, "AdvancedReminders");
             ApplyNamedSubsections(builder, cfg, knownProviderTypes, "Journaling");
             ApplyNamedSubsections(builder, cfg, knownProviderTypes, "BroadcastChannel");
             ApplyNamedSubsections(builder, cfg, knownProviderTypes, "Streaming");

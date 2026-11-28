@@ -26,6 +26,7 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly SingleWaiterAutoResetEvent _pendingOperationSignal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly Task _operationProcessor;
+    private bool _executionRetired;
     private bool _retiring;
     private int _disposed;
 
@@ -115,6 +116,8 @@ internal sealed class JournaledJobShard : IJobShard
     internal JournalId StorageId => JobShardId.Parse(Id).ToJournalId();
 
     internal bool IsRetired => Volatile.Read(ref _retiring) || Volatile.Read(ref _disposed) != 0;
+
+    internal bool ExecutionRetired => Volatile.Read(ref _executionRetired);
 
     /// <inheritdoc/>
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _state.ConsumeDurableJobsAsync();
@@ -409,6 +412,12 @@ internal sealed class JournaledJobShard : IJobShard
                     continue;
                 }
 
+                if (_executionRetired)
+                {
+                    operation.CompleteNotOwned();
+                    continue;
+                }
+
                 startedOperations.Add(operation);
             }
 
@@ -494,6 +503,10 @@ internal sealed class JournaledJobShard : IJobShard
             }
             catch (Exception exception)
             {
+                // A failed journal write fences this state manager. Wake the old reader
+                // and leave persisted jobs for an owner with a fresh manager.
+                Volatile.Write(ref _executionRetired, true);
+                _state.RetireExecution();
                 _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: false, error: true);
                 foreach (var operation in operationsAwaitingWrite)
                 {
@@ -738,6 +751,17 @@ internal sealed class JournaledJobShard : IJobShard
         : PendingMutationOperation<DurableJobMutationResult>(cancellationToken)
     {
         protected override DurableJobMutationResult NotOwnedResult => DurableJobMutationResult.OwnershipLost;
+
+        public override bool TryCompleteWithoutOwnership(JournaledJobShard shard)
+        {
+            if (!shard._executionRetired)
+            {
+                return false;
+            }
+
+            TrySetResult(DurableJobMutationResult.JobNotFound);
+            return true;
+        }
 
         protected override bool Apply(JournaledJobShard shard, out DurableJobMutationResult result)
         {

@@ -12,6 +12,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,5 +23,8 @@
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">
+    <Compile Remove="IAdvancedReminderTestGrain.cs" />
   </ItemGroup>
 </Project>
