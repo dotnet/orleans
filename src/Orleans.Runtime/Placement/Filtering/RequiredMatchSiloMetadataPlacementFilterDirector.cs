@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 
@@ -8,24 +9,35 @@ namespace Orleans.Runtime.Placement.Filtering;
 internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetails localSiloDetails, ISiloMetadataCache siloMetadataCache)
     : IPlacementFilterDirector
 {
-    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+    public Task<IReadOnlyList<SiloAddress>> FilterAsync(
+        PlacementFilterStrategy filterStrategy,
+        PlacementTarget target,
+        IReadOnlyList<SiloAddress> silos,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var metadataKeys = (filterStrategy as RequiredMatchSiloMetadataPlacementFilterStrategy)?.MetadataKeys ?? [];
 
-        // yield return all silos if no silos match any metadata keys
         if (metadataKeys.Length == 0)
         {
-            return silos;
+            return Task.FromResult(silos);
         }
 
         var localMetadata = siloMetadataCache.GetSiloMetadata(localSiloDetails.SiloAddress);
         var localRequiredMetadata = GetMetadata(localMetadata, metadataKeys);
 
-        return silos.Where(silo =>
+        var result = new List<SiloAddress>();
+        foreach (var silo in silos)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var remoteMetadata = siloMetadataCache.GetSiloMetadata(silo);
-            return DoesMetadataMatch(localRequiredMetadata, remoteMetadata, metadataKeys);
-        });
+            if (DoesMetadataMatch(localRequiredMetadata, remoteMetadata, metadataKeys))
+            {
+                result.Add(silo);
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<SiloAddress>>(result);
     }
 
     private static bool DoesMetadataMatch(string?[] localMetadata, SiloMetadata siloMetadata, string[] metadataKeys)

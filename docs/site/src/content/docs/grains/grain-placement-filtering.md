@@ -56,26 +56,40 @@ Prefer the built-in filters when exact metadata matching is sufficient. A custom
 
 The following example requires candidates to advertise a minimum logical core count in the `hardware.cores` silo metadata entry. First, define the attribute and strategy:
 
-:::code language="csharp" source="snippets/placement/CustomPlacementFilter.cs" id="custom_placement_filter_strategy":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacementFilter.cs" id="custom_placement_filter_strategy":::
 
 Filter configuration is stored in the grain manifest rather than serialized with the attribute instance. The public parameterless constructor lets dependency injection create the strategy. <xref:Orleans.Placement.PlacementFilterStrategy.GetAdditionalGrainProperties*> writes configuration to the manifest, and <xref:Orleans.Placement.PlacementFilterStrategy.AdditionalInitialize*> restores and validates it on each silo.
 
 Next, implement the director:
 
-:::code language="csharp" source="snippets/placement/CustomPlacementFilter.cs" id="custom_placement_filter_director":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacementFilter.cs" id="custom_placement_filter_director":::
 
 The director excludes candidates with missing, malformed, or insufficient metadata. If none remain, placement fails instead of silently weakening the requirement. A preference filter should explicitly return an appropriate fallback subset when its preferred result is empty.
 
 Apply the filter to a grain class. A placement strategy still chooses from the candidates which remain:
 
-:::code language="csharp" source="snippets/placement/CustomPlacementFilter.cs" id="apply_custom_placement_filter":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacementFilter.cs" id="apply_custom_placement_filter":::
 
 Finally, register the filter on every silo:
 
-:::code language="csharp" source="snippets/placement/CustomPlacementFilter.cs" id="register_custom_placement_filter":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacementFilter.cs" id="register_custom_placement_filter":::
 
 <xref:Orleans.Placement.PlacementFilterExtensions.AddPlacementFilter*> requires a <xref:Microsoft.Extensions.DependencyInjection.ServiceLifetime> for the strategy. This example uses `Transient` because initialization mutates the strategy with grain-type-specific configuration. Orleans caches the resulting strategy per grain type. The director is always registered as a keyed singleton, regardless of the strategy lifetime, so it must be thread-safe and use singleton-safe dependencies.
 
 Return only candidates from the input sequence, keep filtering fast and deterministic for the supplied data, and monitor placement failures caused by hard requirements. Silo metadata is operator-provided scheduling information, not live utilization data or a security boundary. Use resource-optimized placement for live load signals and enforce authorization independently.
 
 During placement, read application request metadata from <xref:Orleans.Runtime.Placement.PlacementTarget.RequestContextData?displayProperty=nameWithType>; the static <xref:Orleans.Runtime.RequestContext> isn't populated because no activation exists yet.
+
+## Asynchronous evaluation and cancellation
+
+<xref:Orleans.Placement.IPlacementFilterDirector.FilterAsync*> returns a materialized <xref:System.Collections.Generic.IReadOnlyList`1> wrapped in a <xref:System.Threading.Tasks.Task`1>. Orleans awaits each filter in configured order and passes its completed result to the next filter. Local-cache filters can return a completed task, as the example does. Return only input candidates; preserve input ownership by leaving the input collection unchanged, and leave the result unchanged after completion. Returning the input collection itself is valid for a pass-through filter.
+
+Placement directors await <xref:Orleans.Runtime.Placement.IPlacementContext.GetCompatibleSilosAsync*>. The runtime supplies a context bound to the placement operation, so filters receive timeout and silo-shutdown cancellation even when a director omits the candidate-query token. An additional query token is linked to that operation token. Pass the supplied token to asynchronous dependencies and check it during substantial synchronous work. Cancellation can stop the runtime's wait even when a dependency ignores the token, but it cannot undo that dependency's side effects.
+
+Compatibility is captured before filtering. Membership changes during an awaited filter don't refresh that operation's candidate snapshot. <xref:Orleans.Runtime.Placement.IPlacementContext.GetCompatibleSilosWithVersions*> returns raw, unfiltered compatibility data rather than invoking filters. Custom directors using that API must account for this distinction.
+
+Prefer background-refreshed local policy data, as the built-in silo metadata cache does. Remote work adds latency and dependency load to activation placement; concurrent placements and retries can repeat it. Batch candidate checks, bound dependency concurrency, and keep filters read-only and idempotent. Calling a grain whose placement depends on the same filter can create a recursive placement dependency. Existing activations and valid directory/cache hits bypass filtering, so a policy update doesn't retroactively move or revalidate them.
+
+Message placement uses <xref:Orleans.Configuration.SiloMessagingOptions.PlacementTimeout> and <xref:Orleans.Configuration.SiloMessagingOptions.PlacementMaxRetries>. Migration destination selection forwards caller and shutdown cancellation but doesn't use the message-placement retry/timeout pipeline. Filter tracing covers invocation, asynchronous waiting, and candidate snapshotting.
+
+For upgrading custom implementations from the synchronous contracts, see [Migrate placement extensions to async filtering](../migration/async-placement-filters.md).

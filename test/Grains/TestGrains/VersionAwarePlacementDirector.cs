@@ -7,12 +7,12 @@ namespace UnitTests.Grains
     {
         private readonly Random random = new Random();
 
-        public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+        public async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             SiloAddress[] silos;
             if (target.InterfaceVersion == 0)
             {
-                silos = context.GetCompatibleSilos(target);
+                silos = await context.GetCompatibleSilosAsync(target);
             }
             else
             {
@@ -30,7 +30,7 @@ namespace UnitTests.Grains
                 silos = silosByVersion[version];
             }
 
-            return Task.FromResult(silos[random.Next(silos.Length)]);
+            return silos[random.Next(silos.Length)];
         }
     }
 
