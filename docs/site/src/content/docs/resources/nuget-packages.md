@@ -85,6 +85,7 @@ Use reminders for recurring durable callbacks. Grain timers are activation-scope
 | `Microsoft.Orleans.Durable.Abstractions` | Pre-release alpha programming model abstractions and analyzers for durable asynchronous operations. Awaiting first NuGet publication. |
 | `Microsoft.Orleans.Durable.Http` | Pre-release alpha ASP.NET Core integration which serves durable tasks as idempotent HTTP operations. Awaiting first NuGet publication. |
 | `Microsoft.Orleans.Durable.AzureStorage` | Pre-release alpha Azure Blob and Azure Table providers for journaling and durable jobs. Awaiting first NuGet publication. |
+| `Microsoft.Orleans.Durable.Cassandra` | Pre-release alpha Apache Cassandra providers for journaling and durable jobs. Awaiting first NuGet publication. |
 | `Microsoft.Orleans.Durable.Redis` | Pre-release alpha Redis journal storage provider. Awaiting first NuGet publication. |
 | `Microsoft.Orleans.Durable.S3` | Pre-release alpha Amazon S3 Express One Zone journal storage provider. Awaiting first NuGet publication. |
 
