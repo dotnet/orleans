@@ -232,19 +232,50 @@ namespace Orleans.Runtime
 
         private async Task CreateGrainServices()
         {
-            var grainServices = this.Services.GetServices<IGrainService>();
-            foreach (var grainService in grainServices)
+            // Enumeration constructs every service so collision ownership can use the complete type set.
+            // Each service and its eligible aliases are published immediately before that service's Init,
+            // so later services are not callable until their turn, while an earlier service's aliases
+            // already exist when a later Init calls through a parent interface.
+            var services = this.Services.GetServices<IGrainService>().ToList();
+            var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
+            var serviceTypes = new Type[services.Count];
+            for (var i = 0; i < services.Count; i++)
             {
-                await RegisterGrainService(grainService);
+                serviceTypes[i] = services[i].GetType();
+            }
+
+            foreach (var service in services)
+            {
+                var grainService = (GrainService)service;
+                activationDirectory.RecordNewTarget(grainService);
+                this.grainServices.Add(grainService);
+                RegisterGrainServiceAliases(grainService, serviceTypes, activationDirectory);
+                await InitializeGrainService(service);
             }
         }
 
-        private async Task RegisterGrainService(IGrainService service)
+        private static void RegisterGrainServiceAliases(
+            GrainService grainService,
+            Type[] serviceTypes,
+            ActivationDirectory activationDirectory)
+        {
+            // A duplicate registration does not own the directory entry. Only the recorded instance gets aliases.
+            var owner = activationDirectory.FindTarget(grainService.GrainId);
+            if (!ReferenceEquals(owner, grainService))
+            {
+                return;
+            }
+
+            foreach (var aliasInterface in GrainServiceInterfaceMap.GetAliasInterfaces(grainService.GetType(), serviceTypes))
+            {
+                var aliasId = GrainServiceInterfaceMap.CreateAliasGrainId(grainService.GrainId, aliasInterface);
+                activationDirectory.RecordAlias(aliasId, grainService);
+            }
+        }
+
+        private async Task InitializeGrainService(IGrainService service)
         {
             var grainService = (GrainService)service;
-            var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
-            activationDirectory.RecordNewTarget(grainService);
-            grainServices.Add(grainService);
 
             try
             {

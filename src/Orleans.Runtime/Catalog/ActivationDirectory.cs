@@ -12,6 +12,9 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
     private int _activationsCount;
 
     private readonly ConcurrentDictionary<GrainId, IGrainContext> _activations = new();
+
+    // Lookup-only addresses for the same grain-service instance. Not counted, enumerated, or disposed.
+    private readonly ConcurrentDictionary<GrainId, GrainId> _aliases = new();
     private readonly CatalogInstruments _catalogInstruments;
 
     public ActivationDirectory(CatalogInstruments catalogInstruments)
@@ -24,8 +27,41 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
 
     public IGrainContext? FindTarget(GrainId key)
     {
-        _activations.TryGetValue(key, out var result);
-        return result;
+        if (_activations.TryGetValue(key, out var result))
+        {
+            return result;
+        }
+
+        if (_aliases.TryGetValue(key, out var primaryId) && _activations.TryGetValue(primaryId, out result))
+        {
+            return result;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Publishes an additional grain id for an instance that is already recorded under <see cref="IGrainContext.GrainId"/>.
+    /// Does nothing when the id is already a real activation or an alias, so an existing entry is never replaced.
+    /// </summary>
+    public bool RecordAlias(GrainId aliasId, IGrainContext target)
+    {
+        if (aliasId.Equals(target.GrainId))
+        {
+            return false;
+        }
+
+        if (!_activations.TryGetValue(target.GrainId, out var recorded) || !ReferenceEquals(recorded, target))
+        {
+            return false;
+        }
+
+        if (_activations.ContainsKey(aliasId))
+        {
+            return false;
+        }
+
+        return _aliases.TryAdd(aliasId, target.GrainId);
     }
 
     public void RecordNewTarget(IGrainContext target)
@@ -42,12 +78,29 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
     {
         if (_activations.TryRemove(KeyValuePair.Create(target.GrainId, target)))
         {
+            // Only grain-service primaries own aliases. Skip the scan on ordinary grain deactivations.
+            if (target.GrainId.Type.IsGrainService())
+            {
+                RemoveAliases(target.GrainId);
+            }
+
             Interlocked.Decrement(ref _activationsCount);
             GetMetrics(target).OnActivationRemoved();
             return true;
         }
 
         return false;
+    }
+
+    private void RemoveAliases(GrainId primaryId)
+    {
+        foreach (var pair in _aliases)
+        {
+            if (pair.Value.Equals(primaryId))
+            {
+                _aliases.TryRemove(pair);
+            }
+        }
     }
 
     private GrainTypeMetrics GetMetrics(IGrainContext target) => target switch
