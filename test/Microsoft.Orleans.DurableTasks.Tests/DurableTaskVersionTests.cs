@@ -92,6 +92,55 @@ public sealed class DurableTaskVersionTests
     });
 
     [Fact]
+    public Task ExecutionWhoseEarlierRunAccessedStatePastTheCheckFollowsVersionZero() => ActivationScheduler.RunAsync(async () =>
+    {
+        var workflowId = TaskId.CreateRoot("version-past-accesses");
+        await using var harness = new DurableTaskReplayHarness(static grain => Before(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(workflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.Equal(1, activation.Grain.Counter.Value);
+        }
+
+        harness.Workflow = static grain => After(grain);
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+
+        // The earlier run recorded no operation past the check, but it recorded its write of the counter there, so the
+        // execution follows the code before the change, and the replay returns the write's record without repeating it.
+        Assert.Equal(0, (await replay.GetResponseAsync(workflowId, TestCancellation)).GetResult<int>());
+        Assert.Equal(1, replay.Grain.Counter.Value);
+        Assert.Empty(replay.Grain.Stock);
+
+        static async DurableTask<int> Before(ReplayGrain grain)
+        {
+            await DurableTask.Run(static _ => { }).WithId("first");
+            grain.Counter.Value++;
+            await grain.WaitAtGateAsync();
+            return -1;
+        }
+
+        static async DurableTask<int> After(ReplayGrain grain)
+        {
+            await DurableTask.Run(static _ => { }).WithId("first");
+            var version = DurableTask.GetVersion("change", 0, 1);
+            if (version >= 1)
+            {
+                grain.Stock["replacement"] = 1;
+            }
+            else
+            {
+                grain.Counter.Value++;
+            }
+
+            await grain.WaitAtGateAsync();
+            return version;
+        }
+    });
+
+    [Fact]
     public Task ExecutionWhichEarlierCodeDidNotRunPastTheCheckFollowsTheNewestVersion() => ActivationScheduler.RunAsync(async () =>
     {
         var workflowId = TaskId.CreateRoot("version-not-past");
@@ -352,14 +401,14 @@ public sealed class DurableTaskVersionTests
             await CommitAtGateAsync(activation);
         }
 
-        // Code which raised the minimum supported version replays an execution which recorded version 0. The check and the
-        // step which the body starts after catching the cancellation report the attempt's cancellation for the
-        // unsupported version, and the body's state change succeeds.
+        // Code which raised the minimum supported version replays an execution which recorded version 0. The check, the step
+        // which the body starts after catching the cancellation, and the body's state change report the attempt's
+        // cancellation for the unsupported version: a later attempt reruns the body, so the stalled attempt changes nothing.
         harness.Workflow = grain => Handling(grain, failures.Enqueue);
         await using var replay = await harness.ActivateAsync(TestCancellation);
         await stalled.Task.WaitAsync(Timeout, TestCancellation);
 
-        Assert.Equal(2, failures.Count);
+        Assert.Equal(3, failures.Count);
         Assert.All(failures, static failure =>
         {
             var canceled = Assert.IsType<DurableTaskAttemptCanceledException>(failure);
@@ -367,7 +416,8 @@ public sealed class DurableTaskVersionTests
             var unsupported = Assert.IsType<DurableTaskVersionException>(canceled.InnerException);
             Assert.Equal(("change", 0, 1, 1), (unsupported.Name, unsupported.Version, unsupported.MinSupported, unsupported.MaxSupported));
         });
-        Assert.Equal(1, replay.Grain.Counter.Value);
+        Assert.Equal(0, replay.Grain.Counter.Value);
+        Assert.True(replay.Storage.GetAccessLog(workflowId).IsEmpty);
         Assert.True(replay.Storage.TryGetTask(workflowId, out var state));
         Assert.False(state.Result is { IsCompleted: true });
         Assert.DoesNotContain(replay.Storage.Tasks, task => task.Id == workflowId.Child("fallback"));
@@ -398,7 +448,14 @@ public sealed class DurableTaskVersionTests
                     observe(scheduleFailure);
                 }
 
-                grain.Counter.Value++;
+                try
+                {
+                    grain.Counter.Value++;
+                }
+                catch (Exception writeFailure)
+                {
+                    observe(writeFailure);
+                }
             }
 
             return "handled";

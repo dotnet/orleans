@@ -768,7 +768,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 _analysis.CheckSchedulerEscape(operation);
                 switch (operation)
                 {
-                    case IFieldReferenceOperation or IPropertyReferenceOperation when replayed && Symbols.IsGrainState(operation.Type):
+                    case IFieldReferenceOperation or IPropertyReferenceOperation when replayed && Symbols.IsPersistentState(operation.Type):
                         _analysis.Report(DurableTaskDiagnostics.GrainStateInReplayedCode, operation.Syntax.GetLocation(), MemberName(operation));
                         break;
                     case IPropertyReferenceOperation property when replayed && DurableTaskSymbols.IsNonDeterministicMember(property.Property) && !IsLogArgument(operation):
@@ -815,7 +815,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     _analysis.Report(DurableTaskDiagnostics.ReplayedLog, invocation.Syntax.GetLocation());
                 }
 
-                if (Symbols.IsGrainState(invocation.Instance?.Type) && IsMutating(method) && !replayed && ReachesExternal(position, null, null))
+                if (Symbols.IsPersistentState(invocation.Instance?.Type) && IsMutating(method) && !replayed && ReachesExternal(position, null, null))
                 {
                     _analysis.Report(DurableTaskDiagnostics.StateChangeBeforeExternalAwait, invocation.Syntax.GetLocation(), method.Name);
                 }
@@ -997,7 +997,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     IIncrementOrDecrementOperation increment => increment.Target,
                     _ => null,
                 };
-                if (target is IPropertyReferenceOperation { Instance: { } instance } property && Symbols.IsGrainState(instance.Type))
+                if (target is IPropertyReferenceOperation { Instance: { } instance } property && Symbols.IsPersistentState(instance.Type))
                 {
                     changed = MemberName(instance);
                     return true;

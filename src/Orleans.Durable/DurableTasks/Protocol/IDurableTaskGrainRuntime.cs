@@ -243,6 +243,14 @@ internal interface IDurableTaskGrainRuntime
     /// <remarks>The caller owns the returned set.</remarks>
     HashSet<TaskId>? GetRecordedOperations(TaskId executionId) => null;
 
+    /// <summary>
+    /// Creates the log which records the journaled state accesses of <paramref name="attempt"/> and returns the outcomes
+    /// which earlier attempts of its execution recorded.
+    /// </summary>
+    /// <param name="diverge">Stalls the attempt when its accesses diverge from their records, and returns the exception which the access throws.</param>
+    /// <returns>The log, which the Orleans grain host always creates; <see langword="null"/> only from a runtime which hosts no journaled state.</returns>
+    DurableTaskAccessLog? CreateAccessLog(DurableTaskContext attempt, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge);
+
     /// <summary>Notes that the attempt of <paramref name="executionId"/> which replayed its recorded operations runs live.</summary>
     void OnReplayEnded(TaskId executionId)
     {
@@ -283,6 +291,40 @@ internal interface IDurableTaskGrainRuntime
         throw new NotSupportedException("The durable task runtime does not support recorded effects.");
 
     /// <summary>
+    /// Runs <paramref name="body"/> as a transaction over the grain's journaled state whose commit stages a record of its
+    /// result under <paramref name="effectId"/>, and returns once a journal write holds the commit.
+    /// </summary>
+    /// <param name="effectId">The transaction's effect identifier.</param>
+    /// <param name="body">The transaction's code.</param>
+    /// <param name="stagesRecord">
+    /// Runs in the transaction's commit and returns whether the commit stages the transaction's record with its changes; an
+    /// exception which it throws aborts the transaction.
+    /// </param>
+    /// <param name="onAbort">
+    /// Runs once the transaction has aborted cleanly, with the exception which the task throws, outside the transaction.
+    /// </param>
+    /// <param name="cancellationToken">The token passed to <paramref name="body"/>.</param>
+    Task<T> RunTransactionAsync<T>(
+        TaskId effectId,
+        Func<CancellationToken, Task<T>> body,
+        Func<bool> stagesRecord,
+        Action<Exception> onAbort,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("The durable task runtime does not support transactions.");
+
+    /// <summary>Stages a record of an effect's outcome under <paramref name="effectId"/>, without writing.</summary>
+    void RecordEffect(TaskId effectId, DurableTaskResponse response) =>
+        throw new NotSupportedException("The durable task runtime does not support recorded effects.");
+
+    /// <summary>
+    /// Returns the outcome which an effect recorded under <paramref name="effectId"/>, or <see langword="null"/> when none
+    /// is recorded.
+    /// </summary>
+    /// <exception cref="DurableTaskDivergenceException">Another kind of operation is recorded under the identifier.</exception>
+    DurableTaskResponse? TryGetEffectOutcome(TaskId effectId, string requested) =>
+        throw new NotSupportedException("The durable task runtime does not support recorded effects.");
+
+    /// <summary>
     /// Returns the version of <paramref name="name"/> which <paramref name="executionId"/> or its nearest enclosing
     /// execution within the same invoked task recorded, or stages a record of <paramref name="version"/> beneath
     /// <paramref name="executionId"/>, without writing, and returns it.
@@ -293,7 +335,9 @@ internal interface IDurableTaskGrainRuntime
     /// <summary>
     /// Cancels the attempt which <paramref name="context"/> runs for <paramref name="reason"/>,
     /// <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/> or
-    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, keeping its task pending for a later activation to replay.
+    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, keeping its task pending for a later activation to replay;
+    /// or for <see cref="DurableTaskAttemptCancellationReason.TransactionConflict"/>, whose
+    /// <paramref name="exception"/> is the conflict, starting its task again once the transaction ends.
     /// </summary>
     void StallAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason, Exception exception) =>
         throw new NotSupportedException("The durable task runtime does not support stalled executions.");

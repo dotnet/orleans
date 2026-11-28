@@ -60,8 +60,13 @@ internal sealed class DurableTaskReplayHarness(
             var invocations = services.GetRequiredKeyedService<IDurableDictionary<MessageId, PendingInvocation>>("$task-invocations");
             var counter = services.GetRequiredKeyedService<IDurableValue<int>>("counter");
             var log = services.GetRequiredKeyedService<IDurableLog<int>>("log");
+            var stock = services.GetRequiredKeyedService<IDurableDictionary<string, int>>("stock");
+            var list = services.GetRequiredKeyedService<IDurableList<int>>("list");
+            var queue = services.GetRequiredKeyedService<IDurableQueue<int>>("queue");
+            var set = services.GetRequiredKeyedService<IDurableSet<int>>("set");
+            var completion = services.GetRequiredKeyedService<IDurableTaskCompletionSource<int>>("completion");
             var manager = services.GetRequiredService<IJournaledStateManager>();
-            var grain = new ReplayGrain(this, counter, log, manager);
+            var grain = new ReplayGrain(this, counter, log, stock, list, manager) { Queue = queue, Set = set, Completion = completion };
             var grainContext = Substitute.For<IGrainContext>();
             grainContext.GrainId.Returns(GrainId);
             grainContext.GetTarget().Returns(grain);
@@ -72,7 +77,7 @@ internal sealed class DurableTaskReplayHarness(
                 Microsoft.Extensions.Options.Options.Create(Options),
                 Microsoft.Extensions.Options.Options.Create(new DurableMessagingOptions()),
                 _journal.Serializer);
-            var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [new RecordingDurableTaskMessageTransport()]);
+            var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [new RecordingDurableTaskMessageTransport()], manager);
             var probe = new WriteProbe(() => (counter.Value, log.Count, CompletedTasks(storage)));
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
             manager.RegisterStateMachine("write-probe", probe);
@@ -149,6 +154,8 @@ internal sealed class ReplayGrain(
     DurableTaskReplayHarness harness,
     IDurableValue<int> counter,
     IDurableLog<int> log,
+    IDurableDictionary<string, int> stock,
+    IDurableList<int> list,
     IJournaledStateManager manager)
 {
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -163,6 +170,24 @@ internal sealed class ReplayGrain(
     /// <summary>Gets the grain's journaled log, to which workflows publish their progress.</summary>
     public IDurableLog<int> Log { get; } = log;
 
+    /// <summary>Gets the grain's journaled stock levels, by item.</summary>
+    public IDurableDictionary<string, int> Stock { get; } = stock;
+
+    /// <summary>Gets the grain's journaled list.</summary>
+    public IDurableList<int> List { get; } = list;
+
+    /// <summary>Gets the grain's journaled queue.</summary>
+    public required IDurableQueue<int> Queue { get; init; }
+
+    /// <summary>Gets the grain's journaled set.</summary>
+    public required IDurableSet<int> Set { get; init; }
+
+    /// <summary>Gets the grain's journaled completion source.</summary>
+    public required IDurableTaskCompletionSource<int> Completion { get; init; }
+
+    /// <summary>Gets or sets what the workflow observed, for the test to assert.</summary>
+    public string? Observed { get; set; }
+
     /// <summary>Completes once the workflow waits at the gate.</summary>
     public Task AtGate => _atGate.Task;
 
@@ -172,6 +197,16 @@ internal sealed class ReplayGrain(
         _atGate.TrySetResult();
         return _gate.Task.WaitAsync(DurableTask.Current.CancellationToken);
     }
+
+    /// <summary>Waits until the test opens the gate, from code which needn't run in a durable task.</summary>
+    public Task WaitAtPlainGateAsync()
+    {
+        _atGate.TrySetResult();
+        return _gate.Task;
+    }
+
+    /// <summary>Gets the grain's journaled state manager.</summary>
+    public JournaledStateManager Manager => (JournaledStateManager)manager;
 
     public void OpenGate() => _gate.TrySetResult();
 
