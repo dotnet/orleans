@@ -356,13 +356,13 @@ synchronously on the activation which makes them, when the runtime stages them: 
 - Activation shutdown begins when deactivation starts, before the grain's
   `OnDeactivateAsync` runs. It stops new execution and cancels every running
   attempt with the reason `ActivationStopping`: from then on, the attempt's
-  durable operations throw `DurableTaskAttemptCanceledException`, and its `AttemptCancellationToken` and
-  `CancellationToken` are canceled. A parked attempt is discarded and runs no
-  further code; a running segment finishes, and its result is discarded. The
-  next activation replays committed work. Other grain work, such as
-  `OnDeactivateAsync` and the inbox, keeps committing while segments finish,
-  and the journaled state changes which a canceled segment's cleanup makes commit
-  with it. A poll or wait on
+  durable operations and its writes to journaled state throw
+  `DurableTaskAttemptCanceledException`, its reads of journaled state run live
+  and unrecorded, and its `AttemptCancellationToken` and `CancellationToken` are
+  canceled. A parked attempt is discarded and runs no further code; a running
+  segment finishes, and its result is discarded. The next activation replays
+  committed work. Other grain work, such as `OnDeactivateAsync` and the inbox, keeps
+  committing while segments finish. A poll or wait on
   the activation fails with `DurableTaskAttemptCanceledException`, as a call
   which arrives while the runtime stops does, and the task continues in the next
   activation.
@@ -557,8 +557,9 @@ synchronously on the activation which makes them, when the runtime stages them: 
   change which an execution follows as a terminal entry of its tree,
   `{taskId}/$version:{name}`, at the execution's first check of the name, staged like
   an effect's record. An execution records `maxSupported` when it reaches the check
-  first, and `0` when its replay reaches the check while operations which earlier runs
-  recorded remain unreached, because earlier code ran past the check. A step reads an
+  first, and `0` when its replay reaches the check while operations or accesses to
+  journaled state which earlier runs recorded remain unreached, because earlier code ran
+  past the check. A step reads an
   enclosing execution's record within the same invoked task. Version records aren't
   operations which a replay reaches, so a deployment which removes a check leaves the
   replay's progress unchanged. An attempt which finds a version outside the supported
@@ -567,17 +568,55 @@ synchronously on the activation which makes them, when the runtime stages them: 
   durable operations throw `DurableTaskAttemptCanceledException`, whose inner exception is a
   `DurableTaskVersionException`. The attempt's result is discarded, the task stays
   pending, and the grain keeps a one-minute wake-up so that a later activation replays it.
+- A body's accesses to journaled state, such as `IDurableValue<T>` and the durable
+  collections, and its sends through the outbox, are recorded in the execution's
+  access log, in order, with a hash of each access's arguments. A write's record is
+  staged in the same work item as the write, and a read's record with the grain's next
+  journal write.
+  A replay returns each recorded outcome, a read's value, a write's result, or an
+  access's exception, without running the access, and runs live once it has
+  consumed the log. An access of other state or with other arguments at a recorded
+  position, or a recorded outcome which no longer decodes, stalls the attempt for
+  `Diverged`, as an unsupported version does. Values and exceptions are recorded with the Orleans
+  serializer in every journal format, and each journal write journals one entry per
+  execution whose log grew. In the binary journal format, a pure read of state in the
+  activation's journal, such as a
+  dictionary's indexer or `TryGetValue`, a list's indexer, or a value's `Value`, records
+  the journal's position and the read's argument hash instead of its value when the
+  value is large and the journal holds exactly what the read observed: the result is a
+  string of at least 512 characters or an array of at least 512 elements (alone, or as
+  the value which a `Try` read found), the state has no change waiting for a write, the
+  result's type is exact (a sealed or value type, or an array of values which hold no
+  references), and an argument is of a type known to compare by value, such as a
+  primitive, a string, or a tuple of these, and encodes to at most 64 bytes. While an execution holds such records, the journal keeps
+  the history after them, and a recovery replays that history to replace each position
+  with the value which the read observed before the execution replays. A snapshot,
+  whether storage or the application requests it, is deferred up to 16 times and then
+  resolves the positions first. Once the journal resolves an execution's positions, at
+  recovery or before a snapshot, its reads record values for the rest of the activation,
+  and a discarded attempt's unstaged positions hold no history. Every other read
+  records its value, so a replay returns what each read observed when it ran. Live
+  observations, `IDurableTaskCompletionSource<T>.Task`,
+  `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own state
+  and its durable messages run as the host's work, so a body's log holds only the body's
+  accesses. Aborting or deleting the task, or completing its body, closes the access
+  log: the attempt's later code, such as cleanup or work which outlives it, returns its
+  remaining records and then accesses state directly. Stopping the activation, or a
+  stall, discards the attempt, whose later writes throw its cancellation, because a later
+  attempt reruns that code. Storing the execution's result removes its access log. The
+  runtime fails to bind to an activation whose task storage or journaled state manager
+  can't record these accesses.
 - A durable task publishes progress to an `IDurableLog<T>` of its grain. It
-  appends an entry with `DurableTask.RunInline(() => log.Append(item))`, whose entry
-  commits with the effect's record. A step which streams content writes it to a
+  appends an entry with `log.Append(item)`, whose entry commits with its access
+  record. A step which streams content writes it to a
   draft from `BeginDraft()`, which readers passing `includeDrafts: true` receive
   live, and commits the draft in its final synchronous code, so the entries commit
   in the same journal write as the step's result. Either way, a replay returns the
-  recorded sequence number without appending or streaming again.
+  recorded sequence number without appending again.
 - A run of a task's body reports `IsReplaying` from its start while earlier runs
   recorded operations in the task's tree: children, including subscriptions to other
   tasks, detach and signal-send markers, and recorded effects, but not signal values or
-  invoked descendants.
+  invoked descendants, and while it hasn't consumed its access log.
   It stops once the run has reached each of them, or starts an operation which
   no earlier run recorded; reaching an operation again doesn't stop it. It
   serves logging and diagnostics only.

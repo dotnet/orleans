@@ -1,6 +1,8 @@
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Durable.Journaling;
 
@@ -43,10 +45,11 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSetCommandHandler<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSetCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableSetCommandCodec<T> _codec;
     private readonly HashSet<T> _items = [];
+    private readonly JournaledStateAccessTarget _accessTarget;
     private JournalStreamWriter _writer;
 
     public DurableSet(
@@ -57,6 +60,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableSetCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -64,10 +68,40 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
-    public int Count => _items.Count;
+    // A replica, which has no manager, so its reads run directly.
+    private DurableSet(IDurableSetCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableSet<T>));
+    }
+
+    // The collection journals each change as it makes it.
+    bool IReplicableState.IsReproducibleFromJournal => true;
+
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableSet<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        switch (operation)
+        {
+            case JournaledStateOperation.SetCount:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Count, result);
+                break;
+            case JournaledStateOperation.SetContains:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Contains(JournaledStateReplicaEncoding.ReadArgument<T>(serializer, argument)), result);
+                break;
+            default:
+                throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableSet<T>));
+        }
+    }
+    public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.SetCount, this, static self => self._items.Count)
+        : _items.Count;
+
     public bool IsReadOnly => false;
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
@@ -91,14 +125,45 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
 
     public void Clear()
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.SetClear, this, static self => self.ClearCore());
+            return;
+        }
+
+        ClearCore();
+    }
+
+    private void ClearCore()
+    {
         _codec.WriteClear(GetWriter());
         ApplyClear();
     }
 
-    public bool Contains(T item) => _items.Contains(item);
-    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
-    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
-    public bool Add(T item)
+    public bool Contains(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.SetContains, item, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
+        : _items.Contains(item);
+
+    public void CopyTo(T[] array, int arrayIndex)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            ReadSnapshot(context).CopyTo(array, arrayIndex);
+            return;
+        }
+
+        _items.CopyTo(array, arrayIndex);
+    }
+
+    public IEnumerator<T> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? ((IEnumerable<T>)ReadSnapshot(context)).GetEnumerator()
+        : _items.GetEnumerator();
+
+    public bool Add(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.SetAdd, item, (Self: this, Item: item), static state => state.Self.AddCore(state.Item))
+        : AddCore(item);
+
+    private bool AddCore(T item)
     {
         if (_items.Contains(item))
         {
@@ -110,7 +175,11 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
         return true;
     }
 
-    public bool Remove(T item)
+    public bool Remove(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.SetRemove, item, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
+        : RemoveCore(item);
+
+    private bool RemoveCore(T item)
     {
         if (!_items.Contains(item))
         {
@@ -127,7 +196,11 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
         _codec.WriteSnapshot(items, GetWriter());
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    // A context records the items which the code enumerates, so a replay enumerates the same items.
+    private T[] ReadSnapshot(JournaledStateContext context) =>
+        context.Read(_accessTarget, JournaledStateOperation.SetSnapshot, this, static self => self._items.ToArray());
 
     private bool ApplyAdd(T item) => _items.Add(item);
     private bool ApplyRemove(T item) => _items.Remove(item);
@@ -149,21 +222,48 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
 
     public void ExceptWith(IEnumerable<T> other)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.SetExceptWith, (Self: this, Other: other), static state => state.Self.ExceptWithCore(state.Other));
+            return;
+        }
+
+        ExceptWithCore(other);
+    }
+
+    private void ExceptWithCore(IEnumerable<T> other)
+    {
         foreach (var item in other)
         {
-            Remove(item);
+            RemoveCore(item);
         }
     }
 
-    public bool IsProperSubsetOf(IEnumerable<T> other) => _items.IsProperSubsetOf(other);
-    public bool IsProperSupersetOf(IEnumerable<T> other) => _items.IsProperSupersetOf(other);
-    public bool IsSubsetOf(IEnumerable<T> other) => _items.IsSubsetOf(other);
-    public bool IsSupersetOf(IEnumerable<T> other) => _items.IsSupersetOf(other);
-    public bool Overlaps(IEnumerable<T> other) => _items.Overlaps(other);
-    public bool SetEquals(IEnumerable<T> other) => _items.SetEquals(other);
+    public bool IsProperSubsetOf(IEnumerable<T> other) => Compare(JournaledStateOperation.SetIsProperSubsetOf, other, static (items, other) => items.IsProperSubsetOf(other));
+    public bool IsProperSupersetOf(IEnumerable<T> other) => Compare(JournaledStateOperation.SetIsProperSupersetOf, other, static (items, other) => items.IsProperSupersetOf(other));
+    public bool IsSubsetOf(IEnumerable<T> other) => Compare(JournaledStateOperation.SetIsSubsetOf, other, static (items, other) => items.IsSubsetOf(other));
+    public bool IsSupersetOf(IEnumerable<T> other) => Compare(JournaledStateOperation.SetIsSupersetOf, other, static (items, other) => items.IsSupersetOf(other));
+    public bool Overlaps(IEnumerable<T> other) => Compare(JournaledStateOperation.SetOverlaps, other, static (items, other) => items.Overlaps(other));
+    public bool SetEquals(IEnumerable<T> other) => Compare(JournaledStateOperation.SetEquals, other, static (items, other) => items.SetEquals(other));
     void ICollection<T>.Add(T item) => Add(item);
 
+    private bool Compare(JournaledStateOperation operation, IEnumerable<T> other, Func<HashSet<T>, IEnumerable<T>, bool> compare) =>
+        JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+            ? context.Read(_accessTarget, operation, (Items: _items, Other: other, Compare: compare), static state => state.Compare(state.Items, state.Other))
+            : compare(_items, other);
+
     public void IntersectWith(IEnumerable<T> other)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.SetIntersectWith, (Self: this, Other: other), static state => state.Self.IntersectWithCore(state.Other));
+            return;
+        }
+
+        IntersectWithCore(other);
+    }
+
+    private void IntersectWithCore(IEnumerable<T> other)
     {
         var next = new HashSet<T>(_items, _items.Comparer);
         next.IntersectWith(other);
@@ -177,6 +277,17 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
 
     public void SymmetricExceptWith(IEnumerable<T> other)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.SetSymmetricExceptWith, (Self: this, Other: other), static state => state.Self.SymmetricExceptWithCore(state.Other));
+            return;
+        }
+
+        SymmetricExceptWithCore(other);
+    }
+
+    private void SymmetricExceptWithCore(IEnumerable<T> other)
+    {
         var next = new HashSet<T>(_items, _items.Comparer);
         next.SymmetricExceptWith(other);
         if (!_items.SetEquals(next))
@@ -189,9 +300,20 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
 
     public void UnionWith(IEnumerable<T> other)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.SetUnionWith, (Self: this, Other: other), static state => state.Self.UnionWithCore(state.Other));
+            return;
+        }
+
+        UnionWithCore(other);
+    }
+
+    private void UnionWithCore(IEnumerable<T> other)
+    {
         foreach (var item in other)
         {
-            Add(item);
+            AddCore(item);
         }
     }
 }

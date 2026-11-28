@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0204: Return the outputs of a DurableTask.RunInline effect"
 description: Understand ORLEANS0204, which reports a DurableTask.RunInline effect which assigns variables of the enclosing body, and fix it by returning the outputs.
-ms.date: 10/15/2026
+ms.date: 10/16/2026
 ms.topic: reference
 ---
 
@@ -21,9 +21,9 @@ The delegate which `DurableTask.RunInline` receives assigns, increments, or decr
 
 ## Rule description
 
-`DurableTask.RunInline` runs its effect once for the running task and records the effect's result. A replay returns the recorded result without running the effect, so the assignments in the delegate happen only in the run which runs it. In every replay, `number` stays `0` and `reference` stays `Guid.Empty`: the replay passes other arguments to the recorded `print` step and returns another ticket than the first run computed.
+`DurableTask.RunInline` runs its effect once for the running task and records the effect's result. A replay returns the recorded result without running the effect, so the assignments in the delegate happen only in the run which runs it. In every replay, `reference` stays `Guid.Empty` and `issuedAt` stays `DateTimeOffset.MinValue`: the replay passes other arguments to the recorded `print` step and returns another ticket than the first run computed.
 
-The state changes which the effect makes, such as the increment of `_lastNumber`, are correct: they commit with the record, and the replay finds them in the grain's state.
+The body increments `_lastNumber` directly: the grain records the body's accesses to journaled state, so a replay returns the recorded number.
 
 For recorded effects, see [Recorded effects, local steps, and calls to other grains](../grains/durable-tasks.md#recorded-effects-local-steps-and-calls-to-other-grains).
 
@@ -37,7 +37,7 @@ For recorded effects, see [Recorded effects, local steps, and calls to other gra
 
 :::code source="snippets/durable-tasks/Orleans0204.cs" id="orleans0204_fix_record" language="csharp":::
 
-Variables which the delegate declares, and grain state which it changes, need no change.
+Variables which the delegate declares need no change.
 
 ## When to suppress
 

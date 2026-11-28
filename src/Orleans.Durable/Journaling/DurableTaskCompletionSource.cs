@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -42,11 +43,12 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IDurableTaskCompletionSourceCommandHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IDurableTaskCompletionSourceCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
+    private readonly JournaledStateAccessTarget _accessTarget;
 
     private TaskCompletionSource<T> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DurableTaskCompletionSourceStatus _status;
@@ -68,6 +70,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableTaskCompletionSourceCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _copier = copier;
         _exceptionCopier = exceptionCopier;
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -82,10 +85,23 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = codec;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
-    public bool TrySetResult(T value)
+    public bool TrySetResult(T value) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetResult, value, (Self: this, Value: value), static state => state.Self.TrySetResultCore(state.Value))
+        : TrySetResultCore(value);
+
+    public bool TrySetException(Exception exception) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetException, exception.GetType().FullName, (Self: this, Exception: exception), static state => state.Self.TrySetExceptionCore(state.Exception))
+        : TrySetExceptionCore(exception);
+
+    public bool TrySetCanceled() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetCanceled, this, static self => self.TrySetCanceledCore())
+        : TrySetCanceledCore();
+
+    private bool TrySetResultCore(T value)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -98,7 +114,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         return true;
     }
 
-    public bool TrySetException(Exception exception)
+    private bool TrySetExceptionCore(Exception exception)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -111,7 +127,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         return true;
     }
 
-    public bool TrySetCanceled()
+    private bool TrySetCanceledCore()
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -124,7 +140,11 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     public Task<T> Task => _completion.Task;
 
-    public DurableTaskCompletionSourceState<T> State => _status switch
+    public DurableTaskCompletionSourceState<T> State => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.CompletionSourceState, this, static self => self.StateCore)
+        : StateCore;
+
+    private DurableTaskCompletionSourceState<T> StateCore => _status switch
     {
         DurableTaskCompletionSourceStatus.Pending => new DurableTaskCompletionSourceState<T> { Status = DurableTaskCompletionSourceStatus.Pending },
         DurableTaskCompletionSourceStatus.Completed => new DurableTaskCompletionSourceState<T> { Status = DurableTaskCompletionSourceStatus.Completed, Value = _value },
@@ -228,6 +248,39 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
 
+    // A replica, which has no manager, so its reads run directly.
+    private DurableTaskCompletionSource(
+        IDurableTaskCompletionSourceCommandCodec<T> codec,
+        DeepCopier<T> copier,
+        DeepCopier<Exception> exceptionCopier)
+    {
+        _codec = codec;
+        _copier = copier;
+        _exceptionCopier = exceptionCopier;
+        _accessTarget = new(nameof(DurableTaskCompletionSource<T>));
+    }
+
+    // A completion journals its state at the next write. Until a write captures it, or acknowledges it, which completes the
+    // task, the journal doesn't hold it. A fault's journaled exception doesn't reproduce the exception which reads observe
+    // (its type, stack trace and data can differ), so reads of a faulted source record values.
+    bool IReplicableState.IsReproducibleFromJournal => _status switch
+    {
+        DurableTaskCompletionSourceStatus.Pending => true,
+        DurableTaskCompletionSourceStatus.Faulted => false,
+        _ => _isCompletionCaptured || _completion.Task.IsCompleted,
+    };
+
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableTaskCompletionSource<T>(_codec, _copier, _exceptionCopier);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        if (operation is not JournaledStateOperation.CompletionSourceState)
+        {
+            throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableTaskCompletionSource<T>));
+        }
+
+        JournaledStateReplicaEncoding.WriteResult(serializer, StateCore, result);
+    }
 }
 
 /// <summary>

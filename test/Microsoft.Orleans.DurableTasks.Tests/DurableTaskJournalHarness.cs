@@ -22,13 +22,26 @@ internal sealed class DurableTaskJournalHarness : IAsyncDisposable
     public const string Json = "json";
     public const string OrleansBinary = "orleans-binary";
 
-    private readonly JournalId _journalId = JournalId.Create("durable-task-storage-tests", Guid.NewGuid().ToString("N"));
+    private readonly JournalId _journalId;
     private readonly ServiceProvider _services;
 
-    public DurableTaskJournalHarness(string journalFormatKey, TimeProvider? timeProvider = null)
+    /// <param name="journalFormatKey">The journal format which the activations write.</param>
+    /// <param name="timeProvider">The time provider, or the system's.</param>
+    /// <param name="storageProvider">The volatile storage which holds the journal, so harnesses can share one journal.</param>
+    /// <param name="journalId">The journal's id, or a new one.</param>
+    /// <param name="wrapStorage">Wraps the storage which managers use, for example to inject failures.</param>
+    /// <param name="configureServices">Adds services, for example JSON metadata for a test's journaled types.</param>
+    public DurableTaskJournalHarness(
+        string journalFormatKey,
+        TimeProvider? timeProvider = null,
+        VolatileJournalStorageProvider? storageProvider = null,
+        JournalId? journalId = null,
+        Func<IJournalStorageProvider, IJournalStorageProvider>? wrapStorage = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         JournalFormatKey = journalFormatKey;
-        StorageProvider = new VolatileJournalStorageProvider(
+        _journalId = journalId ?? JournalId.Create("durable-task-storage-tests", Guid.NewGuid().ToString("N"));
+        StorageProvider = storageProvider ?? new VolatileJournalStorageProvider(
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }));
         var silo = new HarnessSiloBuilder();
         silo.Services.AddLogging();
@@ -45,9 +58,10 @@ internal sealed class DurableTaskJournalHarness : IAsyncDisposable
         silo.UseJournaledDurableJobs();
         silo.Services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskJournalHarness).Assembly));
         silo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
-        silo.Services.AddSingleton<IJournalStorageProvider>(StorageProvider);
+        silo.Services.AddSingleton<IJournalStorageProvider>(wrapStorage?.Invoke(StorageProvider) ?? StorageProvider);
         silo.Services.AddScoped<IJournaledStateManager>(services =>
             services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(_journalId));
+        configureServices?.Invoke(silo.Services);
         _services = silo.Services.BuildServiceProvider();
     }
 
@@ -94,6 +108,8 @@ internal sealed class DurableTaskJournalHarness : IAsyncDisposable
     public sealed class Activation(AsyncServiceScope scope, DurableTaskGrainStorage storage) : IAsyncDisposable
     {
         public DurableTaskGrainStorage Storage { get; } = storage;
+
+        public IServiceProvider Services => scope.ServiceProvider;
 
         public ValueTask DisposeAsync() => scope.DisposeAsync();
     }
