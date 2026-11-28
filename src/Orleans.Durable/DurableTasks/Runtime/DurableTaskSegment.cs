@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,9 +26,18 @@ internal interface IDurableTaskSegment
 /// grain's other requests. The request releases the attempt's code which waits for <paramref name="gate"/>, such as the
 /// body's start or the continuation of a durable wait, and completes once the attempt parks or ends.
 /// </remarks>
-internal sealed class DurableTaskSegment(GrainDurableTaskContext attempt, TaskCompletionSource gate) : ILocalRequest, IDurableTaskSegment
+internal sealed class DurableTaskSegment(GrainDurableTaskContext? attempt, TaskCompletionSource? gate) : ILocalRequest, IDurableTaskSegment
 {
-    public ValueTask<Response> Invoke() => attempt.RunSegmentAsync(gate);
+    /// <summary>
+    /// Gets a segment which the activation's admission rules evaluate as any segment, and which is never received.
+    /// </summary>
+    public static DurableTaskSegment Probe { get; } = new(null, null);
+
+    public ValueTask<Response> Invoke()
+    {
+        Debug.Assert(attempt is not null && gate is not null, "The activation receives only segments of attempts.");
+        return attempt.RunSegmentAsync(gate);
+    }
 
     // The activation rejects a queued request only once it no longer runs requests, so the attempt has ended with it.
     void ILocalRequest.Complete(Response response)
@@ -64,5 +74,5 @@ internal sealed class DurableTaskSegment(GrainDurableTaskContext attempt, TaskCo
     {
     }
 
-    public override string ToString() => $"Durable task segment '{attempt.Id}'";
+    public override string ToString() => attempt is null ? "Durable task segment" : $"Durable task segment '{attempt.Id}'";
 }

@@ -227,7 +227,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     internal static IScheduledTaskHandle GetHandle(DurableTaskRequestShared shared, IDurableTaskRequest request, TaskId taskId)
     {
         var target = IDurableTaskRequest.GetContext(request).TargetId;
-        return new GrainScheduledTaskHandle(taskId, target, request, GetServer(shared, target), lastResponse: null);
+        return new GrainScheduledTaskHandle(taskId, target, request, shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(target), lastResponse: null);
     }
 
     /// <summary>
@@ -235,11 +235,25 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     /// the target, or the target's grain extension.
     /// </summary>
     private static IDurableTaskServer GetServer(DurableTaskRequestShared shared, GrainId target) =>
-        TryGetRuntime(shared, out var runtime)
-        && runtime is IDurableTaskServer local
-        && shared.GrainContextAccessor.GrainContext.GrainId == target
+        TryGetLocalServer(shared.GrainContextAccessor.GrainContext, target, out var local)
             ? local
             : shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(target);
+
+    /// <summary>
+    /// Gets the runtime of the grain which runs the calling code, <paramref name="context"/>, when that grain is
+    /// <paramref name="target"/> and hosts durable tasks.
+    /// </summary>
+    /// <remarks>
+    /// Code which reaches its own grain's tasks calls the runtime directly, so a wait for them checks the calling code's
+    /// admission, and activation code, which runs before the grain's requests, reaches them.
+    /// </remarks>
+    internal static bool TryGetLocalServer(IGrainContext? context, GrainId target, [NotNullWhen(true)] out IDurableTaskServer? server)
+    {
+        server = context is not null && context.GrainId == target
+            ? context.GetComponent<IDurableTaskGrainRuntime>() as IDurableTaskServer
+            : null;
+        return server is not null;
+    }
 
     /// <inheritdoc/>
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) =>
@@ -448,10 +462,20 @@ internal sealed class GrainScheduledTaskHandle(
     TaskId taskId,
     GrainId target,
     IDurableTaskRequest? request,
-    IDurableTaskServer grain,
+    IDurableTaskServer remote,
     DurableTaskResponse? lastResponse) : IScheduledTaskHandle
 {
     public TaskId TaskId { get; } = taskId;
+
+    /// <summary>
+    /// Gets the server of the task for an operation: the runtime of the grain which runs the calling code, when it's the
+    /// target, or <c>remote</c>, the target's grain extension.
+    /// </summary>
+    /// <remarks>
+    /// Each operation resolves the server, since callers on other activations, schedulers, or clients can share a handle.
+    /// </remarks>
+    private IDurableTaskServer Server =>
+        DurableTaskRequest.TryGetLocalServer(RuntimeContext.Current, target, out var local) ? local : remote;
 
     /// <summary>Returns the task's <see cref="DurableTaskAddress"/>, as <see cref="IDurableTaskReference"/>.</summary>
     public TFeature? GetFeature<TFeature>()
@@ -461,7 +485,7 @@ internal sealed class GrainScheduledTaskHandle(
     /// <remarks>Cancellation is idempotent, so failures to reach the grain are retried as polls are.</remarks>
     public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
         DurableTaskPolling.SendAsync(
-            grain,
+            Server,
             (TaskId, reason),
             static (grain, state) => RequestCancellationAsync(grain, state.TaskId, state.reason),
             cancellationToken);
@@ -476,7 +500,7 @@ internal sealed class GrainScheduledTaskHandle(
     /// <remarks>Abort is idempotent, so failures to reach the grain are retried as polls are.</remarks>
     public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
         DurableTaskPolling.SendAsync(
-            grain,
+            Server,
             (TaskId, reason),
             static (grain, state) => grain.AbortAsync(state.TaskId, state.reason, CancellationToken.None),
             cancellationToken);
@@ -489,12 +513,12 @@ internal sealed class GrainScheduledTaskHandle(
         }
 
         var pollOptions = new SubscribeOrPollOptions { PollTimeout = options.PollTimeout };
-        return DecodeResponse(await DurableTaskPolling.PollAsync(grain, TaskId, pollOptions, cancellationToken));
+        return DecodeResponse(await DurableTaskPolling.PollAsync(Server, TaskId, pollOptions, cancellationToken));
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
     {
-        return await grain.ScheduleAsync(
+        return await Server.ScheduleAsync(
             TaskId,
             request ?? throw new InvalidOperationException("An attached durable task cannot be scheduled."),
             cancellationToken);
@@ -507,11 +531,17 @@ internal sealed class GrainScheduledTaskHandle(
             return response;
         }
 
+        // Each poll is bounded, so the wait checks once, before it polls, what the calling code holds of its own grain's task.
+        if (Server is DurableTaskGrainRuntime local)
+        {
+            await local.EnsureWaitCanEndAsync(TaskId, cancellationToken);
+        }
+
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
-            response = DecodeResponse(await DurableTaskPolling.PollAsync(grain, TaskId, options, cancellationToken));
+            response = DecodeResponse(await DurableTaskPolling.PollAsync(Server, TaskId, options, cancellationToken));
             if (response.IsCompleted)
             {
                 return response;

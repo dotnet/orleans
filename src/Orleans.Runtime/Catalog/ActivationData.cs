@@ -41,6 +41,13 @@ internal sealed partial class ActivationData :
     IDisposable
 {
     internal const string GrainAddressMigrationContextKey = "sys.addr";
+
+    // The request which the current code belongs to, recorded for activations whose type tracks it.
+    private static readonly AsyncLocal<Message?> CurrentRequest = new();
+
+    // The exclusive section which the current code holds or waits for, recorded for activations whose type tracks the
+    // current request; ExclusiveSectionHolder identifies the open section's.
+    private static readonly AsyncLocal<object?> CurrentSection = new();
     private readonly Lock _lock = new();
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
@@ -1339,15 +1346,7 @@ internal sealed partial class ActivationData :
         {
             if (_exclusiveSectionOpen)
             {
-                // Only requests which always interleave and requests on the section holder's call chain start while an
-                // exclusive section is open.
-                if (incoming.IsAlwaysInterleave)
-                {
-                    return true;
-                }
-
-                var reentrancyId = incoming.GetReentrancyId();
-                return reentrancyId != Guid.Empty && reentrancyId == _extras?.ExclusiveSectionReentrancyId;
+                return IsAdmittedByOpenSection(incoming);
             }
 
             if (!IsCurrentlyExecuting)
@@ -1379,32 +1378,15 @@ internal sealed partial class ActivationData :
             foreach (var runningRequest in _runningRequests)
             {
                 var runningMessage = runningRequest.Key;
-                if (runningMessage.IsAlwaysInterleave
-                    || (runningMessage.IsReadOnly && incoming.IsReadOnly))
+                if (MayInterleaveWith(runningMessage, incoming, canInterleave, ref incomingMayInterleave))
                 {
+                    // A predicate which admits the incoming request admits it alongside every running request.
+                    if (incomingMayInterleave == true)
+                    {
+                        return true;
+                    }
+
                     continue;
-                }
-
-                if (canInterleave is not null)
-                {
-                    try
-                    {
-                        incomingMayInterleave ??= canInterleave.MayInterleave(GrainInstance, incoming);
-                        if (incomingMayInterleave.Value)
-                        {
-                            return true;
-                        }
-
-                        if (canInterleave.MayInterleave(GrainInstance, runningMessage))
-                        {
-                            continue;
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
-                        throw;
-                    }
                 }
 
                 _blockingRequest = runningMessage;
@@ -1621,12 +1603,135 @@ internal sealed partial class ActivationData :
 
 
     /// <summary>
+    /// Returns whether <paramref name="incoming"/> may run while <paramref name="running"/> runs, by the activation's
+    /// interleaving rules for a pair of requests.
+    /// </summary>
+    /// <param name="incomingMayInterleave">
+    /// Caches whether the activation's may-interleave predicates admit <paramref name="incoming"/>, across the running
+    /// requests which one admission decision compares it with.
+    /// </param>
+    private bool MayInterleaveWith(Message running, Message incoming, GrainCanInterleave? canInterleave, ref bool? incomingMayInterleave)
+    {
+        if (running.IsAlwaysInterleave
+            || (running.IsReadOnly && incoming.IsReadOnly))
+        {
+            return true;
+        }
+
+        if (canInterleave is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            incomingMayInterleave ??= canInterleave.MayInterleave(GrainInstance, incoming);
+            return incomingMayInterleave.Value || canInterleave.MayInterleave(GrainInstance, running);
+        }
+        catch (Exception exception)
+        {
+            LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Returns whether the open exclusive section admits <paramref name="incoming"/>: only requests which always interleave
+    /// and requests on the section holder's call chain start while an exclusive section is open. The caller holds
+    /// <see cref="_lock"/>, and a section is open.
+    /// </summary>
+    private bool IsAdmittedByOpenSection(Message incoming)
+    {
+        Debug.Assert(_exclusiveSectionOpen);
+        if (incoming.IsAlwaysInterleave)
+        {
+            return true;
+        }
+
+        return IsOnOpenSectionCallChain(incoming);
+    }
+
+    void IGrainRequestAdmission.TrackCurrentRequest() => _shared.TracksCurrentRequest = true;
+
+    // The message loop invokes requests only once the activation is valid, so its scheduler runs only activation code before.
+    bool IGrainRequestAdmission.IsCurrentCodeActivating() =>
+        RuntimeContext.Current == this && State is ActivationState.Creating or ActivationState.Activating;
+
+    bool IGrainRequestAdmission.IsBlockedByCurrentRequest(ILocalRequest request, LocalRequestOptions options, bool holdsSuchRequest)
+    {
+        Debug.Assert(_shared.TracksCurrentRequest, "The activation's type tracks the request which the current code belongs to.");
+        var current = CurrentRequest.Value;
+        var section = CurrentSection.Value;
+        if (current is null && section is null && !holdsSuchRequest)
+        {
+            return false;
+        }
+
+        // The probe goes through the same factory and admission rules as the request which the activation would receive,
+        // and the incoming-only rules of MayInvokeRequest, which a local request doesn't meet, don't apply to it.
+        var incoming = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, options);
+        Debug.Assert(incoming.GetReentrancyId() == Guid.Empty, "A local request starts a new call chain.");
+        if (incoming.IsAlwaysInterleave)
+        {
+            return false;
+        }
+
+        var canInterleave = GetComponent<GrainCanInterleave>();
+        bool? incomingMayInterleave = null;
+
+        // The calling code holds a running request like the probe, such as a durable task's segment, until its wait ends.
+        if (holdsSuchRequest && !MayInterleaveWith(incoming, incoming, canInterleave, ref incomingMayInterleave))
+        {
+            return true;
+        }
+
+        lock (_lock)
+        {
+            // An exclusive section which the calling code holds stays open until that code closes it, and so does one whose
+            // holder's call chain the calling code's running request belongs to, since the holder waits for that request.
+            // A section which another flow holds closes when that flow does, so the wait for it can end.
+            if (_exclusiveSectionOpen
+                && !IsAdmittedByOpenSection(incoming)
+                && ((section is not null && ReferenceEquals(section, _extras?.ExclusiveSectionHolder))
+                    || (current is not null && _runningRequests.ContainsKey(current) && IsOnOpenSectionCallChain(current))))
+            {
+                return true;
+            }
+
+            if (current is null || !_runningRequests.ContainsKey(current))
+            {
+                return false;
+            }
+        }
+
+        return !MayInterleaveWith(current, incoming, canInterleave, ref incomingMayInterleave);
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="message"/> belongs to the open exclusive section holder's call chain. The caller holds
+    /// <see cref="_lock"/>, and a section is open.
+    /// </summary>
+    private bool IsOnOpenSectionCallChain(Message message)
+    {
+        Debug.Assert(_exclusiveSectionOpen);
+        var reentrancyId = message.GetReentrancyId();
+        return reentrancyId != Guid.Empty && reentrancyId == _extras?.ExclusiveSectionReentrancyId;
+    }
+
+    /// <summary>
     /// Handle an incoming message and queue/invoke appropriate handler
     /// </summary>
     /// <param name="message"></param>
     private void InvokeIncomingRequest(Message message)
     {
         _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+
+        // The request's code captures the value as it first awaits, and the message loop's own flow is restored after.
+        var tracksCurrentRequest = _shared.TracksCurrentRequest;
+        if (tracksCurrentRequest)
+        {
+            CurrentRequest.Value = message;
+        }
 
         try
         {
@@ -1645,6 +1750,13 @@ internal sealed partial class ActivationData :
         catch
         {
             OnCompletedRequest(message);
+        }
+        finally
+        {
+            if (tracksCurrentRequest)
+            {
+                CurrentRequest.Value = null;
+            }
         }
 
         static async Task OnCompleteAsync(ActivationData activation, Message message, Task task)
@@ -1702,11 +1814,13 @@ internal sealed partial class ActivationData :
         _workSignal.Signal();
     }
 
-    // The holder's call chain is read here, synchronously in the caller's flow.
+    // The holder's call chain is read here, synchronously in the caller's flow, which also records the section it holds or waits
+    // for, so IsBlockedByCurrentRequest can tell the calling code's own section from another flow's.
     ValueTask<IDisposable> IGrainRequestAdmission.EnterExclusiveSectionAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var reentrancyId = RequestContext.ReentrancyId;
+        var tracksHolder = _shared.TracksCurrentRequest;
         ExclusiveSectionWaiter waiter;
         lock (_lock)
         {
@@ -1720,7 +1834,14 @@ internal sealed partial class ActivationData :
                     (_extras ??= new()).ExclusiveSectionReentrancyId = reentrancyId;
                 }
 
-                return new(new ExclusiveSection(this));
+                var section = new ExclusiveSection(this);
+                if (tracksHolder)
+                {
+                    (_extras ??= new()).ExclusiveSectionHolder = section;
+                    CurrentSection.Value = section;
+                }
+
+                return new(section);
             }
 
             var waiters = (_extras ??= new()).ExclusiveSectionWaiters ??= new();
@@ -1731,6 +1852,11 @@ internal sealed partial class ActivationData :
 
             waiter = new(reentrancyId);
             waiters.Enqueue(waiter);
+        }
+
+        if (tracksHolder)
+        {
+            CurrentSection.Value = waiter;
         }
 
         return WaitAsync(this, waiter, cancellationToken);
@@ -1758,6 +1884,9 @@ internal sealed partial class ActivationData :
             if (_extras is { } extras)
             {
                 extras.ExclusiveSectionReentrancyId = next?.ReentrancyId ?? Guid.Empty;
+
+                // A waiting section is its own holder record, which its requester's flow holds in CurrentSection.
+                extras.ExclusiveSectionHolder = _shared.TracksCurrentRequest ? next : null;
             }
 
             _exclusiveSectionOpen = next is not null;
@@ -2846,6 +2975,13 @@ internal sealed partial class ActivationData :
             get => TryGetValue(nameof(ExclusiveSectionReentrancyId), out var id) ? (Guid)id : Guid.Empty;
             set => SetOrRemoveValue(nameof(ExclusiveSectionReentrancyId), value == Guid.Empty ? null : value);
         }
+
+        /// <summary>
+        /// The open exclusive section's holder, which code that requested the section records in
+        /// <see cref="CurrentSection"/>. It's recorded only for activations whose type tracks the request which the current
+        /// code belongs to.
+        /// </summary>
+        public object? ExclusiveSectionHolder { get => GetValueOrDefault<object>(nameof(ExclusiveSectionHolder)); set => SetOrRemoveValue(nameof(ExclusiveSectionHolder), value); }
 
         private DeactivationInfo? GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
         private DeactivationInfo EnsureDeactivationInfo()
